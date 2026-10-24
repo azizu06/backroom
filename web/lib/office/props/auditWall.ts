@@ -14,6 +14,8 @@ export interface AuditWallRow {
   summary: string;
 }
 export interface AuditWallView {
+  /** Set when the snapshot is not the live audit log; the wall then paints this instead of rows. */
+  notice?: string;
   rows: readonly AuditWallRow[];
   total: number;
   connection: OfficeSnapshot['connection'];
@@ -26,12 +28,24 @@ export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
   return `${id.slice(0, head)}…${id.slice(id.length - tail)}`;
 }
 
-/** Newest first, from the same snapshot rows the lobby audit panel list reads. */
+const NOTICES: Record<Exclude<OfficeSnapshot['connection'], 'live'>, string> = {
+  preview: 'Preview · simulated state, not the audit log',
+  replay: 'Replay · not the live audit log',
+  connecting: 'Connecting to the audit log…',
+  disconnected: 'Audit log disconnected',
+};
+
+/**
+ * Newest first. Only the live feed paints rows (its ids are the /api/audit/entries ids); preview, replay and
+ * offline snapshots are not that log, so they get a notice instead of rows that look like receipts.
+ */
 export function auditWallView(snapshot: OfficeSnapshot, max = AUDIT_WALL_MAX_ROWS): AuditWallView {
+  const live = snapshot.connection === 'live';
   return {
-    total: snapshot.audit.length,
+    ...(live ? {} : { notice: NOTICES[snapshot.connection] }),
+    total: live ? snapshot.audit.length : 0,
     connection: snapshot.connection,
-    rows: snapshot.audit.slice(-max).reverse().map(row => ({
+    rows: !live ? [] : snapshot.audit.slice(-max).reverse().map(row => ({
       receipt: shortReceipt(row.id), decision: row.decision, summary: truncateSummary(row.summary, AUDIT_WALL_SUMMARY_MAX),
     })),
   };
@@ -39,6 +53,7 @@ export function auditWallView(snapshot: OfficeSnapshot, max = AUDIT_WALL_MAX_ROW
 
 /** Plain-text mirror of the canvas, for assistive tech and tests. */
 export function auditWallText(view: AuditWallView): string {
+  if (view.notice) return view.notice;
   return view.rows.map(row => `${row.receipt} ${row.decision} ${row.summary}`).join('\n');
 }
 
