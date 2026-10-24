@@ -18,7 +18,8 @@ async function unrecognized(store: GatewayStore, tool: string, raw: unknown) {
       if (existing.fingerprint !== fingerprint) throw new GatewayError(409, "WEBHOOK_ID_REUSED");
       return { kind: "ESCALATE", can_confirm: false, duplicate: true, speak: "This delivery was already processed." };
     }
-    if (call.status === "active") call.status = "human_requested";
+    // Any earlier classification (dispute, already paid) now needs a human; only an opt-out stays sticky.
+    if (call.status !== "opted_out") call.status = "human_requested";
     call.outbox.push({ type: "request_human" });
     call.audits.push({ actor: "code", id: randomUUID(), action: "unrecognized_request", kind: "ESCALATE",
       ruleIds: ["UNRECOGNIZED_REQUEST"], policyVersion: call.policyVersion, webhookRequestId });

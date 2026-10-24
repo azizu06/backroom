@@ -594,6 +594,14 @@ describe("Cartesia tool gateway", () => {
         duration_days: 0, waive_fee: false, discount_pct: 0 })).json()).toMatchObject({ kind: "DENY", can_confirm: false });
     });
 
+    it.each(["report_already_paid", "mark_dispute"])("an unrecognized tool after %s still ends as a human hold", async (first) => {
+      const store = new MemoryGatewayStore([judgeCall()], new MemoryStateStore());
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      await post(gateway, first, { call_id: "call-1", webhook_request_id: "first" });
+      await post(gateway, "invented_tool", { call_id: "call-1", webhook_request_id: "second" });
+      expect((await store.transact("call-1", call => call)).status).toBe("human_requested");
+    });
+
     it("an unrecognized tool never un-stops an opted-out call", async () => {
       const store = new MemoryGatewayStore([{ ...judgeCall(), status: "opted_out" }], new MemoryStateStore());
       const gateway = createGateway({ secret: () => "test-secret", store });
