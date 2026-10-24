@@ -1,9 +1,8 @@
 'use client';
 
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { needsHandoffHuman } from '../../lib/office/handoffs';
 import { useHandoffPresentation } from './handoffs/HandoffPresentation';
-
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
@@ -17,6 +16,9 @@ import {
   frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
+import { interactionStore } from '../../lib/office/interactions';
+import { bakedArtRequested } from '../../lib/office/baked-art';
+import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 
 function playEye([x, z]: readonly [number, number]): IntroPose {
@@ -51,7 +53,14 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
   const reduced = useRef(window.matchMedia(REDUCED_MOTION_QUERY).matches);
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
-  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
+  // Refresh movement barriers immediately when a viewer opens or closes a cosmetic door.
+  const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
+  // Bundled footprints; appended only for ?art=baked so the default collision set is unchanged.
+  const baked = useMemo(() => bakedArtRequested(location.search), []);
+  const colliders = useMemo(
+    () => officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX]), local.doors),
+    [roomsKey, baked, local.doors],
+  );
   const [spawn] = useState(() => playSpawn(location.search, colliders));
   const [eye] = useState(() => playEye(spawn));
   const position = useRef<[number, number]>(spawn);
