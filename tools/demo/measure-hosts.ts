@@ -57,7 +57,7 @@ try {
     results.push({ name: target.name, origin: target.origin, decisionOrigin: target.decisionOrigin, decision: summary(decisions), pageLoad: summary(pages), stateConnected: summary(connected) });
   }
 } finally { await browser.close(); }
-const receipt = { at: new Date().toISOString(), scope: 'Mac client; production hosts; fresh Chromium contexts; page over direct host; decision over public tunnel; synthetic duplicate preset; code decision only, no model/bank/dial; server warmed', results };
+const receipt = { at: new Date().toISOString(), backends: { mac: process.env.MAC_STATE_BACKEND || 'operator-declared separately', gx10: process.env.GX10_STATE_BACKEND || 'operator-declared separately' }, scope: 'Mac client; production hosts; fresh Chromium contexts; page over direct host; decision over public tunnel; synthetic duplicate preset; code decision only, no model/bank/dial; server warmed', results };
 mkdirSync(`${root}docs/evidence/gx10-host`, { recursive: true });
 writeFileSync(`${root}docs/evidence/gx10-host/latency.json`, JSON.stringify(receipt, null, 2) + '\n');
 console.log(JSON.stringify(receipt, null, 2));

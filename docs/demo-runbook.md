@@ -399,16 +399,18 @@ copy sponsor env privately as in AGENTS.md, build once with `pnpm -r build`, the
 keep a separate warm standby running:
 
 ```sh
-DEMO_PREBUILT=1 DEMO_PORT=3350 DEMO_STATE_PORT=3351 VOICE_PORT=3352 pnpm demo:up
+DEMO_LIVE=1 DEMO_VOICE=1 DEMO_VOICE_SETUP=0 DEMO_PREBUILT=1 \
+DEMO_PORT=3350 DEMO_STATE_PORT=3351 VOICE_PORT=3352 pnpm demo:up
 ```
 
-This standby uses a separate local database, mock bank, LLM OFF, and its own
-quick tunnel. Save both hosts' printed public URLs and enroll Dana's passkey on
-each origin in advance. The standby's preview is deliberately labeled; a switch
-must disclose the mock-bank/OFF mode. For live sandbox parity, explicitly prepare
-`DEMO_LIVE=1` on that standby too and check its actual receipts before the take;
-that may start its one capped Apify request. Never let two receiver writers use
-the same `.env.voice` directory.
+Copy the already-provisioned voice resource IDs/secrets as described below before
+starting this receiver. These flags use a separate local database, live sandbox
+adapters, LLM ON and an existing-agent receiver; callbacks stay on GX10 until the
+explicit setup command below. Save both hosts' public URLs and enroll Dana's
+passkey on each origin in advance. Startup can make one capped Apify attempt.
+For a labeled offline standby instead, select `DEMO_LIVE=0 DEMO_VOICE=0`; this
+uses mock bank + LLM OFF. Never let two receiver writers use the same `.env.voice`
+directory.
 
 1. If GX10 degrades, open the already-warm Mac `/office` and the saved Mac public
    approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
@@ -441,7 +443,9 @@ STATE_STORE=memory node --env-file=.env.local --env-file=.demo/private.env \
   orchestrator/src/voice/live.ts setup
 ```
 
-That updates existing IDs, never dials and must finish before the receiver is
+Measured existing-resource callback update: 6.3 seconds to Mac, 11.6 seconds to
+restore GX10 (see the receipt). That updates existing IDs, never dials and must
+finish before the receiver is
 called active. Copy the current `.demo/voice.env` into the Node command only as
 shown; it contains the warm Mac's public origin. Return traffic to GX10 by
 running the same setup under the GX10 private env/current voice.env. Do not

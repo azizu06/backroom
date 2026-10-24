@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-24T14:14:30.195Z",
+  "backends": {
+    "mac": "local",
+    "gx10": "maincloud"
+  },
+  "scope": "Mac client; production hosts; fresh Chromium contexts; page over direct host; decision over public tunnel; synthetic duplicate preset; code decision only, no model/bank/dial; server warmed",
+  "results": [
+    {
+      "name": "mac",
+      "origin": "http://127.0.0.1:3350",
+      "decisionOrigin": "https://marble-excitement-owner-pasta.trycloudflare.com",
+      "decision": {
+        "samplesMs": [
+          85,
+          73,
+          65,
+          116,
+          71,
+          128,
+          68,
+          51,
+          180,
+          68
+        ],
+        "medianMs": 73,
+        "p95Ms": 180
+      },
+      "pageLoad": {
+        "samplesMs": [
+          69,
+          51,
+          52,
+          52,
+          53
+        ],
+        "medianMs": 52,
+        "p95Ms": 69
+      },
+      "stateConnected": {
+        "samplesMs": [
+          122,
+          99,
+          100,
+          104,
+          106
+        ],
+        "medianMs": 104,
+        "p95Ms": 122
+      }
+    },
+    {
+      "name": "gx10",
+      "origin": "http://100.117.44.20:3340",
+      "decisionOrigin": "https://professional-dentists-joe-microphone.trycloudflare.com",
+      "decision": {
+        "samplesMs": [
+          310,
+          303,
+          347,
+          332,
+          277,
+          267,
+          342,
+          363,
+          339,
+          288
+        ],
+        "medianMs": 332,
+        "p95Ms": 363
+      },
+      "pageLoad": {
+        "samplesMs": [
+          133,
+          219,
+          255,
+          247,
+          368
+        ],
+        "medianMs": 247,
+        "p95Ms": 368
+      },
+      "stateConnected": {
+        "samplesMs": [
+          1622,
+          1986,
+          1524,
+          1632,
+          1625
+        ],
+        "medianMs": 1625,
+        "p95Ms": 1986
+      }
+    }
+  ]
+}

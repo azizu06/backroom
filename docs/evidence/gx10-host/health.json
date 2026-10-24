@@ -1,0 +1,45 @@
+{
+  "at": "2026-10-24T14:15:31.238Z",
+  "results": [
+    {
+      "name": "gx10",
+      "office": "state connected",
+      "publicOffice": "Maincloud state connected",
+      "pages": [
+        "controller",
+        "approve",
+        "pay",
+        "inbox",
+        "real-vs-sim"
+      ],
+      "relay": "healthy",
+      "unsignedVoiceCallbacks": 401,
+      "privateControl": 401,
+      "pageErrors": 0,
+      "websocketOrigins": [
+        "wss://maincloud.spacetimedb.com"
+      ]
+    },
+    {
+      "name": "mac",
+      "office": "state connected",
+      "publicOffice": "not tested (local DB)",
+      "pages": [
+        "controller",
+        "approve",
+        "pay",
+        "inbox",
+        "real-vs-sim"
+      ],
+      "relay": "healthy",
+      "unsignedVoiceCallbacks": 401,
+      "privateControl": 401,
+      "pageErrors": 0,
+      "websocketOrigins": [
+        "ws://127.0.0.1:3351"
+      ]
+    }
+  ],
+  "warmUrlSwitchMs": 334,
+  "scope": "Warm URL/origin switch only; no passkey registration, voice callback reassignment, dial, payment, or in-flight state migration"
+}
