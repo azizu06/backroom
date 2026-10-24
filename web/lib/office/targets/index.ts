@@ -5,6 +5,7 @@
 import { agentTarget } from "./agent";
 import { coworkerTarget } from "./coworker";
 import { deskTarget } from "./desk";
+import { handoffTarget } from "./handoff";
 import { inboxTarget } from "./inbox";
 import { paylinkTarget } from "./paylink";
 import { phoneTarget } from "./phone";
@@ -14,6 +15,7 @@ import type { PlayTargetModule } from "./types";
 
 export const PLAY_TARGETS = [
   agentTarget,
+  handoffTarget,
   deskTarget,
   treasuryTarget,
   paylinkTarget,
