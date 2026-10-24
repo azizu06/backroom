@@ -77,6 +77,11 @@ removing `.demo/owner.lock` and `.demo/process.json`. `demo:down` never trusts a
 persisted PID or uses `pkill`; unreachable control is an error, not permission to
 kill another session.
 
+For the opt-in GX10-only inference + Nessie sandbox rehearsal over the owned
+SpacetimeDB server, run `pnpm demo:live --confirm-sandbox` after startup. It uses
+scripted call turns and a software test passkey, never dials, and writes full
+audit receipts. See [live receipt scope and reproduction](evidence/live-run/README.md).
+
 ## Phone / operator setup
 
 - Demo operator: big screen; use the printed **local** `/office` URL on the laptop

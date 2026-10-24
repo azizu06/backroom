@@ -32,6 +32,8 @@ export interface WhyAnswer {
 }
 
 export interface WhyOptions {
+  /** Trusted server injection for phone-free/local-only rehearsals. */
+  modelRoute?: typeof route;
   stateStore?: StateStore;
   apiKey?: string;
   baseUrl?: string;
@@ -147,20 +149,20 @@ export async function askWhy(question: string, entries: readonly WhyAuditEntry[]
   const generation = state.llmSignal;
   if (!state.llmEnabled || generation.aborted) return fallback(relevant);
   const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
-  if (!relevant.length || !apiKey) return fallback(relevant);
+  if (!relevant.length || (!apiKey && !options.modelRoute)) return fallback(relevant);
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const runRoute = Object.keys(options).length ? createRouter({
+      const runRoute = options.modelRoute ?? (Object.keys(options).length ? createRouter({
         stateStore: state, cloudApiKey: apiKey, cloudBaseUrl: options.baseUrl,
         cloudModel: options.model, fetch: options.fetch, timeoutMs: 15_000,
-      }).route : route;
+      }).route : route);
       const response = await runRoute('ask_why', {
         question, entries: relevant,
-        ...(attempt ? { correction: 'Previous output failed citation validation. Return valid JSON with supplied entry ids and inline citations.' } : {}),
+        ...(attempt ? { correction: 'Previous output failed citation validation. The answer string MUST include inline citations in exactly [entry:ID] syntax, using supplied entry ids. The citations array MUST contain those same ids. A citations array alone is invalid.' } : {}),
       }, {
         parse: (value: unknown) => value,
         jsonSchema: { type: 'object', description: systemPrompt, required: ['answer', 'citations'], additionalProperties: false,
-          properties: { answer: { type: 'string' }, citations: { type: 'array', items: { type: 'string', enum: relevant.map(entry => entry.id) } } } },
+          properties: { answer: { type: 'string', description: 'Include [entry:ID] inline after every factual claim, with ID from supplied entries. A citations array alone is invalid.', pattern: '\\[entry:' }, citations: { type: 'array', minItems: 1, items: { type: 'string', enum: relevant.map(entry => entry.id) } } } },
       });
       if (isLlmOff(response) || generation.aborted || !state.llmEnabled) return fallback(relevant);
       const result = validate(JSON.stringify(response.output), relevant);
