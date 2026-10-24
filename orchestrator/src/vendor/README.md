@@ -15,8 +15,10 @@ fields, tool arguments, or other untrusted input. The probe uses an ephemeral
 synthetic cedar → P13 mapping without changing the seed or eval answer key.
 
 `createCrsBankChangeRisk(client, identityForVendor)` consumes only exported
-`getFraudRisk`. Audits show `CRS sandbox: test identity #N`, score, timestamp and
-SHA-256. Raw provider responses, identity bodies and tokens stay in the client.
+`getFraudRisk`. Audits show `CRS sandbox: test identity #N`, or
+`CRS sandbox: test identity #N (cached at HH:MM UTC)` when the client served its
+outage fallback. Score, timestamp and SHA-256 are included either way. Raw
+provider responses, identity bodies and tokens stay in the client.
 The policy package owns `CRS_FRAUD_RISK_THRESHOLD` (70), `FRAUD_RISK_HOLD` and its
 NF-028 policy quote. P13 score 88 holds; a lower score never removes the ordinary
 bank-change/passkey hold. A fraud-held vendor proposal remains unverified, so even

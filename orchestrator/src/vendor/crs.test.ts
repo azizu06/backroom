@@ -27,6 +27,24 @@ it('default fake makes no network call and labels its synthetic result', async (
   expect(await createBankChangeRiskCheck({ env: {}, fetch: http }).check('any-vendor')).toMatchObject({ label: 'FAKE: synthetic fraud risk (not checked)' });
   expect(http).not.toHaveBeenCalled();
 });
+it('keeps a cached fraud label and still holds the ordinary bank-change gate', async () => {
+  const { createCrsBankChangeRisk, assessBankChangeRisk } = await import('./crs');
+  const check = createCrsBankChangeRisk({ getFraudRisk: async () => ({ source: 'crs_sandbox', product: 'fraudRisk', testIdentityId: 13,
+    label: 'SANDBOX: test identity #13 (cached at 18:05 UTC)', cached: true, checkedAt: '2026-10-24T18:05:00.000Z',
+    responseHash: 'ab'.repeat(32), summary: { fraudRiskScore: 12 } }) }, () => 13);
+  const result = await check.check('cedar');
+  expect(result.label).toBe('CRS sandbox: test identity #13 (cached at 18:05 UTC)');
+  const assessed = await assessBankChangeRisk(check, 'cedar', 'cedarfreight.example');
+  expect(assessed.decision).toBeUndefined();
+  expect(assessed.inputs.label).toBe(result.label);
+});
+it('rejects a cached flag that dropped its clock', async () => {
+  const { createCrsBankChangeRisk } = await import('./crs');
+  const check = createCrsBankChangeRisk({ getFraudRisk: async () => ({ source: 'crs_sandbox', product: 'fraudRisk', testIdentityId: 13,
+    label: 'SANDBOX: test identity #13', cached: true, checkedAt: '2026-10-24T18:05:00.000Z',
+    responseHash: 'ab'.repeat(32), summary: { fraudRiskScore: 12 } }) }, () => 13);
+  await expect(check.check('cedar')).rejects.toThrow('Invalid CRS evidence');
+});
 it('rejects fixture evidence instead of surfacing it as live CRS sandbox proof', async () => {
   const { createCrsBankChangeRisk } = await import('./crs');
   const check = createCrsBankChangeRisk({ getFraudRisk: async () => ({ source: 'crs_sandbox', product: 'fraudRisk', testIdentityId: 13,

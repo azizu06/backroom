@@ -132,7 +132,8 @@ async function supervise() {
     const stateMode = env.STATE_STORE; env.STATE_STORE = 'memory';
     if (env.DEMO_PREBUILT !== '1') await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
     env.STATE_STORE = stateMode;
-    publicUrl = base;
+    // WebAuthn allows a non-HTTPS origin only for hostname localhost. The listen socket stays on the bind address.
+    publicUrl = env.DEMO_TUNNEL === '0' ? `http://localhost:${port}` : base;
     if (env.DEMO_TUNNEL !== '0') {
       const log = join(dir, 'tunnel.log'); writeFileSync(log, '', { mode: 0o600 });
       children.start('cloudflared', ['tunnel', '--url', base, '--no-autoupdate'], log);
