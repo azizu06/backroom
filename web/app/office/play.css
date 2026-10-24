@@ -10,6 +10,10 @@
 .play-crosshair::after { top: 9px; left: 0; height: 2px; width: 20px; }
 .play-prompt { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); margin: 0; padding: 5px 12px; background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--office-navy); }
 .play-prompt:empty { padding: 0; border: 0; }
+.play-prompt { opacity: 0; transition: opacity 140ms ease; }
+.play-prompt[data-visible='true'] { opacity: 1; }
+.play-prompt kbd { display: inline-block; padding: 0 4px; border: 1px solid var(--office-lavender); border-radius: 3px; font: inherit; }
+@media (prefers-reduced-motion: reduce) { .play-prompt { transition: none; } }
 .office-shell .play-exit { position: absolute; top: 12px; right: 18px; padding: 6px 12px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-peach); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-weight: 600; }
 .play-joystick { position: absolute; left: 20px; bottom: 44px; width: 112px; height: 112px; border-radius: 50%; background: var(--office-cream); border: 1px solid var(--office-lavender); touch-action: none; display: grid; place-items: center; }
 .play-joystick span { width: 44px; height: 44px; border-radius: 50%; background: var(--office-navy); pointer-events: none; }

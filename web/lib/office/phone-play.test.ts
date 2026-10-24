@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyLook, applyTurnTap, insideAny, interactCandidates, movePlayer, officeColliders, pickTarget, PLAYER_RADIUS, PlayInput, SPAWN, targetLabel, TURN_SPEED } from './play';
 import { createMockOfficeState } from './preview';
-import { OFFICE_ANCHORS } from './state';
+import { OFFICE_ANCHORS, visibleRooms } from './state';
 import { PHONE_INTERACTION } from './props/phone';
 
 describe('desk phone Play targeting', () => {
@@ -32,10 +32,11 @@ describe('desk phone Play targeting', () => {
     const snapshot = createMockOfficeState().source.getSnapshot();
     // PlayRig candidates use the motion positions. Preview motions begin at these snapshot positions.
     const playRigAgents = snapshot.agents.map(agent => ({ id: agent.id, position: agent.pos }));
-    const candidates = interactCandidates(playRigAgents, ['collections']);
+    const rooms = visibleRooms(snapshot);
+    const candidates = interactCandidates(playRigAgents, rooms);
     // Match office-phone.spec.ts: walk into the desk, then strafe toward the handset.
     // The aisle pedestal stops that strafe on the phone instead of letting it slide to the partition.
-    const colliders = officeColliders(['lobby', 'collections', 'payables', 'vendor_onboarding', 'dana', 'treasury']);
+    const colliders = officeColliders(rooms);
     let eye: readonly [number, number] = SPAWN.position;
     for (let i = 0; i < 400 && eye[1] > -2.5; i++) {
       const next = movePlayer(eye, [0, -0.03], colliders);
@@ -68,7 +69,11 @@ describe('desk phone Play targeting', () => {
     expect(through[1]).toBeGreaterThan(-0.5);
     const phone = PHONE_INTERACTION.position;
     const yaw = Math.atan2(-(phone[0] - eye[0]), -(phone[1] - eye[1]));
-    expect(pickTarget(eye, yaw, candidates)).toEqual({ kind: 'phone' });
+    for (const offset of [-0.2, 0, 0.2]) {
+      const target = pickTarget(eye, yaw + offset, candidates);
+      expect(target).toEqual({ kind: 'phone' });
+      expect(targetLabel(snapshot, target!)).toBe('Use desk phone');
+    }
 
     const deskEye: [number, number] = [-5, -1.9];
     expect(pickTarget(deskEye, 0, candidates)).toEqual({ kind: 'desk', room: 'collections' });
