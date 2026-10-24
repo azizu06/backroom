@@ -51,7 +51,8 @@ describe('office lobby', () => {
     expect(html).toContain('class="office-footer"');
     expect(html).toContain('class="seat-statuses"');
     expect(html).toContain('class="mock-controls"');
-    expect(html).toContain('href="/operator"');
+    // Operator is reached through the shared site nav (lib/site-nav.ts), not an office toolbar link.
+    expect(html).not.toContain('<a href="/operator">Operator</a>');
     expect(html).toContain('href="/inbox"');
     expect(html).toContain('Receipts there are not synced into this static scene.');
     expectLobby(html);
