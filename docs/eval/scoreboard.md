@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `b91f1cc6e9f9b7376098e13694b9406a3811d96e`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `862c882256cfaf8e95ed03478cda9bca677e93a3`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -24,6 +24,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | Authoritative AP decision rule agreement | 9/9 (100%) |
 | Collections pre-call permit agreement | 8/8 (100%) |
 | Keyed bank-feed reconciliation agreement | 4/4 (100%) |
+| P10 Collections dispatcher tool isolation (not policy rule agreement) | 1/1 (100%) |
 | P04 dispatcher bank-change application (software passkey, fixture providers) | 1/1 (100%) |
 | P04 missing/denied/spoken approval guards | 3/3 (100%) |
 | Existing eval answer-key checks (partial execution permitted) | 34/34 (100%) |
@@ -39,7 +40,8 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **extraction**: Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.
 - **providers**: Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.
 - **fraudDefinition**: Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.
-- **payablesDefinition**: Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 also has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 badge attack, P11 recovery and P12 failover remain legacy checks/gaps.
+- **payablesDefinition**: Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 has a separate Collections runtime tool-isolation probe; its NOT_IN_BADGE reference is a direct policy check, not a runtime permission error. P11 recovery and P12 failover remain legacy checks/gaps.
+- **badgeAttack**: Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.
 - **bankChange**: Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.
 - **falseHoldDefinition**: Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.
 - **unscored**: The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy.
