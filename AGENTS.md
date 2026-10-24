@@ -68,7 +68,7 @@ Team sponsor keys live in `/srv/team/backroom.env` on the GX10. From the repo ro
 
 For model calls, the OFF switch, or the #15 state adapter, read `docs/llm-control.md` first.
 
-`web/` Next.js + R3F, `orchestrator/` Node TS, `policy/` pure TS (`evaluate`), `spacetime/` module (placeholder), `fixtures/`, `tools/board`. Install `pnpm install`; check `pnpm -r build`, `pnpm -r test`.
+`web/` Next.js + R3F, `orchestrator/` Node TS, `policy/` pure TS (`evaluate`), `spacetime/` module, `fixtures/`, `tools/board`. Install `pnpm install`; check `pnpm -r build`, `pnpm -r test`.
 
 Passkey escalation setup and StateStore/gateway integration: `docs/m6-approvals.md`.
 
@@ -78,3 +78,8 @@ Keep this file for knowledge useful to almost every future agent session in this
 Do not repeat what the codebase already shows; point to the authoritative file or command instead.
 Prefer rewriting or pruning existing entries over appending new ones.
 When updating this file, preserve this bar for all agents and keep entries concise.
+
+## SpacetimeDB spike
+
+T8 local evidence and Maincloud auth status: `docs/t8-spacetime.md`.
+Module dev loop and exported reducer/client contracts: `spacetime/README.md`.

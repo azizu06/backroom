@@ -17,7 +17,8 @@
     "next": "16.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "three": "0.186.1"
+    "three": "0.186.1",
+    "spacetimedb": "2.13.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
