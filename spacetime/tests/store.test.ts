@@ -156,3 +156,13 @@ test('persisted vendor bank holds override a stale queued task snapshot', async 
   const lease = (await store.claimTask('pay', 0, 5000))!;
   await expect(store.reservePayment(lease, 'pay-stale', 'fingerprint', 0)).rejects.toThrow('ESCALATE:BANK_CHANGE_HOLD');
 });
+
+test('claims retain enqueue order independently of lexical database row order', async () => {
+  const { store } = harnessStore();
+  await store.registerAgent('worker', 'collections', 0);
+  for (const id of ['z-first', 'a-second']) await store.enqueueTask({ id, seatId: 'collections', refs: [], steps: [] });
+  const first = (await store.claimTask('worker', 0, 5000))!;
+  expect(first.id).toBe('z-first');
+  await store.completeTask(first, 'done', 0);
+  expect((await store.claimTask('worker', 0, 5000))!.id).toBe('a-second');
+});

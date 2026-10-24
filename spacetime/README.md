@@ -192,7 +192,7 @@ memory lane; the real-policy worker cases run in both lanes. Test clock control
 belongs exclusively to the SDK harness, never to a production reducer argument.
 
 `state:live` is the opt-in real-service lane. It starts its **own loopback server**,
-uses an isolated CLI config, publishes five fresh DBs, and shuts its server down.
+uses an isolated CLI config, publishes six fresh DBs, and shuts its server down.
 It makes no model, bank, voice or paid-service request. It verifies:
 
 - Anonymous office subscriptions see Dana's target and all audit rows within 1s;

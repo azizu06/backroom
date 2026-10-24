@@ -19,7 +19,7 @@ const spacetimedb = schema({
     targetAnchor: t.string(), posX: t.f64(), posY: t.f64(), posZ: t.f64(),
     heartbeatAt: t.timestamp(), currentTaskId: t.string().optional(), modelRoute: t.string(),
   }),
-  human: entity(), task: table({}, { id: t.string().primaryKey(), seatId: t.string(), status: t.string(), leaseOwner: t.string().optional(), leaseExpiresAt: t.f64().optional(), leaseToken: t.f64(), cursor: t.u32(), json: t.string() }),
+  human: entity(), task: table({}, { id: t.string().primaryKey(), queueSeq: t.u64(), seatId: t.string(), status: t.string(), leaseOwner: t.string().optional(), leaseExpiresAt: t.f64().optional(), leaseToken: t.f64(), cursor: t.u32(), json: t.string() }),
   escalation: table({ public: true }, { id: t.string().primaryKey(), taskId: t.string(), fromAgent: t.string(), toHuman: t.string(), status: t.string(), ruleIds: t.array(t.string()), evidenceRefs: t.array(t.string()), createdAt: t.f64(), expiresAt: t.f64(), json: t.string() }),
   inbox_item: entity(), client: entity(), ar_invoice: invoice(), payment_plan: entity(), payment_link: entity(),
   vendor: entity(), ap_invoice: invoice(), po: entity(), bank_change: entity(), call: entity(), call_turn: entity(),
@@ -61,7 +61,7 @@ function load(ctx: Ctx): ReducerEngine {
     state: a.state as Agent['state'], room: a.room, targetAnchor: a.targetAnchor || undefined,
     pos: { x: a.posX, y: a.posY, z: a.posZ }, heartbeatAt: Number(a.heartbeatAt.microsSinceUnixEpoch / 1000n),
     currentTaskId: a.currentTaskId, modelRoute: a.modelRoute });
-  for (const row of ctx.db.task.iter()) engine.tasks.set(row.id, JSON.parse(row.json));
+  for (const row of [...ctx.db.task.iter()].sort((a, b) => Number(a.queueSeq - b.queueSeq))) engine.tasks.set(row.id, JSON.parse(row.json));
   for (const row of ctx.db.escalation.iter()) engine.escalations.set(row.id, JSON.parse(row.json));
   for (const rows of [ctx.db.ar_invoice, ctx.db.ap_invoice]) for (const row of rows.iter()) engine.invoices.set(row.id, JSON.parse(row.json));
   for (const row of ctx.db.payment_receipt.iter()) {
@@ -99,9 +99,9 @@ function persist(ctx: Ctx, engine: ReducerEngine) {
     else if (json({ ...prior, heartbeatAt: prior.heartbeatAt.toString() }) !== json({ ...row, heartbeatAt: row.heartbeatAt.toString() })) ctx.db.agent.id.update(row);
   }
   for (const task of engine.tasks.values()) {
-    const row = { id: task.id, seatId: task.seatId, status: task.status, leaseOwner: task.leaseOwner,
+    const prior = ctx.db.task.id.find(task.id);
+    const row = { id: task.id, queueSeq: prior?.queueSeq ?? ctx.db.task.count() + 1n, seatId: task.seatId, status: task.status, leaseOwner: task.leaseOwner,
       leaseExpiresAt: task.leaseExpiresAt, leaseToken: task.leaseToken, cursor: task.cursor, json: json(task) };
-    const prior = ctx.db.task.id.find(row.id);
     if (!prior) ctx.db.task.insert(row); else if (prior.json !== row.json) ctx.db.task.id.update(row);
   }
   for (const e of engine.escalations.values()) {
@@ -156,19 +156,25 @@ const timeAt: Partial<Record<Method, number>> = { savePolicyLimits: 2, setLlmEna
 function invoke(method: Method) {
   return spacetimedb.reducer(args, (ctx, { requestId, payload }) => {
     authorize(ctx);
-    if (!requestId || requestId.length > 200 || payload.length > 2_000_000) throw new SenderError('INVALID_REQUEST');
-    if (ctx.db.operation_result.id.find(requestId)) return; // lost acknowledgement retry
-    const values = JSON.parse(payload) as unknown[];
-    if (!Array.isArray(values)) throw new SenderError('INVALID_REQUEST');
-    const index = timeAt[method];
-    if (index !== undefined) values[index] = now(ctx);
-    if (method === 'appendAudit') values[0] = { ...values[0] as object, ts: now(ctx) };
-    if (method === 'appendAudits') values[0] = (values[0] as object[]).map(entry => ({ ...entry, ts: now(ctx) }));
-    const engine = load(ctx);
-    guard(ctx, engine, method, values);
-    const result = engine.execute(method, values as never, now(ctx));
-    persist(ctx, engine);
-    ctx.db.operation_result.insert({ id: requestId, result: json({ value: result ?? null }) });
+    try {
+      if (!requestId || requestId.length > 200 || payload.length > 2_000_000) throw new SenderError('INVALID_REQUEST');
+      if (ctx.db.operation_result.id.find(requestId)) return; // lost acknowledgement retry
+      const values = JSON.parse(payload) as unknown[];
+      if (!Array.isArray(values)) throw new SenderError('INVALID_REQUEST');
+      const index = timeAt[method];
+      if (index !== undefined) values[index] = now(ctx);
+      if (method === 'appendAudit') values[0] = { ...values[0] as object, ts: now(ctx) };
+      if (method === 'appendAudits') values[0] = (values[0] as object[]).map(entry => ({ ...entry, ts: now(ctx) }));
+      const engine = load(ctx);
+      guard(ctx, engine, method, values);
+      const result = engine.execute(method, values as never, now(ctx));
+      persist(ctx, engine);
+      ctx.db.operation_result.insert({ id: requestId, result: json({ value: result ?? null }) });
+    } catch (error) {
+      if (error instanceof SenderError) throw error;
+      const message = error instanceof Error && /^[A-Z_]+(?::[A-Z_0-9,]+)?$/.test(error.message) ? error.message : 'INVALID_STATE_REQUEST';
+      throw new SenderError(message);
+    }
   });
 }
 function evaluatePersistedStep(ctx: Ctx, badge: Badge, step: Step) {
