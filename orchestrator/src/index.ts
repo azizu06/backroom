@@ -19,3 +19,6 @@ export type { ReplayRecording, ReplayFrame, ReplayHeader, ReplayState } from './
 export { createReplayRecorder, parseReplay } from './replay/record';
 
 export { renderInvoiceDocument, type InvoiceAttachment } from './payables/document';
+// Public server adapters consumed by the trusted demo web host.
+export * from './collections';
+export { createCrsClientFromEnv, createCrsFixtureClient } from './integrations/crs/sandbox';
