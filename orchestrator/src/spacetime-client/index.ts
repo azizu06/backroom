@@ -68,7 +68,6 @@ import HeartbeatReducer from "./heartbeat_reducer";
 import InsertInvoiceReducer from "./insert_invoice_reducer";
 import ListAuditReducer from "./list_audit_reducer";
 import OfficePresenceLeaveReducer from "./office_presence_leave_reducer";
-import OfficePresenceSweepReducer from "./office_presence_sweep_reducer";
 import OfficePresenceUpsertReducer from "./office_presence_upsert_reducer";
 import PauseTaskReducer from "./pause_task_reducer";
 import ReapExpiredReducer from "./reap_expired_reducer";
@@ -273,7 +272,6 @@ const reducersSchema = __reducers(
   __reducerSchema("insert_invoice", InsertInvoiceReducer),
   __reducerSchema("list_audit", ListAuditReducer),
   __reducerSchema("office_presence_leave", OfficePresenceLeaveReducer),
-  __reducerSchema("office_presence_sweep", OfficePresenceSweepReducer),
   __reducerSchema("office_presence_upsert", OfficePresenceUpsertReducer),
   __reducerSchema("pause_task", PauseTaskReducer),
   __reducerSchema("reap_expired", ReapExpiredReducer),
