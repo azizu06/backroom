@@ -1,0 +1,193 @@
+{
+  "issue": 6,
+  "spec": "8.1 T5; 4.8",
+  "observedAt": "2026-10-24T07:41:42.864Z",
+  "company": "Blue Bottle Coffee, Ferry Building, San Francisco",
+  "status": "BLOCKED_OR_FAILED",
+  "elapsedSecs": 0.2753194,
+  "totalCostUsd": null,
+  "runOptions": {
+    "timeout": "55",
+    "maxTotalChargeUsd": "0.04",
+    "restartOnError": "false"
+  },
+  "results": [
+    {
+      "name": "maps",
+      "actor": "compass~crawler-google-places",
+      "input": {
+        "searchStringsArray": [
+          "Blue Bottle Coffee Ferry Building"
+        ],
+        "locationQuery": "San Francisco, USA",
+        "maxCrawledPlacesPerSearch": 1,
+        "language": "en",
+        "skipClosedPlaces": false,
+        "scrapePlaceDetailPage": false,
+        "scrapeDirectories": false,
+        "scrapeContacts": false,
+        "maximumLeadsEnrichmentRecords": 0,
+        "maxReviews": 0,
+        "maxImages": 0,
+        "scrapeReviewsPersonalData": false,
+        "enableCompetitorAnalysis": false
+      },
+      "schemaBuildId": "EH35UvIrsV0hnZG0Y",
+      "schemaBuildNumber": "0.14.775",
+      "pricing": {
+        "model": "PAY_PER_EVENT",
+        "effectiveAt": "2026-06-30T13:23:33.247Z",
+        "minimumConfigurableCapUsd": 0.5,
+        "events": {
+          "place-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.004
+          },
+          "filter-applied": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.001
+          },
+          "place-details-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.002
+          },
+          "contact-details-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.002
+          },
+          "lead-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "lead-email-verified": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "social-profile-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "review-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0005
+          },
+          "image-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0005
+          },
+          "competitor-analyzed": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.025
+          },
+          "apify-actor-start": {
+            "priceUsd": 0.00005,
+            "freeTierPriceUsd": null
+          }
+        }
+      },
+      "error": {
+        "httpStatus": 400,
+        "type": "max-total-charge-usd-below-minimum",
+        "message": "Maximum cost per run is less than the allowed minimum of $0.50"
+      }
+    },
+    {
+      "name": "search",
+      "actor": "apify~google-search-scraper",
+      "input": {
+        "queries": "Blue Bottle Coffee Ferry Building San Francisco",
+        "maxPagesPerQuery": 1,
+        "countryCode": "us",
+        "languageCode": "en",
+        "maximumLeadsEnrichmentRecords": 0,
+        "aiOverview": {
+          "scrapeFullAiOverview": false
+        },
+        "aiModeSearch": {
+          "enableAiMode": false
+        },
+        "geminiSearch": {
+          "enableGemini": false
+        },
+        "perplexitySearch": {
+          "enablePerplexity": false
+        },
+        "chatGptSearch": {
+          "enableChatGpt": false
+        },
+        "copilotSearch": {
+          "enableCopilot": false
+        },
+        "websiteContentScraper": {
+          "enable": false
+        },
+        "focusOnPaidAds": false,
+        "saveHtml": false,
+        "saveHtmlToKeyValueStore": false
+      },
+      "schemaBuildId": "G3YvRcwtJopIgVcSA",
+      "schemaBuildNumber": "0.0.468",
+      "pricing": {
+        "model": "PAY_PER_EVENT",
+        "effectiveAt": "2026-10-07T10:39:55.497Z",
+        "minimumConfigurableCapUsd": 0.5,
+        "events": {
+          "search-page-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0045
+          },
+          "ai-overview-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.003
+          },
+          "ai-mode-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "perplexity-ai-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "chatgpt-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "copilot-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "gemini-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "lead-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "lead-email-verified": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "ads-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0065
+          },
+          "website-content-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.008
+          },
+          "apify-actor-start": {
+            "priceUsd": 0.00005,
+            "freeTierPriceUsd": null
+          }
+        }
+      },
+      "error": {
+        "httpStatus": 400,
+        "type": "max-total-charge-usd-below-minimum",
+        "message": "Maximum cost per run is less than the allowed minimum of $0.50"
+      }
+    }
+  ],
+  "cachedDataAvailable": false
+}
