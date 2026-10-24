@@ -4,6 +4,15 @@ const completion = (output: unknown = { seat: 'ap' }, confidence = 0.99, usage: 
 const schema = {parse(value: unknown) { if (!value || typeof value !== 'object' || !('seat' in value)) throw new Error('Missing seat'); return value as {seat:string}; }};
 afterEach(() => vi.useRealTimers());
 describe('router public boundary', () => {
+  it('distinguishes initial availability from timestamped health evidence without a model call', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({data:[{id:'gpt-oss:20b'}]}));
+    const router = createRouter({fetch:fetcher});
+    expect(router.health().checkedAt).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+    await router.healthPing();
+    expect(router.health()).toMatchObject({localAvailable:true, checkedAt:expect.any(String)});
+    expect(fetcher.mock.calls[0]?.[0]).toContain('/models');
+  });
   it.each(['inbox_classification','field_extraction','reconciliation_candidates','post_call_summary'] as const)('routes %s locally with audit metadata', async task => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(completion());
     const router = createRouter({fetch:fetcher});

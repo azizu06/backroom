@@ -65,6 +65,7 @@ export function createRouter(options: RouterOptions = {}) {
   let healthyPings = 0;
   let samples: number[] = [];
   let checking = false;
+  let checkedAt: string | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
   const median = () => {
     const sorted = [...samples].sort((a, b) => a - b);
@@ -83,7 +84,7 @@ export function createRouter(options: RouterOptions = {}) {
       if (!body.data?.some(model => model.id === localModel) || now() - start > 5000) throw new Error('GX10 unavailable');
       if (!available && ++healthyPings >= 3) { available = true; samples = []; healthyPings = 0; }
     } catch { offline(); }
-    finally { checking = false; }
+    finally { checkedAt = new Date().toISOString(); checking = false; }
   }
   async function complete(local: boolean, taskType: TaskType, input: unknown, schema: OutputSchema<unknown> | undefined, signal: AbortSignal) {
     signal.throwIfAborted();
@@ -153,7 +154,7 @@ export function createRouter(options: RouterOptions = {}) {
   }
   return {
     route, healthPing,
-    health: () => ({localAvailable:available, localEnabled:enabled, healthyPings, p50LatencyMs:median()}),
+    health: () => ({localAvailable:available, localEnabled:enabled, healthyPings, p50LatencyMs:median(), checkedAt}),
     /** Link-kill demo seam; does not change the shared server. */
     setLocalBaseUrl: (url: string) => { localBaseUrl = url; },
     start() { if (!timer) { timer = setInterval(() => { void healthPing(); }, options.healthIntervalMs ?? 10000); timer.unref?.(); } },
@@ -161,6 +162,10 @@ export function createRouter(options: RouterOptions = {}) {
   };
 }
 let singleton: ReturnType<typeof createRouter> | undefined;
+/** Read the routing process's actual observations; never creates a router or sends a request. */
+export function getRouterHealth() {
+  return singleton?.health() ?? null;
+}
 export function route<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>) {
   if (!singleton) { singleton = createRouter(); singleton.start(); }
   return singleton.route(taskType, input, schema);
