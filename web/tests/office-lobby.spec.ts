@@ -59,3 +59,17 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
   await expect(ask.getByRole('alert')).toContainText('The audit chain is broken');
   await expect(ask.getByRole('alert')).toContainText('AUDIT_CHAIN_BROKEN');
 });
+
+test('office props render in the 3D scene', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box!.width).toBeGreaterThan(0);
+  expect(box!.height).toBeGreaterThan(0);
+  expect(await canvas.evaluate((element: HTMLCanvasElement) => element.width > 0 && element.height > 0)).toBe(true);
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+});
