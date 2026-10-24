@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { MemoryStateStore, SpacetimeStateStore, SpacetimeTransport, type SpacetimeOptions, installStateStore, getStateStore, SeatWorker, FakeEffects,
   northfield, createNorthfieldRepository, PaymentService, type Seat, type InvoiceState } from '@backroom/orchestrator';
-import { NessieClient, type Transaction } from '@backroom/nessie';
+import { createDemoServices, installDemoServiceStatus } from './services';
 import { createGateway } from '../gateway/http';
 import { installGatewayStore } from '../gateway/runtime';
 import { MemoryGatewayStore, type GatewayCall } from '../gateway/store';
@@ -13,6 +13,8 @@ import { installPaymentService } from '../payments/runtime';
 import type { DemoStatus } from '../../../tools/demo/health';
 
 export async function createDemoRuntime() {
+  let services = await createDemoServices();
+  installDemoServiceStatus(() => services.status().services);
   const mode = process.env.STATE_STORE === 'spacetime' ? 'spacetime' : 'memory';
   let config: SpacetimeOptions = { uri: process.env.SPACETIMEDB_URI || '', database: process.env.SPACETIMEDB_DATABASE || '', token: process.env.SPACETIMEDB_TOKEN || '' };
   let abort = new AbortController();
@@ -29,6 +31,7 @@ export async function createDemoRuntime() {
   async function reset(next?: SpacetimeOptions) {
     if (next) config = next;
     await stop();
+    if (!services.status().live) services = await createDemoServices();
     abort = new AbortController(); failed = false;
     const transport = mode === 'spacetime' ? new SpacetimeTransport(config) : undefined;
     if (transport) await transport.seedCompany(northfield);
@@ -36,7 +39,8 @@ export async function createDemoRuntime() {
     const prior = getStateStore();
     await installStateStore(state);
     if (prior instanceof SpacetimeStateStore) await prior.close();
-    await state.setLlmEnabled(process.env.DEMO_LLM === 'on');
+    await state.setLlmEnabled(process.env.DEMO_LLM === 'on' || (process.env.DEMO_LIVE === '1' && process.env.DEMO_LLM !== 'off'));
+    await services.prepare(state);
     if (!transport) for (const invoice of northfield.arInvoices) await state.insertInvoice({ id: invoice.id, kind: 'ar', state: invoice.status as InvoiceState });
     if (!transport) for (const invoice of northfield.apInvoices) await state.insertInvoice({ id: invoice.id, kind: 'ap', state: invoice.status as InvoiceState });
     // This is a preverified synthetic call, never a live caller identity assertion.
@@ -62,18 +66,6 @@ export async function createDemoRuntime() {
     const plan = await invoke('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
     const link = await invoke('send_payment_link', { plan_id: plan.plan_id });
     paths = { approvePath: escalation.approval_path as string, payPath: link.link_path as string };
-    // No startup/reset bank requests. All external effects in this host are explicitly mock.
-    const deposits: Transaction[] = [], claims = new Set<string>();
-    const bank = new NessieClient({ apiKey: 'mock-no-network', claims: { async claim(key) {
-      if (claims.has(key)) return false; claims.add(key); return true;
-    } }, fetch: async (url, init) => {
-      if (init?.method === 'POST') {
-        const row = { ...JSON.parse(String(init.body)), _id: `mock-deposit-${deposits.length + 1}` };
-        deposits.push(row); return Response.json({ objectCreated: row });
-      }
-      return Response.json(String(url).includes('/deposits') ? deposits : {
-        balance: northfield.bankAccounts.find(row => row.id === 'receivables')!.balanceCents / 100 });
-    } });
     // Advance the scripted ALLOW to promised using the same reducer path as the core demo.
     const bookkeeper = 'demo:reconcile';
     await state.registerAgent(bookkeeper, 'collections', Date.now());
@@ -83,7 +75,7 @@ export async function createDemoRuntime() {
     await state.transitionInvoice(promiseLease, invoice.id, 'overdue', 'in_collection', Date.now());
     await state.transitionInvoice(promiseLease, invoice.id, 'in_collection', 'promised', Date.now());
     await state.completeTask(promiseLease, 'done', Date.now());
-    const service: PaymentService = new PaymentService({ bank, accountId: 'mock-northfield',
+    const service: PaymentService = new PaymentService({ bank: services.bank, accountId: services.accountId,
       lookup: async id => { const stored = await gatewayStore.findPaymentCall(id); return stored && authorizedPaymentLink(stored, id); },
       onPosted: id => collections(async () => {
         const agent = 'demo:reconcile';
@@ -115,8 +107,8 @@ export async function createDemoRuntime() {
     })().catch(() => { if (!signal.aborted) { failed = true; abort.abort(); } }));
   }
   await reset();
-  return { reset, stop, check: () => getStateStore().getPolicy(), status: (): DemoStatus & { workersHealthy: boolean; bank: 'mock' } => ({
+  return { reset, stop, health: () => services.health(), check: () => getStateStore().getPolicy(), status: (): DemoStatus => ({
     llmEnabled: getStateStore().llmEnabled, stateStore: mode, voice: process.env.DEMO_VOICE_RUNNING === '1',
-    workersHealthy: !failed && !abort.signal.aborted, bank: 'mock', ...paths,
+    workersHealthy: !failed && !abort.signal.aborted, ...services.status(), ...paths,
   }) };
 }

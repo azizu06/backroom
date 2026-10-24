@@ -1,0 +1,344 @@
+{
+  "sourceSha": "4ec6e02cb5f931bf04a9cf1b5847d0a292aa7b77",
+  "month": "2026-09",
+  "model": "gpt-oss:20b",
+  "completed": 370,
+  "total": 370,
+  "failedItems": 5,
+  "trapsCaught": 120,
+  "trapRuleMatches": 79,
+  "trapsTotal": 120,
+  "ruleTrapsTotal": 80,
+  "falseHolds": 30,
+  "simulatedPayments": 220,
+  "holdsByRule": {
+    "BANK_CHANGE_HOLD": 30,
+    "OFAC_STOP": 20,
+    "INVALID_INPUT": 44,
+    "PAYEE_NOT_IN_MASTER": 17,
+    "DUPLICATE_INVOICE": 9,
+    "LOOKALIKE_DOMAIN": 10,
+    "NO_PO": 10,
+    "OVER_LIMIT": 20
+  },
+  "modelTasks": 697,
+  "localTasks": 692,
+  "failedTasks": 5,
+  "attempts": 698,
+  "pendingAttempts": 0,
+  "promptTokens": 410970,
+  "completionTokens": 59183,
+  "missingUsage": 0,
+  "elapsedSeconds": 1122.7336761660001,
+  "itemsPerSecond": 0.3295527762768329,
+  "tokensPerSecond": 418.7573687158968,
+  "outputTokensPerSecond": 52.71330259024811,
+  "localShare": 1,
+  "cloudEquivalentAvoidedUsd": null,
+  "measuredAt": "2026-10-24T13:21:53.019Z",
+  "completedAt": "2026-10-24T13:40:35.760Z",
+  "command": "pnpm demo:burst -- --companies 10 --month 2026-09 --concurrency 2",
+  "scope": "synthetic; GX10-only inference; isolated memory state; simulated payments; no dial or external integrations",
+  "workloadCompanies": 10,
+  "concurrency": 2,
+  "manifestSha256": "24e88750892646e7dea8e54911714ff0e9a152836afadb8f9bec69434c7ffeeb",
+  "sourceEventsSha256": "04db7f3cbe69cc7ac25dea2ddd0317d6a478d238e18ffd8799a54704e486139e",
+  "gpuPreflight": "Sat Oct 24 06:21:52 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA GB10                    On  |   0000000F:01:00.0 Off |                  N/A |\n| N/A   57C    P0             54W /  N/A  | Not Supported          |     95%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A          376052      C   ...local/lib/ollama/llama-server      66896MiB |\n|    0   N/A  N/A          423979      C   ...local/lib/ollama/llama-server      16061MiB |\n|    0   N/A  N/A          429256      C   ...local/lib/ollama/llama-server      14319MiB |\n+-----------------------------------------------------------------------------------------+\n",
+  "comparisonRates": {
+    "inputUsdPerMillion": null,
+    "outputUsdPerMillion": null
+  },
+  "scopeSelection": "10 companies instead of 25: preflight GPU utilization 93%; shared-load projection exceeded ~30 minutes for 925 items.",
+  "falseHoldsCaveat": "Raw runner counts all held non-trap-labeled invoices. This includes seeded Cedar pending bank change (5002), sanctions vendor (5023), and unverified vendor (5024); these are code-required holds, not evidence of erroneous policy.",
+  "ordinaryHolds": [
+    {
+      "id": "synthetic-0001:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0002:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0002:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0001:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0002:2026-09:5024",
+      "rules": [
+        "INVALID_INPUT"
+      ],
+      "modelFailed": true
+    },
+    {
+      "id": "synthetic-0001:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0003:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0004:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0003:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0003:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0004:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0004:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0005:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0006:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0005:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0006:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0005:2026-09:5024",
+      "rules": [
+        "INVALID_INPUT"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0006:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0007:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0008:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0007:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0007:2026-09:5024",
+      "rules": [
+        "INVALID_INPUT"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0008:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0008:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0009:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0010:2026-09:5002",
+      "rules": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0009:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0009:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0010:2026-09:5023",
+      "rules": [
+        "OFAC_STOP"
+      ],
+      "modelFailed": false
+    },
+    {
+      "id": "synthetic-0010:2026-09:5024",
+      "rules": [
+        "PAYEE_NOT_IN_MASTER"
+      ],
+      "modelFailed": false
+    }
+  ],
+  "modelFailures": [
+    {
+      "id": "synthetic-0002:2026-09:5024",
+      "routerFailures": [
+        {
+          "taskType": "inbox_classification",
+          "route": "local",
+          "kind": "confidence"
+        },
+        {
+          "taskType": "inbox_classification",
+          "route": "cloud_fallback",
+          "kind": "transport"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-0001:2026-09:RT-161",
+      "routerFailures": [
+        {
+          "taskType": "inbox_classification",
+          "route": "local",
+          "kind": "confidence"
+        },
+        {
+          "taskType": "inbox_classification",
+          "route": "cloud_fallback",
+          "kind": "transport"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-0006:2026-09:RT-162",
+      "routerFailures": [
+        {
+          "taskType": "inbox_classification",
+          "route": "local",
+          "kind": "confidence"
+        },
+        {
+          "taskType": "inbox_classification",
+          "route": "cloud_fallback",
+          "kind": "transport"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-0007:2026-09:4419",
+      "routerFailures": [
+        {
+          "taskType": "field_extraction",
+          "route": "local",
+          "kind": "schema"
+        },
+        {
+          "taskType": "field_extraction",
+          "route": "cloud_fallback",
+          "kind": "transport"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-0008:2026-09:RT-161",
+      "routerFailures": [
+        {
+          "taskType": "inbox_classification",
+          "route": "local",
+          "kind": "confidence"
+        },
+        {
+          "taskType": "inbox_classification",
+          "route": "cloud_fallback",
+          "kind": "transport"
+        }
+      ]
+    }
+  ],
+  "receiptNotes": "items.jsonl retains every original item event and its actual audit entries. Repeated per-second progress omitted; sourceEventsSha256 identifies the original local events.jsonl. Processing elapsedSeconds excludes GPU preflight and workload generation. No novel company population or laptop baseline measured.",
+  "exitCode": 1
+}

@@ -103,3 +103,22 @@ health check remains `FAKE`. Run `pnpm --filter @backroom/orchestrator apify:liv
 with that switch for a website-only Actor smoke without a live model, phone, or
 bank. See `docs/evidence/apify/README.md` for the receipt, limits, schema boundary,
 and provenance labels. Actor implementation/publication remains stream D's scope.
+
+### CRS public-record bankruptcy stop (Refs #4)
+
+`createPreCallCreditCheck()` defaults to an explicitly labeled `FAKE` check for
+scripted demos. `PRECALL_CRS=live` uses the exported `createCrsClientFromEnv()`
+and `getPublicRecords()` for the trusted `PreCallInput.testIdentityId` only.
+Any bankruptcy count sets the existing `BANKRUPTCY_STOP` signal and escalates
+before planning. Counts cannot distinguish open P07 Ch.13 from discharged P06:
+we conservatively stop/escalate either, without claiming the response proves
+an open case. CRS sandbox has no business credit or OFAC; the audit says
+`not available in sandbox`, OFAC stays `unknown`, and even a zero-bankruptcy
+report cannot authorize dialing. No provider names/addresses/raw bodies enter
+planning or audits: only counts, timestamps, labels and hashes.
+
+For an opt-in proof through pre-call, vendor and Payables code (no model, phone,
+bank or approval): `PRECALL_CRS=live VENDOR_CRS=live pnpm --filter
+@backroom/orchestrator crs:wiring:live`. It uses ephemeral P07/P13 test mappings
+and writes `docs/evidence/crs/wiring-live-run.json`. Server credentials are
+`CRS_USERNAME` / `CRS_PASSWORD`; never put them in the command or the receipt.
