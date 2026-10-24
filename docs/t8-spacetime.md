@@ -3,7 +3,7 @@
 Verified 2026-10-24 at approximately 00:41 PDT, before the Sat 02:00 hard stop.
 The TypeScript module publishes locally, the database rejects an out-of-badge
 write, the real policy package bundles and runs in the reducer, and the Next.js
-page subscribes to row changes in less than 1 second. **Maincloud remains unverified.**
+page subscribes to row changes in less than 1 second. **Maincloud publication and authenticated seeding are verified; hosted office parity is recorded below.**
 
 ## Environment and commands
 
@@ -69,42 +69,75 @@ not claim Maincloud/network latency. Initial or reconnect snapshots do not count
 fresh writes; use the live script's fresh run ID when evaluating samples.
 
 The page only subscribes. Reducers perform permission checks with the renderer closed
-or open; no UI event triggers authority or changes room permissions. Full §4.9 audit
-parity needs the forthcoming full schema and orchestrator adapter, and is not claimed here.
+or open; no UI event triggers authority or changes room permissions. This original T8 run did not measure full §4.9 audit parity; the later full-module
+Maincloud evidence below supersedes that limitation.
 
-## Maincloud: OPEN (authentication)
+## Maincloud: VERIFIED
 
-Attempt:
+On 2026-10-24, Aziz completed `spacetime login --no-browser` using CLI 2.13.0.
+`login show` confirmed the authenticated identity without printing a token.
+The earlier `401 InvalidSignature` was a local-only identity, not a module build
+failure. The full current-main schema/reducers published successfully:
 
 ```sh
-spacetime publish backroom-t8-aziz-20261024 --server maincloud --module-path spacetime --yes=remote,skip-login
+.t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime publish \
+  backrooms-calhacks13 --server maincloud --module-path spacetime --yes
 ```
 
-Build succeeded; remote pre-publish check failed:
+- Hosted dashboard: <https://spacetimedb.com/backrooms-calhacks13>.
+- Database identity: `c200be1be7f36d55de859088afc916ea52c55bf4407be592e0248abec1cd73c3`.
+- Anonymous office URI: `wss://maincloud.spacetimedb.com`.
+- Authenticated `SpacetimeTransport.seedCompany` imported synthetic Northfield:
+  10 clients, 25 vendors, 10 AR invoices, 83 AP invoices. No live provider action.
+- Publisher credentials remain private server configuration; never expose them
+  through browser props, public env vars, evidence, board posts or command output.
 
-```text
-401 Unauthorized: Invalid token: InvalidSignature
+`DEMO_SPACETIME=maincloud pnpm demo:parity` passed on 2026-10-24 at
+13:48:26 UTC (06:48 PDT), against two fresh hosted databases. See the committed
+[proof and screenshots](evidence/maincloud-parity/README.md).
+
+- Browser closed/open runs: 10 byte-identical normalized audit rows, both chains
+  valid; IDs preserved; only `ts`, `hash` and `prevHash` excluded.
+- Closed-world office catch-up, authenticated reducer DENY preserving the agent,
+  visible red door (`audit:11`), and OFF propagation all passed.
+- Anonymous renderer: zero state writes and zero browser errors.
+- 20/20 request-to-frame samples below 1000 ms: min 86.2 ms, median (upper middle)
+  104.3 ms, nearest-rank p95 168.3 ms, max 207.7 ms. These include network time.
+  The browser uses `performance.now()` before reducer dispatch until DOM target
+  commit plus two animation frames. This includes Playwright/controller overhead;
+  it does not subtract a remote server clock or measure physical display latency.
+- The parity run made no bank, voice or model requests. Hosted publication does
+  not establish persistence for the separately in-memory gateway/finance stores.
+
+Reproduction (authenticated CLI 2.13.0, production web build):
+
+```sh
+pnpm --filter @backroom/web build
+DEMO_SPACETIME=maincloud pnpm demo:parity
+# Default local lane remains unchanged:
+pnpm demo:parity
 ```
 
-The CLI had a local-server-only identity. `spacetime login --no-browser` requested a
-browser login; the attempt was cancelled without completing it. No successful
-Maincloud publish is claimed. Firstmate directed this task to skip Maincloud for now
-and ship local evidence. **Anthony/Diego (whoever owns the browser login) must authenticate,
-publish, and verify the hosted subscription before relying on Maincloud.**
-Self-hosted SpacetimeDB is viable; this result does not trigger the Convex fallback.
+`SPACETIME_CLI` / `SPACETIME_ROOT` select the CLI install; `SPACETIME_CONFIG`
+optionally selects a different authenticated CLI config for hosted parity. Do not
+pass the manager's own root config again: CLI 2.13.0 can stall publishing when
+that same config is explicitly supplied twice. Each parity run publishes two
+fresh owned databases and retains them for evidence; no shared DB is reset.
+
+Local standalone remains the default fallback; a Maincloud outage must not
+silently substitute simulated state.
 
 ## Scope and continuation
 
-This ships T8 first. The full §4.7 table/reducer set plus durable orchestration semantics
-is larger than a 45-minute safe extension: #15 must implement the exported #16
-`StateStore` seam (`orchestrator/src/store.ts` in the orchestrator work), atomic
-leases/fencing, idempotent effects/receipts, audit chaining, policy transitions and
-controller/passkey approval checks. T8's private publisher controller is a spike
-boundary, not a substitute for those product approvals.
+The original T8 spike established the module/policy/subscription path. The full
+§4.7 schema and `StateStore` adapter have since landed; see
+[`spacetime/README.md`](../spacetime/README.md) for their reducer, lease, fencing,
+audit and server-verified approval contracts. The Maincloud verification above
+uses that full module and its existing generated bindings without schema changes.
 
-The generated client and reducer signatures are documented in `spacetime/README.md`.
-No Convex code or full-StateStore compatibility is claimed. Keep network I/O in the
-orchestrator; the module performs deterministic state writes and policy evaluation.
+Keep network I/O in the orchestrator; reducers perform deterministic state writes
+and policy evaluation. Hosted office parity does not establish live voice,
+real human passkey hardware, bank reconciliation or GX10 web hosting.
 
 Primary references: [official TypeScript quickstart](https://spacetimedb.com/docs/quickstarts/typescript/),
 [official installation/local server guide](https://spacetimedb.com/docs/).
