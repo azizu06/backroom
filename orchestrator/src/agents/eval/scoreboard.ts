@@ -268,7 +268,7 @@ const lines = [
   '## Keyed AP items', '', '| Item | Invoice | Expected | Actual | Exact rule match |', '| --- | --- | --- | --- | --- |',
   ...gradedAP.map(row => `| ${row.id} | ${row.invoiceId} | ${row.expected} | ${row.actual} | ${row.exactRuleMatch ?? 'workflow gate'} |`), '',
 ];
-const out = join(root, 'docs/eval');
+const out = process.env.BACKROOM_REPORT_DIR || join(root, 'docs/eval');
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\n');
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));

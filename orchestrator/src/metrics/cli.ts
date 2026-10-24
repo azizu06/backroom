@@ -1,5 +1,5 @@
 /** Offline metrics only: never dials, contacts a bank, or invokes a model. */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -123,7 +123,9 @@ async function main() {
     `Answer-key SHA-256: \`${hash('fixtures/answer-key/expected.json')}\``, `Corpus SHA-256: \`${hash('fixtures/redteam/corpus.jsonl')}\``, '',
     '<details><summary>Fresh policy-step eval details (not full final-state grading)</summary>', '', '```text', evalText, '```', '', '</details>', '',
   ].join('\n');
-  writeFileSync(resolve(root, 'docs/metrics.md'), report);
+  const outputDir = process.env.BACKROOM_REPORT_DIR;
+  if (outputDir) mkdirSync(outputDir, { recursive: true, mode: 0o700 });
+  writeFileSync(outputDir ? resolve(outputDir, 'metrics.md') : resolve(root, 'docs/metrics.md'), report);
   console.log(report);
 }
 main().catch(error => {

@@ -1,0 +1,17 @@
+.page { color-scheme: dark; background: #171b17; color: #edf0e8; min-height: 100svh; padding: 0 24px 180px; font: 16px/1.5 system-ui, sans-serif; }
+.page * { box-sizing: border-box; }
+.content { max-width: 1020px; margin: auto; }
+.page header, .page nav { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 0; border-bottom: 1px solid #495044; }
+.page a { color: #d8d6ac; text-underline-offset: 4px; }
+.page h1 { font-size: 30px; margin: 28px 0 12px; }
+.page h2 { font-size: 21px; margin: 0 0 12px; }
+.page section { border-bottom: 1px solid #495044; padding: 24px 0; }
+.page button { background: #30382d; color: #edf0e8; border: 1px solid #839175; border-radius: 4px; padding: 8px 12px; min-height: 44px; font: inherit; cursor: pointer; }
+.page button:disabled { opacity: .5; cursor: wait; }
+.page :is(a, button):focus-visible { outline: 3px solid #efcf94; outline-offset: 4px; }
+.action { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 14px 0; border-top: 1px solid #343c30; }
+.action p { color: #c1c9b8; margin: 4px 0; font-size: 14px; }
+.action button { flex-shrink: 0; }
+.page pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 600px; overflow: auto; background: #10140e; padding: 16px; font-size: 13px; }
+.error { color: #ffd5bc; border-left: 3px solid #e9a07a; padding: 12px; }
+@media (max-width: 650px) { .page { padding-inline: 16px; } .action { align-items: stretch; flex-direction: column; gap: 8px; } }
