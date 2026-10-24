@@ -1,20 +1,14 @@
-// Apify SDK - toolkit for building Apify Actors (Read more at https://docs.apify.com/sdk/js/)
 import { Actor, log } from 'apify';
-// Crawlee - web scraping and browser automation library (Read more at https://crawlee.dev)
-// import { CheerioCrawler } from '@crawlee/cheerio';
+import { healthResult, probeWebsite } from './signals.js';
 
-// this is ESM project, and as such, it requires you to specify extensions in your relative imports
-// read more about this here: https://nodejs.org/docs/latest-v18.x/api/esm.html#mandatory-file-extensions
-// note that we need to use `.js` even when inside TS files
-// import { router } from './routes.js';
-
-// The init() call configures the Actor to correctly work with the Apify-provided environment - mainly the storage infrastructure. It is necessary that every Actor performs an init() call.
 await Actor.init();
-
-log.info('Hello from the Actor!');
-/**
- * Actor code
- */
-
-// Gracefully exit the Actor process. It's recommended to quit all Actors with an exit()
+const input = await Actor.getInput() as {
+  companyName?: string; website?: string; phone?: string; listedPhone?: string;
+  maps?: { permanentlyClosed?: boolean; temporarilyClosed?: boolean; sourceUrl?: string; observedAt?: string };
+} | null;
+const observedAt = new Date().toISOString();
+const websiteStatus = input?.website ? await probeWebsite(input.website, fetch, AbortSignal.timeout(10_000)) : undefined;
+const result = healthResult({ ...input, websiteStatus, observedAt });
+log.info('Client health signals ready', { count: result.signals.length });
+await Actor.pushData(result);
 await Actor.exit();

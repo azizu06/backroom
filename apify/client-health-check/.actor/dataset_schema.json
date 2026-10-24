@@ -1,6 +1,28 @@
 {
     "$schema": "https://apify.com/schemas/v1/dataset.ide.json",
     "actorSpecification": 1,
-    "fields": {},
-    "views": {}
+    "fields": {
+        "type": "object",
+        "properties": {
+            "signals": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type": { "type": "string" },
+                        "value": {},
+                        "sourceUrl": { "type": "string" },
+                        "observedAt": { "type": "string" }
+                    }
+                }
+            }
+        }
+    },
+    "views": {
+        "signals": {
+            "title": "Health signals",
+            "transformation": { "fields": ["signals"] },
+            "display": { "component": "table", "properties": { "signals": { "label": "Signals", "format": "object" } } }
+        }
+    }
 }
