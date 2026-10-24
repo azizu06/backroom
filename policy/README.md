@@ -84,8 +84,10 @@ type Decision =
       policyVersion: number; quote: { sentenceId: string; text: string } };
 ```
 
-Every blocked result contains one rule and its exact sentence from
-`fixtures/policy/northfield-policy.md`. `reason` is a code template that includes
+Every blocked result contains one rule and its original sentence from
+`fixtures/policy/northfield-policy.md`. Numeric-limit results after v1 append
+the current saved limit and version; the frozen sentence remains verbatim.
+See `docs/policy-editor.md` for the owner-save and state adapter contracts. `reason` is a code template that includes
 the full quote and is ready for speech. Render `quote.text` and `sentenceId` on
 the audit/approval UI, and persist the entire decision with the attempted action.
 ALLOW cites `IN_BADGE`, plus `DEMO_OVERRIDE` or `SIGNALS_ONLY_NARROW` when used.

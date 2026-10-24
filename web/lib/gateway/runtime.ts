@@ -1,3 +1,4 @@
+import { getStateStore } from '@backroom/orchestrator';
 import { approvalState } from "../approvals/runtime";
 import { createApprovalBridge } from "../approvals/gateway";
 import { createGateway } from "./http";
@@ -11,6 +12,7 @@ export function installGatewayStore(adapter: GatewayStore): void {
   root.backroomGatewayStore = adapter;
 }
 export const handleTool = createGateway({
+  currentPolicy: () => getStateStore().getPolicy(),
   approvalBridge: createApprovalBridge(approvalState),
   secret: () => process.env.TOOL_GATEWAY_SECRET,
   store: { transact: (callId, work) => root.backroomGatewayStore!.transact(callId, work) },

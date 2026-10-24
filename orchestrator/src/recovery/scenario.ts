@@ -15,7 +15,7 @@ export interface RecoveryResult {
   payments: number; kills: number; signals: (NodeJS.Signals | null)[];
 }
 interface Request { id: number; target: 'store' | 'effects'; method: string; args: unknown[] }
-const storeMethods = new Set(['registerAgent', 'getAgent', 'heartbeat', 'claimTask', 'renewLease',
+const storeMethods = new Set(['getPolicy', 'registerAgent', 'getAgent', 'heartbeat', 'claimTask', 'renewLease',
   'assertLease', 'reapExpired', 'getTask', 'setAgentState', 'setAgentTarget', 'advanceTask',
   'completeTask', 'getEscalation', 'createEscalation', 'appendAudit', 'listAudit',
   'getPayment', 'reservePayment', 'recordPayment']);

@@ -1,8 +1,11 @@
 import type { ControllerDecision, ApprovalTerms } from './approvals/types';
 import type { VerifiedApproval } from './approvals/verified';
-import type { Action, Badge, Context, Decision } from '@backroom/policy';
+import type { Action, Badge, Context, Decision, Policy } from '@backroom/policy';
 import type { ChainStatus } from './audit';
 
+export interface PolicyLimits {
+  maxInstallments: number; minFirstPct: number; maxPlanDays: number; maxPaymentCents: number;
+}
 export type Seat = Badge;
 export type AgentState = 'idle' | 'working' | 'walking' | 'waiting' | 'on_call' | 'paused' | 'offline';
 export interface Agent {
@@ -54,6 +57,11 @@ export interface Invoice { id: string; kind: 'ar' | 'ap'; state: InvoiceState }
  * appendAudit is append-only and assigns sequence/hash atomically.
  */
 export interface StateStore {
+  /** Immutable snapshots; omitted version reads the current policy. */
+  getPolicy(version?: number): Promise<Policy>;
+  /** Trusted owner transport only. Atomically compare version, append snapshot + human audit.
+   * Never expose this reducer through agent/voice tool schemas. */
+  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number): Promise<Policy>;
   /** Global model gate; adapters map to runtime_control[global] in #15. */
   readonly llmEnabled: boolean;
   /** Aborted on OFF; a new signal on ON fences results from the old generation. */
