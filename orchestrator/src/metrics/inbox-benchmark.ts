@@ -102,7 +102,7 @@ export async function runBenchmarkCase(c: BenchmarkCase, mode: 'ON' | 'OFF', inj
     catch (error) { attempts.push({ latencyMs: performance.now() - start, status: error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'transport_error' }); throw error; }
   };
   const failures: RouterFailure[] = [];
-  const router = createRouter({ onFailure: failure => failures.push(failure), stateStore: state, localBaseUrl: base, localModel: 'gpt-oss:20b', cloudApiKey: 'forbidden', fetch: guarded });
+  const router = createRouter({ onFailure: failure => failures.push(failure), stateStore: state, localBaseUrl: base, localModel: 'gpt-oss:20b', cloudProvider: 'openrouter', cloudApiKey: 'forbidden', fetch: guarded });
   const modelRoute: typeof route = async (task, input, schema) => {
     const start = performance.now();
     try {

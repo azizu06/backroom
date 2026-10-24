@@ -149,11 +149,13 @@ export async function askWhy(question: string, entries: readonly WhyAuditEntry[]
   const generation = state.llmSignal;
   if (!state.llmEnabled || generation.aborted) return fallback(relevant);
   const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
-  if (!relevant.length || (!apiKey && !options.modelRoute)) return fallback(relevant);
+  if (!relevant.length || (!apiKey && !process.env.ANTHROPIC_API_KEY && !options.modelRoute)) return fallback(relevant);
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const runRoute = options.modelRoute ?? (Object.keys(options).length ? createRouter({
         stateStore: state, cloudApiKey: apiKey, cloudBaseUrl: options.baseUrl,
+        // Legacy explicit OpenRouter options remain an opt-in; defaults use Anthropic.
+        cloudProvider: options.apiKey !== undefined || options.baseUrl !== undefined || options.model !== undefined ? 'openrouter' : undefined,
         cloudModel: options.model, fetch: options.fetch, timeoutMs: 15_000,
       }).route : route);
       const response = await runRoute('ask_why', {

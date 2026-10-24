@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRouter, TASK_ROUTES } from './index.js';
 const completion = (output: unknown = { seat: 'ap' }, confidence = 0.99, usage: unknown = {prompt_tokens:100,completion_tokens:20}) => Response.json({ choices:[{message:{content:JSON.stringify({output,confidence})}}],usage });
 const schema = {parse(value: unknown) { if (!value || typeof value !== 'object' || !('seat' in value)) throw new Error('Missing seat'); return value as {seat:string}; }};
-afterEach(() => vi.useRealTimers());
+beforeEach(() => { vi.stubEnv('ANTHROPIC_API_KEY', ''); vi.stubEnv('LLM_CLOUD_PROVIDER', 'openrouter'); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe('router public boundary', () => {
   it('distinguishes initial availability from timestamped health evidence without a model call', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({data:[{id:'gpt-oss:20b'}]}));
