@@ -3,7 +3,7 @@
 Verified 2026-10-24 at approximately 00:41 PDT, before the Sat 02:00 hard stop.
 The TypeScript module publishes locally, the database rejects an out-of-badge
 write, the real policy package bundles and runs in the reducer, and the Next.js
-page subscribes to row changes in less than 1 second. **Maincloud remains unverified.**
+page subscribes to row changes in less than 1 second. **Maincloud publication and authenticated seeding are verified; hosted office parity is recorded below.**
 
 ## Environment and commands
 
@@ -72,26 +72,29 @@ The page only subscribes. Reducers perform permission checks with the renderer c
 or open; no UI event triggers authority or changes room permissions. Full §4.9 audit
 parity needs the forthcoming full schema and orchestrator adapter, and is not claimed here.
 
-## Maincloud: OPEN (authentication)
+## Maincloud: published (office parity pending)
 
-Attempt:
+On 2026-10-24, Aziz completed `spacetime login --no-browser` using CLI 2.13.0.
+`login show` confirmed the authenticated identity without printing a token.
+The earlier `401 InvalidSignature` was a local-only identity, not a module build
+failure. The full current-main schema/reducers published successfully:
 
 ```sh
-spacetime publish backroom-t8-aziz-20261024 --server maincloud --module-path spacetime --yes=remote,skip-login
+.t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime publish \
+  backrooms-calhacks13 --server maincloud --module-path spacetime --yes
 ```
 
-Build succeeded; remote pre-publish check failed:
+- Hosted dashboard: <https://spacetimedb.com/backrooms-calhacks13>.
+- Database identity: `c200be1be7f36d55de859088afc916ea52c55bf4407be592e0248abec1cd73c3`.
+- Anonymous office URI: `wss://maincloud.spacetimedb.com`.
+- Authenticated `SpacetimeTransport.seedCompany` imported synthetic Northfield:
+  10 clients, 25 vendors, 10 AR invoices, 83 AP invoices. No live provider action.
+- Publisher credentials remain private server configuration; never expose them
+  through browser props, public env vars, evidence, board posts or command output.
 
-```text
-401 Unauthorized: Invalid token: InvalidSignature
-```
-
-The CLI had a local-server-only identity. `spacetime login --no-browser` requested a
-browser login; the attempt was cancelled without completing it. No successful
-Maincloud publish is claimed. Firstmate directed this task to skip Maincloud for now
-and ship local evidence. **Anthony/Diego (whoever owns the browser login) must authenticate,
-publish, and verify the hosted subscription before relying on Maincloud.**
-Self-hosted SpacetimeDB is viable; this result does not trigger the Convex fallback.
+Publication and a successful seed do not establish office parity or network
+latency. Hosted parity evidence is pending. Local standalone remains the default
+fallback; a Maincloud outage must not silently substitute simulated state.
 
 ## Scope and continuation
 
