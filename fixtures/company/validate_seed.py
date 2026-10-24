@@ -131,7 +131,8 @@ def validate(root=ROOT):
     for path, expected in manifest["sha256"].items():
         assert hashlib.sha256((root / path).read_bytes()).hexdigest() == expected, f"Frozen content changed: {path}"
     print(f'PASS: 25 vendors, {len(invoices)} AP invoices/PDFs/emails across 3 months, 10 AR/consents, P01-P12 + C01-C22, {len(manifest["sha256"])} frozen files')
-    print("PENDING: owner signoff, outside authorship target, live Nessie/CRS/reducer provisioning and integration scenarios")
+    signoff = "APPROVED by triumph! for policy-decision eval run #1" if key["signoff"]["status"] == "approved" else "PENDING: owner signoff"
+    print(f"{signoff}. PENDING: outside authorship target, live Nessie/CRS/reducer provisioning and integration scenarios")
 
 
 def expect_reject(mutator, label, needle):
