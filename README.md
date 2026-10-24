@@ -38,9 +38,11 @@ Cal Hacks 13.0. Full product spec: [`docs/spec.md`](docs/spec.md).
 - **Seven agents, one job each.** Intake, Extractor, Vendor, Payables,
   Collections, Reconciler and Auditor hand a case to one another through a
   single dispatcher ([agents](docs/agents.md)).
-- **Collections calls.** The collections agent phones a late client through
-  Cartesia, gives the AI disclosure, confirms identity before any amount, and
-  negotiates a payment plan only inside its badge.
+- **Collections calls.** The collections agent is built to phone a late client
+  through Cartesia, give the AI disclosure, confirm identity before any amount,
+  and negotiate a payment plan only inside its badge. The offline demo uses
+  scripted call turns, and a historical call receipt is not a new dial
+  ([Cartesia limits](#cartesia-setup-features-and-limitations)).
 - **Payables that refuse fraud.** A lookalike sender domain or a risky bank
   change is held for the owner, never paid.
 - **Server-enforced policy.** A pure TypeScript engine checks every action
@@ -48,14 +50,18 @@ Cal Hacks 13.0. Full product spec: [`docs/spec.md`](docs/spec.md).
 - **Owner approval by passkey.** Anything over a limit needs a human WebAuthn
   passkey tap. Voice and models can never approve.
 - **Pay and reconcile.** Clients pay through a link tied to the approved plan.
-  Deposits go to Capital One's Nessie sandbox and are matched exactly before an
-  invoice moves to paid.
+  Deposits go to Capital One's Nessie sandbox, and an invoice moves only on an
+  exact deposit match. A posted deposit and a displayed balance are separate;
+  neither is settlement or proof that the balance rose
+  ([pay and reconcile](docs/m7-payments.md)).
 - **Audit wall with "ask why".** Every decision is a hash-chained audit entry.
   Ask any agent why, and its answer must cite entry ids.
 - **LLM OFF switch.** Turn the models off and the office keeps enforcing every
   rule with zero model calls.
-- **Live shared state.** SpacetimeDB holds the tables and reducers; the office
-  subscribes and updates in under a second.
+- **Live shared state.** SpacetimeDB holds the tables and reducers, and the
+  office subscribes to them. The retained
+  [Maincloud parity receipts](docs/evidence/maincloud-parity/README.md) measured
+  request-to-frame updates under one second.
 
 ## Highlights
 
