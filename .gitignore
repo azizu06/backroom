@@ -19,3 +19,6 @@ web/playwright-report/
 .t8-tools/
 spacetime/node_modules/
 spacetime/dist/
+
+# Local Nessie idempotency claims; preserve across restarts.
+.nessie-state/
