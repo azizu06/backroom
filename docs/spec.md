@@ -1,6 +1,7 @@
 # Combined spec: the 3D back office with a collections clerk that calls you
 
 **Status:** merged draft v1, Fri Oct 23 2026, about 10:45 PM PT. Writing only; no code exists yet.
+Source B collections spec: [`spec-b.md`](spec-b.md).
 **Merges:** A = teammate's `back-office-spec.md` (the 3D office, badges, rooms, walk-to-human, audit wall, inbox tray, SpacetimeDB, GX10). B = Aziz's `BackOffice_spec.md` ("Ledgerline": live collections call, policy engine, legal guardrails, CRS, Apify, Nessie, test plan, T1–T8). Where they conflict, the **agreed merge** decisions win (listed in §0.3).
 **Team:** Aziz (lead; TS/Next.js, agents, voice), SwiftTaco (front end), triumph! (PM; Arduino/ESP32), antjutsu (suggested SpacetimeDB; skills unknown). Every owner is a **suggestion**.
 **Labels:** FACT = in a cited source (B's ledger, S1, or the new rows in §11). INFERENCE = our reasoning. UNKNOWN = no source. VERIFY = needs a check. NOC = needs organizer/sponsor confirmation. [Bn] points to B's section n; [Ln] to the source ledger.
