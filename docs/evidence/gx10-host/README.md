@@ -17,7 +17,7 @@ supervisor survives SSH logout; no system/Ollama/other-user changes were made.
 The deployed revision is the PR candidate; `main` is the wrapper's release default
 once merged. Stop the owned host before updating its checkout.
 
-A **new** `backrooms-gx10-judge-1792851139` database was published using the full
+A **new** `backrooms-gx10-judge-1792851602` database was published using the full
 current-main module. `spacetime/scripts/seed.ts` imported synthetic Northfield
 (10 clients, 25 vendors, 10 AR and 83 AP invoices). The pre-existing shared
 `backrooms-calhacks13` database was not reset or modified. The private publisher
@@ -37,7 +37,7 @@ SSH stdin from Keychain, absent from app/team env files.
   callbacks return **401 from the receiver**, rather than Next 404. Private
   supervisor web controls also return 401 without credentials.
 - External-state supervisor reset was rejected with 409, with no republish/reset.
-- The warm office/controller URL switch completed in **334 ms**.
+- The warm office/controller URL switch completed in **256 ms**.
 
 Both `demo:health --live` commands passed web/seats, state, Cartesia key, Nessie
 sandbox reads, configured GX10 model, actual Anthropic pre-call preparation,
@@ -59,13 +59,15 @@ payments must finish on their original host. See the [switch runbook](../../demo
 **GX10 + Maincloud is measurably slower than Mac + local state.** Keep the office
 warm before the pitch. The Mac standby gives the fastest observed judging path;
 choose it if low latency matters more than the GX10-hosted application claim.
-The hosted path still worked throughout this sample, but is not latency-neutral.
+The hosted path still worked throughout this sample, but is clearly worse for a
+latency-sensitive live demo. Prefer the warm Mac for that take unless the GX10
+hosting narrative is worth this visible delay.
 
 | Metric | Mac + local DB median / p95 | GX10 + Maincloud median / p95 |
 | --- | ---: | ---: |
-| Office page load | 52 / 69 ms | 247 / 368 ms |
-| Office state connected | 104 / 122 ms | 1,625 / 1,986 ms |
-| Held duplicate decision | 73 / 180 ms | 332 / 363 ms |
+| Office page load | 55 / 56 ms | 440 / 524 ms |
+| Office state connected | 109 / 110 ms | 1,817 / 1,908 ms |
+| Held duplicate decision | 81 / 225 ms | 944 / 1,897 ms |
 
 [latency.json](latency.json) contains every sample: five fresh Chromium contexts
 per office and ten deterministic duplicate decisions per host. Pages use direct
@@ -89,6 +91,11 @@ STATE_STORE=memory pnpm --filter @backroom/orchestrator exec tsx \
   ../tools/demo/measure-hosts.ts mac=http://127.0.0.1:3350 gx10=http://100.117.44.20:3340
 ```
 
-Vitest: **727 tests passed** across policy, Nessie, orchestrator, SpacetimeDB and
+Vitest: **775 tests passed** across policy, Nessie, orchestrator, SpacetimeDB and
 web, including bind/external-state/callback boundary regressions. Full production
 build passed. No additional review or no-mistakes pipeline is claimed.
+
+One later fresh-database publish took several minutes. Publication and successful
+seed were confirmed before the final hosted launch. The earlier owned judge DB
+is retained too; no shared database was modified. These deployment delays make
+the already-warm Mac especially important.

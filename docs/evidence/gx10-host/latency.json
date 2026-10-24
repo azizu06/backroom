@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-24T14:14:30.195Z",
+  "at": "2026-10-24T14:28:33.064Z",
   "backends": {
     "mac": "local",
     "gx10": "maincloud"
@@ -9,87 +9,87 @@
     {
       "name": "mac",
       "origin": "http://127.0.0.1:3350",
-      "decisionOrigin": "https://marble-excitement-owner-pasta.trycloudflare.com",
+      "decisionOrigin": "https://boxed-tuesday-enrolled-outside.trycloudflare.com",
       "decision": {
         "samplesMs": [
-          85,
+          225,
+          89,
+          91,
+          79,
+          74,
+          142,
+          81,
+          81,
           73,
-          65,
-          116,
-          71,
-          128,
-          68,
-          51,
-          180,
-          68
+          64
         ],
-        "medianMs": 73,
-        "p95Ms": 180
+        "medianMs": 81,
+        "p95Ms": 225
       },
       "pageLoad": {
         "samplesMs": [
-          69,
-          51,
-          52,
-          52,
-          53
+          55,
+          56,
+          56,
+          53,
+          54
         ],
-        "medianMs": 52,
-        "p95Ms": 69
+        "medianMs": 55,
+        "p95Ms": 56
       },
       "stateConnected": {
         "samplesMs": [
-          122,
-          99,
-          100,
-          104,
-          106
+          110,
+          110,
+          106,
+          105,
+          109
         ],
-        "medianMs": 104,
-        "p95Ms": 122
+        "medianMs": 109,
+        "p95Ms": 110
       }
     },
     {
       "name": "gx10",
       "origin": "http://100.117.44.20:3340",
-      "decisionOrigin": "https://professional-dentists-joe-microphone.trycloudflare.com",
+      "decisionOrigin": "https://tire-interview-human-guys.trycloudflare.com",
       "decision": {
         "samplesMs": [
-          310,
-          303,
-          347,
-          332,
-          277,
-          267,
-          342,
-          363,
-          339,
-          288
+          1112,
+          802,
+          1205,
+          1897,
+          695,
+          861,
+          887,
+          864,
+          1154,
+          944
         ],
-        "medianMs": 332,
-        "p95Ms": 363
+        "medianMs": 944,
+        "p95Ms": 1897
       },
       "pageLoad": {
         "samplesMs": [
-          133,
-          219,
-          255,
-          247,
-          368
+          291,
+          329,
+          524,
+          440,
+          448
         ],
-        "medianMs": 247,
-        "p95Ms": 368
+        "medianMs": 440,
+        "p95Ms": 524
       },
       "stateConnected": {
         "samplesMs": [
-          1622,
-          1986,
-          1524,
-          1632,
-          1625
+          1777,
+          1641,
+          1908,
+          1817,
+          1887
         ],
-        "medianMs": 1625,
-        "p95Ms": 1986
+        "medianMs": 1817,
+        "p95Ms": 1908
       }
     }
   ]
