@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "922e72bbb2fed486a9bc59518dc935632eefa08f",
+    "baseCommit": "c7e9d29b14beeb26eb605b89d1da54d92c4c91e6",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
@@ -18,9 +18,9 @@
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
-      "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
+      "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "48a7fc27d0dea653c442a98beb5d72aa03dbda93311bc175c260b27c08aa4bf0"
+      "orchestrator/src/agents/eval/scoreboard.ts": "4734f59146a234b6661ba18bad6c45469732d78a868f8c24db0035a35238159f"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -32,7 +32,8 @@
       "fixtures/answer-key/expected.json": "486033e930a903ad6b63bee06a5b9c267bd3300bcf5746a95cc0443c4a61606f",
       "fixtures/answer-key/frozen-manifest.json": "6ff7132e7792784b833774f1bf02fa79b5b15d59a02d3c18062ca377f65da1e5",
       "fixtures/scenarios/payables.json": "5dfb840adc3286e91df15148b9c698e7e7908294f0ba16bcacd93f36fa9a37d8",
-      "fixtures/scenarios/collections.json": "e8411c084e3da3f8a6812ceaeb96d1e565bf3ddb5149933c0923ed567642735a"
+      "fixtures/scenarios/collections.json": "e8411c084e3da3f8a6812ceaeb96d1e565bf3ddb5149933c0923ed567642735a",
+      "docs/eval/pdf-extraction.json": "762e09694c6605dcb77c36fb5c84364ffc6248e04c05d8a17e54e709d7ff4e90"
     },
     "keyVersion": "northfield-v1",
     "signoff": {
