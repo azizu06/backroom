@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "3f271fd4e76feadd01c07975d5c1d904647e0b19",
+    "baseCommit": "f9b3b41c90d3f73fd093ef6dd12c4f5452b15134",
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
       "fixtures/answer-key/expected.json": "486033e930a903ad6b63bee06a5b9c267bd3300bcf5746a95cc0443c4a61606f",
