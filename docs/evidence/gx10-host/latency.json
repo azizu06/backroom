@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-24T14:28:33.064Z",
+  "backends": {
+    "mac": "local",
+    "gx10": "maincloud"
+  },
+  "scope": "Mac client; production hosts; fresh Chromium contexts; page over direct host; decision over public tunnel; synthetic duplicate preset; code decision only, no model/bank/dial; server warmed",
+  "results": [
+    {
+      "name": "mac",
+      "origin": "http://127.0.0.1:3350",
+      "decisionOrigin": "https://boxed-tuesday-enrolled-outside.trycloudflare.com",
+      "decision": {
+        "samplesMs": [
+          225,
+          89,
+          91,
+          79,
+          74,
+          142,
+          81,
+          81,
+          73,
+          64
+        ],
+        "medianMs": 81,
+        "p95Ms": 225
+      },
+      "pageLoad": {
+        "samplesMs": [
+          55,
+          56,
+          56,
+          53,
+          54
+        ],
+        "medianMs": 55,
+        "p95Ms": 56
+      },
+      "stateConnected": {
+        "samplesMs": [
+          110,
+          110,
+          106,
+          105,
+          109
+        ],
+        "medianMs": 109,
+        "p95Ms": 110
+      }
+    },
+    {
+      "name": "gx10",
+      "origin": "http://100.117.44.20:3340",
+      "decisionOrigin": "https://tire-interview-human-guys.trycloudflare.com",
+      "decision": {
+        "samplesMs": [
+          1112,
+          802,
+          1205,
+          1897,
+          695,
+          861,
+          887,
+          864,
+          1154,
+          944
+        ],
+        "medianMs": 944,
+        "p95Ms": 1897
+      },
+      "pageLoad": {
+        "samplesMs": [
+          291,
+          329,
+          524,
+          440,
+          448
+        ],
+        "medianMs": 440,
+        "p95Ms": 524
+      },
+      "stateConnected": {
+        "samplesMs": [
+          1777,
+          1641,
+          1908,
+          1817,
+          1887
+        ],
+        "medianMs": 1817,
+        "p95Ms": 1908
+      }
+    }
+  ]
+}
