@@ -149,7 +149,8 @@ function redness(data: readonly number[]): number {
  * Red margins of the DENY sign board (centred (6.35, 1.1, 0.55), 1.6 x 0.72, facing +z), right half only:
  * clear of the 'DENIED' and rule text, whose position on screen shifts with the canvas size, and of the door ring and flash.
  */
-const SIGN_MARGINS = [[6.95, 0.84, 0.56], [7.0, 1.38, 0.56], [6.7, 0.82, 0.56], [6.95, 1.1, 0.56]] as const;
+// Red board spots with no ink on the taller two-line DENY sign: between the rule rows, between header and rules, and the bottom strip.
+const SIGN_MARGINS = [[6.95, 1.04, 0.56], [7.05, 1.44, 0.56], [5.75, 1.04, 0.56], [6.35, 0.63, 0.56]] as const;
 
 /** Redness at every sign margin point under the Treasury focus camera. */
 async function signRedness(page: Page, canvas: Locator): Promise<number[]> {
