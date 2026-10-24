@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import auditLog from "../../../fixtures/why/audit-log.json";
 import answerKey from "../../../fixtures/why/answer-key.json";
 import { askWhy, createAskWhyHandler, type WhyAuditEntry } from "./index.js";
+
+beforeEach(() => vi.stubEnv('ANTHROPIC_API_KEY', ''));
+afterEach(() => vi.unstubAllEnvs());
 
 const entries = auditLog as WhyAuditEntry[];
 const question = answerKey[0]!.question;
@@ -10,6 +13,19 @@ const completion = (value: unknown) => new Response(JSON.stringify({ choices: [{
 const mockModel = (value: unknown = valid) => vi.fn<typeof fetch>(async () => completion(value));
 
 describe("askWhy", () => {
+  it('uses the default cloud router with only an Anthropic key', async () => {
+    vi.stubEnv('LLM_CLOUD_PROVIDER', 'anthropic');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-test');
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
+      model: 'claude-sonnet-5-5', stop_reason: 'end_turn',
+      content: [{ type: 'text', text: JSON.stringify({ output: valid, confidence: 1 }) }],
+      usage: { input_tokens: 100, output_tokens: 20 },
+    }));
+    expect(await askWhy(question, entries, { fetch: fetcher })).toMatchObject({ source: 'model', citations: ['212'] });
+    expect(fetcher.mock.calls[0]?.[0]).toBe('https://api.anthropic.com/v1/messages');
+  });
+
   it("cites the StateStore audit:seq identifiers through projection and model validation", async () => {
     const entry = { ...entries[0]!, id: "audit:1" };
     const fetcher = mockModel({ answer: "Held as a duplicate [entry:audit:1].", citations: ["audit:1"] });
