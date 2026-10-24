@@ -6,6 +6,7 @@ import type { InboxSource, InvoiceFields, InvoiceRecord, PayablesClient, SeatOpt
 export type * from './types';
 export { MemoryFinanceRepository } from './repository';
 export { controllerForLease } from './decisions';
+export * from './northfield';
 export { nessiePayables } from './payments';
 
 function items(lines: readonly LineItem[]) {
@@ -32,7 +33,7 @@ export class PayablesSeat {
       const history = await repo.listInvoices(fields.vendorId);
       const context: Context = {
         vendor: vendor ? { id: vendor.id, knownDomain: vendor.domain, sourceDomain: domain(source.senderDomain),
-          inMaster: true, approved: vendor.approved, pendingBankChange: bankChanged || await repo.hasPendingBankChange(fields.vendorId) } : undefined,
+          inMaster: vendor.inMaster ?? true, approved: vendor.approved, pendingBankChange: bankChanged || await repo.hasPendingBankChange(fields.vendorId) } : undefined,
         signals: { ofacHit: vendor?.ofacHit }, priorInvoices: history.map(row => row.policyInvoice),
       };
       let decision = prior && !canReevaluate ? hold('DUPLICATE_INVOICE') : !vendor ? hold('PAYEE_NOT_IN_MASTER')

@@ -28,9 +28,9 @@ export class VendorSeat {
       const vendor = await repo.getVendor(fields.vendorId);
       let decision = fields.kind === 'bank_change'
         ? vendor ? evaluate('vendor_onboarding', { type: 'propose_bank_change', emailDomain: source.senderDomain }, {
-          vendor: { id: vendor.id, knownDomain: vendor.domain, inMaster: true, approved: vendor.approved, pendingBankChange: true },
+          vendor: { id: vendor.id, knownDomain: vendor.domain, inMaster: vendor.inMaster ?? true, approved: vendor.approved, pendingBankChange: true },
         }) : hold('PAYEE_NOT_IN_MASTER') : hold('PAYEE_NOT_IN_MASTER');
-      let canVerify = fields.kind === 'bank_change' ? vendor?.approved === true : !vendor;
+      let canVerify = fields.kind === 'bank_change' ? vendor?.approved === true && vendor.inMaster !== false : !vendor || vendor.inMaster === false;
       const knownDomain = vendor?.domain ?? fields.domain;
       if (domain(source.senderDomain) !== domain(knownDomain) || domain(fields.domain) !== domain(knownDomain)) canVerify = false;
       const refs = [source.id];

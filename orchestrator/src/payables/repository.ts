@@ -24,7 +24,7 @@ export class MemoryFinanceRepository implements FinanceRepository {
   }
   async getVendor(id: string) { return structuredClone(this.vendors.get(id)); }
   async hasPendingBankChange(vendorId: string) {
-    return [...this.changes.values()].some(row => row.fields.vendorId === vendorId && row.fields.kind === 'bank_change' && ['held', 'awaiting_controller'].includes(row.result.status));
+    return this.vendors.get(vendorId)?.pendingBankChange === true || [...this.changes.values()].some(row => row.fields.vendorId === vendorId && row.fields.kind === 'bank_change' && ['held', 'awaiting_controller'].includes(row.result.status));
   }
   async saveVendor(vendor: ApprovedVendor) { this.vendors.set(vendor.id, structuredClone(vendor)); }
   async getPO(id: string) { return structuredClone(this.orders.get(id)); }
@@ -38,7 +38,7 @@ export class MemoryFinanceRepository implements FinanceRepository {
     if (!stored || JSON.stringify(stored.fields) !== JSON.stringify(change.fields) ||
         stored.result.escalationId !== change.result.escalationId ||
         (this.vendors.get(vendor.id)?.revision ?? null) !== change.baselineRevision) throw new Error('STALE_BANK_CHANGE');
-    this.vendors.set(vendor.id, structuredClone(vendor));
+    this.vendors.set(vendor.id, { ...structuredClone(vendor), pendingBankChange: false, inMaster: true });
     this.changes.set(change.id, structuredClone(change));
   }
 }
