@@ -17,3 +17,10 @@ export function externalState(env: NodeJS.ProcessEnv) {
   if (uri.protocol !== 'wss:') throw new Error('DEMO_EXTERNAL_STATE_REQUIRES_WSS');
   return { uri: env.SPACETIMEDB_URI, database: env.SPACETIMEDB_DATABASE, token: env.SPACETIMEDB_TOKEN };
 }
+
+/** Match the actual Cartesia URLs emitted by provisionVoice plus the legacy relay prefix. */
+export function voiceRelayPath(path: string): string | undefined {
+  if (path === '/api/voice/cartesia' || path.startsWith('/api/voice/tools/')) return path;
+  if (path.startsWith('/_cartesia/')) return path.slice('/_cartesia'.length);
+  return undefined;
+}

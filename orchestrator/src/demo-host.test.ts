@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { demoBindHost, externalState } from '../../tools/demo/host';
+import { demoBindHost, externalState, voiceRelayPath } from '../../tools/demo/host';
 
 describe('demo host boundary', () => {
   it('keeps the Mac private and permits the GX10 Tailscale address only when selected', () => {
@@ -14,4 +14,11 @@ describe('demo host boundary', () => {
     expect(externalState(env)).toEqual({ uri: 'wss://maincloud.spacetimedb.com', database: 'judge', token: 'private' });
     expect(() => externalState({ ...env, SPACETIMEDB_URI: 'ws://example.com' })).toThrow('DEMO_EXTERNAL_STATE_REQUIRES_WSS');
   });
+});
+
+it('forwards provisioned event/tool callbacks to the authenticated receiver, preserving legacy URLs', () => {
+  expect(voiceRelayPath('/api/voice/cartesia')).toBe('/api/voice/cartesia');
+  expect(voiceRelayPath('/api/voice/tools/propose_plan')).toBe('/api/voice/tools/propose_plan');
+  expect(voiceRelayPath('/_cartesia/health')).toBe('/health');
+  for (const path of ['/api/voice/other', '/api/voice/cartesia-extra', '/api/tools/propose_plan']) expect(voiceRelayPath(path)).toBeUndefined();
 });

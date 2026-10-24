@@ -1,6 +1,6 @@
 // Single local process: Next route chunks, seats, gateway and controller share globals.
 import next from 'next';
-import { demoBindHost } from '../tools/demo/host';
+import { demoBindHost, voiceRelayPath } from '../tools/demo/host';
 import { createServer, request as proxyRequest } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -75,10 +75,11 @@ async function main() {
       res.writeHead(409).end(); return;
     }
     if (resetting) { res.writeHead(503).end('Demo resetting; retry shortly'); return; }
-    if (path.startsWith('/_cartesia/')) {
+    const relayPath = voiceRelayPath(path);
+    if (relayPath !== undefined) {
       if (process.env.DEMO_VOICE_RUNNING !== '1') { res.writeHead(503).end('Voice relay disabled'); return; }
       const upstream = proxyRequest({ hostname: '127.0.0.1', port: Number(process.env.VOICE_PORT || 8788),
-        path: (req.url || '').slice('/_cartesia'.length), method: req.method,
+        path: relayPath + new URL(req.url || '/', 'http://localhost').search, method: req.method,
         headers: { ...req.headers, host: `127.0.0.1:${process.env.VOICE_PORT || 8788}` }, timeout: 10000 }, response => {
         res.writeHead(response.statusCode || 502, response.headers); response.pipe(res);
       });

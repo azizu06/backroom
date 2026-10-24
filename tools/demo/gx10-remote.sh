@@ -12,6 +12,7 @@ if [[ "$action" == up ]]; then
   command -v pnpm >/dev/null
   command -v cloudflared >/dev/null
   mkdir -p "$base"
+  if [[ ! -f "$base/host.env" ]]; then printf 'DEMO_LIVE=1\nDEMO_VOICE=1\n' > "$base/host.env"; fi
   mkdir "$base/deploy.lock" || { echo 'Another deployment owns this host directory.' >&2; exit 1; }
   trap 'rmdir "$base/deploy.lock"' EXIT
   if [[ ! -d "$app/.git" ]]; then

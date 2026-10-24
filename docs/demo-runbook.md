@@ -348,7 +348,7 @@ Keep `host.env` and `state.env` under that same private host directory, mode 060
 they are dotenv data, never sourced shell scripts. Inspect private host logs on
 the GX10 (`build.log`, `install.log`, `app/.demo/*.log`); do not paste raw logs.
 
-`host.env` selects the real sandbox adapter path and receiver (no dial):
+`host.env` defaults to the real sandbox adapter path and receiver (no dial), and may override these settings:
 
 ```dotenv
 DEMO_LIVE=1
@@ -359,6 +359,9 @@ Voice setup creates/updates this checkout's private Cartesia agent/tools, then
 starts the receiver. It never invokes `dial`. Receiver and control listeners
 remain loopback-only. Its file-backed gateway is still separate from the web
 StateStore; hosting does not prove phone → passkey → payment integration.
+
+Actual callbacks `/api/voice/tools/*` and `/api/voice/cartesia` also proxy to the
+authenticated receiver; `/_cartesia/*` remains available for relay health.
 
 Web binds **100.117.44.20:3340**, local fallback DB **100.117.44.20:3341**,
 voice **127.0.0.1:3342**. Startup prints `ss -ltn`; the runner checks each selected
@@ -384,6 +387,10 @@ The host never publishes/deletes/resets external databases. `demo:reset` returns
 scripted database is not a clean rehearsal; obtain a fresh one from the state
 operator. Without `state.env`, the host owns its own GX10 SpacetimeDB server and
 fresh `backroom-demo-*` database. Never point two hosts at the same demo database.
+
+The honest pitch is “the application server stack and routine inference run on
+GX10; durable state is Maincloud when configured; Cartesia, Anthropic, Nessie and
+Apify remain external services.” Do not say every provider runs on GX10.
 
 ### Switch in under one minute
 
@@ -414,3 +421,36 @@ the same `.env.voice` directory.
 This is a URL/origin switch, not transparent failover. Process-local finance and
 voice state do not migrate. Complete an in-flight approval/payment on its original
 host; never replay a possibly completed bank operation on the fallback.
+
+For an equivalent warm live Mac receiver without allocating a second Cartesia
+agent, copy **only** the GX10's private `.env.voice/resources.json` and
+`.demo/voice-private.env` into those same paths in the separate Mac checkout
+(mode 0600). Do not copy journals, gateway state or bank idempotency claims.
+Start with `DEMO_LIVE=1 DEMO_VOICE=1 DEMO_VOICE_SETUP=0` plus the Mac ports above.
+This does not update the active GX10 agent's webhook destinations. A fresh
+second-agent attempt returned HTTP 402 during testing; do not keep retrying it
+or purchase credits as part of switching hosts.
+
+To direct **new sessions** to the prepared Mac receiver, update the existing
+agent's tools/webhook explicitly from the Mac repo root:
+
+```sh
+STATE_STORE=memory node --env-file=.env.local --env-file=.demo/private.env \
+  --env-file=.demo/voice-private.env --env-file=.demo/voice.env \
+  --import ./orchestrator/node_modules/tsx/dist/loader.mjs \
+  orchestrator/src/voice/live.ts setup
+```
+
+That updates existing IDs, never dials and must finish before the receiver is
+called active. Copy the current `.demo/voice.env` into the Node command only as
+shown; it contains the warm Mac's public origin. Return traffic to GX10 by
+running the same setup under the GX10 private env/current voice.env. Do not
+switch a live call between separate journals. Hardware failure still needs
+Cartesia/internet access to update callbacks; if those are down, say so and
+continue with the web/text fallback.
+
+Measured host latency and scope live in [the GX10 hosting receipt](evidence/gx10-host/README.md).
+The reproducible opt-in `tools/demo/measure-hosts.ts` writes synthetic duplicate
+inbox/audit rows only; it requires `MAC_PUBLIC_URL` / `GX10_PUBLIC_URL` for the
+same-origin decision endpoints. Page loads use direct host URLs. It performs
+no model inference, bank request, approval or dial.
