@@ -131,7 +131,9 @@ export class SpacetimeStateStore implements StateStore {
   get llmSignal() { return this.controller.signal; }
   async close() { this.unsubscribe(); this.enabled = false; this.controller.abort('SPACETIME_CLOSED'); this.transport.close(); }
   private async call<K extends keyof StateStore>(method: string, values: unknown[]): Promise<Awaited<ReturnType<Extract<StateStore[K], (...args: never[]) => unknown>>>> {
-    return await this.transport.invoke(method, JSON.parse(canonicalAuditJson(values))) as Awaited<ReturnType<Extract<StateStore[K], (...args: never[]) => unknown>>>;
+    const wire = [...values];
+    while (wire.length && wire.at(-1) === undefined) wire.pop();
+    return await this.transport.invoke(method, JSON.parse(canonicalAuditJson(wire))) as Awaited<ReturnType<Extract<StateStore[K], (...args: never[]) => unknown>>>;
   }
   async decideEscalation(approval: VerifiedApproval, now: number) {
     return this.call<'decideEscalation'>('decideEscalation', [consumeVerifiedApproval(approval), now]);

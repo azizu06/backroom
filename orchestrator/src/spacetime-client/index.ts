@@ -51,6 +51,7 @@ import GetAgentReducer from "./get_agent_reducer";
 import GetAuditReducer from "./get_audit_reducer";
 import GetEscalationReducer from "./get_escalation_reducer";
 import GetPaymentReducer from "./get_payment_reducer";
+import GetPolicyReducer from "./get_policy_reducer";
 import GetTaskReducer from "./get_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
 import InsertInvoiceReducer from "./insert_invoice_reducer";
@@ -68,6 +69,7 @@ import RegisterAgentReducer from "./register_agent_reducer";
 import RenewLeaseReducer from "./renew_lease_reducer";
 import RequestRoomEntryReducer from "./request_room_entry_reducer";
 import ReservePaymentReducer from "./reserve_payment_reducer";
+import SavePolicyLimitsReducer from "./save_policy_limits_reducer";
 import SeedCompanyReducer from "./seed_company_reducer";
 import SetAgentStateReducer from "./set_agent_state_reducer";
 import SetAgentTargetReducer from "./set_agent_target_reducer";
@@ -216,6 +218,7 @@ const reducersSchema = __reducers(
   __reducerSchema("get_audit", GetAuditReducer),
   __reducerSchema("get_escalation", GetEscalationReducer),
   __reducerSchema("get_payment", GetPaymentReducer),
+  __reducerSchema("get_policy", GetPolicyReducer),
   __reducerSchema("get_task", GetTaskReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("insert_invoice", InsertInvoiceReducer),
@@ -233,6 +236,7 @@ const reducersSchema = __reducers(
   __reducerSchema("renew_lease", RenewLeaseReducer),
   __reducerSchema("request_room_entry", RequestRoomEntryReducer),
   __reducerSchema("reserve_payment", ReservePaymentReducer),
+  __reducerSchema("save_policy_limits", SavePolicyLimitsReducer),
   __reducerSchema("seed_company", SeedCompanyReducer),
   __reducerSchema("set_agent_state", SetAgentStateReducer),
   __reducerSchema("set_agent_target", SetAgentTargetReducer),

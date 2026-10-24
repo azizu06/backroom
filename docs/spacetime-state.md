@@ -1,6 +1,6 @@
 # Full SpacetimeDB state: local evidence
 
-Verified 2026-10-24 around 01:45 PDT, after integrating main through `952b2c7`.
+Verified 2026-10-24 around 01:48 PDT, after integrating main through `bb63766`.
 This extends the original T8 spike; it does not replace its historical evidence.
 Setup, table visibility, reducer signatures and UI subscription mapping are in
 [`spacetime/README.md`](../spacetime/README.md).
@@ -12,8 +12,8 @@ API, bank or paid service is contacted by this lane.
 
 | Check | Observed result |
 | --- | --- |
-| `pnpm -r test` | 439 passing at the integrated candidate |
-| `pnpm --filter @backroom/spacetime test:contract` | 79 existing state/audit/real-policy/recovery/LLM-OFF/approval/gateway/core-demo tests pass through actual WASM reducers and the durable adapter |
+| `pnpm -r test` | 445 passing at the integrated candidate |
+| `pnpm --filter @backroom/spacetime test:contract` | 84 existing state/audit/real-policy/recovery/LLM-OFF/approval/gateway/core-demo/policy-editor tests pass through actual WASM reducers and the durable adapter |
 | `pnpm --filter @backroom/spacetime test` | 14 module tests pass, including database-time fencing, cross-badge writes, AP approval/receipt requirements, stale vendor context, fixture seed replay and FIFO claims |
 | `pnpm -r build`, `pnpm -r typecheck` | Pass, including `/office`, `/audit`, `/t8` and generated client reexports |
 | `tsc --project spacetime/tsconfig.tests.json --noEmit` | Scripts and test-harness types pass |
@@ -21,6 +21,7 @@ API, bank or paid service is contacted by this lane.
 | Anonymous office subscription | Saw Dana target and all 31 collection audit entries; maximum local row-to-client callback latency **4 ms**; server result view remained empty |
 | Collection audit parity | All **31** audit bodies equal memory replay; only timestamps and their derived hashes differ; both original hash chains verify |
 | Cross-client model switch | OFF aborts the peer's old signal, ON creates a fresh signal, old generation remains fenced |
+| Owner policy save | Immutable v1 stays readable; v2 and its owner audit commit atomically; subsequent reads see v2 |
 | New client after close | Reads completed task and verifies the persisted chain |
 | Anonymous writer | Rejected with `CONTROLLER_REQUIRED` |
 | Canonical company seed | Loaded through the real reducer; repeating it creates no extra seed event or duplicate invoice |

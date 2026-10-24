@@ -73,7 +73,7 @@ Typed public projections for the office:
 | `escalation` | `id`, `taskId`, `fromAgent`, `toHuman`, `status`, `ruleIds`, `evidenceRefs`, `createdAt`, `expiresAt`, `json` (full StateStore row) |
 | `audit_entry` | `seq` (u64), unique `id`, `ts` (integer ms), actor/seat/action, ruleIds/policyVersion/refs/route, latencyMs/costUsd, optional decision, canonical `inputs` JSON, prevHash/hash |
 | `runtime_control` | `id=global`, `llmEnabled`, monotonic `generation` (u64), `heartbeatAt` |
-| `policy`, `seat`, `badge` | immutable policy version and code-enforced badges/limits |
+| `policy`, `seat`, `badge` | immutable policy snapshots and current code-enforced badges/limits |
 
 `agent.state` includes `paused`; an escalation target is `Dana_desk`. Map that
 anchor to the existing office desk. Treasury entry is evaluated against the
@@ -156,6 +156,9 @@ The adapter does not retry an ambiguous side effect automatically.
   are trusted-server ingress. A bank change is immutable after verification;
   apply requires bound evidence, an approved passkey escalation, correct policy
   version and unchanged vendor revision. No generic row-update reducer exists.
+- `save_policy_limits` uses optimistic version checks and appends the owner audit
+  atomically with an immutable snapshot, updating current seat/badge projections.
+  Reducers and workers evaluate the latest policy; historical snapshots remain readable.
 - OFF and its code audit commit atomically. Subscriptions abort the old model
   signal on OFF, disconnect, stale heartbeat (>5s), or generation change; ON gets
   a fresh signal. A server heartbeat runs each second. Recreate a disconnected

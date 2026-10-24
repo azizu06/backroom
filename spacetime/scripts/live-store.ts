@@ -55,7 +55,11 @@ async function main() {
     await seedTransport.seedCompany(fixture);
     await assert.rejects(seeded.insertInvoice({ id: '1042', kind: 'ar', state: 'overdue' }), /INVOICE_EXISTS/);
     assert.equal((await seeded.listAudit()).filter(entry => entry.action === 'seed_company').length, 1);
-    console.log('PASS: canonical company seed loads on the server and replays idempotently');
+    const nextPolicy = await seeded.savePolicyLimits(1, { maxInstallments: 3, minFirstPct: 50, maxPlanDays: 30, maxPaymentCents: 200000 }, Date.now());
+    assert.equal(nextPolicy.policyVersion, 2);
+    assert.equal((await seeded.getPolicy(1)).badges.collections.limits.maxInstallments, 2);
+    assert.equal((await seeded.getPolicy(undefined)).badges.collections.limits.maxInstallments, 3);
+    console.log('PASS: canonical seed replay and immutable owner policy versions on the server');
     const tape: { method: string; values: unknown[] }[] = [];
     const transport = new SpacetimeTransport({ uri, database: database + '-parity', token });
     const recording: StateTransport = {
