@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { localSpacetime } from '../../../tools/demo/spacetime';
+import { OwnedProcesses } from '../../../tools/demo/processes';
 import { demoDatabaseTarget } from './database';
 import { preflight } from './preflight';
 
@@ -35,4 +39,41 @@ it('requires authenticated reads and the configured Ollama model; never makes PO
   expect(rows.find(row => row.name === 'GX10 Ollama')?.ok).toBe(false);
   expect(rows.find(row => row.name === 'SpacetimeDB')?.ok).toBe(true);
   expect(calls.every(init => !init.method && init.redirect === 'error' && init.signal)).toBe(true);
+});
+
+it('preserves existing shared-state attachment while refusing mixed hosted reset modes', () => {
+  expect(demoDatabaseTarget({ BACKROOM_DEMO: '1', DEMO_STATE_REMOTE: '1', SPACETIMEDB_DATABASE: 'shared-judge' }).mode).toBe('local');
+  expect(() => demoDatabaseTarget({ BACKROOM_DEMO: '1', DEMO_STATE_REMOTE: '1', DEMO_SPACETIME: 'maincloud', DEMO_MAINCLOUD: '1' })).toThrow('DEMO_CONFLICTING_STATE_MODES');
+});
+
+
+it('rotates fresh marked Maincloud databases without starting a local server or deleting old state', async () => {
+  const scratch = resolve('.demo');
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, 'reset-test-'));
+  mkdirSync(join(root, '.demo'));
+  const config = join(root, 'publisher.toml');
+  writeFileSync(config, 'spacetimedb_token = "test-private-token"');
+  const children = new OwnedProcesses(root, {});
+  const commands: string[][] = [];
+  vi.spyOn(children, 'run').mockImplementation(async (_cmd, args, log) => {
+    commands.push(args);
+    if (args.includes('--version')) writeFileSync(log, 'spacetime 2.13.0');
+  });
+  vi.spyOn(children, 'start').mockImplementation(() => { throw new Error('must not start a local server'); });
+  try {
+    const db = localSpacetime(root, { BACKROOM_DEMO: '1', DEMO_SPACETIME: 'maincloud', DEMO_MAINCLOUD: '1', SPACETIME_CONFIG: config }, children);
+    await db.start();
+    const first = await db.publish(), second = await db.publish();
+    expect(first.database).toMatch(/^backroom-demo-[0-9]+-[0-9a-f]{6}$/);
+    expect(second.database).not.toBe(first.database);
+    expect(first.uri).toBe('wss://maincloud.spacetimedb.com');
+    const publishes = commands.filter(args => args.includes('publish'));
+    expect(publishes).toHaveLength(2);
+    for (const args of publishes) {
+      expect(args[args.indexOf('--server') + 1]).toBe('https://maincloud.spacetimedb.com');
+      expect(args).not.toContain('--delete-data');
+      expect(args).not.toContain('test-private-token');
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

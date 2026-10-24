@@ -16,7 +16,9 @@ try {
     const body = await response.json() as DemoStatus & { localUrl: string };
     status = body;
     // Probe the running host's web port rather than a different shell's default.
-    process.env.DEMO_PORT = new URL(body.localUrl).port;
+    const local = new URL(body.localUrl);
+    process.env.DEMO_PORT = local.port;
+    process.env.DEMO_BIND_HOST = local.hostname;
   }
 } catch { /* Still print every dependency when the host is down. */ }
 const rows = await preflight(process.env, status);

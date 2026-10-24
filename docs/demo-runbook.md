@@ -43,7 +43,7 @@ command's private environment; run it on the actual host with the same config.
 Mock/memory/offline rehearsal intentionally leaves unused dependencies RED.
 GREEN reachability does not claim a completed call, inference or deposit.
 
-For GX10 deployment and a warm Mac fallback use [GX10 host operations](../tools/demo/host/README.md).
+For GX10 deployment and a warm Mac fallback use [GX10 host operations](#gx10-production-host-and-warm-mac-fallback-refs-29-32).
 Keep Anthropic credentials Mac-only; do not copy a Mac `.env.local` containing
 them to GX10. Do not reset a shared host while another presenter is using it.
 
@@ -158,7 +158,9 @@ requires `DEMO_MAINCLOUD=1`, a private authenticated `SPACETIME_CONFIG`, and the
 fixed Maincloud endpoint. An existing `SPACETIMEDB_DATABASE` value must be named
 `backroom-demo-*` or startup refuses it; remove the legacy shared database
 selection from the private environment before starting this fresh-database lane.
-It never resets `backrooms-calhacks13` or any other existing shared DB.
+It never resets `backrooms-calhacks13` or any other existing shared DB. The
+separate `DEMO_STATE_REMOTE=1` host mode still attaches to existing shared state
+and refuses reset; do not combine it with `DEMO_SPACETIME=maincloud`.
 
 Each reset publishes a new `backroom-demo-<time>-<random>` module, then the
 existing private reset API stops the old seat workers, imports the seed company
@@ -167,9 +169,12 @@ approval/pay scenario through public gateway/reducer APIs. No reducer changes,
 SQL deletes, clear-database flags, or fixture edits are involved. Old local and
 hosted databases remain for inspection; this is a clean **active run**, not data
 erasure. The runtime integration seam remains `/__demo/reset` with
-`{uri,database,token}`; autonomous runtimes must quiesce their own activations
-before switching the installed store. This command does not stop independent
-agent runtime processes or clear separate voice/usage journals.
+`{uri,database,token}`; autonomous runtime hosts must call their existing
+`AgentCaseStore.stopCase(caseId, 'cancelled', 'DEMO_RESET')` and drain active
+queries before switching the installed store. See [agents.md](agents.md).
+This command does not stop independent agent runtime processes or clear separate voice/usage journals. Preserve the
+real `FileUsageLedger` at `.env.agents/usage-ledger.json`: resetting the demo must
+never reset credential-owner spend accounting or its budget limits.
 
 Keep the same backend for the lifetime of a host; changing shell variables on
 `demo:reset` does not retarget an already running host. To return to local,

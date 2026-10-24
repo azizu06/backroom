@@ -16,8 +16,9 @@ export async function preflight(env: NodeJS.ProcessEnv, status: DemoStatus | und
   }
   const bankUrl = env.NESSIE_API_KEY && env.NESSIE_ACCOUNT_ID
     ? `https://prod-api.nessieisreal.com/accounts/${encodeURIComponent(env.NESSIE_ACCOUNT_ID)}?key=${encodeURIComponent(env.NESSIE_API_KEY)}` : undefined;
+  const host = (env.DEMO_BIND_HOST || '127.0.0.1').replace(/^\[|\]$/g, '');
   const rows = await Promise.all([
-    probe('Web', `http://127.0.0.1:${env.DEMO_PORT || 3000}/__demo/ping`),
+    probe('Web', `http://${host.includes(':') ? `[${host}]` : host}:${env.DEMO_PORT || 3000}/__demo/ping`),
     probe('Cartesia', env.CARTESIA_API_KEY ? 'https://api.cartesia.ai/voices' : undefined,
       { 'X-API-Key': env.CARTESIA_API_KEY || '', 'Cartesia-Version': '2026-08-14' }),
     probe('Nessie', bankUrl),
