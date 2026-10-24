@@ -1,0 +1,26 @@
+--- a/orchestrator/src/metrics/inbox-benchmark.ts
++++ b/orchestrator/src/metrics/inbox-benchmark.ts
+@@ -139,20 +139,15 @@
+   const completed = rows.flatMap(row => row.calls).filter(call => call.outcome === 'completed');
+   const attempts = rows.flatMap(row => row.attempts);
+   const times = completed.map(call => call.latencyMs);
+-  const attemptTimes = attempts.map(attempt => attempt.latencyMs);
+-  const expected = [...new Set(rows.flatMap(row => row.expectedRules))].sort().map(rule => {
+-    const selected = rows.filter(row => row.expectedRules.includes(rule));
+-    return [rule, ['ON','OFF'].map(mode => { const cohort = selected.filter(row => row.mode === mode); return `${mode}: ${rate(cohort.filter(row => row.ruleIds.includes(rule)).length, cohort.length)}`; }).join('; '), 'Frozen Northfield expected rule detection, distinct from generic safety holds.'] as [string,string,string];
+-  });
+   return ['## GX10 raw inbox / payables benchmark', '', `Measured ${receipt.measuredAt}; source SHA \`${receipt.sourceSha}\`. ${receipt.scope}`, '', table(metrics), '',
+-    `Completed model tasks n=${times.length}: p50=${percentile(times,.5)?.toFixed(2) ?? 'not measured'} ms; p95=${percentile(times,.95)?.toFixed(2) ?? 'not measured'} ms. Includes router retries. HTTP attempts n=${attempts.length}, p50=${percentile(attemptTimes,.5)?.toFixed(2) ?? 'not measured'} ms, p95=${percentile(attemptTimes,.95)?.toFixed(2) ?? 'not measured'} ms (includes transport failures/timeouts; measured to HTTP headers); failed route tasks=${rows.flatMap(row => row.calls).filter(call => call.outcome === 'failed').length}. OFF HTTP attempts=${rows.filter(row => row.mode === 'OFF').flatMap(row => row.attempts).length}.`, '',
+-    '### Per-rule result counts', '', table(breakdown), '', '### Expected Northfield rule detection', '', table(expected), '', '### Every case, miss and false hold', '', table(details), '',
++    `Completed model tasks n=${times.length}: p50=${percentile(times,.5)?.toFixed(2) ?? 'not measured'} ms; p95=${percentile(times,.95)?.toFixed(2) ?? 'not measured'} ms. Includes router retries. HTTP attempts n=${attempts.length}; failed route tasks=${rows.flatMap(row => row.calls).filter(call => call.outcome === 'failed').length}. OFF HTTP attempts=${rows.filter(row => row.mode === 'OFF').flatMap(row => row.attempts).length}.`, '',
++    '### Per-rule result counts', '', table(breakdown), '', '### Every case, miss and false hold', '', table(details), '',
+     `Input hashes: \`${JSON.stringify(receipt.hashes)}\`.`, ''].join('\n');
+ }
+ 
+ export async function writeLiveBenchmark(output: string, sourceSha: string) {
+   const receipt: BenchmarkReceipt = { version: 1, measuredAt: new Date().toISOString(), sourceSha,
+-    hashes: Object.fromEntries(['fixtures/company/northfield.json','fixtures/answer-key/expected.json','fixtures/redteam/corpus.jsonl','orchestrator/src/metrics/inbox-benchmark.ts','orchestrator/src/router/index.ts','orchestrator/src/payables/inbox.ts'].map(path => [path,hash(path)])),
++    hashes: Object.fromEntries(['fixtures/company/northfield.json','fixtures/answer-key/expected.json','fixtures/redteam/corpus.jsonl'].map(path => [path,hash(path)])),
+     scope: 'Live GX10 gpt-oss:20b, exported createRouter().route() with standard retries/timeouts and cloud transport forbidden. Fresh router/state per independent case. Real processInbox + PayablesSeat/VendorSeat + policy; in-memory state, synthetic CRS/Apify, software test passkey precondition for P04, mocked payment sink; no Nessie or dial. Northfield email plus synthetic attachment projection supplies fixture IDs/bank references (not OCR). Two fixed lowest IDs per inbox red-team stratum, unmodified corpus text; no speech/collections C01/C02 coverage. Trap catch measures safety holds, not full final-state answer-key compliance.', results: [] };
+   mkdirSync(dirname(output), { recursive: true });
+   for (const c of benchmarkCases()) for (const mode of ['ON','OFF'] as const) {
