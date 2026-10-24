@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { probeDependencies } from '../../tools/demo/health';
+import { probeAttackDemo, probeDependencies } from '../../tools/demo/health';
 
 describe('demo dependency health', () => {
   it('reports actual OFF and missing integrations without any live network', async () => {
@@ -34,4 +34,32 @@ it('uses web host service observations even if the health CLI has different cred
   expect(rows.filter(row => row.name === 'Nessie')).toEqual([hostRows[0]]);
   expect(rows).toContainEqual(hostRows[1]);
   expect(rows.some(row => row.name === 'Cloud fallback')).toBe(false);
+});
+
+it('probes the private attack server with a bearer and never reads or reports its body', async () => {
+  let cancelled = false;
+  const attackDemo = await probeAttackDemo({ ATTACK_DEMO_BASE_URL: 'http://127.0.0.1:48970', TOOL_GATEWAY_SECRET: 'private-gateway' },
+    async (url, init) => {
+      expect(String(url)).toBe('http://127.0.0.1:48970/api/attack-demo');
+      expect(init).toMatchObject({ headers: { authorization: 'Bearer private-gateway' }, redirect: 'error' });
+      expect(init?.method).toBeUndefined(); // GET; no analysis or inference.
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return { ok: true, body: { cancel: async () => { cancelled = true; } },
+        json: () => { throw new Error('response body must not be read'); } } as unknown as Response;
+    });
+  expect(attackDemo).toEqual({ name: 'Attack demo', ok: true, detail: 'reachable (mock)' });
+  expect(cancelled).toBe(true);
+  const rows = await probeDependencies({ env: {}, status: { llmEnabled: false, stateStore: 'memory', voice: false, attackDemo } });
+  expect(rows).toContainEqual(attackDemo);
+  expect(JSON.stringify(rows)).not.toContain('private-gateway');
+});
+
+it('reports attack refusal and failure without exposing upstream details or claiming mock for live opt-in', async () => {
+  const env = { ATTACK_DEMO_BASE_URL: 'http://127.0.0.1:48970', TOOL_GATEWAY_SECRET: 'private-gateway' };
+  expect(await probeAttackDemo(env, async () => new Response('private error', { status: 401 })))
+    .toEqual({ name: 'Attack demo', ok: false, detail: 'HTTP 401' });
+  expect(await probeAttackDemo(env, async () => { throw new Error('private error'); }))
+    .toEqual({ name: 'Attack demo', ok: false, detail: 'unreachable or timed out' });
+  expect(await probeAttackDemo({ ...env, ATTACK_DEMO_LIVE: '1' }, async () => new Response('')))
+    .toEqual({ name: 'Attack demo', ok: true, detail: 'reachable (live enabled)' });
 });
