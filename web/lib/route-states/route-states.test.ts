@@ -31,10 +31,12 @@ describe('route states', () => {
   });
 
   it('global error renders its own document', () => {
-    const html = renderToStaticMarkup(createElement(GlobalError, { error: 'boom', retry: () => {} }));
+    const error = Object.assign(new Error('layout secret sk-test'), { digest: 'def456' });
+    const html = renderToStaticMarkup(createElement(GlobalError, { error, retry: () => {} }));
     expect(html.startsWith('<html lang="en">')).toBe(true);
     expect(html).toContain('<title>');
-    expect(html).not.toContain('boom');
+    expect(html).toContain('<code>def456</code>');
+    expect(html).not.toContain('layout secret');
   });
 
   it('errorReference ignores missing, non-string and unsafe digests', () => {
