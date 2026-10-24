@@ -168,6 +168,7 @@ export function matchRemittance(expected: { amountCents: number; memo: string },
 }
 export type PaymentView = Awaited<ReturnType<PaymentService['view']>>;
 export type { PostedDepositsDisplay };
+export { mirrorBankFeed } from './bank-feed';
 
 export type BankEvidence = Transaction & { paymentLinkRef?: string };
 /** A trusted imported link reference can identify exceptions; it can never substitute

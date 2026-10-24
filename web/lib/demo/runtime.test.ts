@@ -53,3 +53,62 @@ it('registers an unverified voice call into the same gateway and reconciles its 
   expect((await getStateStore().getPayment('ar:1042:1'))?.result.amountCents).toBe(247500);
   delete process.env.TOOL_GATEWAY_SECRET;
 });
+
+it('mirrors the bank feed after pay and reconcile, and a replay does not add a row', async () => {
+  runtime = await createDemoRuntime();
+  const store = getStateStore() as MemoryStateStore;
+  const record = vi.spyOn(store, 'recordBankTxn');
+  const linkId = runtime.status().payPath!.split('/').at(-1)!;
+  expect((await getPaymentService().pay(linkId)).status).toBe('partially_paid');
+  expect(record).toHaveBeenCalledTimes(2);
+  expect(record.mock.calls[0]![0]).toEqual(record.mock.calls[1]![0]);
+  expect(await store.listBankTxns()).toEqual([record.mock.calls[0]![0]]);
+  record.mockClear();
+  expect((await getPaymentService().pay(linkId)).status).toBe('partially_paid');
+  expect(record).not.toHaveBeenCalled();
+  expect(await store.listBankTxns()).toHaveLength(1);
+});
+
+it('schedules one pending-reconciliation sweep and clears it when the host stops', async () => {
+  const scheduled: Array<() => void> = [];
+  const realSet = globalThis.setInterval;
+  const setSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: TimerHandler, ms?: number, ...rest: unknown[]) => {
+    if (ms === 5_000 && typeof fn === 'function') { scheduled.push(() => { fn(); }); return 1 as unknown as ReturnType<typeof setInterval>; }
+    return realSet(fn as never, ms as never, ...(rest as []));
+  }) as unknown as typeof setInterval);
+  const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    runtime = await createDemoRuntime();
+    expect(scheduled).toHaveLength(1);
+    const service = getPaymentService();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let calls = 0;
+    const pending = vi.spyOn(service, 'retryPending').mockImplementation(() => { calls += 1; return gate.then(() => []); });
+    scheduled[0]!();
+    scheduled[0]!();
+    expect(calls).toBe(1);
+    const flush = () => new Promise(resolve => setImmediate(resolve));
+    release();
+    await gate;
+    await flush();
+    scheduled[0]!();
+    expect(calls).toBe(2);
+    await flush();
+    pending.mockReset();
+    pending.mockRejectedValue(new Error('retry-down'));
+    scheduled[0]!();
+    await flush();
+    expect(logged).toHaveBeenCalledWith('demo pending reconciliation retry failed', expect.any(Error));
+    expect(runtime.status().workersHealthy).toBe(true);
+    await runtime.stop();
+    expect(clearSpy).toHaveBeenCalled();
+    scheduled[0]!();
+    expect(calls).toBe(2);
+  } finally {
+    setSpy.mockRestore();
+    clearSpy.mockRestore();
+    logged.mockRestore();
+  }
+});
