@@ -93,6 +93,7 @@ function projectFocus([px, py, pz]: readonly [number, number, number], width: nu
 
 /** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
 async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number] = PAYABLES): Promise<number> {
+  await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
   const [x, y] = projectFocus(point, box.width, box.height, focus);
   const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
@@ -113,6 +114,7 @@ const TREASURY = [5, 3.4] as const;
 
 /** Mean RGB of a 6x6 screenshot patch around a world point projected under a room's focus camera. */
 async function patchColor(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number]): Promise<[number, number, number]> {
+  await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
   const [x, y] = projectFocus(point, box.width, box.height, focus);
   const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
