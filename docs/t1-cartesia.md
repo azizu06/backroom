@@ -1,6 +1,6 @@
 # T1 Cartesia smoke test
 
-Status: **PARTIAL** (2026-10-24): connected in 8.2 s PASS; actual `call_turn` receipt PASS; phone mid-call tool round trip PENDING. A separate phone-free WebSocket call successfully exercised the real webhook tool within its 2 s timeout. Firstmate explicitly authorized M4 implementation while the coordinated phone retest waits for Aziz (approximately 02:55 AM PT); no redial while he is away.
+Status: **PARTIAL** (2026-10-24, updated 09:50 UTC): the coordinated M4 phone retest rang but both tools failed with HTTP 502 after the private evidence observer crashed the receiver. No successful phone tool round trip is established. See the retest evidence below. Earlier T1 evidence: connected in 8.2 s PASS; actual `call_turn` receipt PASS; phone mid-call tool round trip PENDING. A separate phone-free WebSocket call successfully exercised the real webhook tool within its 2 s timeout. Firstmate explicitly authorized M4 implementation while the coordinated phone retest waits for Aziz (approximately 02:55 AM PT); no redial while he is away.
 
 | Check | Evidence | Result |
 | --- | --- | --- |
@@ -65,6 +65,35 @@ T1_DIAL_GO=yes node --env-file=.env.local orchestrator/src/voice/t1.mjs dial
 ```
 
 The command stores consent before requesting a call, checks per-destination errors even on HTTP 200, and never automatically retries a dial. Measure actual ring from `dial_requested_at` to the phone owner's ring confirmation. Obtain the Cartesia tool duration from call runtime logs/turn evidence, then record it here alongside an actual `call_turn` receipt. Do not substitute local handler time or `call_started` time for phone ring time.
+
+
+## Coordinated M4 phone retest — 09:48 UTC
+
+Firstmate relayed fresh authorization at 09:48:05Z with Aziz holding his own phone. Exactly one full M4 dial was run, using the Keychain destination privately, the previously provisioned free T1 number, four distinct server secrets, and a localhost:8788 tunnel. No retry was placed. Aziz confirmed through firstmate that it rang, asked for Jordan, accepted his “yes,” and then reported errors. This was the synthetic invoice scenario, not a real debt or bank action.
+
+| Evidence | Observation | Result |
+| --- | --- | --- |
+| Phone-free prerequisite | WebSocket `ac_QFWN2QKvMBCnFdPZgywupX`: complete fixed welcome, synthetic Jordan reply, `t1_echo` returned `ok:true`; receiver receipt 09:47:03.872Z, provider tool result 09:47:03.908Z | PASS, separate transport |
+| WebSocket timing | Observed user-turn-end receipt 09:47:02.851Z → successful tool-result receipt 09:47:03.908Z = **1,057 ms**; includes inference, not an exact HTTP duration | PASS under configured 2 s tool timeout |
+| Phone call | `ac_E1UZuuTZC7eq3fh7sjKD3d`; local session `46082151-8ec6-4389-9b1c-211184c69942` | Connected |
+| Permit audit | 09:48:10.137Z `CALL_PERMIT`, rules `IN_BADGE`, `DEMO_OVERRIDE`; consent persisted before provider request | PASS |
+| Connection | Provider start 09:48:16.566527Z, **6.429527 s after permit**; Aziz confirmed ring, without an exact ring timestamp | Connection bound only |
+| Disclosure | Initial “Hi,” interrupted at call-relative 0.389 s; another assistant turn interrupted at 4.390 s. Uninterrupted replacement at 7.213–15.857 s said “collections assistant” and “may be recorded,” without explicit AI disclosure | FAIL; exact fixed disclosure not completed |
+| Caller identity | Final clear “Yes.” at 31.276–32.068 s; agent attempted identity tool at 33.120 s | Caller response captured in provider transcript; gateway confirmation absent |
+| `verify_identity_result` | Provider tool id `toolu_01Q1Y2mRXuLp2Jhkym5ZBKVJ`, arguments `result=confirmed`; result: service unavailable **502**, outcome unknown | FAIL; no authenticated relay/gateway receipt |
+| `get_invoice_context` | Provider tool id `toolu_014bBx78RkPWvhQc9ZBsAKHL`, at 33.236 s; same **502**, outcome unknown | FAIL; no gateway policy result |
+| Other seven tools | Not invoked | Not tested |
+| Lifecycle receiver | `call_started` persisted 09:48:17.608Z, event `webhook_HF58nx96eRSrxHQiQNMWPa`; no `call_turn` or completion event persisted as of 09:50 UTC | Phone `call_turn` webhook proof absent; transcript obtained by provider GET |
+| Gateway audit/state | Empty tool audit, delivery, plan, escalation, link, and outbox collections; `identityConfirmed=false`; relay `disclosureComplete=false` | No financial action; no tool ALLOW/DENY measured |
+| End | 09:48:57.715178Z, `client_hangup` | Completed |
+
+### Diagnosis and correction
+
+The test's temporary, uncommitted HTTP observer caused this failure; it was not an authenticated gateway rejection or a tool timeout. It redacted the entire serialized JSON string with a phone-number regex, which also matched numeric fractional timing values. Parsing the altered JSON threw before the first event response ended. The receiver's error path then attempted headers already sent (`ERR_HTTP_HEADERS_SENT`, `live.ts`), terminating Node after `call_started` had committed. Both subsequent tools reached an unavailable origin through Cloudflare and returned 502. After the call, localhost health failed and public health was 502. The provider transcript records the tool errors; no gateway receipt exists to attribute a policy decision. The agent also attempted the second tool despite the first tool's unknown outcome.
+
+The private observer has been removed from the launch command. The local receiver now records private `http-evidence.jsonl` through `withVoiceEvidence` in `orchestrator/src/voice/evidence.ts`: redact string values only, preserve numeric timings, omit authentication headers/controller requests, and catch evidence parsing/storage errors after response completion. Regression tests reproduce the numeric-corruption exception and a failing log sink, then verify HTTP responses and subsequent health requests survive. All **26 voice tests** and orchestrator typecheck pass. A public unauthenticated tool probe returned 401, followed by public health 200; these probes are not live-call evidence.
+
+Private evidence remains in `.env.t1/` and `.env.voice/` (`websocket-evidence.json`, `provider-call.json`, `audit.jsonl`, `journal.json`, `gateway.json`, `http-evidence.jsonl`). Destination, callback number, credentials, raw provider response and consent stay uncommitted. Aziz deferred the next phone test at 09:52 UTC; the phone retest is **pending a fresh firstmate go**. Task servers and tunnels were shut down. A new phone call requires a new explicit firstmate dial-go. The disclosure deviation remains a separate observed limitation; no guard was relaxed to accept it.
 
 ## Sources checked
 
