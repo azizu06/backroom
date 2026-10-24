@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
-import { Instance, Instances, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
+import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -23,6 +24,7 @@ type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const deskIds = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
+const { key: keyLight, fill: fillLight, hemisphere, contactShadows, base, screen, vault } = OFFICE_LIGHTING;
 // Office (in the initial bundle) requests on-demand frames through this bridge.
 registerSceneFrameRequester(invalidate);
 
@@ -47,7 +49,12 @@ function Desk({ room }: { room: typeof deskIds[number] }) {
     <Block at={[0, 0.83, 0]} size={[2.25, 0.16, 1.05]} color='#bcaa8c' />
     {[-0.9, 0.9].map(x => <Block key={x} at={[x, 0.4, 0]} size={[0.13, 0.8, 0.8]} color='#485049' />)}
     <Block at={[-0.35, 1.18, -0.23]} size={[0.78, 0.5, 0.08]} color='#343d36' />
-    <Block at={[-0.35, 1.18, -0.18]} size={[0.67, 0.37, 0.015]} color={accent} />
+    {/* A plain mesh, not an instance, so the screen gets its own glossy material. */}
+    <mesh position={[-0.35, 1.18, -0.18]} castShadow receiveShadow>
+      <boxGeometry args={[0.67, 0.37, 0.015]} />
+      <meshPhysicalMaterial color={accent} emissive={accent} emissiveIntensity={screen.emissiveIntensity} roughness={screen.roughness}
+        metalness={screen.metalness} clearcoat={screen.clearcoat} clearcoatRoughness={screen.clearcoatRoughness} />
+    </mesh>
     <Block at={[-0.35, 0.96, -0.23]} size={[0.1, 0.22, 0.1]} color='#485049' />
     <Block at={[0.65, 0.95, 0.1]} size={[0.4, 0.06, 0.5]} color='#e7ddc5' rotation={-0.12} />
     <Block at={[0.05, 0.45, -0.9]} size={[0.65, 0.14, 0.6]} color={accent} />
@@ -177,11 +184,19 @@ export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, l
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
     <color attach='background' args={['#202620']} />
-    <ambientLight intensity={1.7} />
-    <directionalLight position={[2, 12, 6]} intensity={2.5} castShadow shadow-mapSize={[1024, 1024]}
-      shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={10} shadow-camera-bottom={-10} />
+    <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
+    <directionalLight position={keyLight.position} color={keyLight.color} intensity={keyLight.intensity} castShadow={keyLight.castShadow}
+      shadow-mapSize={[keyLight.shadow.mapSize, keyLight.shadow.mapSize]} shadow-bias={keyLight.shadow.bias}
+      shadow-camera-left={keyLight.shadow.left} shadow-camera-right={keyLight.shadow.right} shadow-camera-top={keyLight.shadow.top} shadow-camera-bottom={keyLight.shadow.bottom} />
+    <directionalLight position={fillLight.position} color={fillLight.color} intensity={fillLight.intensity} castShadow={fillLight.castShadow} />
+    {/* frames={Infinity} (default) re-bakes on every frame, but with frameloop='demand' that is only frames
+        something else requested (walking agents, door flashes, camera moves), so avatars stay grounded while
+        they walk and the scene never loops on its own. Scale and color are module constants so drei's
+        render targets are not reallocated on re-render. */}
+    <ContactShadows position={contactShadows.position} scale={contactShadows.scale} resolution={contactShadows.resolution}
+      blur={contactShadows.blur} opacity={contactShadows.opacity} far={contactShadows.far} color={contactShadows.color} />
     <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
-    <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={0.9} />
+    <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
     <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color='#535c4e' />
     <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color='#828976' />
     <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color='#747e6a' />
@@ -207,7 +222,10 @@ export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, l
     </group>}
     {visibleRooms(snapshot).includes('treasury') && <group>
     <Block at={[5, 0.7, 4]} size={[1.8, 1.4, 1.25]} color='#3d4e47' />
-    <Block at={[5, 0.7, 3.35]} size={[1.4, 1.05, 0.08]} color='#718176' />
+    <mesh position={[5, 0.7, 3.35]} castShadow receiveShadow>
+      <boxGeometry args={[1.4, 1.05, 0.08]} />
+      <meshStandardMaterial color={vault.color} roughness={vault.roughness} metalness={vault.metalness} />
+    </mesh>
     <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
     </group>}
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
