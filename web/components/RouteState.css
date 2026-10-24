@@ -1,0 +1,17 @@
+.route-state { color-scheme: dark; background: #0b141c; color: #edf2f3; min-height: 100svh; font: 16px/1.5 system-ui, sans-serif; padding: 0 24px 200px; box-sizing: border-box; }
+.route-state * { box-sizing: border-box; }
+.route-state-content { max-width: 720px; margin: auto; }
+.route-state header { display: flex; gap: 24px; justify-content: space-between; border-bottom: 1px solid #344655; padding: 24px 0; }
+.route-state a { color: #bad9f5; text-underline-offset: 4px; }
+.route-state-status { margin: 40px 0 0; color: #f7ca82; font: 600 13px/1.4 'SFMono-Regular', Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.route-state h1 { font-size: 30px; font-weight: 600; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.route-state-body { color: #adc0ce; }
+.route-state-body p { margin: 0 0 12px; }
+.route-state-reference { font-size: 14px; color: #adc0ce; overflow-wrap: anywhere; }
+.route-state-reference code { color: #edf2f3; }
+.route-state-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 24px 0; border-bottom: 1px solid #344655; }
+.route-state-actions a, .route-state-actions button { min-height: 44px; display: inline-flex; align-items: center; }
+.route-state button { padding: 8px 16px; border: 1px solid #bad9f5; border-radius: 4px; background: #bad9f5; color: #102334; font: inherit; cursor: pointer; }
+.route-state :is(a, button):focus-visible { outline: 3px solid #f7ca82; outline-offset: 3px; }
+.route-state footer { padding: 16px 0; color: #adc0ce; font-size: 14px; }
+@media (max-width: 650px) { .route-state { padding-inline: 16px; } .route-state h1 { font-size: 26px; } .route-state-actions { flex-direction: column; align-items: stretch; } }
