@@ -1,13 +1,26 @@
 'use client';
 
 import { Component, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { LlmToggle } from '../../components/LlmToggle';
 import { WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
 import { OfficeLobby } from './OfficeLobby';
-import { OfficeScene, type RoomLabels } from './scene';
+import type { RoomLabels } from './scene';
 import '../office.css';
+
+function SceneLoading({ error }: { error?: Error | null }) {
+  // next/dynamic passes load errors to this renderer; let SceneBoundary handle them.
+  if (error) throw error;
+  return <div role='status' style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#202620', color: '#d8d8e0' }}>
+    Loading 3D office…
+  </div>;
+}
+const OfficeScene = dynamic(() => import('./scene').then(module => module.OfficeScene), {
+  ssr: false,
+  loading: SceneLoading,
+});
 
 type ViewMode = 'walk' | 'tween' | 'plan';
 function PlanAgent({ agent, recorded }: { agent: OfficeAgent; recorded: boolean }) {
