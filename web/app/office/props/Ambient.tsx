@@ -9,16 +9,20 @@ import {
 import { REDUCED_MOTION_QUERY } from '../../../lib/office/a11y';
 import { OFFICE_ANCHORS, visibleRooms, type OfficeSnapshot } from '../../../lib/office/state';
 import {
-  AMBIENT_FPS, GLOW_MEAN, ambientActive, ambientDesks, busyLevel, cursorBlink, plantSway, screenGlow, type AmbientDesk,
+  AMBIENT_FPS, CURSOR_SIZE, GLOW_MEAN, ambientActive, ambientDesks, busyLevel, cursorBlink, cursorPoint, plantSway, screenGlow, type AmbientDesk,
 } from '../../../lib/office/props/ambient';
+import { monitorScreen } from '../../../lib/office/props/monitors';
 import { useCanvasTexture } from './useCanvasTexture';
 
-/** Peak additive opacity of a busy desk's screen glow, and of the lobby board rim. */
-const GLOW_BASE = 0.2, BOARD_GLOW_BASE = 0.14, BOARD_SEED = 4;
-const GLOW_TEX = 64;
-/** Desk-local monitor face centre (see scene.tsx Desk) and the desk-top plant spot. */
-const SCREEN: [number, number, number] = [-0.35, 1.18, -0.165];
-const CURSOR: [number, number, number] = [-0.62, 1.07, -0.1705];
+/** Peak additive opacity of a busy desk's monitor halo, and of the lobby board rim. */
+const GLOW_BASE = 0.25, BOARD_GLOW_BASE = 0.14, BOARD_SEED = 4;
+const GLOW_TEX = 64, GLOW_INSET = 8;
+/** The glow texture's full-strength core covers this share of its quad; quads are sized so the core matches what they surround. */
+const GLOW_CORE = (GLOW_TEX - 2 * GLOW_INSET) / GLOW_TEX;
+/** Desk-local halo centre just behind the monitor box (z -0.27..-0.19, bezel 0.78 x 0.5; see scene.tsx Desk). */
+const HALO: [number, number, number] = [-0.35, 1.18, -0.28];
+/** Just in front of the DeskMonitors screen plane (z -0.171). */
+const CURSOR_Z = -0.163;
 const PLANT: [number, number, number] = [0.85, 0.91, -0.3];
 const LOBBY_BOARD: [number, number, number] = [-5.9, 1.25, 3.78];
 
@@ -40,10 +44,10 @@ function useDocumentHidden() {
 
 function createShared() {
   return {
-    screenGlow: new PlaneGeometry(0.67 + 0.16, 0.37 + 0.14),
-    boardGlow: new PlaneGeometry(2.9, 2.2),
-    cursor: new BoxGeometry(0.014, 0.045, 0.003),
-    cursorMaterial: new MeshStandardMaterial({ color: '#f1ede2', emissive: '#f1ede2', emissiveIntensity: 0.8 }),
+    monitorHalo: new PlaneGeometry(0.78 / GLOW_CORE, 0.5 / GLOW_CORE),
+    boardGlow: new PlaneGeometry(2 / GLOW_CORE, 1.45 / GLOW_CORE),
+    cursor: new BoxGeometry(CURSOR_SIZE[0], CURSOR_SIZE[1], 0.002),
+    cursorMaterial: new MeshBasicMaterial({ color: '#e8efe4', toneMapped: false }),
     pot: new CylinderGeometry(0.05, 0.038, 0.08, 10),
     potMaterial: new MeshStandardMaterial({ color: '#b98667', roughness: 0.9 }),
     leaf: new IcosahedronGeometry(1, 0),
@@ -56,8 +60,8 @@ type Shared = ReturnType<typeof createShared>;
 function drawGlow(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = '#ffffff';
   ctx.shadowColor = '#ffffff';
-  ctx.shadowBlur = 12;
-  ctx.fillRect(14, 14, GLOW_TEX - 28, GLOW_TEX - 28);
+  ctx.shadowBlur = GLOW_INSET;
+  ctx.fillRect(GLOW_INSET, GLOW_INSET, GLOW_TEX - 2 * GLOW_INSET, GLOW_TEX - 2 * GLOW_INSET);
 }
 
 function useGlowMaterial(color: string, map: Texture, opacity: number, side?: Side) {
@@ -79,8 +83,8 @@ function DeskPlant({ shared, foliage }: { shared: Shared; foliage: RefObject<Gro
   </group>;
 }
 
-function DeskAmbient({ room, seed, busy, active, shared, glowMap }: {
-  room: AmbientDesk; seed: number; busy: number; active: boolean; shared: Shared; glowMap: Texture;
+function DeskAmbient({ room, seed, busy, lines, active, shared, glowMap }: {
+  room: AmbientDesk; seed: number; busy: number; lines: number; active: boolean; shared: Shared; glowMap: Texture;
 }) {
   const [x, z] = OFFICE_ANCHORS[room].center;
   const level = 0.4 + 0.6 * busy;
@@ -100,8 +104,9 @@ function DeskAmbient({ room, seed, busy, active, shared, glowMap }: {
     }
   });
   return <group position={[x, 0, z]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
-    <mesh geometry={shared.screenGlow} material={material} position={SCREEN} renderOrder={1} />
-    {busy >= 1 && <mesh ref={cursor} geometry={shared.cursor} material={shared.cursorMaterial} position={CURSOR} />}
+    {/* Behind the monitor, so the box hides the core and only a soft rim shows around the bezel; never over the screen text. */}
+    <mesh geometry={shared.monitorHalo} material={material} position={HALO} renderOrder={1} />
+    {busy >= 1 && <mesh ref={cursor} geometry={shared.cursor} material={shared.cursorMaterial} position={[...cursorPoint(lines), CURSOR_Z]} />}
     {room !== 'dana' && <DeskPlant shared={shared} foliage={foliage} />}
   </group>;
 }
@@ -116,7 +121,7 @@ function BoardGlow({ active, shared, glowMap }: { active: boolean; shared: Share
 }
 
 /**
- * View-only ambience: breathing screen glow, blinking cursors on busy screens and swaying desk plants.
+ * View-only ambience: breathing monitor halos, blinking cursors on busy screens and swaying desk plants.
  * One low-rate ticker requests frames while active; reduced motion, a hidden tab or replay get one static frame.
  */
 export function Ambient({ snapshot }: { snapshot: OfficeSnapshot }) {
@@ -135,6 +140,7 @@ export function Ambient({ snapshot }: { snapshot: OfficeSnapshot }) {
   }, [active, invalidate]);
   return <group name='prop:ambient'>
     {ambientDesks(snapshot).map(({ room, seed }) => <DeskAmbient key={room} room={room} seed={seed} busy={busyLevel(snapshot, room)}
+      lines={monitorScreen(snapshot, room).lines.length}
       active={active} shared={shared} glowMap={glowMap} />)}
     {visibleRooms(snapshot).includes('lobby') && <BoardGlow active={active} shared={shared} glowMap={glowMap} />}
   </group>;
