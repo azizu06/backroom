@@ -18,6 +18,7 @@ import { InteractPrompt } from './InteractPrompt';
 import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
+import { useHandoffPresentation } from './handoffs/HandoffPresentation';
 import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
@@ -102,9 +103,10 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
 }
 
 function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void }) {
+  const handoffFor = useHandoffPresentation()?.handoffFor;
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
-  const panel = playPanel(snapshot, target);
+  const panel = playPanel(snapshot, target, handoffFor);
   const key = targetKey(target);
   useEffect(() => { closeButton.current?.focus(); }, [key]);
   if (!panel) return null;
@@ -134,6 +136,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
 }) {
   const touch = useTouch();
   const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
+  const handoffFor = useHandoffPresentation()?.handoffFor;
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, setSettings] = useState<PlaySettings>(() => loadPlaySettings(viewerStorage()));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -158,8 +161,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
   useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
   useEffect(() => {
-    if (panel && !playPanel(snapshot, panel)) { setPanel(null); hud.current?.focus(); }
-  }, [panel, snapshot, hud]);
+    if (panel && !playPanel(snapshot, panel, handoffFor)) { setPanel(null); hud.current?.focus(); }
+  }, [panel, snapshot, hud, handoffFor]);
 
   function interact() {
     if (panel || settingsOpen || chatOpen) return;

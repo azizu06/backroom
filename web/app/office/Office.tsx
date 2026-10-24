@@ -26,6 +26,7 @@ import { FloorPlan } from './FloorPlan';
 import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
 import { ViewBoundary } from './ViewBoundary';
+import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
@@ -49,7 +50,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
   auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode; storyStart?: boolean; storyPreview?: (preview: StoryChapter['preview']) => void;
 }) {
-  const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  const received = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  const { snapshot, presentation } = useOfficeHandoffs(received);
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
   const touch = useTouch();
   const { mode, lostContext, sceneAttempt } = viewport;
@@ -134,7 +136,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setFocus(room);
   }
   const plan = mode === 'plan' || lostContext;
-  return <section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
+  return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
@@ -170,6 +172,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             ref={element => { if (!element) return; tagElements.current.set(agent.id, element); return () => { if (tagElements.current.get(agent.id) === element) tagElements.current.delete(agent.id); }; }}>
             <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
           </div>)}</div>}
+          {!layers.floorPlan && <HandoffTags />}
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
@@ -207,9 +210,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section>}
+      <ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>
       {controls}
     </footer>
-  </section>;
+  </section></HandoffPresentation>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */
 export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {

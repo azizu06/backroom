@@ -1,10 +1,10 @@
 'use client';
 
-import { Fragment, useEffect, useRef, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useState, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instances, OrbitControls } from '@react-three/drei';
 import { Group, MathUtils, Vector3 } from 'three';
-import { cameraAlpha, legSwing } from '../../lib/office/a11y';
+import { cameraAlpha } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import type { PlayBridge } from '../../lib/office/play';
 import { PlayRig } from './play';
@@ -17,6 +17,7 @@ import { ROLES } from '../../lib/office/palette';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
 import { PresenceGhosts } from './PresenceGhosts';
+import { Bear, createBearRig, poseBear } from './avatars/Bear';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
@@ -57,7 +58,7 @@ function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkM
 function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean }) {
   const reduced = useReducedMotion();
   const body = useRef<Group>(null);
-  const legs = useRef<Group>(null);
+  const [rig] = useState(createBearRig);
   useFrame((state, delta) => {
     const walk = motion;
     if (paused) return;
@@ -68,21 +69,14 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     body.current.position.set(walk.position[0], 0, walk.position[1]);
     const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = legSwing(walk.distance, i, walk.moving && !tween && !recorded, reduced); });
+    poseBear(rig, walk.distance, walk.moving && !tween && !recorded, reduced);
   });
   const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
   return <group ref={body} position={[motion.position[0], 0, motion.position[1]]}>
-    <Block at={[0, 0.83, 0]} size={[0.43, 0.6, 0.28]} color={color} />
-    <Block at={[0, 1.3, 0]} size={[0.34, 0.36, 0.32]} color='#c58d67' />
-    <Block at={[0, 1.49, -0.02]} size={[0.36, 0.1, 0.35]} color='#3c342e' />
-    {[-1, 1].map(side => <Block key={side} at={[side * 0.3, 0.84, 0]} size={[0.14, 0.48, 0.18]} color={color} />)}
-    {agent.escalationId && <group name={`folder:${agent.escalationId}`}>
-      <Block at={[0.36, 0.68, 0.14]} size={[0.1, 0.43, 0.5]} color='#e0b365' />
-      <Block at={[0.37, 0.77, 0.14]} size={[0.11, 0.04, 0.34]} color='#f3dfb9' />
-    </group>}
-    <group ref={legs}>{[-1, 1].map(side => <mesh key={side} position={[side * 0.12, 0.3, 0]} castShadow>
-      <boxGeometry args={[0.18, 0.55, 0.22]} /><meshStandardMaterial color='#414b43' />
-    </mesh>)}</group>
+    <Bear color={color} seed={agent.id} rig={rig} carry={agent.escalationId ? 'paw' : 'none'} paw={agent.escalationId && <group name={`folder:${agent.escalationId}`}>
+      <Block at={[0.05, 0.04, 0.14]} size={[0.1, 0.43, 0.5]} color='#e0b365' />
+      <Block at={[0.06, 0.13, 0.14]} size={[0.11, 0.04, 0.34]} color='#f3dfb9' />
+    </group>} />
   </group>;
 }
 /** Tour moves start from wherever the camera is when the frame after a focus change renders. */

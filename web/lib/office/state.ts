@@ -1,3 +1,5 @@
+import type { Handoff } from './handoffs';
+
 export const OFFICE_ANCHORS = {
   lobby: { name: "Lobby", position: [-5, 3] as const, center: [-5, 2.9] as const, color: "#8c9c87" },
   collections: { name: "Collections", position: [-5, -1.8] as const, center: [-5, -3] as const, color: "#a9bc8f" },
@@ -60,6 +62,8 @@ export interface OfficeSnapshot {
   readonly connection: "preview" | "connecting" | "live" | "disconnected" | "replay";
   readonly llmEnabled: boolean | null;
   readonly inboxCount: number;
+  /** Public agent-to-agent handoff rows (adapter: handoff-subscription.ts); previews may omit them. */
+  readonly handoffs?: readonly Handoff[];
 }
 /** Immutable cached row projection. No reducers, policy evaluation or business writes. */
 export interface OfficeState {
