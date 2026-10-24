@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { PlaneGeometry } from 'three';
 import { OFFICE_ANCHORS, type OfficeSnapshot } from '../../../lib/office/state';
 import { MONITOR_DESKS, MONITOR_FACE, MONITOR_TEXTURE, monitorInteraction, monitorOverview, monitorScreen, monitorScreenKey, type MonitorDesk, type MonitorScreen, type MonitorStatusKey } from '../../../lib/office/props/monitors';
 import { canvasTextLines } from '../../../lib/office/props/readability';
@@ -11,6 +12,7 @@ const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: '#b9d59b', deny
 const LINE_COLORS = { agent: '#f2f5ed', away: '#d0d6c6', folder: '#f3dfb9', idle: '#d0d6c6', awaiting: '#f2f5ed', escalation: '#d0d6c6' } as const;
 const { width: TEX_W, height: TEX_H, overviewFont } = MONITOR_TEXTURE;
 const { width: FACE_W, height: FACE_H } = MONITOR_FACE;
+const SCREEN_GEOMETRY = new PlaneGeometry(FACE_W, FACE_H);
 const MONITORS = Object.fromEntries(MONITOR_DESKS.map(room => [room, monitorInteraction(room)])) as Record<MonitorDesk, ReturnType<typeof monitorInteraction>>;
 
 function drawScreen(ctx: CanvasRenderingContext2D, screen: MonitorScreen, accent: string, detailed: boolean) {
@@ -59,7 +61,7 @@ function Screen({ snapshot, room }: { snapshot: OfficeSnapshot; room: MonitorDes
   return <group name={`prop:monitor:${room}`} position={[x, 0, z]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
     <group position={[sx, sy, sz]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
       <mesh position={[0, 0, 0.059]}>
-        <planeGeometry args={[FACE_W, FACE_H]} />
+        <primitive object={SCREEN_GEOMETRY} attach='geometry' />
         <meshBasicMaterial map={texture} toneMapped={false} />
       </mesh>
     </group>
