@@ -10,6 +10,7 @@ it('keeps rehearsal offline even when sponsor credentials are present', async ()
   const http = vi.fn();
   const services = await createDemoServices({ env: { NODE_ENV: 'test', NESSIE_API_KEY: 'private' }, fetch: http });
   expect(services.status().bank).toBe('mock');
+  expect((await services.bank.readBalanceWithPostedDeposits(services.accountId)).sandboxLabel).toBe('Mock bank (offline)');
   expect(http).not.toHaveBeenCalled();
 });
 it('live payments use real Nessie HTTP and reuse invoice memos across new hosts', async () => {
@@ -28,6 +29,7 @@ it('live payments use real Nessie HTTP and reuse invoice memos across new hosts'
   const again = await createDemoServices({ env, fetch: http });
   await again.bank.deposit(payment);
   expect(http.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+  expect((await first.bank.readBalanceWithPostedDeposits(first.accountId)).sandboxLabel).toBe('Nessie = sandbox bank');
   expect(first.status()).toMatchObject({ live: true, bank: 'nessie_sandbox', services: { crs: { mode: 'FAKE' } } });
   expect(JSON.stringify(first.status())).not.toContain('private');
 });

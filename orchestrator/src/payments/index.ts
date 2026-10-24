@@ -6,7 +6,7 @@ export interface AuthorizedPaymentLink {
   id: string; invoiceId: string; planId: string; auditId: string; policyVersion: number;
   installment: number; amountCents: number; totalCents: number; currency: 'USD';
 }
-export type PaymentBank = Pick<NessieClient, 'deposit' | 'listDeposits' | 'readBalanceWithPostedDeposits'>;
+export type PaymentBank = Pick<NessieClient, 'deposit' | 'listDeposits' | 'readBalanceWithPostedDeposits' | 'surfaceCopy'>;
 export interface PaymentRecord {
   linkId: string; invoiceId: string; installment: number; amountCents: number; depositId: string;
   status: 'pending_reconciliation' | 'partially_paid' | 'paid' | 'exception';
@@ -54,6 +54,8 @@ export class PaymentService {
       currency: link.currency, payment: structuredClone(this.records.get(id)),
       balance: await this.options.bank.readBalanceWithPostedDeposits(this.options.accountId) };
   }
+  /** Disclosure for the adapter this service was constructed with. */
+  bankDisclosure() { return this.options.bank.surfaceCopy(); }
   async pay(id: string): Promise<PaymentRecord> {
     const posted = await this.serial(async () => {
       const link = await this.link(id);
