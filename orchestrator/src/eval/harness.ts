@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { evaluate, type ActionRequest, type Badge, type Context } from '@backroom/policy';
 import { FakeEffects, MemoryStateStore, SeatWorker, type AuditInput } from '../index';
-import { controllerForLease, createNorthfieldRepository, MemoryFinanceRepository, northfieldChange, northfieldInvoice, northfieldVendor, PayablesSeat } from '../payables';
+import { controllerForLease, createNorthfieldRepository, MemoryFinanceRepository, northfieldChange, northfieldInvoice, northfieldSource, northfieldVendor, PayablesSeat } from '../payables';
 import { VendorSeat } from '../vendor';
 import { inspectPaymentEvidence, PaymentService, reconcileAlreadyPaid, type BankEvidence } from '../payments';
 import { NessieClient, type Transaction } from '@backroom/nessie';
@@ -597,6 +597,41 @@ async function plantedIdentityPaymentCase(step: PolicyStep): Promise<{ kind: str
   return { kind: 'PAID_AFTER_IDENTITY', seams };
 }
 
+async function plantedVendorEvidenceCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  if (step.operation !== 'vendor_evidence_gate') return;
+  const seams = ['crs:fixture', 'apify:fixture'];
+  const now = Date.parse('2026-10-24T18:00:00Z');
+  const state = new MemoryStateStore();
+  const repository = await createNorthfieldRepository();
+  const source = northfieldSource('4484');
+  await state.registerAgent('vendor-seat', 'vendor_onboarding', now);
+  await state.enqueueTask({ id: 'vendor-4484', seatId: 'vendor_onboarding', refs: [source.id], steps: [] });
+  const lease = await state.claimTask('vendor-seat', now, 12000);
+  if (!lease) return { kind: 'EVIDENCE_NOT_GATED', seams };
+  let footprintSeen = false;
+  const seat = new VendorSeat({ state, repository, now: () => now, controller: controllerForLease(state, lease, () => now), checks: {
+    business: async () => ({ verified: true, evidenceRef: 'fixture:crs-business' }),
+    ofac: async () => ({ status: 'clear', evidenceRef: 'fixture:crs-ofac' }),
+    footprint: async () => {
+      footprintSeen = true;
+      return { websiteReachable: false, listingOperating: false, domain: 'unverified.example', evidenceRef: 'fixture:apify-footprint' };
+    },
+  } });
+  const proposal = await seat.propose(
+    { kind: 'vendor', vendorId: 'unverified', domain: 'unverified.example', bankAccountId: 'bank-master:unverified' },
+    source,
+  );
+  const unchanged = await seat.apply(source.id);
+  const vendor = await repository.getVendor('unverified');
+  let paid = 0;
+  const payables = new PayablesSeat({ repository, state, controller: { request: async () => 'ap-hold' }, nessie: { payInvoice: async () => { paid += 1; return { status: 'completed', id: 'should-not-pay' }; } } });
+  const payment = await payables.process(northfieldInvoice('4484'), { ...source, id: 'invoice-4484' });
+  if (!footprintSeen || proposal.status !== 'held' || !proposal.escalationId || proposal.decision.kind !== 'ESCALATE' || unchanged.status === 'approved' || vendor?.approved === true || payment.status === 'paid' || paid !== 0) {
+    return { kind: 'EVIDENCE_NOT_GATED', seams };
+  }
+  return { kind: 'EVIDENCE_HELD', seams };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -621,13 +656,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step) ?? await plantedDiscountCase(step) ?? await plantedIdentityPaymentCase(step);
+        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step) ?? await plantedDiscountCase(step) ?? await plantedIdentityPaymentCase(step) ?? await plantedVendorEvidenceCase(step);
         const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED', 'DISCOUNT_NOT_DENIED', 'LINK_BEFORE_IDENTITY'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED', 'DISCOUNT_NOT_DENIED', 'LINK_BEFORE_IDENTITY', 'EVIDENCE_NOT_GATED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
