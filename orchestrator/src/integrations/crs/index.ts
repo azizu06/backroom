@@ -111,8 +111,11 @@ export class CrsClient {
 
   async #json(response: Response): Promise<Record<string, unknown>> {
     if (!response.ok) throw new CrsError('HTTP', response.status);
+    // A body dropped or timed out mid-read is an outage; a body that arrives but is not JSON is bad data.
+    let text: string;
+    try { text = await response.text(); } catch { throw new CrsError('TRANSPORT'); }
     try {
-      const value: unknown = await response.json();
+      const value: unknown = JSON.parse(text);
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
       return value as Record<string, unknown>;
     } catch { throw new CrsError('RESPONSE'); }

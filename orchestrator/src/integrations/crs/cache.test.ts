@@ -6,13 +6,15 @@ import { CrsClient, CRS_CACHE_MAX_AGE_MS, isCrsOutage, CrsError } from './index'
 import { FileCrsEvidenceCache, MemoryCrsEvidenceCache } from './cache';
 import { CRS_CALHACKS_SANDBOX, createCachedCrsClientFromEnv, createCrsClientFromEnv, crsSandboxFixtureFetch } from './sandbox';
 
-type Mode = 'up' | 'network' | 503 | 429 | 400 | 'garbage';
+type Mode = 'up' | 'network' | 'dropped' | 503 | 429 | 400 | 'garbage';
 function sandbox() {
   const state = { mode: 'up' as Mode, now: Date.parse('2026-10-24T13:05:00Z') };
   const fetch: typeof globalThis.fetch = async (input, init) => {
     if (state.mode === 'network') throw new TypeError('fetch failed');
     if (typeof state.mode === 'number') return new Response('{}', { status: state.mode });
     if (state.mode === 'garbage') return new Response('not json');
+    // Headers arrive, then the connection resets mid-body.
+    if (state.mode === 'dropped') return new Response(new ReadableStream({ start(controller) { controller.error(new TypeError('terminated')); } }));
     return crsSandboxFixtureFetch(input, init);
   };
   return { state, fetch };
@@ -21,7 +23,7 @@ const client = (s: ReturnType<typeof sandbox>, cache = new MemoryCrsEvidenceCach
   new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: 'u', password: 'p', fetch: s.fetch, cache, now: () => s.state.now });
 
 describe('CRS outage fallback (spec 6.3)', () => {
-  it.each(['network', 503, 429] as const)('serves the last good evidence, labelled cached, when CRS is down (%s)', async mode => {
+  it.each(['network', 'dropped', 503, 429] as const)('serves the last good evidence, labelled cached, when CRS is down (%s)', async mode => {
     const s = sandbox();
     const crs = client(s);
     const live = await crs.getPublicRecords(7);
@@ -37,7 +39,7 @@ describe('CRS outage fallback (spec 6.3)', () => {
     const crs = client(s);
     await crs.getFraudRisk(13);
     s.state.mode = mode;
-    await expect(crs.getFraudRisk(13)).rejects.toBeInstanceOf(CrsError);
+    await expect(crs.getFraudRisk(13)).rejects.toMatchObject({ code: mode === 400 ? 'HTTP' : 'RESPONSE' });
   });
 
   it('needs a cached row for that product and identity, younger than the age limit', async () => {
