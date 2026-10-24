@@ -7,7 +7,8 @@ import type { PlayPanel } from '../../../lib/office/play';
  */
 export interface PlayPanelView {
   /** Rendered after the generic state/task lines. */
-  readonly Body?: ComponentType<{ panel: PlayPanel }>;
+  /** `askWhy` hands off to the lobby's grounded ask-why flow, optionally prefilling a question. */
+  readonly Body?: ComponentType<{ panel: PlayPanel; askWhy?: (question?: string) => void }>;
   /** The body brings its own h2, so the title is a plain paragraph rather than a second peer heading. */
   readonly ownHeading?: boolean;
   readonly hideAudit?: boolean;

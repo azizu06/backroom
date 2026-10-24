@@ -2,44 +2,77 @@
 .play-hud { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .play-hud > * { pointer-events: auto; }
 .play-surface { position: absolute; inset: 0; cursor: crosshair; outline: none; touch-action: none; }
-.play-surface:focus-visible { box-shadow: inset 0 0 0 2px #f3dfb9; }
+.play-surface:focus-visible { box-shadow: inset 0 0 0 2px var(--office-aqua), inset 0 0 0 4px var(--office-navy); }
 .play-hud > .play-crosshair, .play-hud > .play-prompt { pointer-events: none; }
 .play-crosshair { position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%); }
-.play-crosshair::before, .play-crosshair::after { content: ''; position: absolute; background: #f3dfb9e6; box-shadow: 0 0 2px #000a; }
+.play-crosshair::before, .play-crosshair::after { content: ''; position: absolute; background: var(--office-navy); box-shadow: 0 0 0 1px var(--office-cream); }
 .play-crosshair::before { left: 9px; top: 0; width: 2px; height: 20px; }
 .play-crosshair::after { top: 9px; left: 0; height: 2px; width: 20px; }
-.play-prompt { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); margin: 0; padding: 5px 10px; background: #30382df2; border: 1px solid #839175; font-size: 13px; font-weight: 600; white-space: nowrap; color: #f3dfb9; }
+.play-prompt { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); margin: 0; padding: 5px 12px; background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--office-navy); }
 .play-prompt:empty { padding: 0; border: 0; }
-.office-shell .play-exit { position: absolute; top: 12px; right: 18px; padding: 6px 12px; background: #30382df2; border: 1px solid #839175; font-weight: 600; }
-.play-joystick { position: absolute; left: 20px; bottom: 44px; width: 112px; height: 112px; border-radius: 50%; background: #30382d99; border: 1px solid #839175; touch-action: none; display: grid; place-items: center; }
-.play-joystick span { width: 44px; height: 44px; border-radius: 50%; background: #c3ccb8cc; pointer-events: none; }
-.office-shell .play-interact { position: absolute; right: 20px; bottom: 56px; padding: 14px 20px; background: #3c4d47; border: 1px solid #c3b68e; font-weight: 700; }
-.play-panel { position: absolute; z-index: 6; top: 14px; left: 18px; width: 320px; max-height: calc(100% - 48px); overflow: auto; background: #272f25; border: 1px solid #8b987b; padding: 14px; box-shadow: 0 3px 10px #0004; }
+.office-shell .play-exit { position: absolute; top: 12px; right: 18px; padding: 6px 12px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-peach); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-weight: 600; }
+.play-joystick { position: absolute; left: 20px; bottom: 44px; width: 112px; height: 112px; border-radius: 50%; background: var(--office-cream); border: 1px solid var(--office-lavender); touch-action: none; display: grid; place-items: center; }
+.play-joystick span { width: 44px; height: 44px; border-radius: 50%; background: var(--office-navy); pointer-events: none; }
+.office-shell .play-interact { position: absolute; right: 20px; bottom: 56px; padding: 14px 20px; background: var(--office-navy); color: var(--office-cream); border: 1px solid var(--office-cream); border-radius: 14px; box-shadow: var(--office-plate-shadow); font-weight: 700; }
+.play-panel { position: absolute; z-index: 6; top: 14px; left: 18px; width: 320px; max-height: calc(100% - 48px); overflow: auto; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-lavender); border-radius: 12px; padding: 14px; box-shadow: var(--office-plate-shadow); }
 .play-panel header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .play-panel h2 { margin: 0; font-size: 17px; }
-.play-panel p, .play-panel li { font-size: 13px; color: #d0d6c6; overflow-wrap: anywhere; }
+.play-panel p, .play-panel li { font-size: 13px; color: var(--office-navy); overflow-wrap: anywhere; }
 .play-panel-state { font-weight: 600; }
 .play-panel ol, .play-panel ul { padding-left: 18px; }
-.play-panel code { font-size: 11px; color: #bac2b2; }
+.play-panel code { font-size: 11px; color: var(--office-navy); }
 .play-panel dl { margin: 12px 0; font: 12px/1.5 'SFMono-Regular', Consolas, monospace; }
-.play-panel dl div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid #45503e; padding: 4px 0; }
+.play-panel dl div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--office-lavender); padding: 4px 0; }
 .play-panel dd { margin: 0; }
-.play-panel button:focus-visible, .play-hud > button:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 2px; }
+.play-panel button:focus-visible, .play-hud > button:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 @media (max-width: 760px) {
   .play-panel { top: 8px; left: 8px; width: min(300px, calc(100% - 16px)); }
 }
-.office-shell .play-settings-toggle { position: absolute; top: 52px; right: 18px; padding: 5px 10px; background: #30382df2; border: 1px solid #839175; font-size: 13px; }
+.office-shell .play-settings-toggle { position: absolute; top: 52px; right: 18px; padding: 5px 10px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-peach); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-size: 13px; }
 .play-panel.play-settings { left: auto; right: 18px; top: 92px; width: 280px; }
-.play-setting { display: grid; gap: 4px; margin: 12px 0; font-size: 13px; color: #d0d6c6; }
+.play-setting { display: grid; gap: 4px; margin: 12px 0; font-size: 13px; color: var(--office-navy); }
 .play-setting span { display: flex; justify-content: space-between; }
-.play-setting output { font: 12px 'SFMono-Regular', Consolas, monospace; color: #f3dfb9; }
-.play-setting input[type='range'] { width: 100%; accent-color: #c3b68e; }
+.play-setting output { font: 12px 'SFMono-Regular', Consolas, monospace; color: var(--office-navy); font-weight: 700; }
+.play-setting input[type='range'] { width: 100%; accent-color: var(--office-navy); }
 .play-setting-check { display: flex; align-items: center; gap: 8px; }
 .play-settings-note { margin: 4px 0 10px; }
-.play-settings input:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 2px; }
+.play-settings input:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 @media (max-width: 760px) {
   .play-panel.play-settings { top: 88px; right: 8px; width: min(280px, calc(100% - 16px)); }
 }
 
 /* PaymentLinkPanel QR inside the narrow Play dialog. */
 .play-panel img { display: block; max-width: 100%; height: auto; }
+/* Talking to an agent (panels/AgentTalkPanel.tsx). */
+.play-panel .agent-talk-who { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.play-panel .agent-talk-who p { margin: 0; }
+.play-panel .agent-talk-portrait {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  border: 2px solid #8b987b; color: #1d231c; font-weight: 700; font-size: 18px;
+}
+.play-panel .agent-talk-role { font-size: 12px; color: var(--office-navy); }
+.play-panel .agent-talk-line { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--office-lavender); background: var(--office-peach); }
+.play-panel .agent-talk-recent { margin: 0 0 10px; padding-left: 18px; }
+.play-panel .agent-talk-recent li { margin-bottom: 4px; }
+.play-panel .agent-talk-recent li[data-tone='fail'], .play-panel .agent-talk-reply[data-tone='fail'] { color: var(--office-navy); background: var(--office-blush); border-left: 3px solid var(--office-coral); }
+.play-panel .agent-talk-recent li[data-tone='correction'] { color: var(--office-navy); background: var(--office-peach); }
+.play-panel .agent-talk-receipt { font-size: 11px; color: var(--office-navy); }
+.play-panel .agent-talk-receipt code { font-family: ui-monospace, monospace; }
+.play-panel .agent-talk-rules { font-family: ui-monospace, monospace; font-size: 11px; color: var(--office-navy); }
+.play-panel .agent-talk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.play-panel .agent-talk-chips button {
+  padding: 4px 9px; font-size: 12px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 12px; cursor: pointer;
+}
+.play-panel .agent-talk-chips button[aria-pressed='true'] { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
+.play-panel .agent-talk-chips kbd { font: inherit; font-weight: 700; opacity: .75; }
+.play-panel .agent-talk-reply { min-height: 1.4em; margin: 0 0 8px; }
+.play-panel .agent-talk-asked { font-size: 11px; color: var(--office-navy); }
+.play-panel .agent-talk-record summary { cursor: pointer; font-size: 12px; color: var(--office-navy); }
+/* The bubble sits above the projected name tag without changing the tag's size (no reprojection needed). */
+.office-shell .handoff-bubble.agent-talk-bubble {
+  position: absolute; left: 50%; bottom: calc(100% + 8px); margin: 0; width: max-content; transform: translateX(-50%);
+  white-space: normal; animation: agent-talk-in .18s ease-out;
+}
+.office-shell .handoff-tag:has(.agent-talk-bubble) > .handoff-bubble:not(.agent-talk-bubble) { display: none; }
+@keyframes agent-talk-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .office-shell .handoff-bubble.agent-talk-bubble { animation: none; } }

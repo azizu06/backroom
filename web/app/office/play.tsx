@@ -1,5 +1,8 @@
 'use client';
 
+import { needsHandoffHuman } from '../../lib/office/handoffs';
+import { useHandoffPresentation } from './handoffs/HandoffPresentation';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
@@ -11,9 +14,11 @@ import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, 
 import { playOfficeCue } from '../../lib/office/sound-events';
 import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, interactCandidates, moveIntent, movePlayer, officeColliders,
-  pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
+  frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
+import { bakedArtRequested } from '../../lib/office/baked-art';
+import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 
 function playEye([x, z]: readonly [number, number]): IntroPose {
@@ -25,6 +30,7 @@ function playEye([x, z]: readonly [number, number]): IntroPose {
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
 export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+  const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);
@@ -47,7 +53,12 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
   const reduced = useRef(window.matchMedia(REDUCED_MOTION_QUERY).matches);
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
-  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
+  // Bundled footprints; appended only for ?art=baked so the default collision set is unchanged.
+  const baked = useMemo(() => bakedArtRequested(location.search), []);
+  const colliders = useMemo(
+    () => officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX])),
+    [roomsKey, baked],
+  );
   const [spawn] = useState(() => playSpawn(location.search, colliders));
   const [eye] = useState(() => playEye(spawn));
   const position = useRef<[number, number]>(spawn);
@@ -83,6 +94,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
       camera.current.updateMatrixWorld();
       if (progress < 1) {
         input.consumeLook();
+        input.consumeTurnTap();
         state.invalidate();
         return;
       }
@@ -95,7 +107,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;
     wasActive.current = active;
     const [lookYaw, lookPitch] = input.consumeLook();
-    const look = applyLook(yaw.current, pitch.current, lookYaw + turnIntent(input, dt), lookPitch);
+    const look = applyLook(yaw.current, pitch.current, frameLookYaw(lookYaw, turnIntent(input, dt), input.consumeTurnTap()), lookPitch);
     const turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
     yaw.current = look.yaw;
     pitch.current = look.pitch;
@@ -125,7 +137,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
-    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current));
+    const handoff = handoffs?.sample(Date.now(), reduced.current);
+    // Only agents with a handoff to show are targets (Dana only while she is at her desk).
+    const handoffAgents = handoff ? handoff.actors.filter(actor => (actor.id !== 'human' || handoff.human)
+      && handoffs!.current.some(row => row.fromRole === actor.id || row.toRole === actor.id || (actor.id === 'human' && needsHandoffHuman(row)))) : [];
+    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current, handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
     if (hud.current && (moved || turned || !written.current)) {

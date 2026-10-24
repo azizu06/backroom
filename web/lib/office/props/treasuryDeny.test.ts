@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeAudit, type OfficeDenial, type OfficeSnapshot } from '../state';
 import { DENY_MOMENT_MS, ECHO_OPACITY, ECHO_START, ECHO_WALK, TREASURY_DOOR_INTERACTION, createDenyPose, denyMoment, denyPose } from './treasuryDeny';
+import { ROLES } from '../palette';
 
 const AT = 1_000_000;
 const denial: OfficeDenial = { room: 'treasury', agentId: 'collections-clerk', auditId: 'audit-7', at: AT };
@@ -38,7 +39,7 @@ describe('denyMoment', () => {
       rule: 'NOT_IN_BADGE', signText: 'DENIED · NOT_IN_BADGE', active: true,
     });
     const unknown = denyMoment(denied({ agents: [], audit: [row({ ruleIds: [], seatId: 'mystery' })] }), AT, false);
-    expect(unknown).toMatchObject({ agentName: 'collections-clerk', color: '#9aa38f', rule: 'DENIED', signText: 'DENIED · DENIED' });
+    expect(unknown).toMatchObject({ agentName: 'collections-clerk', color: ROLES.shadow, rule: 'DENIED', signText: 'DENIED · DENIED' });
   });
 
   it('plays the echo: faces the door, turns, then walks back toward the aisle and fades', () => {
