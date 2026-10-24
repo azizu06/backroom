@@ -3,6 +3,7 @@
  * folder (a component taking SceneMountProps) and one entry below. Order is draw order.
  */
 import { OfficeProps } from '../props/OfficeProps';
+import { BakedArt } from './BakedArt';
 import { Desks } from './Desks';
 import { Doors } from './Doors';
 import { LobbyCounter } from './LobbyCounter';
@@ -20,6 +21,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
+  { id: 'baked-art', instanced: false, Component: BakedArt },
   { id: 'props', instanced: false, Component: OfficeProps },
   { id: 'performance', instanced: false, Component: Performance },
 ];
