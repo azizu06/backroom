@@ -1,0 +1,86 @@
+import { createHash } from 'node:crypto';
+import { evaluate, type APInvoice, type Context, type LineItem } from '@backroom/policy';
+import { audit, domain, hold } from './decisions';
+import { invoiceSchema, sourceSchema } from './schemas';
+import type { InboxSource, InvoiceFields, InvoiceRecord, PayablesClient, SeatOptions, SeatResult } from './types';
+export type * from './types';
+export { MemoryFinanceRepository } from './repository';
+export { controllerForLease } from './decisions';
+export { nessiePayables } from './payments';
+
+function items(lines: readonly LineItem[]) {
+  return JSON.stringify(lines.map(item => [item.description.trim().toLowerCase().replace(/\s+/g, ' '), item.quantity, item.unitPriceCents])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+}
+export class PayablesSeat {
+  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient }) {}
+  async process(unchecked: InvoiceFields, envelope: InboxSource): Promise<SeatResult> {
+    const fields = invoiceSchema.parse(unchecked), source = sourceSchema.parse(envelope);
+    const repo = this.options.repository;
+    return repo.withVendorLock(`vendor:${fields.vendorId}`, async () => {
+      const fingerprint = createHash('sha256').update(JSON.stringify(fields)).digest('hex');
+      const prior = await repo.getInvoice(fields.vendorId, fields.invoiceId);
+      const vendor = await repo.getVendor(fields.vendorId);
+      if (prior?.fingerprint === fingerprint && prior.paymentAttempted) return prior.result;
+      const canReevaluate = prior?.fingerprint === fingerprint && !prior.paymentAttempted;
+      const po = fields.poId ? await repo.getPO(fields.poId) : undefined;
+      const policyInvoice: APInvoice = { id: fields.invoiceId, vendorId: fields.vendorId,
+        amountCents: fields.amountCents, lineItems: fields.lineItems,
+        poMatched: !!po && po.vendorId === fields.vendorId && po.amountCents === fields.amountCents && items(po.lineItems) === items(fields.lineItems),
+        account: 'operating' };
+      const bankChanged = !!vendor && fields.bankAccountId !== vendor.accountId;
+      const history = await repo.listInvoices(fields.vendorId);
+      const context: Context = {
+        vendor: vendor ? { id: vendor.id, knownDomain: vendor.domain, sourceDomain: domain(source.senderDomain),
+          inMaster: true, approved: vendor.approved, pendingBankChange: bankChanged || await repo.hasPendingBankChange(fields.vendorId) } : undefined,
+        signals: { ofacHit: vendor?.ofacHit }, priorInvoices: history.map(row => row.policyInvoice),
+      };
+      let decision = prior && !canReevaluate ? hold('DUPLICATE_INVOICE') : !vendor ? hold('PAYEE_NOT_IN_MASTER')
+        : evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, context);
+      // Record both pieces of phishing evidence even though policy returns the first failure.
+      if (bankChanged && decision.kind !== 'ALLOW' && !decision.ruleIds.includes('BANK_CHANGE_HOLD')) {
+        decision = { ...decision, ruleIds: [...decision.ruleIds, 'BANK_CHANGE_HOLD'] };
+      }
+      // An unrelated sender domain cannot be authenticated by a model's vendor ID.
+      if (decision.kind === 'ALLOW' && vendor && domain(source.senderDomain) !== domain(vendor.domain)) decision = hold('PAYEE_NOT_IN_MASTER');
+      if (decision.kind === 'ALLOW' && !this.options.nessie) decision = hold('INVALID_INPUT');
+      const duplicate = decision.ruleIds.includes('DUPLICATE_INVOICE') ? history.find(row =>
+        evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, { ...context, priorInvoices: [row.policyInvoice] }).ruleIds.includes('DUPLICATE_INVOICE')) ?? prior : undefined;
+      const refs = [source.id, fields.invoiceId];
+      const evidenceRefs = duplicate ? [...refs, duplicate.fields.invoiceId] : refs;
+      const result: SeatResult = { status: 'held', decision, evidenceRefs };
+      const row: InvoiceRecord = { fields, policyInvoice, fingerprint, result, vendorRevision: vendor?.revision ?? null, paymentAttempted: false };
+      await audit(this.options, 'payables', 'pay_invoice', source, decision, evidenceRefs.slice(1), {
+        invoiceId: fields.invoiceId, vendorId: fields.vendorId, bankChanged,
+        senderDomain: domain(source.senderDomain), vendorDomain: vendor?.domain,
+        relatedInvoiceId: duplicate?.fields.invoiceId, amountDelta: duplicate ? (fields.amountCents - duplicate.fields.amountCents) / 100 : undefined,
+      });
+      if (decision.kind !== 'ALLOW') {
+        if (decision.kind === 'ESCALATE') result.escalationId = await this.options.controller.request(decision, refs);
+        // Conflicting replays never overwrite an original receipt or its fingerprint.
+        if (!prior || canReevaluate) await repo.saveInvoice(row);
+        return result;
+      }
+      // Persist reservation BEFORE network I/O. A crash or ambiguous response stays held.
+      row.paymentAttempted = true;
+      row.result.decision = hold('INVALID_INPUT');
+      await repo.saveInvoice(row);
+      try {
+        const receipt = await this.options.nessie!.payInvoice({ idempotencyKey: `ap:${encodeURIComponent(fields.vendorId)}:${encodeURIComponent(fields.invoiceId)}`,
+          invoiceId: fields.invoiceId, vendorId: vendor!.id, amountCents: fields.amountCents,
+          sourceAccount: policyInvoice.account, destinationAccountId: vendor!.accountId });
+        if (typeof receipt.id === 'string' && receipt.id) result.receiptId = receipt.id;
+        if (receipt.status !== 'completed' || typeof receipt.id !== 'string' || !receipt.id) throw new Error('PAYMENT_UNCONFIRMED');
+        result.status = 'paid'; result.receiptId = receipt.id; result.decision = decision;
+      } catch {
+        const uncertain = hold('INVALID_INPUT');
+        result.decision = uncertain;
+        result.escalationId = await this.options.controller.request(uncertain, refs);
+      }
+      await repo.saveInvoice(row);
+      await audit(this.options, 'payables', result.status === 'paid' ? 'nessie_completed' : 'payment_uncertain', source,
+        result.decision, [fields.invoiceId], { receiptId: result.receiptId });
+      return result;
+    });
+  }
+}
