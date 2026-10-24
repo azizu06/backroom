@@ -153,6 +153,14 @@ async function payablesBoardDrawn(page: Page, canvas: Locator): Promise<number> 
   return Math.min(...color) > 170 ? offBackground(color) : 0;
 }
 
+/** Mean (red minus blue) of a 6x6 screenshot patch: positive on warm peach, negative on aqua. */
+async function patchWarmth(page: Page, canvas: Locator, point: Point, focus: readonly [number, number] = PAYABLES): Promise<number> {
+  const [data] = await samplePatches(page, canvas, [point], focus);
+  let sum = 0;
+  for (let i = 0; i < data!.length; i += 4) sum += data![i]! - data![i + 2]!;
+  return sum / (data!.length / 4);
+}
+
 const TREASURY = [5, 3.4] as const;
 
 /** How far the mean red channel of RGBA pixels stands above the other two (the DENY sign's #ed6252 is about 140). */
@@ -208,10 +216,11 @@ test('office desk monitors survive the Collections escalation preview', async ({
   await page.getByRole('button', { name: 'Preview escalation' }).click();
   await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Collections', exact: true }).click();
-  // Once the focus camera settles, the empty right strip of the Collections screen shows the panel's #1d2420 (min channel 29),
-  // not the bright accent face (#a9bc8f) behind it, while the lit desk top beside it stays bright.
+  // Once the focus camera settles, the empty right strip of the Collections screen shows the aqua panel (blue above red),
+  // while the lit peach desk top beside it stays bright and warm (red above blue).
   await expect.poll(() => patchBrightness(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
-  await expect.poll(() => patchBrightness(page, canvas, [-5.074, 1.135, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(60);
+  await expect.poll(() => patchWarmth(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(15);
+  await expect.poll(() => patchWarmth(page, canvas, [-5.074, 1.135, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(-15);
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
   expect(errors).toEqual([]);
