@@ -9,6 +9,7 @@
  */
 import { CrsClient, type CrsOptions, type CrsProductAdapter, type CrsSandboxIdentity, type CrsSummary } from './index';
 import { CRS_CALHACKS_PERSONAS } from './personas';
+import { FileCrsEvidenceCache } from './cache';
 
 export { CRS_CALHACKS_PERSONAS };
 export const CRS_SANDBOX_SOURCE = '@crscreditapi/crs-calhacks-mcp-server@1.1.2 test-data/personas.json';
@@ -95,10 +96,14 @@ export const crsSandboxFixtureFetch: typeof fetch = async (input, init) => {
   return fixtureJson({ codes: ['CRS200'], messages: ['Not a sandbox persona request'] }, 400);
 };
 
-/** Live sandbox client when CRS_USERNAME and CRS_PASSWORD are set; otherwise undefined, so callers fall back to fixtures. */
+/**
+ * Live sandbox client when CRS_USERNAME and CRS_PASSWORD are set; otherwise undefined, so callers fall back to fixtures.
+ * CRS_CACHE_FILE opts into the spec 6.3 outage fallback: last good evidence, labelled "cached at HH:MM UTC".
+ */
 export function createCrsClientFromEnv(env: Record<string, string | undefined> = process.env, fetchImpl?: typeof fetch): CrsClient | undefined {
   if (!env.CRS_USERNAME?.trim() || !env.CRS_PASSWORD) return undefined;
-  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: env.CRS_USERNAME, password: env.CRS_PASSWORD, fetch: fetchImpl });
+  const cache = env.CRS_CACHE_FILE?.trim() ? new FileCrsEvidenceCache(env.CRS_CACHE_FILE.trim()) : undefined;
+  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: env.CRS_USERNAME, password: env.CRS_PASSWORD, fetch: fetchImpl, cache });
 }
 
 /** Offline client over crsSandboxFixtureFetch. Its evidence is source crs_fixture with a FAKE label. */
