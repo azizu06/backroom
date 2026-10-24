@@ -113,8 +113,8 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit }: {
-  snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void;
+export function PlayHud({ snapshot, input, target, hud, onExit, onHelp }: {
+  snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; onHelp?: () => void;
 }) {
   const touch = useTouch();
   const [panel, setPanel] = useState<PlayTarget | null>(null);
@@ -158,6 +158,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
   }
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === '?') { event.preventDefault(); event.stopPropagation(); onHelp?.(); return; }
     if (isCloseKey(event.key)) {
       event.preventDefault();
       if (locked(event.currentTarget)) releasePointer();

@@ -1,0 +1,24 @@
+.office-help { color: #d0d6c6; background: #272f25; border: 1px solid #8b987b; padding: 14px; box-shadow: 0 3px 10px #0006; }
+.office-help header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.office-help h2 { margin: 0; color: #f3dfb9; font-size: 17px; }
+.office-help ol { padding-left: 22px; margin: 12px 0 0; }
+.office-help li { padding: 0 0 10px 2px; }
+.office-help li:last-child { padding-bottom: 0; }
+.office-help li strong, .office-help li span { display: block; }
+.office-help li strong { color: #f3dfb9; }
+.office-help li span, .office-help dd { font-size: 13px; overflow-wrap: anywhere; }
+.office-help-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 16px; background: #101510b8; }
+.office-guide { position: fixed; z-index: 10; top: 82px; right: 24px; width: min(440px, calc(100vw - 32px)); max-height: min(78dvh, 620px); overflow: auto; }
+.office-tools .office-guide-trigger { white-space: nowrap; }
+.office-shortcuts { width: min(460px, 100%); max-height: min(85dvh, 620px); overflow: auto; }
+.office-shortcuts dl { margin: 14px 0 0; }
+.office-shortcuts dl > div { display: grid; grid-template-columns: minmax(105px, 1fr) 2fr; gap: 12px; align-items: center; border-top: 1px solid #45503e; padding: 9px 0; }
+.office-shortcuts dt { display: flex; gap: 4px; flex-wrap: wrap; }
+.office-shortcuts dd { margin: 0; }
+.office-help kbd { min-width: 24px; padding: 2px 6px; text-align: center; color: #f3dfb9; background: #202620; border: 1px solid #8b987b; border-radius: 3px; font: 12px 'SFMono-Regular', Consolas, monospace; }
+.office-help button:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 2px; }
+@media (max-width: 760px) {
+  .office-guide { position: fixed; z-index: 10; inset: auto 8px 8px; max-height: min(78dvh, 620px); overflow: auto; padding: 12px; }
+  .office-guide li { font-size: 12px; }
+  .office-shortcuts dl > div { grid-template-columns: 90px 1fr; gap: 8px; }
+}
