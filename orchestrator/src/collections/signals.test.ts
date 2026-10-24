@@ -56,16 +56,41 @@ describe('signal conversion', () => {
     expect(rows[0]!.id).not.toBe(signalsFromCrs('vendor-1', evidence())[0]!.id);
   });
 
-  it('maps health values, observation times, caller label and run reference', () => {
+  it('maps health values, observation times, source URLs and live run provenance', () => {
     const rows = signalsFromHealth('client-1', health(), 'FAKE');
     expect(rows).toEqual(health().signals.map(signal => ({
       id: expect.any(String), source: 'apify', type: `apify_${signal.type}`, subjectRef: 'client-1', value: signal.value,
-      observedAt: signal.observedAt, confidence: 1, label: 'FAKE', evidenceRef: 'run-1',
+      observedAt: signal.observedAt, confidence: 1, label: 'Apify: live run run-1', evidenceRef: 'run-1', sourceUrl: signal.sourceUrl,
     })));
     expect(signalsFromHealth('client-1', health(), 'FAKE')).toEqual(rows);
     const withoutRun = signalsFromHealth('client-1', { signals: health().signals }, 'Apify');
+    expect(withoutRun[0]!.label).toBe('Apify');
     expect(withoutRun[0]).not.toHaveProperty('evidenceRef');
     expect(JSON.parse(signalPayload(withoutRun[0]!))).not.toHaveProperty('evidenceRef');
+  });
+
+  it('downgrades caller labels claiming a live run without a run id', () => {
+    for (const apifyRunId of [undefined, '']) {
+      const result = { signals: health().signals, apifyRunId };
+      expect(signalsFromHealth('client-1', result, 'Apify: LIVE RUN pending')[0]!.label).toBe('Apify: no run id');
+      expect(signalsFromHealth('client-1', result, 'FAKE')[0]!.label).toBe('FAKE');
+    }
+  });
+
+  it('stores same-type observations at the same time from different URLs independently', async () => {
+    const first = health().signals[0]!;
+    const result: HealthResult = { apifyRunId: 'run-1', signals: [first,
+      { ...first, type: 'maps_status', value: 'permanently_closed', sourceUrl: `https://example.com/${'x'.repeat(300)}` },
+    ] };
+    const rows = signalsFromHealth('client-1', result, 'Apify');
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map(row => row.id)).size).toBe(2);
+    for (const row of rows) expect(row.id.length).toBeLessThanOrEqual(200);
+    expect(rows.map(row => row.sourceUrl)).toEqual(result.signals.map(signal => signal.sourceUrl));
+    expect(signalsFromHealth('client-1', result, 'Apify')).toEqual(rows);
+    const store = new MemoryStateStore();
+    expect(await recordSignals(store, rows)).toEqual({ recorded: 2, failed: 0 });
+    expect(await store.listSignals()).toEqual(rows);
   });
 
   it('distinguishes CRS identity, subject and observation time and health subject/time', () => {
@@ -150,6 +175,16 @@ describe('signal persistence', () => {
     await store.recordSignal({ evidenceRef, label, confidence, observedAt, value, subjectRef, type, source, id });
     const payload = JSON.stringify({ id, source, type, subjectRef, value, observedAt, confidence, label, evidenceRef });
     expect(recordSignal.mock.calls).toEqual([[{ payload }], [{ payload }]]);
+    expect(JSON.parse(payload)).not.toHaveProperty('sourceUrl');
+    const healthRow = signalsFromHealth('client-1', health(), 'Apify')[0]!;
+    await store.recordSignal({ sourceUrl: healthRow.sourceUrl, evidenceRef: healthRow.evidenceRef, label: healthRow.label,
+      confidence: healthRow.confidence, observedAt: healthRow.observedAt, value: healthRow.value,
+      subjectRef: healthRow.subjectRef, type: healthRow.type, source: healthRow.source, id: healthRow.id });
+    expect(recordSignal).toHaveBeenLastCalledWith({ payload: JSON.stringify({
+      id: healthRow.id, source: healthRow.source, type: healthRow.type, subjectRef: healthRow.subjectRef,
+      value: healthRow.value, observedAt: healthRow.observedAt, confidence: healthRow.confidence,
+      label: healthRow.label, evidenceRef: healthRow.evidenceRef, sourceUrl: healthRow.sourceUrl,
+    }) });
     recordSignal.mockRejectedValueOnce(new Error('EVENT_ID_CONFLICT'));
     await expect(store.recordSignal(row())).rejects.toThrow('EVENT_ID_CONFLICT');
     await store.close();

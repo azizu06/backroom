@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { CrsEvidence } from '../integrations/crs';
 import type { HealthResult } from './types';
 
@@ -11,13 +12,14 @@ export interface SignalRow {
   confidence: number;
   label: string;
   evidenceRef?: string;
+  sourceUrl?: string;
 }
 export interface SignalSink { recordSignal(row: SignalRow): Promise<void> }
 
 /** Fixed key order keeps retries identical regardless of the caller's property order. */
 export function signalPayload(row: SignalRow): string {
-  const { id, source, type, subjectRef, value, observedAt, confidence, label, evidenceRef } = row;
-  return JSON.stringify({ id, source, type, subjectRef, value, observedAt, confidence, label, evidenceRef });
+  const { id, source, type, subjectRef, value, observedAt, confidence, label, evidenceRef, sourceUrl } = row;
+  return JSON.stringify({ id, source, type, subjectRef, value, observedAt, confidence, label, evidenceRef, sourceUrl });
 }
 
 function validRow(row: SignalRow): boolean {
@@ -46,13 +48,15 @@ export function signalsFromCrs(subjectRef: string, evidence: CrsEvidence): Signa
 }
 
 export function signalsFromHealth(subjectRef: string, result: HealthResult, label: string): SignalRow[] {
+  label = result.apifyRunId ? `Apify: live run ${result.apifyRunId}` : /live run/i.test(label) ? 'Apify: no run id' : label;
   const rows: SignalRow[] = [];
   for (const signal of result.signals) {
     if (!signal.type) continue;
     const type = `apify_${signal.type}`;
     const row: SignalRow = {
-      id: JSON.stringify(['apify', type, subjectRef, signal.observedAt]),
+      id: JSON.stringify(['apify', type, subjectRef, signal.observedAt, createHash('sha256').update(signal.sourceUrl).digest('hex').slice(0, 12)]),
       source: 'apify', type, subjectRef, value: signal.value, observedAt: signal.observedAt, confidence: 1, label,
+      sourceUrl: signal.sourceUrl,
       ...(result.apifyRunId === undefined ? {} : { evidenceRef: result.apifyRunId }),
     };
     if (validRow(row)) rows.push(row);
