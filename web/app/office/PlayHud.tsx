@@ -6,6 +6,7 @@ import { requestSceneFrame } from '../../lib/office/frame';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { PLAY_PANEL_VIEWS } from './panels';
+import { RoomEntryLabel } from './RoomEntryLabel';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -192,6 +193,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
       }}
       onPointerDown={onSurfacePointerDown} onPointerMove={onSurfacePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} />
     <div className='play-crosshair' aria-hidden='true' />
+    <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <p className='play-prompt' aria-live='polite'>{prompt && `E · ${prompt}`}</p>
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     {touch && <>
