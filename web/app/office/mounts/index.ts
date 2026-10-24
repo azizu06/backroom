@@ -21,6 +21,9 @@ import { RoomDetail } from './RoomDetail';
 import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
+import { AgentCardAnchor } from '../hud/diegetic/AgentCardAnchor';
+import { DeskStatusPlates } from '../hud/diegetic/DeskStatusPlates';
+import { LobbyNoticeBoard } from '../hud/diegetic/LobbyNoticeBoard';
 import type { SceneMount } from './types';
 
 export type { SceneMount, SceneMountProps } from './types';
@@ -44,4 +47,8 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'lobby-deny-stamp', instanced: false, Component: LobbyDenyStamp },
   { id: 'handoffs', instanced: false, Component: HandoffMount },
   { id: 'performance', instanced: false, Component: Performance },
+  // HUD variant (c), diegetic: Play-only in-world status (hud/diegetic).
+  { id: 'hud-desk-plates', instanced: false, Component: DeskStatusPlates },
+  { id: 'hud-notice-board', instanced: false, Component: LobbyNoticeBoard },
+  { id: 'hud-agent-card', instanced: false, Component: AgentCardAnchor },
 ];

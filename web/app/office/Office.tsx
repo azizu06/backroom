@@ -32,6 +32,9 @@ import '../office.css';
 import './a11y.css';
 import './lobby.css';
 import './tags.css';
+import './hud/diegetic/diegetic.css';
+import { OfficeAdvanced } from './hud/diegetic/OfficeAdvanced';
+import { lobbyModeLabel } from '../../lib/office/lobby-v2';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -136,18 +139,19 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setFocus(room);
   }
   const plan = mode === 'plan' || lostContext;
-  return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
+  return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <header className='office-toolbar'>
-      <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
+      <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span>{lobbyModeLabel(snapshot.connection) && <span className='office-mode-chip'>{lobbyModeLabel(snapshot.connection)}</span>}</div>
       <div className='office-tools'>
         <a href='/operator'>Operator</a>
-        <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
-        <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
-          <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
-        </fieldset>
         <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
+        <OfficeAdvanced replay={snapshot.connection === 'replay'}
+          connection={snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}
+          llm={<fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
+            <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
+          </fieldset>} />
         <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
           {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
         </select></label>

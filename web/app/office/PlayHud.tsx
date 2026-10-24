@@ -16,6 +16,7 @@ import { playTargetModule } from '../../lib/office/targets';
 import { visibleRooms } from '../../lib/office/state';
 import { InteractPrompt } from './InteractPrompt';
 import { useGamepad } from './useGamepad';
+import { anchorsToAgent, setAnchoredCard } from './hud/diegetic/cardAnchor';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
 import { useHandoffPresentation } from './handoffs/HandoffPresentation';
@@ -120,7 +121,11 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
   if (!panel) return null;
   // Per-kind layout comes from the panel view registry (./panels); kinds without an entry use the defaults.
   const view = PLAY_PANEL_VIEWS[panel.kind] ?? {};
-  return <section className='play-panel' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+  // HUD variant (c): a seated agent's dialog is a speech card the scene pins over that agent (hud/diegetic).
+  const anchored = target.kind === 'agent' && anchorsToAgent(target.kind) ? target.id : null;
+  return <section className={anchored ? 'play-panel diegetic-card' : 'play-panel'} role='dialog' aria-labelledby={headingId} data-target-kind={target.kind}
+    ref={anchored ? element => { setAnchoredCard(element ? { element, agentId: anchored } : null); return () => setAnchoredCard(null); } : undefined}
+    onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <header>{view.ownHeading ? <p id={headingId}><strong>{panel.title}</strong></p> : <h2 id={headingId}>{panel.title}</h2>}<button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>

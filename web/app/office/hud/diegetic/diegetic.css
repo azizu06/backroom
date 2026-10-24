@@ -1,0 +1,123 @@
+/*
+ * HUD variant (c), diegetic. While Play is on (Office sets data-hud='diegetic'), the scene fills the
+ * window and information lives in the world: desk status signs, the lobby notice board, and the agent
+ * card pinned over the agent. On screen: crosshair, the E prompt, a quiet control cluster and the
+ * real-vs-sim disclosure line. Colours come from the --office-* tokens (lobby.css, mirrors palette.ts).
+ */
+:root { --office-mint: #CDF2DC; --office-butter: #FFF0B3; }
+
+/* The scene takes the whole window; the toolbar and the dashboard strip stay in the page, covered. */
+html body .office-shell[data-hud='diegetic'] .office-viewport { position: fixed; inset: 0; z-index: 60; height: auto; min-height: 0; flex: none; }
+body:has(.office-shell[data-hud='diegetic']) { overflow: hidden; }
+
+/* Screen overlays replaced by in-world signs. */
+.office-shell[data-hud='diegetic'] .agent-tags:not(.handoff-tags),
+.office-shell[data-hud='diegetic'] .scene-label,
+.office-shell[data-hud='diegetic'] .play-minimap-wrap,
+.office-shell[data-hud='diegetic'] .play-room-entry,
+.office-shell[data-hud='diegetic'] .play-chat:not([data-open]) .play-chat-hint,
+.office-shell[data-hud='diegetic'] .play-chat:not([data-open]) .play-chat-off { display: none; }
+
+/* Controls: one quiet row in the top-right corner, full strength on hover or focus. */
+.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle),
+.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] {
+  position: absolute; top: 12px !important; bottom: auto; min-height: 0; padding: 4px 10px !important; font-size: 12px !important; line-height: 1.4;
+  color: var(--office-navy) !important; background: var(--office-cream) !important; border: 1px solid var(--office-lavender) !important; border-radius: 999px !important;
+  box-shadow: var(--office-plate-shadow); opacity: .62; transition: opacity 120ms ease; text-decoration: none; font-weight: 600;
+}
+.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle):is(:hover, :focus-visible),
+.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator']:is(:hover, :focus-visible) { opacity: 1; }
+.office-shell[data-hud='diegetic'] .play-exit { right: 12px !important; }
+.office-shell[data-hud='diegetic'] .play-settings-toggle { right: 96px !important; }
+.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { right: 176px !important; }
+.office-shell[data-hud='diegetic'] .office-sound-toggle { right: 258px !important; z-index: 4; }
+.office-shell[data-hud='diegetic'] .play-panel.play-settings { top: 46px; }
+
+/* Controls hint: top left, clear of the disclosure line; fades once the player has had a look. */
+.office-shell[data-hud='diegetic'] .office-caption {
+  left: 12px; top: 12px; bottom: auto; z-index: 4; padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); font-size: 11px;
+  animation: diegetic-hint 9s ease forwards;
+}
+@keyframes diegetic-hint { 0%, 70% { opacity: .9; } 100% { opacity: 0; } }
+
+/* Real-vs-sim disclosure (product requirement): on office pages, its one-line note as a pill, bottom left; details via Advanced. */
+body:has(.office-shell) .real-sim.real-sim-overlay {
+  position: fixed; z-index: 100; left: 12px; right: auto; bottom: 12px; top: auto; width: auto; max-width: min(460px, calc(100% - 24px));
+  margin: 0; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--office-slate); background: var(--office-navy); color: var(--office-cream);
+}
+body:has(.office-shell) .real-sim.real-sim-overlay > :not(.real-sim-note) { display: none; }
+body:has(.office-shell) .real-sim.real-sim-overlay .real-sim-note {
+  margin: 0; color: var(--office-cream); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+body:has(.office-shell) .real-sim.real-sim-overlay .real-sim-note::before { content: 'Real vs. sim · '; font-weight: 700; }
+@media (max-width: 760px) { .office-shell[data-hud='diegetic'] .office-caption { top: 46px; white-space: normal; max-width: calc(100% - 24px); } }
+
+/* The agent card: a speech card pinned over the agent's head by the scene (AgentCardAnchor). */
+.office-shell .play-panel.diegetic-card {
+  top: 0; left: 0; width: min(300px, calc(100vw - 24px)); max-height: none; overflow: visible; padding: 12px 14px 10px;
+  border-radius: 14px; border-color: var(--office-lavender); transform-origin: 50% 100%; visibility: hidden; will-change: transform;
+}
+.office-shell .play-panel.diegetic-card[data-anchored] { visibility: visible; }
+.office-shell .play-panel.diegetic-card::after {
+  content: ''; position: absolute; top: 100%; left: var(--tail-x, 50%); width: 16px; height: 16px; margin-top: -8px;
+  background: var(--office-cream); border-right: 1px solid var(--office-lavender); border-bottom: 1px solid var(--office-lavender);
+  transform: translateX(-50%) rotate(45deg);
+}
+.office-shell .play-panel.diegetic-card[data-anchored='docked'] { transform: none !important; top: 14px; left: 18px; }
+.office-shell .play-panel.diegetic-card[data-anchored='docked']::after { display: none; }
+.office-shell .play-panel.diegetic-card header { margin-bottom: 6px; }
+.office-shell .play-panel.diegetic-card header h2 { font-size: 15px; }
+.office-shell .play-panel.diegetic-card header p { margin: 0; font-size: 12px; color: var(--office-slate); text-transform: uppercase; letter-spacing: .04em; }
+.office-shell .play-panel.diegetic-card header button { padding: 2px 9px; font-size: 12px; border-radius: 999px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-lavender); }
+.office-shell .play-panel.diegetic-card .agent-talk-who { margin-bottom: 6px; gap: 8px; }
+/* The card title already names the agent: keep the portrait and role, drop the repeated name. */
+.office-shell .play-panel.diegetic-card .agent-talk-who strong, .office-shell .play-panel.diegetic-card .agent-talk-who br { display: none; }
+.office-shell .play-panel.diegetic-card .agent-talk-portrait { width: 30px; height: 30px; font-size: 14px; border-color: var(--office-navy); }
+.office-shell .play-panel.diegetic-card .agent-talk-line { font-size: 14px; margin-bottom: 6px; background: var(--office-butter); border-left-color: var(--office-navy); border-radius: 0 8px 8px 0; }
+.office-shell .play-panel.diegetic-card .agent-talk-recent { max-height: 84px; overflow: auto; font-size: 12px; margin-bottom: 8px; }
+.office-shell .play-panel.diegetic-card .agent-talk-recent li { font-size: 12px; }
+.office-shell .play-panel.diegetic-card .agent-talk-reply:empty { display: none; }
+.office-shell .play-panel.diegetic-card .agent-talk-reply { max-height: 96px; overflow: auto; }
+/* The card already speaks for the agent; the old floating speech bubble would double it. */
+.office-shell[data-hud='diegetic'] .agent-talk-bubble { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .office-shell[data-hud='diegetic'] .office-caption { animation: none; opacity: .9; }
+  .office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle) { transition: none; }
+}
+
+/* Overview chrome, minimal by default: diagnostics live in one collapsed Advanced section. */
+.office-shell .office-mode-chip { margin-left: 10px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--office-navy); background: var(--office-butter); vertical-align: 2px; }
+.office-shell .office-footer { padding-right: 24px; padding-bottom: 48px; }
+.office-shell .office-advanced { position: relative; }
+.office-shell .office-advanced > summary {
+  list-style: none; cursor: pointer; padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender);
+}
+.office-shell .office-advanced > summary::-webkit-details-marker { display: none; }
+.office-shell .office-advanced > summary::after { content: ' ▾'; font-size: 10px; }
+.office-shell .office-advanced[open] > summary::after { content: ' ▴'; }
+.office-shell .office-advanced > summary:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; }
+.office-shell .office-advanced-panel {
+  position: absolute; z-index: 70; top: calc(100% + 8px); right: 0; width: 300px; max-height: 70vh; overflow: auto; padding: 12px 14px;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 12px; box-shadow: var(--office-plate-shadow);
+  display: grid; gap: 12px; font-size: 12px;
+}
+.office-shell .office-advanced-panel h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--office-slate); }
+.office-shell .office-advanced-panel p { margin: 0; }
+.office-shell .office-advanced-panel .connection-status { color: var(--office-navy); font-weight: 600; }
+.office-shell .office-advanced-panel .llm-control { margin: 0; padding: 0; border: 0; }
+.office-shell .office-advanced-panel .llm-control button { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); border-radius: 999px; }
+.office-shell .office-advanced-gx10 { padding-top: 10px; border-top: 1px solid var(--office-lavender); }
+.office-shell .office-advanced-gx10 h3 { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--office-navy); display: flex; align-items: center; gap: 6px; }
+.office-shell .office-advanced-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--office-butter); border: 1px solid var(--office-navy); }
+.office-shell .office-advanced-dot[data-ok] { background: var(--office-mint); }
+.office-shell .office-advanced-models { overflow-wrap: anywhere; color: var(--office-slate); margin-bottom: 6px !important; }
+.office-shell .office-advanced-gx10 dl { margin: 0; font: 11px/1.5 ui-monospace, monospace; }
+.office-shell .office-advanced-gx10 dl div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--office-lavender); padding: 2px 0; }
+.office-shell .office-advanced-gx10 dd { margin: 0; }
+.office-shell .office-advanced-gx10 details { margin-top: 6px; }
+.office-shell .office-advanced-gx10 details p { margin: 6px 0; color: var(--office-navy); }
+.office-shell .office-advanced-gx10 summary { cursor: pointer; }
+.office-shell .office-advanced-note { color: var(--office-slate); font-size: 11px; }
+.office-shell .office-advanced-panel a { color: var(--office-navy); }
