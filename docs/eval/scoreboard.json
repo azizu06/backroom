@@ -10,7 +10,7 @@
       "orchestrator/src/agents/eval/chain.ts": "82bc1146624f5786bc1fb33b6bda7001d3528efb8efd6b5560050e3842fd968e",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
-      "orchestrator/src/agents/eval/badge-attack.ts": "3ee6bc3c327eac9c45891e8354866b193cbe2cb567240ce4abd87744db7631d4",
+      "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
       "orchestrator/src/agents/eval/scoreboard.ts": "d8e87c9cf5eb79a9e13bad005430af5d7e207f76a72da309cb87512fc9629258"
@@ -12335,6 +12335,7 @@
     ],
     "paymentCapabilityExposed": false,
     "schemaRejected": true,
+    "normalCallsSucceeded": true,
     "policyReference": {
       "kind": "DENY",
       "ruleIds": [
