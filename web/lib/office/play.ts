@@ -3,6 +3,7 @@
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { OFFICE_ANCHORS, anchorLabel, matchingDenial, type AnchorId, type FloorPosition, type OfficeSnapshot } from "./state";
+import { PHONE_INTERACTION } from "./props/phone";
 
 export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
@@ -159,7 +160,7 @@ export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: numb
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" } | { kind: "paylink" } | { kind: "server" };
+export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" } | { kind: "paylink" } | { kind: "server" } | { kind: "phone" };
 export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
 export function targetKey(target: PlayTarget | null): string {
   if (!target) return "";
@@ -174,6 +175,7 @@ export function interactCandidates(agents: readonly { id: string; position: Vec2
     ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: DESK_RADIUS })),
     ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: DOOR_RADIUS }] : []),
     ...(visible.has("lobby") ? [{ target: { kind: "paylink" } as const, position: PAYLINK_KIOSK, radius: PAYLINK_RADIUS }] : []),
+    ...(visible.has("collections") ? [{ target: { kind: "phone" } as const, position: PHONE_INTERACTION.position, radius: PHONE_INTERACTION.radius }] : []),
     { target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 },
   ];
 }
@@ -249,6 +251,7 @@ export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPan
   }
   // Live GX10 numbers are not in the snapshot; the dialog reads them from GET /api/gx10.
   if (target.kind === "server") return { kind: "server", title: "GX10 server", entries: [] };
+  if (target.kind === "phone") return { kind: "phone", title: "Collections desk phone", entries: [] };
   if (target.kind === "paylink") return { kind: "paylink", title: "Payment link kiosk", entries: [] };
   const denial = matchingDenial(snapshot, "treasury");
   const row = denial && snapshot.audit.find(entry => entry.id === denial.auditId);
@@ -263,6 +266,7 @@ export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): strin
   if (target.kind === "agent") return `Talk to ${snapshot.agents.find(row => row.id === target.id)?.name ?? target.id}`;
   if (target.kind === "desk") return target.room === "dana" ? `Inspect ${OFFICE_ANCHORS.dana.name}` : `Inspect ${OFFICE_ANCHORS[target.room].name} desk`;
   if (target.kind === "server") return "Check GX10 server";
+  if (target.kind === "phone") return "Use desk phone";
   if (target.kind === "paylink") return "Scan to pay · payment link kiosk";
   return "Treasury door";
 }

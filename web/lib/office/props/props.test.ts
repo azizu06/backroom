@@ -83,7 +83,8 @@ describe('office prop interactions', () => {
       expect(z, id).toBeGreaterThanOrEqual(-5.5);
       expect(z, id).toBeLessThanOrEqual(5.5);
       expect(radius, id).toBeGreaterThan(0);
-      for (const [dx, dz] of desks) expect(Math.abs(x - dx) <= 2.25 / 2 && Math.abs(z - dz) <= 1.05 / 2, `${id} inside desk`).toBe(false);
+      // The desk phone is deliberately on the Collections desk surface; other prop interaction points stand on clear floor.
+      if (id !== 'desk-phone') for (const [dx, dz] of desks) expect(Math.abs(x - dx) <= 2.25 / 2 && Math.abs(z - dz) <= 1.05 / 2, `${id} inside desk`).toBe(false);
     }
   });
 
@@ -107,11 +108,11 @@ describe('office prop interactions', () => {
   it('hide the whiteboard without payables and the clock without lobby or collections', () => {
     // Desk monitors are covered in monitors.test.ts.
     const ids = (value: OfficeSnapshot) => propInteractions(value).map(prop => prop.id).filter(id => !id.startsWith('monitor:'));
-    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'clock']);
+    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'clock', 'desk-phone']);
     expect(ids(withRooms())).toEqual([]);
     expect(ids(withRooms('payables'))).toEqual(['whiteboard']);
     expect(ids(withRooms('lobby'))).toEqual(['clock']);
-    expect(ids(withRooms('collections', 'treasury'))).toEqual(['clock']);
+    expect(ids(withRooms('collections', 'treasury'))).toEqual(['clock', 'desk-phone']);
     expect(ids(withRooms('dana', 'treasury', 'vendor_onboarding'))).toEqual([]);
   });
 });
