@@ -38,7 +38,13 @@ async function main() {
         resetting = true;
         try { await Promise.all([...active]); let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 8192) throw new Error('RESET_TOO_LARGE'); }
           const config = JSON.parse(raw || '{}');
-          await runtime.reset(process.env.STATE_STORE === 'spacetime' ? config : undefined); res.end(JSON.stringify(runtime.status())); }
+          await runtime.reset(process.env.STATE_STORE === 'spacetime' ? config : undefined);
+          if (process.env.STATE_STORE === 'spacetime') {
+            // The server-rendered office must subscribe to the freshly installed database.
+            process.env.SPACETIMEDB_URI = config.uri;
+            process.env.SPACETIMEDB_DATABASE = config.database;
+          }
+          res.end(JSON.stringify(runtime.status())); }
         catch { res.writeHead(503).end('{"error":"DEMO_RESET_FAILED"}'); }
         finally { resetting = false; }
         return;

@@ -3,8 +3,9 @@
 This is the rehearsal host for spec §6.2, §6.3 and the three §8.2 dress rehearsals.
 It is **local SpacetimeDB state + mock bank transport + synthetic, already verified caller**.
 `STATE_STORE=memory` is available for tests/offline rehearsal.
-It does not turn the office preview, the local voice relay, or external sponsor
-checks into one connected production system. Keep the rehearsal banner visible.
+The office subscribes to the selected StateStore in SpacetimeDB mode; memory
+mode retains its labeled preview. The local voice relay and external sponsor
+checks are still separate integration paths. Keep the rehearsal banner visible.
 
 ## Bring up / reset / shut down
 
@@ -78,10 +79,13 @@ kill another session.
 
 ## Phone / operator setup
 
-- Demo operator: big screen; open the printed public `/office`, `/audit`, `/policy`
-  and available `/inbox` in tabs. `/office` is still a labeled preview on current
-  main; it is not subscribed to this host's live StateStore. Use `/audit` for
-  authoritative backend evidence. Confirm every printed surface before judging.
+- Demo operator: big screen; use the printed **local** `/office` URL on the laptop
+  for its anonymous SpacetimeDB subscription, and public `/audit`, `/policy` and
+  `/inbox` as needed. Reload the office after reset so it subscribes to the new DB.
+  The DB WebSocket remains loopback-only: a phone/public-origin office on another
+  device is not connected through the web tunnel. Dana and pay pages use HTTPS
+  HTTP APIs and do not need that WebSocket. Memory mode remains a labeled preview.
+  Confirm the office connection indicator before judging.
 - Dana: open public `/controller` on the passkey phone. Use the private
   `CONTROLLER_ENROLLMENT_SECRET` from `.env.local` or generated `.demo/private.env`;
   never display it. Complete registration before resetting for the pitch.
@@ -118,7 +122,7 @@ phone holds the passkey. Run `demo:reset` immediately before the opening.
 
 | Time | Speaker / operator | Action and claim |
 | --- | --- | --- |
-| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and office preview. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” Open the new approval URL on Dana's enrolled phone. |
+| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” Open the new approval URL on Dana's enrolled phone. |
 | 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion before the 60-second request expires. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
 | 0:45–1:15 | Demo operator; presenter | Open the printed pay URL, press Pay with simulated card, then show `partially_paid` and the exact-match reconciliation audit. “The real policy, SDK and reducer path ran over an in-memory mock HTTP transport.” No card data and no real money. |
 | 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Use the frozen #4419 or #4471 preset for the trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
@@ -157,8 +161,8 @@ phone by Sun 3 AM. This document does not claim those rehearsals happened.
    not label OFF as “cloud fallback.” Use the existing real-vs-sim router banner
    where actual router observations exist; no shared GX10 process is stopped.
 3. **3D breaks:** office controls offer fixed/tween camera then **2D plan**;
-   finally show `/audit` alone. The preview is still a preview; backend policy
-   and the shared audit work without it. Close the 3D tab during the terminal
+   finally show `/audit` alone. Memory mode remains a labeled preview; backend policy
+   and the shared audit work without the renderer. Close the 3D tab during the terminal
    proof to demonstrate that rendering grants no authority.
 4. **CRS / Apify / Nessie down:** try live first only in the owning opt-in smoke;
    cached evidence needs an actual `cached at hh:mm` timestamp. This host's mock
