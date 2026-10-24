@@ -44,5 +44,9 @@ describe('inbox tray Play target', () => {
     expect(panel?.state).toBe('2 unread');
     expect(panel?.entries.map(entry => entry.id)).toEqual(['i2', 'i1']);
     expect(inboxTarget.panel(INITIAL_OFFICE, { kind: 'inbox' })?.entries).toEqual([]);
+    expect(inboxTarget.panel(INITIAL_OFFICE, { kind: 'inbox' })?.task).toBeUndefined();
+    // Preview counts items without receipts: the dialog says so rather than implying an empty inbox.
+    expect(inboxTarget.panel({ ...INITIAL_OFFICE, inboxCount: 3 }, { kind: 'inbox' })?.task).toContain('3 intake items');
+    expect(inboxTarget.panel(snapshot, { kind: 'inbox' })?.task).toBeUndefined();
   });
 });
