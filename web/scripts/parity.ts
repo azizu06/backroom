@@ -1,4 +1,4 @@
-/** Explicit opt-in: disposable local SpacetimeDB + production Next + headless Chromium. No sponsor calls. */
+/** Opt-in real SpacetimeDB (local default / Maincloud) + production Next + headless Chromium. No model/bank/voice calls. */
 import assert from 'node:assert/strict';
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, openSync, closeSync } from 'node:fs';
@@ -15,7 +15,9 @@ import { canonicalAuditJson } from '../../orchestrator/src/audit';
 import type { AuditEntry } from '../../orchestrator/src/store';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const out = resolve(root, 'docs/evidence/parity');
+const maincloud = process.env.DEMO_SPACETIME === 'maincloud';
+if (process.env.DEMO_SPACETIME && !['local', 'maincloud'].includes(process.env.DEMO_SPACETIME)) throw new Error('INVALID_DEMO_SPACETIME');
+const out = resolve(root, maincloud ? 'docs/evidence/maincloud-parity' : 'docs/evidence/parity');
 const scratch = resolve(root, `.t8-tools/office-parity-${Date.now()}`);
 const cli = process.env.SPACETIME_CLI ?? resolve(root, '.t8-tools/spacetime/spacetime');
 const cliRoot = process.env.SPACETIME_ROOT ?? resolve(root, '.t8-tools/spacetime');
@@ -35,29 +37,38 @@ async function stop(child: ChildProcess | undefined) {
   await new Promise<void>(done => child.once('exit', () => done()));
 }
 async function main() {
-  mkdirSync(scratch, { recursive: true }); mkdirSync(out, { recursive: true });
-  const prefix = [`--root-dir=${cliRoot}`, `--config-path=${resolve(scratch, 'cli.toml')}`];
+  mkdirSync(scratch, { recursive: true, mode: 0o700 }); mkdirSync(out, { recursive: true });
+  const configPath = maincloud ? (process.env.SPACETIME_CONFIG || resolve(cliRoot, 'config/cli.toml')) : resolve(scratch, 'cli.toml');
+  // The CLI manager already loads its root config. Passing that same path again
+  // can deadlock publishing in CLI 2.13.0; only override a genuinely different file.
+  const prefix = [`--root-dir=${cliRoot}`, ...(!maincloud || configPath !== resolve(cliRoot, 'config/cli.toml') ? [`--config-path=${configPath}`] : [])];
   const dbPort = await port(), webPort = await port();
-  const uri = `ws://127.0.0.1:${dbPort}`, http = `http://127.0.0.1:${dbPort}`, base = `http://localhost:${webPort}`;
+  const uri = maincloud ? 'wss://maincloud.spacetimedb.com' : `ws://127.0.0.1:${dbPort}`, http = maincloud ? 'https://maincloud.spacetimedb.com' : `http://127.0.0.1:${dbPort}`, base = `http://localhost:${webPort}`;
   // The lobby audit wall is operator-gated (#82). Parity unlocks it the way a real operator does.
   const operatorCode = randomBytes(24).toString('hex');
-  const dbLog = openSync(resolve(scratch, 'server.log'), 'w');
-  const server = spawn(cli, [...prefix, 'start', '--listen-addr', `127.0.0.1:${dbPort}`,
-    '--data-dir', resolve(scratch, 'db'), '--in-memory', '--non-interactive'], { cwd: root, stdio: ['ignore', dbLog, dbLog] });
-  closeSync(dbLog);
+  let server: ChildProcess | undefined;
+  if (!maincloud) {
+    const dbLog = openSync(resolve(scratch, 'server.log'), 'w', 0o600);
+    server = spawn(cli, [...prefix, 'start', '--listen-addr', `127.0.0.1:${dbPort}`,
+      '--data-dir', resolve(scratch, 'db'), '--in-memory', '--non-interactive'], { cwd: root, stdio: ['ignore', dbLog, dbLog] });
+    closeSync(dbLog);
+  }
   const stores: SpacetimeStateStore[] = [];
   let browser: Browser | undefined, web: ChildProcess | undefined, writer: DbConnection | undefined;
   const errors: string[] = [], writes: string[] = [];
   try {
-    await until(async () => { try { return (await fetch(`${http}/v1/ping`)).ok; } catch { return false; } }, 'owned local server');
-    const names = ['closed', 'open'].map(mode => `backroom-office-${Date.now()}-${mode}`);
-    for (const database of names) execFileSync(cli, [...prefix, 'publish', database!, '--server', http, '--module-path', 'spacetime', '--yes'],
-      { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
-    const token = /^spacetimedb_token\s*=\s*"([^"]+)"/m.exec(readFileSync(resolve(scratch, 'cli.toml'), 'utf8'))?.[1];
-    assert(token, 'isolated publisher identity missing');
+    await until(async () => { try { return (await fetch(`${http}/v1/ping`, { signal: AbortSignal.timeout(3000) })).ok; } catch { return false; } }, maincloud ? 'Maincloud' : 'owned local server');
+    const names = ['closed', 'open'].map(mode => `backroom-${maincloud ? 'maincloud' : 'office'}-${Date.now()}-${randomBytes(3).toString('hex')}-${mode}`);
+    for (const database of names) {
+      console.log(`Publishing fresh ${maincloud ? 'Maincloud' : 'local'} parity database: ${database}`);
+      execFileSync(cli, [...prefix, 'publish', database!, '--server', maincloud ? 'maincloud' : http, '--module-path', 'spacetime', '--yes'],
+        { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
+    }
+    const token = /^spacetimedb_token\s*=\s*"([^"]+)"/m.exec(readFileSync(configPath, 'utf8'))?.[1];
+    assert(token, 'publisher identity missing; authenticate Maincloud CLI first');
     const store = (database: string) => { const result = new SpacetimeStateStore({ uri, database, token }); stores.push(result); return result; };
     const startWeb = async (database: string) => {
-      const log = openSync(resolve(scratch, `${database}.web.log`), 'w');
+      const log = openSync(resolve(scratch, `${database}.web.log`), 'w', 0o600);
       web = spawn(process.execPath, [resolve(root, 'web/node_modules/next/dist/bin/next'), 'start', '--port', String(webPort)], {
         cwd: resolve(root, 'web'), stdio: ['ignore', log, log], env: { ...process.env,
           STATE_STORE: 'spacetime', SPACETIMEDB_URI: uri, SPACETIMEDB_DATABASE: database, SPACETIMEDB_TOKEN: token,
@@ -120,12 +131,14 @@ async function main() {
         .onConnect(() => done(connection)).onConnectError((_ctx, error) => reject(error)).build();
     });
     // Measure the first rendered frame after React commits each fresh target row.
-    // Browser and standalone server share this host's wall clock. Never count initial snapshots.
+    // Local: same-host server timestamp. Maincloud: browser-monotonic request start,
+    // including outbound reducer network time; remote wall-clock offset cannot bias it.
     const samples: number[] = [];
     for (let i = 0; i < 20; i++) {
       const target = i % 2 ? 'payables_desk' : 'lobby';
       const expected = i % 2 ? 'payables' : 'lobby';
-      await page.evaluate(({ expected }) => {
+      await page.evaluate(({ expected, maincloud }) => {
+        const start = performance.now();
         const scope = window as typeof window & { officeSample?: Promise<number> };
         scope.officeSample = new Promise<number>((done, reject) => {
         const timer = setTimeout(() => { observer.disconnect(); reject(new Error('Fresh row did not reach the view')); }, 3000);
@@ -133,11 +146,11 @@ async function main() {
         const observer = new MutationObserver(() => {
           if (row.dataset.target !== expected) return;
           observer.disconnect(); clearTimeout(timer);
-          requestAnimationFrame(() => requestAnimationFrame(() => done(Date.now() - Number(row.dataset.rowAt))));
+          requestAnimationFrame(() => requestAnimationFrame(() => done(maincloud ? performance.now() - start : Date.now() - Number(row.dataset.rowAt))));
         });
         observer.observe(row, { attributes: true });
         });
-      }, { expected });
+      }, { expected, maincloud });
       await writer.reducers.setAgentTarget({ agentId: 'payables-demo', targetAnchor: target });
       const ms = await page.evaluate(() => (window as typeof window & { officeSample: Promise<number> }).officeSample); samples.push(ms); assert(ms >= 0 && ms <= 1000, `row/frame ${ms}ms exceeds 1s`);
       await delay(125);
@@ -171,19 +184,19 @@ async function main() {
     await expect(page.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
     assert.equal(writes.length, 0, 'renderer caused a write'); assert.equal(errors.length, 0, errors.join('; '));
     const sorted = [...samples].sort((a, b) => a - b);
-    const proof = { measuredAt: new Date().toISOString(), backend: 'SpacetimeDB 2.13.0 local standalone', scenario: 'moment 2 / runInboxTrap',
+    const proof = { measuredAt: new Date().toISOString(), backend: maincloud ? 'SpacetimeDB 2.13.0 Maincloud' : 'SpacetimeDB 2.13.0 local standalone', databases: names, scenario: 'moment 2 / runInboxTrap',
       auditEntries: closed.entries.length, normalizedAuditByteIdentical: true, excluded: ['ts', 'hash', 'prevHash'], idsPreserved: true,
       chainsValid: true, closedWorldCaughtUp: true, bankEffects: 0, modelRequests: 0,
-      rowToFrameMs: samples, minMs: sorted[0], medianMs: sorted[10], p95Ms: sorted[18], maxMs: sorted.at(-1),
+      ...(maincloud ? { requestToFrameMs: samples } : { rowToFrameMs: samples }), minMs: sorted[0], medianMs: sorted[10], p95Ms: sorted[18], maxMs: sorted.at(-1),
       denialAuditId: denial.id, redDoorPixels, denialPreservesAgentRow: true, runtimeOffObserved: true,
-      rendererWrites: writes, browserErrors: errors, maincloud: 'not measured',
-      note: 'Same-host clock; DOM target commit + two animation frames. Measures animation response, not walk completion or physical display/GPU performance.' };
+      rendererWrites: writes, browserErrors: errors, maincloud: maincloud ? 'measured (network included)' : 'not measured',
+      note: maincloud ? 'Browser performance.now from before reducer dispatch through DOM target commit + two animation frames; includes network and controller/Playwright overhead. No server-clock subtraction. Not walk completion or physical display latency.' : 'Same-host clock; DOM target commit + two animation frames. Measures animation response, not walk completion or physical display/GPU performance.' };
     writeFileSync(resolve(out, 'proof.json'), JSON.stringify(proof, null, 2) + '\n');
-    console.log(`PASS: 20/20 row-to-frame samples <=1s; max ${proof.maxMs}ms; denied door ${denial.id}; no renderer writes`);
+    console.log(`PASS: 20/20 ${maincloud ? 'request-to-frame (network included)' : 'row-to-frame'} samples <=1s; max ${proof.maxMs}ms; denied door ${denial.id}; no renderer writes`);
     console.log(`Evidence: ${out}`);
   } finally {
     writer?.disconnect(); await browser?.close(); await stop(web);
     await Promise.all(stores.map(store => store.close())); await stop(server);
   }
 }
-main().catch(error => { console.error(error instanceof Error ? error.message.slice(0, 1000) : 'OFFICE_PARITY_FAILED'); process.exitCode = 1; });
+main().catch(error => { console.error(error instanceof Error ? (error.message.startsWith('Command failed:') ? 'SpacetimeDB publish failed; inspect private CLI configuration/authentication' : error.message.slice(0, 1000)) : 'OFFICE_PARITY_FAILED'); process.exitCode = 1; });
