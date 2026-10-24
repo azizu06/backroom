@@ -3,6 +3,7 @@
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { OFFICE_ANCHORS, anchorLabel, matchingDenial, type AnchorId, type FloorPosition, type OfficeSnapshot } from "./state";
+import { handoffAgentName, statusLabel, type Handoff } from "./handoffs";
 
 export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
@@ -139,17 +140,18 @@ export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: numb
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" };
+export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" } | { kind: "handoff"; actor: string };
 export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
 export function targetKey(target: PlayTarget | null): string {
-  return !target ? "" : target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : "treasury";
+  return !target ? "" : target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : target.kind === "handoff" ? `handoff:${target.actor}` : "treasury";
 }
 
-/** Agents at their drawn (motion) positions, each visible desk at its room centre, and the Treasury door. */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[]): PlayCandidate[] {
+/** Agents at their drawn (motion) positions, handoff agents at their planned positions, each visible desk, and the Treasury door. */
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
   const visible = new Set(rooms);
   return [
     ...agents.map(agent => ({ target: { kind: "agent", id: agent.id } as const, position: agent.position, radius: 0.45 })),
+    ...handoffAgents.map(agent => ({ target: { kind: "handoff", actor: agent.id } as const, position: agent.position, radius: 0.45 })),
     ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: 1.1 })),
     ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: 0.65 }] : []),
   ];
@@ -189,6 +191,7 @@ export interface PlayPanel {
   readonly seated?: readonly { readonly id: string; readonly name: string; readonly state: string }[];
   readonly locked?: string;
   readonly denial?: PlayPanelEntry;
+  readonly handoff?: { readonly id: string; readonly from: string; readonly to: string; readonly item: string; readonly summary: string; readonly status: string };
   readonly entries: readonly PlayPanelEntry[];
 }
 const MAX_ENTRIES = 8;
@@ -200,8 +203,25 @@ function valueText(value: unknown): string {
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
 
-/** Display data for the interaction panel; null when the target is no longer in the snapshot. */
-export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPanel | null {
+/**
+ * Display data for the interaction panel; null when the target is no longer in the snapshot.
+ * `handoffFor` picks the handoff a handoff agent is carrying now (HandoffStage), else its latest row is shown.
+ */
+export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget, handoffFor?: (actor: string) => Handoff | undefined): PlayPanel | null {
+  if (target.kind === "handoff") {
+    const rows = (snapshot.handoffs ?? []).filter(row => row.from === target.actor || row.to === target.actor);
+    if (!rows.length) return null;
+    const current = handoffFor?.(target.actor) ?? [...rows].sort((a, b) => b.at - a.at)[0]!;
+    return {
+      kind: "handoff", title: `${handoffAgentName(target.actor)} · handoff`, state: statusLabel(current.status),
+      task: `${handoffAgentName(current.from)} → ${handoffAgentName(current.to)}${current.item ? ` · ${current.item}` : ""}`,
+      handoff: { id: current.id, from: handoffAgentName(current.from), to: handoffAgentName(current.to), item: current.item, summary: current.summary, status: statusLabel(current.status) },
+      entries: [...rows].sort((a, b) => b.at - a.at).slice(0, MAX_ENTRIES).map(row => ({
+        id: row.id, decision: statusLabel(row.status).toUpperCase(),
+        summary: `${handoffAgentName(row.from)} → ${handoffAgentName(row.to)}${row.item ? ` · ${row.item}` : ""}: ${row.summary}`, ruleIds: [],
+      })),
+    };
+  }
   if (target.kind === "agent") {
     const agent = snapshot.agents.find(row => row.id === target.id);
     if (!agent) return null;
@@ -231,6 +251,7 @@ export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPan
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {
   if (target.kind === "agent") return `Talk to ${snapshot.agents.find(row => row.id === target.id)?.name ?? target.id}`;
+  if (target.kind === "handoff") return `Ask ${handoffAgentName(target.actor)} about the handoff`;
   if (target.kind === "desk") return target.room === "dana" ? `Inspect ${OFFICE_ANCHORS.dana.name}` : `Inspect ${OFFICE_ANCHORS[target.room].name} desk`;
   return "Treasury door";
 }
@@ -238,6 +259,8 @@ export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): strin
 /** What the lazy scene needs from Office to run Play; `hud` receives data-player-* attributes. */
 export interface PlayBridge {
   readonly input: PlayInput;
+  /** Live handoff choreography, when handoff rows exist; its agents become interact targets. */
+  readonly handoffs?: { sample(now: number, reduced?: boolean): { actors: readonly { id: string; position: Vec2 }[]; human: boolean } };
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };
 }

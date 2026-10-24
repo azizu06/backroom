@@ -16,7 +16,7 @@ import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Renders on demand: frames continue only while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, handoffs }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);
@@ -76,7 +76,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
-    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current)));
+    const handoff = handoffs?.sample(Date.now(), reduced.current);
+    const handoffAgents = handoff ? handoff.actors.filter(actor => actor.id !== 'human' || handoff.human) : [];
+    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
     if (hud.current && (moved || turned || !written.current)) {

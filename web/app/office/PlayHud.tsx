@@ -5,6 +5,7 @@ import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import type { Handoff } from '../../lib/office/handoffs';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -41,10 +42,11 @@ function focusAskWhy() {
   field?.focus({ preventScroll: true });
 }
 
-function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void }) {
+type HandoffResolver = (actor: string) => Handoff | undefined;
+function PlayPanelDialog({ snapshot, target, close, askWhy, handoffFor }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void; handoffFor?: HandoffResolver }) {
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
-  const panel = playPanel(snapshot, target);
+  const panel = playPanel(snapshot, target, handoffFor);
   const key = targetKey(target);
   useEffect(() => { closeButton.current?.focus(); }, [key]);
   if (!panel) return null;
@@ -62,12 +64,17 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
     {panel.seated && (panel.seated.length ? <ul aria-label='Seated agents'>{panel.seated.map(agent => <li key={agent.id}><strong>{agent.name}</strong> · {agent.state}</li>)}</ul>
       : <p>No agents seated here.</p>)}
     {panel.locked && <p>{panel.locked}</p>}
+    {panel.handoff && <dl className='play-panel-handoff' data-handoff-id={panel.handoff.id}>
+      <div><dt>From</dt><dd>{panel.handoff.from}</dd></div><div><dt>To</dt><dd>{panel.handoff.to}</dd></div>
+      {panel.handoff.item && <div><dt>Item</dt><dd>{panel.handoff.item}</dd></div>}
+      <div><dt>Status</dt><dd>{panel.handoff.status}</dd></div><div><dt>Summary</dt><dd>{panel.handoff.summary}</dd></div>
+    </dl>}
     {panel.kind === 'treasury' && panel.denial && <p className='denial-text' role='status' data-denial-audit={panel.denial.id}>
       <strong>{panel.denial.decision}</strong> Entry denied · rule {panel.denial.ruleIds.join(', ')} · audit <code>{panel.denial.id}</code>
     </p>}
     {panel.kind !== 'treasury' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
-      <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
-      <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
+      <strong className={entry.decision === 'DENY' || entry.decision === 'FAILED' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
+      {panel.kind !== 'handoff' && <><span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · </>}<code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
     <button className='play-panel-ask' onClick={askWhy}>Ask why</button>
   </section>;
@@ -77,8 +84,9 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit }: {
+export function PlayHud({ snapshot, input, target, hud, onExit, handoffFor }: {
   snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void;
+  handoffFor?: HandoffResolver;
 }) {
   const touch = useTouch();
   const [panel, setPanel] = useState<PlayTarget | null>(null);
@@ -98,8 +106,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     };
   }, [hud, input]);
   useEffect(() => {
-    if (panel && !playPanel(snapshot, panel)) { setPanel(null); hud.current?.focus(); }
-  }, [panel, snapshot, hud]);
+    if (panel && !playPanel(snapshot, panel, handoffFor)) { setPanel(null); hud.current?.focus(); }
+  }, [panel, snapshot, hud, handoffFor]);
 
   function interact() {
     const current = targetRef.current;
@@ -207,6 +215,6 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
       </div>
       {prompt && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
-    {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} />}
+    {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} handoffFor={handoffFor} />}
   </div>;
 }

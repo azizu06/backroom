@@ -1,12 +1,15 @@
 'use client';
 
-import { Component, useCallback, useEffect, useId, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PlayHud } from './PlayHud';
-import { isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
+import { REDUCED_MOTION_QUERY, isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
+import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, handoffLine, type Handoff, type HandoffAgentId } from '../../lib/office/handoffs';
+import { HandoffStage } from '../../lib/office/handoff-plan';
+import { createMockHandoffFeed, type HandoffFeed } from '../../lib/office/handoff-mock';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
@@ -14,9 +17,11 @@ import { INITIAL_VIEWPORT, boundaryStateForProps, isFixedCamera, reportViewFailu
 import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStops } from '../../lib/office/tour';
 import { OfficeLobby } from './OfficeLobby';
 import type { AgentTagLookup, RoomLabels } from './scene';
+import type { HandoffTagLookup } from './handoffs/HandoffLayer';
 import '../office.css';
 import './a11y.css';
 import './tags.css';
+import './handoffs/handoffs.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -68,6 +73,42 @@ function FloorPlan({ snapshot, motions, select }: { snapshot: OfficeSnapshot; mo
     </button>)}
     {snapshot.agents.map(agent => <PlanAgent key={agent.id} agent={agent} motion={motions.get(agent)} recorded={snapshot.connection === 'replay'} />)}
   </div>;
+}
+const NO_HANDOFFS: readonly Handoff[] = [];
+const noSubscription = () => () => {};
+function subscribeReducedMotion(onChange: () => void) {
+  const query = window.matchMedia(REDUCED_MOTION_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+/**
+ * Handoff rows for the office: the subscribed snapshot's rows, or the fixture stream behind `?handoffs=mock`.
+ * Returns the shared stage (null until there is something to draw) and the rows.
+ */
+function useHandoffs(snapshot: OfficeSnapshot) {
+  const [mock, setMock] = useState<{ feed: HandoffFeed; stage: HandoffStage } | null>(null);
+  const [live] = useState(() => new HandoffStage());
+  useEffect(() => {
+    const flag = handoffFlag(window.location.search);
+    if (!flag.mock) return;
+    const feed = createMockHandoffFeed({ speed: flag.speed });
+    setMock({ feed, stage: new HandoffStage(flag.speed) });
+    feed.start();
+    return () => feed.stop();
+  }, []);
+  const mockRows = useSyncExternalStore(mock?.feed.subscribe ?? noSubscription, mock?.feed.getRows ?? (() => NO_HANDOFFS), () => NO_HANDOFFS);
+  const rows = snapshot.handoffs ?? (mock ? mockRows : NO_HANDOFFS);
+  const stage = snapshot.handoffs ? live : mock?.stage ?? null;
+  useEffect(() => { if (stage?.update(rows)) requestSceneFrame(); }, [stage, rows]);
+  return { stage: rows.length || mock ? stage : null, rows };
+}
+function HandoffLog({ rows, reduced }: { rows: readonly Handoff[]; reduced: boolean }) {
+  return <section className='office-audit handoff-log' aria-label='Agent handoffs' data-office-mount='handoffs'>
+    <h2>Agent handoffs <span>{reduced ? 'Reduced motion · listed instead of animated' : 'Folders passed between agent desks'}</span></h2>
+    {!rows.length ? <p>No handoffs yet.</p> : <ol role='log' aria-live='polite' aria-relevant='additions text'>
+      {rows.slice(-8).map(row => <li key={row.id} data-handoff-id={row.id} data-status={row.status}>{handoffLine(row)}</li>)}
+    </ol>}
+  </section>;
 }
 /** Contains a render failure to its own region; a changed `resetKey` retries the children. */
 class ViewBoundary extends Component<{ name: string; children: ReactNode; fallback: ReactNode; onFailure?: () => void; resetKey?: unknown }, BoundaryState> {
@@ -139,6 +180,15 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
   const tagElements = useRef(new Map<string, HTMLDivElement>());
   const agentTag = useCallback<AgentTagLookup>(id => tagElements.current.get(id), []);
+  const handoffs = useHandoffs(snapshot);
+  const handoffStage = handoffs.stage;
+  const handoffElements = useRef(new Map<HandoffAgentId, HTMLDivElement>());
+  const handoffTag = useCallback<HandoffTagLookup>(id => handoffElements.current.get(id), []);
+  const handoffFor = useCallback((actor: string) => handoffStage?.handoffFor(actor, Date.now()), [handoffStage]);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia(REDUCED_MOTION_QUERY).matches, () => false);
+  // Play panels read handoff rows from the snapshot, whichever source produced them.
+  const playSnapshot = useMemo(() => handoffs.rows === (snapshot.handoffs ?? NO_HANDOFFS) ? snapshot : { ...snapshot, handoffs: handoffs.rows }, [snapshot, handoffs.rows]);
+  const playBridge = useMemo(() => handoffStage ? { ...play, handoffs: handoffStage } : play, [play, handoffStage]);
   const touring = mode === 'tour';
   const [tour, setTour] = useState<{ stops: AnchorId[]; index: number } | null>(null);
   const rooms = visibleRooms(snapshot);
@@ -219,12 +269,18 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? playBridge : undefined}
+              handoffs={handoffStage ?? undefined} handoffTag={handoffTag} />
           </div>
           {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
             ref={element => { if (!element) return; tagElements.current.set(agent.id, element); return () => { if (tagElements.current.get(agent.id) === element) tagElements.current.delete(agent.id); }; }}>
             <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
+          </div>)}</div>}
+          {/* Handoff names and speech bubbles; the handoff log in the footer is the accessible version. */}
+          {handoffStage && !layers.floorPlan && <div className='agent-tags handoff-tags' aria-hidden='true'>{([...FLOOR_AGENTS, HUMAN] as HandoffAgentId[]).map(id => <div key={id} className='handoff-tag' data-handoff-actor={id}
+            ref={element => { if (!element) return; handoffElements.current.set(id, element); return () => { if (handoffElements.current.get(id) === element) handoffElements.current.delete(id); }; }}>
+            <p className='handoff-bubble' hidden /><strong>{HANDOFF_AGENTS[id].name}{id === HUMAN ? ' · passkey' : ''}</strong>
           </div>)}</div>}
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
@@ -236,7 +292,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           })}
         </>}
       </ViewBoundary>
-      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} />}
+      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={playSnapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} handoffFor={handoffFor} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
@@ -259,6 +315,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           <ReceiptList snapshot={snapshot} title='Office receipts' />
         </ViewBoundary>
       </section>}
+      {handoffStage && <ViewBoundary name='Handoff log' resetKey={handoffs.rows} fallback={<p role='status'>Handoff log unavailable.</p>}>
+        <HandoffLog rows={handoffs.rows} reduced={reducedMotion} />
+      </ViewBoundary>}
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section>}
