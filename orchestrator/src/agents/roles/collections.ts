@@ -26,7 +26,7 @@ export function classifyCall(call: CallRecordView): CallOutcome {
   if (call.status === 'already_paid') return 'already_paid';
   if (call.links.length) return 'payment_link_sent';
   if (call.plans.length) return 'plan_approved';
-  if (call.escalations.some(e => e.status === 'pending' || e.status === 'pending_owner')) return 'approval_pending';
+  if (call.escalations.some(e => e.status === 'pending' || e.status === 'pending_owner' || e.status === 'expired')) return 'approval_pending';
   return 'no_agreement';
 }
 export function routeOutcome(outcome: CallOutcome): PostCallRoute {

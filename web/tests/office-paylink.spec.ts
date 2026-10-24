@@ -27,6 +27,16 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('office lobby kiosk labels a loopback rehearsal link', async ({ page }) => {
+  await page.route('**/api/pay/active', route => route.fulfill({ json: { active: {
+    code: 'ABCDEF1234', url: 'http://127.0.0.1:3300/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr: PIXEL, localOnly: true,
+  } } }));
+  await page.goto('/office');
+  const kiosk = page.locator("[data-office-mount='payment-link']");
+  await expect(kiosk.getByText('local rehearsal only, not scannable by a phone')).toBeVisible();
+  await expect(kiosk.getByRole('link', { name: 'http://127.0.0.1:3300/p/ABCDEF1234' })).toBeVisible();
+});
+
 test('office lobby kiosk waits when no payment is authorized', async ({ page }) => {
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
   await page.goto('/office');

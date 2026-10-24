@@ -12,6 +12,8 @@ export interface ExtractorDependencies {
   readDocument(ctx: ToolContext, documentRef: string): Promise<ExtractorDocument | undefined>;
   /** Persist immutable evidence, checking lease/generation atomically at commit. No master/payment writes. */
   saveExtraction(ctx: ToolContext, artifact: ExtractionArtifact): Promise<string>;
+  /** Reuse a server-recorded router candidate; absence holds instead of starting another model call. */
+  readCandidate?(ctx: ToolContext, documentRef: string): Promise<Json | undefined>;
   fetch?: typeof fetch;
   /** Cloud fallback when GX10 is unreachable; defaults to the production router. */
   router?: ExtractionRouter;
@@ -89,6 +91,13 @@ export function createExtractorSpecialist(deps: ExtractorDependencies): Speciali
       if (!document) return { decision: 'DENY', errors: ['READ_DOCUMENT_FIRST'] };
       if (s.localAttempts >= MAX_ATTEMPTS) return { decision: 'ESCALATE', errors: ['LOCAL_ATTEMPTS_EXHAUSTED'], next: 'intake' };
       s.localAttempts++;
+      if (deps.readCandidate) {
+        const fields = await deps.readCandidate(ctx, args.documentRef);
+        await ctx.assertCurrent();
+        if (!fields) return { decision: 'ESCALATE', errors: ['RECORDED_EXTRACTION_UNAVAILABLE'], next: 'intake' };
+        s.localRefs.add(args.documentRef);
+        return { decision: 'ALLOW', documentRef: args.documentRef, fields, source: 'recorded_router_candidate' };
+      }
       let result: RoutedExtraction;
       try { result = await extractWithFallback(document, ctx.activation.signal, { fetch: deps.fetch, router: deps.router }); }
       catch {
