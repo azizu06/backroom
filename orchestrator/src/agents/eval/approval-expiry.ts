@@ -26,18 +26,19 @@ async function liveCall() {
   const auth = new TestAuthenticator();
   const enrolled = await service.registrationOptions('offline-eval-only');
   await service.register('offline-eval-only', enrolled.challengeId, auth.registration(enrolled.options.challenge));
-  const gateway = createGateway({ secret: () => 'offline-eval-tool', store: new MemoryGatewayStore([approvalDemoCall()], state),
+  const gateway = createGateway({ secret: () => 'offline-eval-tool', store: new MemoryGatewayStore([approvalDemoCall(), approvalDemoCall('voice-probe')], state),
     approvalBridge: createApprovalBridge(state, time.now) });
   let seq = 0;
-  const tool = async (name: string, fields: Record<string, unknown> = {}) => {
+  const tool = async (name: string, fields: Record<string, unknown> = {}, callId = 'approval-demo') => {
     const response = await gateway(name, new Request(`${origin}/api/tools/${name}`, {
       method: 'POST', headers: { authorization: 'Bearer offline-eval-tool', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ call_id: 'approval-demo', webhook_request_id: `expiry-${++seq}`, ...fields }),
+      body: JSON.stringify({ call_id: callId, webhook_request_id: `expiry-${++seq}`, ...fields }),
     }));
     return { status: response.status, body: await response.json() as ToolView };
   };
   const audits = async (action: string) => (await state.listAudit()).filter(entry => entry.action === action).length;
-  const voiceDecide = await tool('decide_escalation', { decision: 'Approve' });
+  // An unknown tool on a known call pauses that call (#202). Probe it off the measured call so it cannot approve and cannot stop the expiry scenario.
+  const voiceDecide = await tool('decide_escalation', { decision: 'Approve' }, 'voice-probe');
   const voiceCheck = await tool('check_approval', { escalation_id: 'fake', method: 'passkey', approved: true });
   const first = await tool('propose_plan', plan);
   const firstId = first.body.escalation_id ?? null;
@@ -72,7 +73,8 @@ async function liveCall() {
   const retry = await tool('propose_plan', plan);
   return {
     windowMs, firstId, storedCallId: stored?.callId ?? null, storedWindow: stored ? stored.expiresAt - stored.createdAt : null,
-    voice: { decide: voiceDecide.status, check: voiceCheck.status },
+    voice: { decide: voiceDecide.status, check: voiceCheck.status, decideKind: voiceDecide.body.kind ?? null,
+      decideCanConfirm: voiceDecide.body.can_confirm ?? null, decideRules: voiceDecide.body.rule_ids ?? [] },
     atSixty, expiredAuditsAtSixty, atWindowMinus, expiredAuditsBeforeWindow, atWindow, serviceAtWindow, expiredAuditsAtWindow,
     latePasskeyError, afterDecide: { status: decided?.status ?? 'missing', method: decided?.method ?? null },
     fresh: fresh.body, createdAfterFresh, open: open.body, createdAfterOpen, secondClosed, retry: retry.body,
@@ -119,7 +121,8 @@ export async function runApprovalExpiry() {
     escalationRetryUsed: live.retry.kind === 'DENY' && JSON.stringify(live.retry.rule_ids) === '["ESCALATION_RETRY_USED"]' && live.retry.can_confirm === false && live.createdAfterRetry === 2,
     latePasskeyRejected: live.latePasskeyError === 'ESCALATION_CLOSED' && live.afterDecide.status === 'expired' && live.afterDecide.method === null,
     noDecideAudit: live.decideAudits === 0,
-    voiceCannotApprove: live.voice.decide === 404 && live.voice.check === 400,
+    voiceCannotApprove: live.voice.decide === 200 && live.voice.decideKind === 'ESCALATE' && live.voice.decideCanConfirm === false
+      && JSON.stringify(live.voice.decideRules) === '["UNRECOGNIZED_REQUEST"]' && live.voice.check === 400,
     noCallId: owner.callId === null && owner.windowMs === 60_000,
     pendingBeforeSixtySeconds: owner.before.status === 'pending' && owner.before.callId === null,
     pendingOwnerAtSixtySeconds: owner.unread.status === 'pending' && owner.closed.status === 'pending_owner' && owner.closed.callId === null,

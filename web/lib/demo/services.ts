@@ -16,8 +16,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   if (live && !env.NESSIE_API_KEY) throw new Error('DEMO_NESSIE_KEY_REQUIRED');
   const claims = new FileClaims(resolve(env.NESSIE_CLAIMS_DIR || '.nessie-state/claims'));
   const deposits: unknown[] = [], mockClaims = new Set<string>();
-  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, claims, fetch: http, readAttempts: 1, timeoutMs: 5000 } : {
-    apiKey: 'mock-no-network', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } },
+  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, surface: 'nessie_sandbox', claims, fetch: http, readAttempts: 1, timeoutMs: 5000 } : {
+    apiKey: 'mock-no-network', surface: 'mock', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } },
     fetch: async (url, init) => {
       if (init?.method === 'POST') {
         const row = { ...JSON.parse(String(init.body)), _id: `mock-deposit-${deposits.length + 1}` };

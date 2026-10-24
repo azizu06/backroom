@@ -9,7 +9,7 @@ it('expires a live call at the approval window with one re-ask, and closes a no-
   expect(run.live.windowMs).toBeGreaterThan(60_000);
   expect(run.live.storedCallId).toBe('approval-demo');
   expect(run.live.storedWindow).toBe(run.live.windowMs);
-  expect(run.live.voice).toEqual({ decide: 404, check: 400 });
+  expect(run.live.voice).toEqual({ decide: 200, check: 400, decideKind: 'ESCALATE', decideCanConfirm: false, decideRules: ['UNRECOGNIZED_REQUEST'] });
   expect(run.live.atSixty).toMatchObject({ approval_status: 'pending', can_confirm: false });
   expect(run.live.expiredAuditsAtSixty).toBe(0);
   expect(run.live.atWindowMinus).toMatchObject({ approval_status: 'pending', can_confirm: false });
