@@ -11,23 +11,67 @@ STATE_DIR="$ROOT/.board"
 die() { echo "board: $*" >&2; exit 1; }
 command -v gh >/dev/null 2>&1 || die "gh not found (https://cli.github.com), then run: gh auth login"
 
-repo() {
-  if [ -n "${BOARD_REPO:-}" ]; then echo "$BOARD_REPO"; return; fi
-  local f="$STATE_DIR/repo" r
-  if [ -s "$f" ]; then cat "$f"; return; fi
-  r="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
-  [ -n "$r" ] && { mkdir -p "$STATE_DIR"; echo "$r" > "$f"; echo "$r"; }
+valid_repo() { [[ "$1" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; }
+valid_login() { [[ "$1" =~ ^[A-Za-z0-9-]+$ ]]; }
+
+repo_from_remote() {
+  local url path
+  url="$(git remote get-url origin 2>/dev/null)" || return 1
+  case "$url" in
+    https://*|http://*|ssh://*) path="${url#*://}"; path="${path#*/}" ;;
+    git@*:* ) path="${url#*:}" ;;
+    *) return 1 ;;
+  esac
+  path="${path%.git}"
+  path="${path%/}"
+  valid_repo "$path" || return 1
+  printf '%s\n' "$path"
 }
-REPO="$(repo)"
+
+repo() {
+  local f="$STATE_DIR/repo" r="" cached=""
+  if [ -n "${BOARD_REPO:-}" ]; then
+    valid_repo "$BOARD_REPO" || return 1
+    r="$BOARD_REPO"
+  else
+    if [ -s "$f" ]; then
+      cached="$(cat "$f")"
+      valid_repo "$cached" || cached=""
+    fi
+    r="$(repo_from_remote 2>/dev/null)" || r=""
+    [ -n "$r" ] || r="$cached"
+    if [ -z "$r" ]; then
+      r="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)" || r=""
+      valid_repo "$r" || r=""
+    fi
+    [ -n "$r" ] || return 1
+  fi
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$r" > "$f"
+  printf '%s\n' "$r"
+}
+REPO="$(repo)" || REPO=""
 [ -n "$REPO" ] || die "cannot determine repo; set BOARD_REPO=owner/name"
 
+# GitHub redirects renamed repositories. Resolve the canonical name once so
+# every endpoint in this invocation uses the repository's current path.
+CANONICAL_REPO="$(gh api "repos/$REPO" --jq .full_name 2>/dev/null)" || CANONICAL_REPO=""
+if valid_repo "$CANONICAL_REPO"; then
+  REPO="$CANONICAL_REPO"
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$REPO" > "$STATE_DIR/repo"
+fi
+
 me() {
-  if [ -n "${BOARD_LOGIN:-}" ]; then echo "$BOARD_LOGIN"; return; fi
+  if [ -n "${BOARD_LOGIN:-}" ]; then valid_login "$BOARD_LOGIN" && { echo "$BOARD_LOGIN"; return; }; return 1; fi
   mkdir -p "$STATE_DIR"
   local f="$STATE_DIR/login" l
-  if [ -s "$f" ]; then cat "$f"; return; fi
+  if [ -s "$f" ]; then
+    l="$(cat "$f")"
+    if valid_login "$l"; then echo "$l"; return; fi
+  fi
   l="$(gh api user --jq .login 2>/dev/null)" || return 1
-  [ -n "$l" ] && { echo "$l" > "$f"; echo "$l"; }
+  valid_login "$l" && { echo "$l" > "$f"; echo "$l"; }
 }
 
 b64d() { base64 -d 2>/dev/null || base64 -D; }
