@@ -1,0 +1,75 @@
+import { test, expect } from '@playwright/test';
+import { verifyChain, type AuditEntry } from '@backroom/orchestrator';
+
+// Real Next routes, canonical chain, policy engine and gateway. No model/bank/voice calls.
+test('private audit wall updates, replays and cites decisions on laptop and phone; tampering turns the badge red', async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/audit');
+  await page.getByLabel('Operator code').fill('local-audit-test-only');
+  await page.getByRole('button', { name: 'Open audit wall' }).click();
+  await expect(page.getByText('Chain verified · 0 entries', { exact: true })).toBeVisible();
+  const tool = async (id: string, terms: Record<string, unknown>) => {
+    const result = await request.post('/api/tools/propose_plan', { headers: { authorization: 'Bearer local-tool-test-only' },
+      data: { call_id: 'approval-demo', webhook_request_id: id, installments: 4, first_payment_pct: 50,
+        duration_days: 30, waive_fee: false, discount_pct: 0, ...terms } });
+    expect(result.ok()).toBe(true);
+    return result.json();
+  };
+  expect((await tool('audit-escalate', {})).kind).toBe('ESCALATE');
+  await expect(page.getByText('Chain verified · 2 entries', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /create escalation/ })).toContainText('via');
+  expect((await tool('audit-deny', { installments: 2, waive_fee: true })).kind).toBe('DENY');
+  await expect(page.getByText('Chain verified · 3 entries', { exact: true })).toBeVisible();
+  const denied = page.getByRole('button', { name: /DENY/ });
+  await expect(denied).toContainText('FEES_NON_WAIVABLE');
+  await expect(denied.locator('.audit-quote')).not.toContainText('not recorded');
+  await denied.click();
+  await expect(page.getByRole('heading', { name: /^Replay / })).toBeVisible();
+  await expect(page.getByLabel('Recorded rule evaluation')).toContainText('FEES_NON_WAIVABLE');
+  await page.getByLabel('Question about a decision').fill('Why was invoice 1042 escalated?');
+  await page.getByRole('button', { name: 'Explain decision' }).click();
+  await expect(page.getByText('Recorded facts · code fallback', { exact: true })).toBeVisible();
+  const citation = page.locator('.audit-citations a').nth(1);
+  const id = await citation.innerText();
+  await citation.click();
+  await expect(page.getByRole('heading', { name: `Replay ${id}`, exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.screenshot({ path: '../docs/evidence/audit-wall/desktop.png', fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('Question about a decision').fill('Why invoice 999999?');
+  await page.getByRole('button', { name: 'Explain decision' }).click();
+  await expect(page.getByText('No matching evidence', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('.audit-why').scrollIntoViewIfNeeded();
+  // The always-visible real-vs-sim panel must leave the submit control reachable.
+  const button = page.getByRole('button', { name: 'Explain decision' });
+  await button.scrollIntoViewIfNeeded();
+  await expect(button).toBeInViewport();
+  const clear = await button.evaluate(element => {
+    const r = element.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return top === element || element.contains(top);
+  });
+  expect(clear).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.screenshot({ path: '../docs/evidence/audit-wall/mobile.png', fullPage: true });
+
+  // Change one byte of a real API snapshot, then use the real verifier. No write/tamper endpoint exists.
+  await page.route('**/api/audit/entries', async route => {
+    const response = await route.fetch();
+    const body = await response.json() as { entries: AuditEntry[]; chain: ReturnType<typeof verifyChain> };
+    body.entries[0]!.inputs!.invoiceId = 'tampered';
+    body.chain = verifyChain(body.entries);
+    await route.fulfill({ response, json: body });
+  });
+  await expect(page.getByText('Chain broken · first broken seq 1', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Explain decision' })).toBeDisabled();
+  await expect(page.locator('.audit-chain')).toHaveCSS('color', 'rgb(255, 176, 176)');
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: '../docs/evidence/audit-wall/tampered.png', fullPage: true });
+  expect(errors).toEqual([]);
+});
