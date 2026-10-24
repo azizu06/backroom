@@ -85,15 +85,19 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
           const session = data.sessions.find(s => s.providerCallId === body.call_id);
           if (!session) throw new HTTPError(503, 'CALL_BINDING_PENDING'); // Retried after dial response binds ID.
           if (body.type === 'call_turn') {
-            const turn = body.turn as { role?: string; text?: string; was_interrupted?: boolean } | undefined;
-            if (!turn || typeof turn.text !== 'string') throw new HTTPError(400, 'INVALID_TURN');
-            if (turn.role === 'assistant' && turn.was_interrupted === false && normalize(turn.text).startsWith(normalize(session.welcome)) && !session.disclosureComplete) {
+            const turn = body.turn as { role?: string; text?: string; was_interrupted?: boolean; tool_calls?: unknown[] } | undefined;
+            // Cartesia omits text on assistant turns that contain only tool calls.
+            // Acknowledge these lifecycle receipts without treating tool claims as speech.
+            const toolOnly = turn?.role === 'assistant' && turn.text === undefined && Array.isArray(turn.tool_calls) && turn.tool_calls.length > 0;
+            if (!turn || (typeof turn.text !== 'string' && !toolOnly)) throw new HTTPError(400, 'INVALID_TURN');
+            const text = turn.text ?? '';
+            if (turn.role === 'assistant' && turn.was_interrupted === false && normalize(text).startsWith(normalize(session.welcome)) && !session.disclosureComplete) {
               session.disclosureComplete = true; session.userReply = ''; // Earlier background speech is not an answer to this question.
             }
             if (turn.role === 'user') {
-              session.userReply = session.disclosureComplete && turn.was_interrupted === false ? turn.text.slice(0, 1000).replace(/\+?\d[\d ()-]{7,}\d/g, '[number]') : '';
-              const optOut = /\b(stop (calling|contacting|collection)|dont call|don't call|do not (call|contact)|never call|remove my number|take me off|opt out)\b/i.test(turn.text);
-              if (optOut || /\b(bankrupt(cy)?|chapter (7|11|13))\b/i.test(turn.text)) {
+              session.userReply = session.disclosureComplete && turn.was_interrupted === false ? text.slice(0, 1000).replace(/\+?\d[\d ()-]{7,}\d/g, '[number]') : '';
+              const optOut = /\b(stop (calling|contacting|collection)|dont call|don't call|do not (call|contact)|never call|remove my number|take me off|opt out)\b/i.test(text);
+              if (optOut || /\b(bankrupt(cy)?|chapter (7|11|13))\b/i.test(text)) {
                 session.stopped = true;
                 await forward(optOut ? 'record_opt_out' : 'request_human', { call_id: session.id, webhook_request_id: body.webhook_request_id });
               }

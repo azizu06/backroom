@@ -17,3 +17,7 @@ export * from './spacetime-store';
 
 export type { ReplayRecording, ReplayFrame, ReplayHeader, ReplayState } from './replay/types';
 export { createReplayRecorder, parseReplay } from './replay/record';
+
+// Public server adapters consumed by the trusted demo web host.
+export * from './collections';
+export { createCrsClientFromEnv, createCrsFixtureClient } from './integrations/crs/sandbox';

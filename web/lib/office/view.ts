@@ -1,5 +1,6 @@
 /** Pure view decisions for the office viewport. Visual only: nothing here decides business state. */
-export type ViewMode = "walk" | "tween" | "plan";
+/** `tour` is the scripted judge tour: the 3D scene with the fixed camera, like `tween`. */
+export type ViewMode = "walk" | "tween" | "plan" | "tour";
 
 /** `sceneAttempt` identifies the mounted 3D scene; a new attempt means a fresh Canvas and WebGL context. */
 export interface ViewportState {
@@ -11,14 +12,16 @@ export type ViewportEvent =
   | { type: "pick"; mode: ViewMode }
   | { type: "prefer"; mode: ViewMode }
   | { type: "lost"; attempt: number }
-  | { type: "restored"; attempt: number };
+  | { type: "restored"; attempt: number }
+  | { type: "endTour" };
 
 export const INITIAL_VIEWPORT: ViewportState = { mode: "tween", lostContext: false, sceneAttempt: 0 };
 
 /**
  * `pick` is the user choosing a view: after a lost context it starts a new scene attempt instead of
  * re-showing the dead canvas. `prefer` is the initial device preference and never retries.
- * Loss and restore events from a previous attempt's canvas are ignored.
+ * Loss and restore events from a previous attempt's canvas are ignored. A lost context ends a tour, and
+ * `endTour` returns a tour to the fixed camera without starting a new scene attempt.
  */
 export function viewportReducer(state: ViewportState, event: ViewportEvent): ViewportState {
   switch (event.type) {
@@ -29,9 +32,12 @@ export function viewportReducer(state: ViewportState, event: ViewportEvent): Vie
     case "prefer":
       return state.mode === event.mode ? state : { ...state, mode: event.mode };
     case "lost":
-      return event.attempt === state.sceneAttempt && !state.lostContext ? { ...state, lostContext: true } : state;
+      return event.attempt === state.sceneAttempt && !state.lostContext
+        ? { ...state, mode: state.mode === "tour" ? "tween" : state.mode, lostContext: true } : state;
     case "restored":
       return event.attempt === state.sceneAttempt && state.lostContext ? { ...state, lostContext: false } : state;
+    case "endTour":
+      return state.mode === "tour" ? { ...state, mode: "tween" } : state;
   }
 }
 
@@ -43,6 +49,11 @@ export interface ViewportLayers {
 export function viewportLayers(state: ViewportState): ViewportLayers {
   if (state.mode === "plan") return { floorPlan: true, scene: null };
   return { floorPlan: state.lostContext, scene: { key: state.sceneAttempt, visible: !state.lostContext } };
+}
+
+/** Fixed camera (no orbit rotation): the fixed view and the tour. */
+export function isFixedCamera(mode: ViewMode): boolean {
+  return mode === "tween" || mode === "tour";
 }
 
 /** Error-boundary state: a changed `resetKey` clears a failure so the children are retried. */
