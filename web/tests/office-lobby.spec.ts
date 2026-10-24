@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { DENY_MOMENT_MS } from '../lib/office/props/treasuryDeny';
 
 // Run via test:office:browser after building the web app.
 const code = process.env.OFFICE_LOBBY_OPERATOR_CODE ?? 'local-audit-test-only';
@@ -39,6 +40,15 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   const denialId = await previewReceipts.locator('[data-audit-id]').first().getAttribute('data-audit-id');
   await expect(lobby.locator(`[data-audit-id="${denialId}"]`)).toHaveCount(0);
   await expect(lobby).not.toContainText('Preview receipts');
+  expect(errors).toEqual([]);
+});
+
+test('office shows the lobby summary and agent roster without page errors', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+  await expect(page.locator('.lobby-v2-roster > li').first()).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -97,6 +107,33 @@ async function patchBrightness(page: Page, canvas: Locator, point: readonly [num
     for (let i = 0; i < data.length; i += 4) sum += Math.min(data[i]!, data[i + 1]!, data[i + 2]!);
     return sum / (data.length / 4);
   }, `data:image/png;base64,${png.toString('base64')}`);
+}
+
+const TREASURY = [5, 3.4] as const;
+
+/** Mean RGB of a 6x6 screenshot patch around a world point projected under a room's focus camera. */
+async function patchColor(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number]): Promise<[number, number, number]> {
+  const box = (await canvas.boundingBox())!;
+  const [x, y] = projectFocus(point, box.width, box.height, focus);
+  const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
+  return page.evaluate(async src => {
+    const image = new Image();
+    image.src = src;
+    await image.decode();
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    ctx.drawImage(image, 0, 0);
+    const { data } = ctx.getImageData(0, 0, image.width, image.height);
+    const sum = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c]! += data[i + c]!;
+    const n = data.length / 4;
+    return [sum[0]! / n, sum[1]! / n, sum[2]! / n] as [number, number, number];
+  }, `data:image/png;base64,${png.toString('base64')}`);
+}
+
+/** How far the red channel stands above the other two (the DENY sign's #ed6252 is about 140). */
+async function patchRedness(page: Page, canvas: Locator, point: readonly [number, number, number]): Promise<number> {
+  const [r, g, b] = await patchColor(page, canvas, point, TREASURY);
+  return r - Math.max(g, b);
 }
 
 test('office props render in the 3D scene', async ({ page }) => {
@@ -219,4 +256,35 @@ test('office judge tour started with the native select arrow keys', async ({ pag
   await expect(view).toHaveValue('tour');
   await page.keyboard.press('Tab');
   await expect(view).toHaveValue('tween');
+});
+
+test('office Treasury denial preview plays the door moment without breaking the scene', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
+  await page.goto('/office');
+  const viewport = page.getByTestId('office-viewport');
+  const canvas = viewport.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
+  const treasury = page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: /^Treasury/ });
+  await treasury.click();
+  await expect(treasury).toHaveAttribute('aria-pressed', 'true');
+  // A red part of the DENY sign board (right of the 'DENIED' line), on the aisle side of the door.
+  const sign = [6.95, 1.2, 0.56] as const;
+  // Let the focus camera settle: the sign's spot stops changing and is not red before the denial.
+  await page.waitForTimeout(2500);
+  expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
+  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  const clicked = Date.now();
+  await page.waitForTimeout(1000);
+  expect(await patchRedness(page, canvas, sign)).toBeGreaterThan(80);
+  await page.waitForTimeout(Math.max(0, clicked + DENY_MOMENT_MS + 1000 - Date.now()));
+  expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
+  // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
+  await expect(viewport.locator('.floor-plan')).toHaveCount(0);
+  await page.getByLabel('Office view').selectOption('plan');
+  await expect(page.locator('.floor-plan .denial-text')).toHaveText('Entry denied');
+  expect(errors).toEqual([]);
 });
