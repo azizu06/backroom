@@ -23,7 +23,8 @@ export async function runFailoverPair(scenarioId: string, invoiceId: string, opt
   const match = sameOutcome && baselineRoutes.length > 0 && baselineRoutes.every(route => route === 'local') &&
     baseline.routing.cloudRequests === 0 && fallbackAudited && cut.routing.cloudRequests === cutRoutes.length && cut.routing.cloudTextOnly;
   const brief = (row: typeof before) => ({ ...row, extraction: undefined, destinations: undefined });
-  return { id: `${scenarioId}:${invoiceId}`, scenarioId, invoiceId, match, sameOutcome, outcome: brief(before),
+  // Unique per keyed step: two P03 steps replay invoice 4471 with different senders.
+  return { id: options.caseId.replace(/^P12:/, ''), scenarioId, invoiceId, match, sameOutcome, outcome: brief(before),
     cutOutcome: sameOutcome ? undefined : brief(after), baselineRoutes, cutRoutes, fallbackAudited,
     cloudRequests: cut.routing.cloudRequests, cloudTextOnly: cut.routing.cloudTextOnly,
     syntheticFallbackCostUsd: cut.routing.audits.reduce((sum, row) => sum + row.costUsd, 0),
