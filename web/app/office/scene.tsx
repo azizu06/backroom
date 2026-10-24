@@ -187,13 +187,16 @@ export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, l
     <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
     <directionalLight position={keyLight.position} color={keyLight.color} intensity={keyLight.intensity} castShadow={keyLight.castShadow}
       shadow-mapSize={[keyLight.shadow.mapSize, keyLight.shadow.mapSize]} shadow-bias={keyLight.shadow.bias}
+      shadow-camera-near={keyLight.shadow.near} shadow-camera-far={keyLight.shadow.far}
       shadow-camera-left={keyLight.shadow.left} shadow-camera-right={keyLight.shadow.right} shadow-camera-top={keyLight.shadow.top} shadow-camera-bottom={keyLight.shadow.bottom} />
     <directionalLight position={fillLight.position} color={fillLight.color} intensity={fillLight.intensity} castShadow={fillLight.castShadow} />
     {/* frames={Infinity} (default) re-bakes on every frame, but with frameloop='demand' that is only frames
         something else requested (walking agents, door flashes, camera moves), so avatars stay grounded while
-        they walk and the scene never loops on its own. Scale and color are module constants so drei's
-        render targets are not reallocated on re-render. */}
-    <ContactShadows position={contactShadows.position} scale={contactShadows.scale} resolution={contactShadows.resolution}
+        they walk and the scene never loops on its own. Each such frame also pays a second shadow-map pass.
+        Scale and color are module constants so drei's render targets are not reallocated on re-render.
+        Bases exactly at y=0 (desk legs, walls) sit below the plane and get no blob; raised undersides
+        (desktops, torsos, feet) do. */}
+    <ContactShadows position={contactShadows.position} near={contactShadows.near} scale={contactShadows.scale} resolution={contactShadows.resolution}
       blur={contactShadows.blur} opacity={contactShadows.opacity} far={contactShadows.far} color={contactShadows.color} />
     <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
