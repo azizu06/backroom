@@ -5,6 +5,10 @@ import type { PayablesToolDeps } from '../tools/payables';
 import { payablesSpecialistFor } from './payables';
 import { chooseVendorModel, createVendorSpecialist } from './vendor';
 import { createCollectionsPostCallSpecialist, runCollectionsPostCall, type PostCallDeps } from './collections';
+import { createIntakeSpecialist, runIntakeActivation, type IntakePorts } from './intake';
+import { createExtractorSpecialist, type ExtractorDependencies } from './extractor';
+import { createReconciler } from './reconciler';
+import type { ReconciliationDependencies } from '../tools/reconciliation';
 
 /** How the dispatcher runs one role. Only `specialist` is required. */
 export interface RoleModule {
@@ -24,6 +28,10 @@ export const toModule = (entry: RoleEntry): RoleModule => 'prompt' in entry ? { 
 /** Server-owned dependencies per role. A role whose deps are absent is not registered,
  * and its cases stop as held (`ROLE_NOT_REGISTERED:<ROLE>`), never guessed. */
 export interface RoleDeps {
+  intake?: IntakePorts;
+  extractor?: ExtractorDependencies;
+  /** Host's `loadCase` supplies `correctionReturns`; use `correctionReturns(state, 'reconciler', 'collections')`. */
+  reconciler?: ReconciliationDependencies;
   payables?: PayablesToolDeps;
   vendor?: VendorToolDeps;
   collections?: PostCallDeps;
@@ -32,12 +40,35 @@ export interface RoleDeps {
 /** Role workers: add one line per role below (and its deps to RoleDeps). */
 export function createRoleRegistry(deps: RoleDeps): RoleRegistry {
   const registry: RoleRegistry = {};
+  if (deps.intake) registry.intake = intakeRole(deps.intake);
+  if (deps.extractor) registry.extractor = extractorRole(deps.extractor);
+  if (deps.reconciler) registry.reconciler = reconcilerRole(deps.reconciler);
   if (deps.payables) registry.payables = payablesRole(deps.payables);
   if (deps.vendor) registry.vendor = vendorRole(deps.vendor);
   if (deps.collections) registry.collections = collectionsRole(deps.collections);
   return registry;
 }
 
+/** Persisted count of committed handoffs on one edge (e.g. reconciler -> collections returns). */
+export function correctionReturns(state: CaseState, from: Role, to: Role): number {
+  return state.handoffs.filter(h => h.from === from && h.to === to && h.status !== 'rejected').length;
+}
+
+export function intakeRole(ports: IntakePorts): RoleModule {
+  return {
+    specialist: ctx => createIntakeSpecialist(ctx, ports),
+    // runIntakeActivation keeps the code-owned human exception and the extractor-only guard.
+    run: (runtime, _spec, ctx) => runIntakeActivation(runtime, ctx, ports),
+  };
+}
+export function extractorRole(deps: ExtractorDependencies): RoleModule {
+  // One Specialist instance isolates per-activation budgets through its own WeakMap.
+  const spec = createExtractorSpecialist(deps);
+  return { specialist: () => spec };
+}
+export function reconcilerRole(deps: ReconciliationDependencies): RoleModule {
+  return { specialist: ctx => createReconciler(deps, ctx) };
+}
 export function payablesRole(deps: PayablesToolDeps): RoleModule {
   return { specialist: ctx => payablesSpecialistFor(deps, ctx) };
 }

@@ -11,9 +11,10 @@ import type { CollectionsCase } from './tools/collections';
 import { ApifyBudget } from './tools/vendor-apify';
 import { MemoryVendorEvidenceStore } from './tools/vendor';
 
-/** Synthetic demo team: the merged role modules (vendor, payables, collections) on
- * network-free Northfield fixtures, plus stand-ins for roles whose workers have not
- * landed yet (intake, extractor, reconciler, auditor). A merged role replaces its stub
+/** Synthetic demo team: the merged role modules (intake, extractor, vendor, payables,
+ * collections) on network-free Northfield fixtures, plus stand-ins for the auditor (not yet
+ * merged) and the reconciler (its real module needs the host's Collections task lease, see
+ * roles/reconciler.md). A merged role replaces its stub
  * by being added to `createRoleRegistry`. All data is synthetic; no bank, call or Apify. */
 export const AP_INVOICE = '4401';
 export const DEMO_CASES = (owner = 'aziz'): CaseRequest[] => [
@@ -31,16 +32,6 @@ const spec = (role: Role, allowedNext: Role[], prompt: string, tools: DomainTool
 
 /** Stand-ins: same contract as a real role, deliberately tiny tools. */
 export const STAND_INS: Partial<Record<Role, Specialist>> = {
-  intake: spec('intake', ['extractor'], 'Classify the inbox item with read_inbox_item. Vendor invoices go to extractor with the inbox ref.', [
-    stub('read_inbox_item', 'Read safe metadata for this case\'s inbox item', none, () =>
-      ({ kind: 'invoice', senderDomain: northfieldSource(AP_INVOICE).senderDomain, artifactRef: `inbox:${AP_INVOICE}` })),
-  ]),
-  extractor: spec('extractor', ['vendor', 'payables', 'intake'], 'Extract invoice facts with read_document. Hand to vendor for verification, citing the extraction ref.', [
-    stub('read_document', 'Read and validate the invoice document fields', none, () => {
-      const f = northfieldInvoice(AP_INVOICE);
-      return { invoiceId: f.invoiceId, vendorId: f.vendorId, amountCents: f.amountCents, poId: f.poId ?? null, artifactRef: `extraction:${AP_INVOICE}` };
-    }),
-  ]),
   reconciler: spec('reconciler', ['auditor', 'collections'], 'Check the already-paid claim with match_payment. Exact matches go to auditor citing the match ref; missing evidence goes back to collections.', [
     stub('match_payment', 'Code-owned exact match of the claimed payment against the bank feed', none, (_, caseId) => ({ matched: true, artifactRef: `${caseId}:match` })),
   ]),
@@ -59,7 +50,17 @@ export async function createDemoTeam() {
   const evidence = new MemoryVendorEvidenceStore();
   const call: CallRecordView = { callId: 'call-1042', status: 'already_paid', plans: [], escalations: [], links: [] };
   const collectionsCase = { sessionId: 'sess-1042', precall: { clientId: 'client-1042', invoiceId: '1042' } } as unknown as CollectionsCase;
+  const itemRef = `inbox:${AP_INVOICE}`;
+  const text = [`From: billing@${source.senderDomain}`, `Invoice ${fields.invoiceId} from Papertrail Print Co`, `PO: ${fields.poId}`,
+    ...fields.lineItems.map(l => `${l.description}: ${l.quantity} x $${(l.unitPriceCents / 100).toFixed(2)}`), `Total due: $${(fields.amountCents / 100).toFixed(2)}`].join('\n');
+  const extractions = new Map<string, unknown>();
+  // Stand-in for the shared GX10 Ollama endpoint: a deterministic local-eyes candidate.
+  const gx10: typeof fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ output: fields, confidence: 0.93 }) } }] });
   const registered = createRoleRegistry({
+    intake: { readItem: async (_ctx, ref) => ref === itemRef ? { id: itemRef, source: 'seed', senderDomain: source.senderDomain, kind: 'email', text } : undefined,
+      state: control, controller: { request: async () => 'esc-intake-demo' }, classify: async () => ({ kind: 'invoice' }) as never },
+    extractor: { readDocument: async (_ctx, ref) => ref === itemRef ? { text } : undefined, fetch: gx10,
+      saveExtraction: async (ctx, artifact) => { const ref = `extraction:${ctx.activation.caseId}:${extractions.size + 1}`; extractions.set(ref, artifact); return ref; } },
     payables: { seat, repository, controller: { request: async () => 'esc-demo' }, loadCase: async () => ({ fields, source }) },
     vendor: {
       loadCase: async () => ({ vendorId: fields.vendorId, kind: 'invoice', senderDomain: source.senderDomain,
@@ -74,7 +75,7 @@ export async function createDemoTeam() {
     collections: { cases: { load: async () => collectionsCase }, outcomes: { read: async () => call }, audit: control },
   });
   const roles: RoleRegistry = { ...STAND_INS, ...registered };
-  return { control, roles, payments, evidence };
+  return { control, roles, payments, evidence, extractions };
 }
 
 const ref = (o: unknown[], i: number, key = 'artifactRef') => String((o[i] as Record<string, unknown>)[key]);
@@ -82,8 +83,11 @@ const handoff = (to: Role, summary: string, refs: (o: unknown[]) => string[]): S
   ({ tool: 'handoff', args: o => ({ to, reason: summary, summary, artifactRefs: refs(o) }) });
 /** What a model would plausibly do, for the network-free run. Live mode lets Claude choose. */
 export const DEMO_SCRIPTS: Record<Role, () => ScriptStep[]> = {
-  intake: () => [{ tool: 'read_inbox_item', args: {} }, handoff('extractor', 'Vendor invoice from Papertrail; please extract it.', o => [ref(o, 0)])],
-  extractor: () => [{ tool: 'read_document', args: {} }, handoff('vendor', 'Extracted invoice 4401, $640.00, PO-4401; vendor needs verification.', o => [ref(o, 0)])],
+  intake: () => [{ tool: 'read_inbox_item', args: { itemRef: `inbox:${AP_INVOICE}` } }, { tool: 'classify_hint', args: { itemRef: `inbox:${AP_INVOICE}` } },
+    handoff('extractor', 'Vendor invoice email from Papertrail; please extract it.', () => [`inbox:${AP_INVOICE}`])],
+  extractor: () => [{ tool: 'read_document', args: { documentRef: `inbox:${AP_INVOICE}`, chunk: 0 } }, { tool: 'local_extract', args: { documentRef: `inbox:${AP_INVOICE}` } },
+    { tool: 'validate_extraction', args: o => ({ documentRef: `inbox:${AP_INVOICE}`, fields: (o[1] as { fields: unknown }).fields }) },
+    handoff('vendor', 'Extracted invoice 4401, $640.00, PO-4401; vendor needs verification.', o => [`inbox:${AP_INVOICE}`, ref(o, 2)])],
   vendor: () => [{ tool: 'get_vendor_master', args: {} }, { tool: 'check_domain', args: { which: 'sender' } },
     { tool: 'check_domain', args: { which: 'claimed' } }, { tool: 'check_business', args: {} },
     { tool: 'conclude_verification', args: { outcome: 'proceed', note: 'Master approves payee; domains match; CRS clean.' } },
