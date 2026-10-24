@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ControllerApprovals, MemoryStateStore } from '@backroom/orchestrator';
+import { approvalWindowMs, ControllerApprovals, MemoryStateStore } from '@backroom/orchestrator';
+import { TestAuthenticator } from '../../../orchestrator/src/approvals/testing/authenticator';
 import { createApprovalHTTP } from './http';
 import { createGateway } from '../gateway/http';
 import { MemoryGatewayStore } from '../gateway/store';
@@ -22,7 +23,7 @@ function setup() {
     method: 'POST', headers: { authorization: 'Bearer test-tool', 'Content-Type': 'application/json' },
     body: JSON.stringify({ call_id: 'approval-demo', webhook_request_id: `r${++seq}`, ...fields }),
   }));
-  return { state, service, handler, tool, gatewayStore, advance: () => { now += 60_000; } };
+  return { state, service, handler, tool, gatewayStore, advance: (ms = 60_000) => { now += ms; } };
 }
 
 describe('M6 HTTP and gateway boundary', () => {
@@ -38,9 +39,47 @@ describe('M6 HTTP and gateway boundary', () => {
     expect(row.quote.text).toBe('A payment plan may not exceed the saved Collections maximum installment count, initially two; ask Dana for an exception.');
     expect((await state.getAgent('collections-1'))?.targetAnchor).toBe('Dana_desk');
     expect(await (await tool('check_approval', { escalation_id: row.id })).json()).toMatchObject({ approval_status: 'pending' });
-    advance();
-    expect(await (await tool('check_approval', { escalation_id: row.id })).json()).toMatchObject({ approval_status: 'pending_owner', speak: 'Dana will confirm by email today.', can_confirm: false });
-    expect((await state.listAudit()).filter(a => a.action === 'pending_owner')).toHaveLength(1);
+    advance(60_000);
+    expect(await (await tool('check_approval', { escalation_id: row.id })).json()).toMatchObject({ approval_status: 'pending', can_confirm: false });
+    advance(approvalWindowMs() - 60_000);
+    expect(await (await tool('check_approval', { escalation_id: row.id })).json()).toMatchObject({
+      approval_status: 'expired', may_reask: true, can_confirm: false, speak: expect.stringContaining('call propose_plan again'),
+    });
+    expect((await state.listAudit()).filter(a => a.action === 'escalation_expired')).toHaveLength(1);
+    expect((await state.listAudit()).filter(a => a.action === 'pending_owner')).toHaveLength(0);
+  });
+
+  it('reproduces the dead-end call: expiry, one re-ask, a second refusal, and no approval without a passkey', async () => {
+    const { state, service, tool, advance } = setup();
+    const auth = new TestAuthenticator();
+    const enrolled = await service.registrationOptions('test-enrollment');
+    await service.register('test-enrollment', enrolled.challengeId, auth.registration(enrolled.options.challenge));
+    const plan = { installments: 4, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 };
+    const first = await (await tool('propose_plan', plan)).json();
+    expect(first).toMatchObject({ kind: 'ESCALATE', can_confirm: false });
+    expect((await tool('check_approval', { escalation_id: first.escalation_id, approved: true, method: 'passkey' })).status).toBe(400);
+    await expect(service.decide(first.escalation_id, 'fake', { verified: true, method: 'passkey' } as never)).rejects.toThrow();
+    expect((await state.getEscalation(first.escalation_id))?.status).toBe('pending');
+    const challenge = await service.decisionOptions(first.escalation_id, { kind: 'Approve' });
+    advance(approvalWindowMs());
+    const expired = await (await tool('check_approval', { escalation_id: first.escalation_id })).json();
+    expect(expired).toMatchObject({ approval_status: 'expired', may_reask: true, can_confirm: false });
+    expect(expired.speak).toContain('call propose_plan again');
+    expect(expired.speak).not.toContain('email');
+    await expect(service.decide(first.escalation_id, challenge.challengeId, auth.assertion(challenge.options.challenge))).rejects.toThrow();
+    expect((await state.getEscalation(first.escalation_id))?.status).toBe('expired');
+    expect((await state.getEscalation(first.escalation_id))?.method).toBeUndefined();
+    const second = await (await tool('propose_plan', plan)).json();
+    expect(second).toMatchObject({ kind: 'ESCALATE', can_confirm: false, approval_path: `/approve/${second.escalation_id}` });
+    expect(second.escalation_id).not.toBe(first.escalation_id);
+    expect(await (await tool('propose_plan', plan)).json()).toMatchObject({ kind: 'DENY', rule_ids: ['ESCALATION_OPEN'], can_confirm: false });
+    advance(approvalWindowMs());
+    const again = await (await tool('check_approval', { escalation_id: second.escalation_id })).json();
+    expect(again).toMatchObject({ approval_status: 'expired', may_reask: false, can_confirm: false });
+    expect(again.speak).toContain('Do not send another request');
+    expect(again.speak).not.toContain('email');
+    expect(await (await tool('propose_plan', plan)).json()).toMatchObject({ kind: 'DENY', rule_ids: ['ESCALATION_RETRY_USED'], can_confirm: false });
+    expect((await state.listAudit()).filter(a => a.action === 'decide_escalation')).toHaveLength(0);
   });
 
   it.each([

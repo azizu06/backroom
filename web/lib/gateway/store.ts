@@ -68,7 +68,7 @@ export interface AllowedPlan extends PlanTerms {
 export interface Escalation {
   id: string;
   ruleIds: string[];
-  status: "pending" | "approved" | "denied" | "counter" | "pending_owner";
+  status: "pending" | "approved" | "denied" | "counter" | "pending_owner" | "expired";
   createdAt?: number; expiresAt?: number; decidedAt?: number;
   decision?: import("@backroom/orchestrator").ControllerDecision;
   toHuman: string;

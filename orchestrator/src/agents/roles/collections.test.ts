@@ -139,6 +139,7 @@ describe('collections post-call routing', () => {
     ['payment_link_sent', { links: [{ id: 'l1' }], plans: [{ id: 'p1' }] }, { kind: 'handoff', to: 'reconciler' }],
     ['plan_approved', { plans: [{ id: 'p1' }] }, { kind: 'handoff', to: 'reconciler' }],
     ['approval_pending', { escalations: [{ id: 'e1', status: 'pending' }] }, { kind: 'terminal', result: 'held' }],
+    ['approval_pending', { escalations: [{ id: 'e1', status: 'expired' }] }, { kind: 'terminal', result: 'held' }],
     ['no_agreement', {}, { kind: 'terminal', result: 'held' }],
   ] as const)('%s', (outcome, over, route) => {
     expect(classifyCall(call(over as Partial<CallRecordView>))).toBe(outcome);

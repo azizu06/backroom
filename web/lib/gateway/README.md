@@ -101,7 +101,9 @@ integration checks for their owning streams.
 ## M6 controller bridge
 
 The default runtime now installs a StateStore-backed approval bridge. Escalations
-return `approval_path`; `check_approval` reads server-verified decisions and returns
-`pending_owner` after 60 seconds. Optional trusted `GatewayCall.agentId` connects
+return `approval_path`; `check_approval` reads server-verified decisions. A live
+call stays open up to `APPROVAL_WINDOW_MS` (default 5 minutes) and returns
+`expired` when that window or the call ends. The caller may be asked once to
+send a fresh request. Optional trusted `GatewayCall.agentId` connects
 the desk target to the live office agent. Full configuration, wire shapes,
 passkey enrollment, and single-process persistence limits: `docs/m6-approvals.md`.
