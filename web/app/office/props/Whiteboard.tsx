@@ -50,7 +50,8 @@ function drawBoard(ctx: CanvasRenderingContext2D, stats: WhiteboardStats) {
 
 function Board({ snapshot }: { snapshot: OfficeSnapshot }) {
   const stats = useMemo(() => whiteboardStats(snapshot), [snapshot]);
-  const key = JSON.stringify(stats);
+  const { allow, deny, escalate, inbox, recent } = stats;
+  const key = JSON.stringify({ allow, deny, escalate, inbox, recent });
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawBoard(ctx, stats), [key]);
   return <group name='prop:whiteboard' position={[1.1, 0, -5.38]}>
     <mesh position={[0, BOTTOM + HEIGHT / 2, 0]} castShadow receiveShadow>
