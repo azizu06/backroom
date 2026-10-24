@@ -27,3 +27,8 @@
 @media (max-width: 760px) {
   .office-shell .handoff-bubble { max-width: 18ch; font-size: 10px; }
 }
+.office-shell .handoff-sound { margin: 0 0 8px; padding: 4px 10px; font-size: 12px; }
+.office-shell p.handoff-sound { color: #c3ccb8; }
+.office-shell button.handoff-sound[aria-pressed='true'] { background: #3c4d47; border: 1px solid #c3b68e; }
+/* Bubbles are transient and never interactive: draw them above the desk labels, below the Play HUD (same z, later in the DOM). */
+.office-shell .agent-tags.handoff-tags { z-index: 3; }

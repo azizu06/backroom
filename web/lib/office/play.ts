@@ -9,8 +9,22 @@ export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
 export const TURN_SPEED = 2.2;
 export const PLAYER_RADIUS = 0.28;
-export const INTERACT_RANGE = 2.2;
+/**
+ * Interact reach, measured from the eye to the edge of the thing (its centre distance minus its radius).
+ * 1.1 m: arm's length plus a step. It has to stay below 1.2 so the Treasury door (radius 0.65) is not
+ * offered from (5, 3.0) inside the locked vault, 1.85 m from the door centre. From where colliders stop
+ * you (PLAYER_RADIUS 0.28) every target is well inside it: the door barrier stops you 0.38 m from the
+ * door centre and agents are not solid. A desk prompt starts 1.1 m from its front edge and 0.5 m from
+ * its ends; from across the aisle (about 2.5 m away) nothing is offered.
+ */
+export const INTERACT_RANGE = 1.1;
+/** Half-angle of the pick cone in radians; widened up close (see pickTarget) so you keep what you stand at. */
 export const PICK_CONE = 0.35;
+/** Interact radii: the size of the thing. A desk is approximated by the circle inscribed in its footprint. */
+export const AGENT_RADIUS = 0.45;
+export const DOOR_RADIUS = 0.65;
+export const DESK_SIZE = { width: 2.25, depth: 1.05 } as const;
+export const DESK_RADIUS = DESK_SIZE.depth / 2;
 export const PITCH_LIMIT = 1.2;
 export const LOOK_SENSITIVITY = 0.0025;
 /** Lobby aisle, facing -z toward the Collections desk. */
@@ -46,7 +60,7 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
     const [x, z] = OFFICE_ANCHORS[room].center;
     // Dana's desk group is rotated by PI, which mirrors the chair offset.
     const facing = room === "dana" ? -1 : 1;
-    boxes.push(box(x, z, 2.25, 1.05), box(x + 0.05 * facing, z - 0.9 * facing, 0.65, 0.6));
+    boxes.push(box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * facing, z - 0.9 * facing, 0.65, 0.6));
   }
   for (const room of DOORS) {
     if (!visible.has(room)) continue;
@@ -150,14 +164,18 @@ export function targetKey(target: PlayTarget | null): string {
 export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
   const visible = new Set(rooms);
   return [
-    ...agents.map(agent => ({ target: { kind: "agent", id: agent.id } as const, position: agent.position, radius: 0.45 })),
-    ...handoffAgents.map(agent => ({ target: { kind: "handoff", actor: agent.id } as const, position: agent.position, radius: 0.45 })),
-    ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: 1.1 })),
-    ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: 0.65 }] : []),
+    ...agents.map(agent => ({ target: { kind: "agent", id: agent.id } as const, position: agent.position, radius: AGENT_RADIUS })),
+    ...handoffAgents.map(agent => ({ target: { kind: "handoff", actor: agent.id } as const, position: agent.position, radius: AGENT_RADIUS })),
+    ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: DESK_RADIUS })),
+    ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: DOOR_RADIUS }] : []),
   ];
 }
 
-/** Nearest candidate within range (radius extends the range) whose bearing is inside the view cone; agents win ties. */
+/**
+ * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone; agents win ties.
+ * Up close the cone widens to the candidate's angular size (asin(radius / distance)), so a target stays
+ * picked while the crosshair is anywhere on it.
+ */
 export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCandidate[], range = INTERACT_RANGE, cone = PICK_CONE): PlayTarget | null {
   const [fx, fz] = forwardOf(yaw);
   let best: { target: PlayTarget; distance: number } | null = null;
@@ -167,7 +185,7 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
     if (distance - candidate.radius > range) continue;
     if (distance > 1e-6) {
       const bearing = Math.acos(clamp((dx * fx + dz * fz) / distance, -1, 1));
-      if (bearing > cone) continue;
+      if (bearing > Math.max(cone, Math.asin(Math.min(1, candidate.radius / distance)))) continue;
     }
     const agent = candidate.target.kind === "agent";
     if (!best || distance < best.distance - 1e-9 || (Math.abs(distance - best.distance) <= 1e-9 && agent && best.target.kind !== "agent")) {

@@ -103,9 +103,11 @@ test('play mode: facing a handoff agent and pressing E shows the handoff details
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
-  // Intake stands at (-6.0, 2.5), behind and to the left of the spawn.
+  // Intake stands at (-6.0, 2.5), behind and to the left of the spawn; the path there is clear.
   const prompt = page.getByText('E · Ask Intake about the handoff');
-  await holdUntil(page, 'ArrowLeft', async () => (await prompt.isVisible()) || Math.abs(await bearing(page, -6, 2.5)) < 0.05);
+  await holdUntil(page, 'ArrowLeft', async () => Math.abs(await bearing(page, -6, 2.5)) < 0.08);
+  // Interact reach is short (#129): step toward Intake until the prompt appears.
+  await holdUntil(page, 'w', () => prompt.isVisible());
   await expect(prompt).toBeVisible();
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: /Intake · handoff/ });
@@ -115,4 +117,55 @@ test('play mode: facing a handoff agent and pressing E shows the handoff details
   await shot(page, 'play-details');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
+});
+
+// --- Voices (#133): the /api/handoff proxy is mocked; the real voice server needs CARTESIA_API_KEY. ---
+function silentWav(ms = 200) {
+  const rate = 8000, samples = Math.round(rate * ms / 1000), data = samples * 2;
+  const buffer = Buffer.alloc(44 + data);
+  buffer.write('RIFF', 0); buffer.writeUInt32LE(36 + data, 4); buffer.write('WAVE', 8); buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16); buffer.writeUInt16LE(1, 20); buffer.writeUInt16LE(1, 22); buffer.writeUInt32LE(rate, 24);
+  buffer.writeUInt32LE(rate * 2, 28); buffer.writeUInt16LE(2, 32); buffer.writeUInt16LE(16, 34); buffer.write('data', 36); buffer.writeUInt32LE(data, 40);
+  return buffer;
+}
+const ROLES = ['intake_sorter', 'extractor', 'vendor_verifier', 'payables', 'collections_caller', 'reconciler', 'auditor'];
+
+test('voices stay off until enabled, then speak handoff lines through the proxy', async ({ page }) => {
+  const lines: { role: string; text: string }[] = [];
+  await page.route('**/api/handoff', async route => {
+    lines.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: 'audio/wav', body: silentWav() });
+  });
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  const toggle = page.getByRole('button', { name: 'Voices off' });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await page.waitForTimeout(1500);
+  expect(lines).toEqual([]);
+  await toggle.click();
+  await expect(page.getByRole('button', { name: 'Voices on' })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => lines.length, { timeout: 20_000 }).toBeGreaterThan(0);
+  for (const line of lines) {
+    expect(Object.keys(line).sort()).toEqual(['role', 'text']);
+    expect(ROLES).toContain(line.role);
+    expect(Array.from(line.text).length).toBeLessThanOrEqual(240);
+    expect(line.text).not.toMatch(/[<>\x00-\x1f]/);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('a failing voice proxy falls back to silent visuals', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/api/handoff', route => { calls++; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"VOICE_NOT_CONFIGURED"}' }); });
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await page.getByRole('button', { name: 'Voices off' }).click();
+  await expect(page.getByText('Voices unavailable · visuals only')).toBeVisible({ timeout: 20_000 });
+  const after = calls;
+  await expect(page.locator('.handoff-bubble:not([hidden])').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(2000);
+  expect(calls).toBe(after);
+  expect(errors).toEqual([]);
 });

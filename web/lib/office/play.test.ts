@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  EYE_HEIGHT, INTERACT_RANGE, PITCH_LIMIT, PLAYER_RADIUS, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
+  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PITCH_LIMIT, PLAYER_RADIUS, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
   interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
   type PlayCandidate, type Vec2,
 } from "./play";
@@ -141,18 +141,26 @@ describe("input", () => {
 });
 
 describe("targets", () => {
-  const alex: PlayCandidate = { target: { kind: "agent", id: "a" }, position: [0, -2], radius: 0.45 };
+  const alex: PlayCandidate = { target: { kind: "agent", id: "a" }, position: [0, -1.2], radius: 0.45 };
   it("picks in range, ignores out of range, behind and outside the cone", () => {
     expect(pickTarget([0, 0], 0, [alex])).toEqual({ kind: "agent", id: "a" });
     expect(pickTarget([0, 3], 0, [alex])).toBeNull();
     expect(pickTarget([0, 0], Math.PI, [alex])).toBeNull();
     expect(pickTarget([0, 0], 0.6, [alex])).toBeNull();
     expect(pickTarget([0, 0], 0.2, [alex])).not.toBeNull();
+    expect(pickTarget([0, -0.4], 0, [alex])).not.toBeNull();
+    expect(pickTarget([0, -1.6 - INTERACT_RANGE], 0, [alex])).toBeNull();
+  });
+
+  it("widens the cone up close so the target under you stays picked", () => {
+    // 0.5 m from Alex and 0.6 rad off: outside PICK_CONE but still on the agent (asin(0.45 / 0.5) ≈ 1.12).
+    expect(pickTarget([0, -0.7], 0.6, [alex])).toEqual(alex.target);
+    expect(pickTarget([0, -0.7], 1.3, [alex])).toBeNull();
   });
 
   it("prefers the nearest and agents on ties", () => {
-    const desk: PlayCandidate = { target: { kind: "desk", room: "payables" }, position: [0, -2], radius: 1.1 };
-    const far: PlayCandidate = { target: { kind: "agent", id: "far" }, position: [0, -2.5], radius: 0.45 };
+    const desk: PlayCandidate = { target: { kind: "desk", room: "payables" }, position: [0, -1.2], radius: DESK_RADIUS };
+    const far: PlayCandidate = { target: { kind: "agent", id: "far" }, position: [0, -1.5], radius: 0.45 };
     expect(pickTarget([0, 0], 0, [desk, alex])).toEqual(alex.target);
     expect(pickTarget([0, 0], 0, [far, alex])).toEqual(alex.target);
     const nearDesk: PlayCandidate = { ...desk, position: [0, -1] };
@@ -173,6 +181,29 @@ describe("targets", () => {
       found = pickTarget(position, SPAWN.yaw, candidates, INTERACT_RANGE);
     }
     expect(found).toEqual({ kind: "agent", id: "collections-clerk" });
+    // Found while still walking: the Collections desk stops the player further on.
+    const stop = walk(SPAWN.position, [0, -1], 6);
+    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.collections.center[1] + DESK_SIZE.depth / 2 + PLAYER_RADIUS, 2);
+    expect(position[1]).toBeGreaterThan(stop[1] + 0.5);
+    // Alex is not solid, so you can walk right up to him and keep the prompt.
+    const alexAt = OFFICE_ANCHORS.collections.position;
+    expect(pickTarget([alexAt[0], alexAt[1] + 0.3], SPAWN.yaw, candidates)).toEqual({ kind: "agent", id: "collections-clerk" });
+    // At the desk the desk is offered.
+    expect(pickTarget(stop, SPAWN.yaw, candidates)).toEqual({ kind: "desk", room: "collections" });
+  });
+
+  it("does not offer a desk from across the aisle", () => {
+    const candidates = interactCandidates([], ALL);
+    for (const room of ["collections", "payables", "vendor_onboarding"] as const) {
+      const [x, z] = OFFICE_ANCHORS[room].center;
+      const edge = z + DESK_SIZE.depth / 2;
+      expect(pickTarget([x, edge + 2.5], 0, candidates)).toBeNull();
+      expect(pickTarget([x, edge + 1.5], 0, candidates)).toBeNull();
+      expect(pickTarget([x, edge + 0.9], 0, candidates)).toEqual({ kind: "desk", room });
+    }
+    const [dx, dz] = OFFICE_ANCHORS.dana.center;
+    expect(pickTarget([dx, dz - DESK_SIZE.depth / 2 - 2.5], Math.PI, candidates)).toBeNull();
+    expect(pickTarget([dx, dz - DESK_SIZE.depth / 2 - 0.9], Math.PI, candidates)).toEqual({ kind: "desk", room: "dana" });
   });
 
   it("offers the Treasury door only when the room is visible", () => {
@@ -180,6 +211,16 @@ describe("targets", () => {
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
     expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections"]);
     expect(pickTarget([5, 0.6], Math.PI, visible)).toEqual({ kind: "treasury" });
+  });
+
+  it("offers the Treasury door where the browser test stands and where the barrier stops you, not from afar", () => {
+    const visible = interactCandidates([], ALL);
+    expect(pickTarget([5, 0.45], Math.PI, visible)).toEqual({ kind: "treasury" });
+    const stop = walk([5, 0.45], [0, 1], 2);
+    expect(stop[1]).toBeCloseTo(1.05 - PLAYER_RADIUS, 2);
+    expect(pickTarget(stop, Math.PI, visible)).toEqual({ kind: "treasury" });
+    expect(pickTarget([5, 3.0], 0, visible)).toBeNull();
+    expect(pickTarget([5, -1], Math.PI, visible)).toBeNull();
   });
 });
 
