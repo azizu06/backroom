@@ -5,6 +5,7 @@ import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { PLAY_PANEL_VIEWS } from './panels';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -50,28 +51,20 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
   const key = targetKey(target);
   useEffect(() => { closeButton.current?.focus(); }, [key]);
   if (!panel) return null;
+  // Per-kind layout comes from the panel view registry (./panels); kinds without an entry use the defaults.
+  const view = PLAY_PANEL_VIEWS[panel.kind] ?? {};
   return <section className='play-panel' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
-    <header><h2 id={headingId}>{panel.title}</h2><button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
+    <header>{view.ownHeading ? <p id={headingId}><strong>{panel.title}</strong></p> : <h2 id={headingId}>{panel.title}</h2>}<button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
     {panel.state && <p className='play-panel-state'>{panel.state}</p>}
     {panel.task && <p>{panel.task}</p>}
-    {panel.kind === 'desk' && (panel.badge ? <>
-      <p>Badge · policy version {panel.badge.policyVersion}</p>
-      {panel.badge.limits.length ? <dl>{panel.badge.limits.map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>
-        : <p>No monetary authority in this badge.</p>}
-    </> : <p>No badge at this desk.</p>)}
-    {panel.seated && (panel.seated.length ? <ul aria-label='Seated agents'>{panel.seated.map(agent => <li key={agent.id}><strong>{agent.name}</strong> · {agent.state}</li>)}</ul>
-      : <p>No agents seated here.</p>)}
-    {panel.locked && <p>{panel.locked}</p>}
-    {panel.kind === 'treasury' && panel.denial && <p className='denial-text' role='status' data-denial-audit={panel.denial.id}>
-      <strong>{panel.denial.decision}</strong> Entry denied · rule {panel.denial.ruleIds.join(', ')} · audit <code>{panel.denial.id}</code>
-    </p>}
-    {panel.kind !== 'treasury' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
+    {view.Body && <view.Body panel={panel} />}
+    {!view.hideAudit && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
       <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
       <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
-    <button className='play-panel-ask' onClick={askWhy}>Ask why</button>
+    {!view.hideAskWhy && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
   </section>;
 }
 
