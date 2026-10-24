@@ -124,6 +124,6 @@ export function HandoffTags() {
 
 export function HandoffLog() {
   const presentation = useHandoffPresentation();
-  if (!presentation?.stage) return null;
+  if (!presentation) return null;
   return <HandoffLogView rows={presentation.rows} reduced={presentation.reduced} sound={<SoundToggle voice={presentation.voice} unlock={presentation.unlock} />} />;
 }
