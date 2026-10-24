@@ -81,8 +81,11 @@ Apify uses `PRECALL_APIFY=live`: one pinned website-only Actor attempt per owned
 host, capped at **$0.10**, with no retry after an ambiguous start. Company resets
 reuse that attempt; restarting the host can initiate a fresh attempt. Public
 company input remains separate from CRS's synthetic identity. CRS uses
-`createCrsClientFromEnv()` when both credentials exist, otherwise the explicitly
-**FAKE** fixture client. Only public-record and fraud-risk products are available;
+`createCachedCrsClientFromEnv()` when both credentials exist (`CRS_CACHE_FILE`
+defaults to `.demo/crs-evidence-cache.json`), otherwise the explicitly
+**FAKE** fixture client. An outage returns that cache with `cached: true` and
+the wall audit keeps the flag. The pre-call decision still uses the uncached
+client, so a cached clear cannot turn a hold into a pass. Only public-record and fraud-risk products are available;
 the event sandbox offers no business credit or OFAC. With credentials, startup
 also enables `PRECALL_CRS=live` and `VENDOR_CRS=live`, consuming the exported
 pre-call and bank-change checks. The scripted pre-call gate records blocked
