@@ -13,8 +13,6 @@ import type { FloorPosition } from './state';
 export const HANDOFF_WALK_SPEED = 2.4 / 1000;
 export const PASS_MS = 1200;
 export const BUBBLE_TAIL_MS = 1600;
-/** Only the most recent rows are choreographed; older ones stay in the text log. */
-export const MAX_PLANNED = 40;
 
 export interface Leg { readonly handoffId: string; readonly phase: 'out' | 'home' | 'return' | 'reset'; readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly route: readonly FloorPosition[]; readonly returning: boolean }
 export interface Hold { readonly handoffId: string; readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly at: FloorPosition; readonly facing: FloorPosition }
@@ -73,7 +71,8 @@ export interface PlanOptions {
 }
 export function planHandoffs(rows: readonly Handoff[], { speed = 1, previous = EMPTY_PLAN, now = -Infinity, openEscalation = false }: PlanOptions = {}): HandoffPlan {
   const pace = HANDOFF_WALK_SPEED * speed, pass = PASS_MS / speed, tail = BUBBLE_TAIL_MS / speed;
-  const ordered = upsertHandoffs([], rows).slice(-MAX_PLANNED);
+  // Sequence age does not tell us whether a walk or an offered-folder hold has finished.
+  const ordered = upsertHandoffs([], rows);
   const free = new Map<HandoffAgentId, number>();
   const legs: Leg[] = [], holds: Hold[] = [], folders: Folder[] = [], bubbles: Bubble[] = [], trips: Trip[] = [];
   const human: [number, number][] = openEscalation ? [[0, Infinity]] : [], skipped: string[] = [];
@@ -82,7 +81,10 @@ export function planHandoffs(rows: readonly Handoff[], { speed = 1, previous = E
   for (const row of ordered) {
     const courier = row.fromRole, receiver = row.toRole;
     if (!isHandoffAgent(courier) || !isHandoffAgent(receiver) || courier === receiver) { skipped.push(row.handoffId); continue; }
-    const prior = previous.trips.find(trip => trip.handoff.handoffId === row.handoffId && trip.start <= now);
+    // Preserve a started trip only while it still fits the actors' sequence-ordered schedule.
+    // An earlier in-place rejection can reserve either actor for a newly added return walk.
+    const available = Math.max(freeAt(courier), freeAt(receiver));
+    const prior = previous.trips.find(trip => trip.handoff.handoffId === row.handoffId && trip.start <= now && trip.start >= available);
     const priorOut = prior && previous.legs.find(leg => leg.handoffId === row.handoffId && leg.phase === 'out');
     const priorHome = prior && previous.legs.find(leg => leg.handoffId === row.handoffId && leg.phase === 'home');
     const priorFolder = prior && previous.folders.find(folder => folder.handoffId === row.handoffId);

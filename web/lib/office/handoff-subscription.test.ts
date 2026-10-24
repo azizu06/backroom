@@ -1,7 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { DbConnection } from '@backroom/orchestrator/spacetime-client';
 import { createSpacetimeOfficeState, OFFICE_QUERIES } from './spacetime';
-import { upsertHandoffs, type Handoff } from './handoffs';
+import { handoffGroups, upsertHandoffs, type Handoff } from './handoffs';
+import type { AgentHandoffPublic } from '@backroom/orchestrator/spacetime-client/types';
+import { projectOfficeRows } from './spacetime';
 
 const offered: Handoff = { handoffId: 'raw-case:handoff:1', sequence: 1n, caseDisplayId: 'INV-1',
   fromAgentId: 'a', toAgentId: 'b', fromRole: 'intake', toRole: 'extractor', fromVoiceRole: 'intake_sorter', toVoiceRole: 'extractor',
@@ -53,4 +55,22 @@ it('subscribes to public inserts, updates and deletes; sequence never acts as a 
   currentRows = currentRows.slice(1); events.delete(); await Promise.resolve();
   expect(source.getSnapshot().handoffs).toEqual(currentRows);
   source.disconnect();
+});
+
+it('projects four agent_handoff_public rows of a five-role chain in sequence order without legacy seat agents', () => {
+  const chain: Handoff[] = [
+    { ...offered, handoffId: 'h4', sequence: 4n, fromRole: 'payables', toRole: 'reconciler', createdAt: 4000 },
+    { ...offered, handoffId: 'h2', sequence: 2n, fromRole: 'extractor', toRole: 'vendor', createdAt: 2000 },
+    { ...offered, handoffId: 'h3', sequence: 3n, fromRole: 'vendor', toRole: 'payables', createdAt: 3000 },
+    { ...offered, handoffId: 'h1', sequence: 1n, fromRole: 'intake', toRole: 'extractor', createdAt: 1000 },
+  ];
+  const snapshot = projectOfficeRows({ agents: [], rooms: [], seats: [], badges: [], escalations: [], audit: [], control: [],
+    handoffs: chain as unknown as AgentHandoffPublic[] });
+  expect(snapshot.connection).toBe('live');
+  expect(snapshot.agents).toEqual([]);
+  expect(snapshot.handoffs?.map(row => row.handoffId)).toEqual(['h1', 'h2', 'h3', 'h4']);
+  expect(handoffGroups(snapshot.handoffs!).flatMap(group => group.rows).map(row => row.handoffId)).toEqual(['h1', 'h2', 'h3', 'h4']);
+  expect(snapshot.handoffs?.map(row => [row.fromRole, row.toRole])).toEqual([
+    ['intake', 'extractor'], ['extractor', 'vendor'], ['vendor', 'payables'], ['payables', 'reconciler'],
+  ]);
 });

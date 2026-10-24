@@ -17,7 +17,8 @@ for tests and offline layout work. Its controls only change fixture state.
 
 `web/lib/office/spacetime.ts` implements `OfficeState` using the exported generated
 client `@backroom/orchestrator/spacetime-client`. One anonymous subscription covers
-`agent`, `room`, `seat`, `badge`, `escalation`, `audit_entry`, and `runtime_control`.
+`agent`, `room`, `seat`, `badge`, `escalation`, `audit_entry`, `runtime_control`, and
+`agent_handoff_public`.
 Row callbacks coalesce after each transaction; the immutable cached snapshot feeds
 the canvas, floor plan, badges, lobby audit receipts, and inbox receipt summaries.
 
@@ -30,11 +31,15 @@ the canvas, floor plan, badges, lobby audit receipts, and inbox receipt summarie
   B carries it back to A; before delivery, A turns around continuously. Reverse
   `correction=true` rows are amber and labeled “Correction”. Dana requires an open
   escalation or explicit approval evidence in reason/decisionRef. Voices use
-  `fromVoiceRole`/`line` verbatim on offered and default off. Masked tokens stay
-  intact; `handoffId` and `decisionRef` are internal and never rendered. Rows upsert
-  by `handoffId`; sequence only orders rows, never filters updates. The anonymous
-  subscription registers insert/update/delete for `agent_handoff_public` when its
-  generated binding is present; this checkout's older bindings omit that table.
+  `fromVoiceRole`/`line` verbatim on offered and default off. Summaries count up to
+  160 code points, extending the limit to finish any masked token at the boundary.
+  `handoffId` stays lossless; it and `decisionRef` are internal and never rendered.
+  Rows upsert by `handoffId`; sequence only orders rows, never filters updates.
+  Choreography retains all subscribed rows so newer rows cannot evict an unfinished
+  walk or hold; rejection returns reserve their actors before later trips.
+  The accessible live log mounts while empty, before the first handoff arrives.
+  The anonymous subscription unconditionally registers insert/update/delete for
+  `agent_handoff_public`; a missing table fails the whole office connection.
   `?handoffs=mock&handoffSpeed=4` includes both in-place stop paths late in each cycle
   (`INV-1046` before acceptance, `INV-1047` after delivery).
 - Agents use stored positions and target anchors. `Dana_desk` maps to `dana`;

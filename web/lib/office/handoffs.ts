@@ -4,6 +4,7 @@
  * `handoffFromRow` is the one place that maps that row into the shape the planner draws.
  */
 import type { AnchorId, FloorPosition } from './state';
+import { handoffText } from './handoff-text';
 
 // Mirrors orchestrator/src/agents/contracts.ts ROLES and the public projection in docs/agents.md / PR #152.
 export const HANDOFF_ROLES = ['intake', 'extractor', 'vendor', 'payables', 'collections', 'reconciler', 'auditor'] as const;
@@ -83,13 +84,26 @@ function epochMs(value: unknown): number | undefined {
 }
 const pick = (r: Readonly<Record<string, unknown>>, camel: string, snake: string) => r[camel] ?? r[snake];
 const short = (v: unknown, max: number) => typeof v === 'string' ? v.slice(0, max) : '';
+/** Count code points, extending the display limit only to finish a redaction token. */
+function shortSummary(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  let result = '', remaining = 160;
+  for (const part of handoffText(value)) {
+    if (remaining <= 0) break;
+    const points = Array.from(part.text);
+    result += part.masked ? part.text : points.slice(0, remaining).join('');
+    remaining -= points.length;
+  }
+  return result;
+}
 /** Public projection adapter; missing timestamps leave a static historical row rather than replaying it. */
 export function handoffFromRow(raw: unknown): Handoff | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const row = raw as Readonly<Record<string, unknown>>;
   const fromRole = pick(row, 'fromRole', 'from_role'), toRole = pick(row, 'toRole', 'to_role');
-  const status = row.status, handoffId = short(pick(row, 'handoffId', 'handoff_id'), 128);
-  if (!handoffId || !(HANDOFF_ROLES as readonly unknown[]).includes(fromRole) || !(HANDOFF_ROLES as readonly unknown[]).includes(toRole)
+  // Primary keys must stay lossless: runtime IDs include an uncapped case ID before :aN:hN.
+  const status = row.status, handoffId = pick(row, 'handoffId', 'handoff_id');
+  if (typeof handoffId !== 'string' || !handoffId || !(HANDOFF_ROLES as readonly unknown[]).includes(fromRole) || !(HANDOFF_ROLES as readonly unknown[]).includes(toRole)
     || typeof status !== 'string' || !['offered', 'accepted', 'completed', 'rejected'].includes(status)) return null;
   const sequence = row.sequence;
   if (!(typeof sequence === 'bigint' ? sequence >= 0n && sequence <= 18_446_744_073_709_551_615n
@@ -102,7 +116,7 @@ export function handoffFromRow(raw: unknown): Handoff | null {
     fromRole: fromRole as HandoffRole, toRole: toRole as HandoffRole,
     fromVoiceRole: short(pick(row, 'fromVoiceRole', 'from_voice_role'), 64), toVoiceRole: short(pick(row, 'toVoiceRole', 'to_voice_role'), 64),
     status: status as HandoffStatus, correction: row.correction === true,
-    reason: short(row.reason, 1000), summary: short(row.summary, 160), line: typeof row.line === 'string' ? row.line : '',
+    reason: short(row.reason, 1000), summary: shortSummary(row.summary), line: typeof row.line === 'string' ? row.line : '',
     createdAt: epochMs(pick(row, 'createdAt', 'created_at')) ?? 0,
     ...(acceptedAt !== undefined ? { acceptedAt } : {}), ...(completedAt !== undefined ? { completedAt } : {}),
     ...(decisionRef ? { decisionRef } : {}), ...(errorCode ? { errorCode } : {}),
