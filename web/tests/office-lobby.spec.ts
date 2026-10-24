@@ -73,3 +73,21 @@ test('office props render in the 3D scene', async ({ page }) => {
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
+
+test('office Treasury denial preview plays the door moment without breaking the scene', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await page.waitForTimeout(1000);
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box!.width).toBeGreaterThan(0);
+  expect(box!.height).toBeGreaterThan(0);
+  expect(await canvas.evaluate((element: HTMLCanvasElement) => element.width > 0 && element.height > 0)).toBe(true);
+  await page.getByLabel('Office view').selectOption('plan');
+  await expect(page.locator('.floor-plan .denial-text')).toHaveText('Entry denied');
+  expect(errors).toEqual([]);
+});
