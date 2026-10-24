@@ -1,14 +1,14 @@
 # Proof-it-works metrics
 
-Generated: 2026-10-24T08:50:01.692Z
-Source git SHA: `5c1ad814afe76ee88f338f6819783038f357cf62` (report/tool changes may be uncommitted at generation time).
+Generated: 2026-10-24T08:53:55.953Z
+Source git SHA: `1c33f7e6a5b390ead5df8755624c563e5b4c6b3c` (report/tool changes may be uncommitted at generation time).
 Exact command (repository root): `pnpm metrics`
 
 Refs #29 #32; spec §7.2. Default command runs the current core-demo, scripted eval and frozen red-team replay offline. It never calls a model, bank or phone. Fresh policy/gateway/StateStore/crypto behavior is real; company, speech, sponsor transports, payment effects and software passkeys are simulated. Historical service receipts are labeled separately.
 
 | Metric | Observed | Evidence / limitation |
 | --- | --- | --- |
-| Audit chain verification | 4/5 valid; 41 accepted entries | Canonical full chains checked from genesis. Invalid chains excluded from all aggregates. |
+| Audit chain verification | 4/5 valid; 118 accepted entries | Canonical full chains checked from genesis. Invalid chains excluded from all aggregates. |
 | Audit escalations | 16 | Decision records, not deduplicated escalation rows or human approvals. |
 | Audit escalations per 100 policy decisions | 55.17 | Explicit denominator: decision-bearing audit entries; not all agent actions. |
 | Answer-key policy-step match | 26/26 (100.00%) | Fresh scripted eval: signoff=pending, gradedEval=not_run; 27/34 scenarios skip integration steps; integration-only scenarios excluded from this score. This is NOT final-state + evidence compliance. |
@@ -47,10 +47,10 @@ No samples means not measured, not zero latency/cost. Nearest-rank percentiles i
 
 | Metric | Observed | Evidence / limitation |
 | --- | --- | --- |
-| demo:core collections | 18 entries; simulated | head=edeb81afb4d9cb0678a0b0655a7dcd93be4d83e5a207410f24ff9960c238b3ce |
-| demo:core inbox LLM ON | 3 entries; simulated | head=290ff9a92b47a073899b9a682256c5c1db93fbfaac3f1baf218be9719c9d9e2a |
-| demo:core inbox LLM OFF | 4 entries; simulated | head=4ba8a66bec80f84ea10b87adf59cb7e535ba32bb084bf8b0507fc16b8d25d464 |
-| demo:core Northfield AP | 16 entries; simulated | head=cdefb19057ce7881dbefb362b34831d26b94211fd306fcaf5547ff24ddf3313b |
+| demo:core collections | 31 entries; simulated | head=24912c3aeebb610937a96b8b43a5426f14b3063f657002826691fb813ee19276 |
+| demo:core inbox LLM ON | 10 entries; simulated | head=7b5c06095314a37358467e3b49d9580d829c534473ab94b46998f574c6712798 |
+| demo:core inbox LLM OFF | 11 entries; simulated | head=a06600e3e7ff707330abd668d82e60a6a8ba3019de640e00335fc0ac3081cd17 |
+| demo:core Northfield AP | 66 entries; simulated | head=d3d0861332c8d1e148077aad40a05ee3393d7c2165552a09e1ccfbde6c43d302 |
 | Historical pre-call smoke (2026-10-24T08:02:23.377Z; model live, CRS/Apify fake) | INVALID at 1: HASH_MISMATCH | head=3e072f6243e22887b5dea3df4292fbe80502b468acb03359c7fe1099dc9f94b3 |
 
 ## Reproduction and interpretation
