@@ -4,12 +4,13 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "795915737fa6886d8cf522993318a95029e10507",
+    "baseCommit": "f31af7f4f81cf45652b53ad9a1382a74f580fbf5",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
       "orchestrator/src/agents/eval/conversation.ts": "43befa9ccb698838405497d48b5099214d72431a221dc00c6f355f337b23e228",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
+      "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
       "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
@@ -17,7 +18,7 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "054e176521854092abc683b35a4d6c3a55a5004d035ae0902493a2d876539019"
+      "orchestrator/src/agents/eval/scoreboard.ts": "ad1d1fae3f7cade5473cd7fb87c303dee208d898c46b9fa2de421fcef3885275"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -60,6 +61,7 @@
     "arConversations": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.",
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
+    "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
@@ -149,6 +151,11 @@
       "percent": 100
     },
     "arConversations": {
+      "numerator": 6,
+      "denominator": 6,
+      "percent": 100
+    },
+    "precallStops": {
       "numerator": 6,
       "denominator": 6,
       "percent": 100
@@ -14001,6 +14008,170 @@
         "collections.next-call.can_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    }
+  ],
+  "precallStops": [
+    {
+      "id": "C11",
+      "match": true,
+      "checks": {
+        "plannerRule": true,
+        "plannerNoDial": true,
+        "directDialRejected": true,
+        "noProviderRequest": true,
+        "auditChain": true
+      },
+      "expected": {
+        "kind": "ESCALATE",
+        "ruleIds": [
+          "BANKRUPTCY_STOP"
+        ]
+      },
+      "permit": {
+        "decision": "ESCALATE",
+        "ruleIds": [
+          "BANKRUPTCY_STOP"
+        ]
+      },
+      "plannerResult": "not_started",
+      "directError": "BANKRUPTCY_STOP",
+      "providerRequests": 0,
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+    },
+    {
+      "id": "C13",
+      "match": true,
+      "checks": {
+        "plannerRule": true,
+        "plannerNoDial": true,
+        "directDialRejected": true,
+        "noProviderRequest": true,
+        "auditChain": true
+      },
+      "expected": {
+        "kind": "DENY",
+        "ruleIds": [
+          "CONSENT_REQUIRED"
+        ]
+      },
+      "permit": {
+        "decision": "DENY",
+        "ruleIds": [
+          "CONSENT_REQUIRED"
+        ]
+      },
+      "plannerResult": "not_started",
+      "directError": "CONSENT_REQUIRED",
+      "providerRequests": 0,
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+    },
+    {
+      "id": "C14",
+      "match": true,
+      "checks": {
+        "plannerRule": true,
+        "plannerNoDial": true,
+        "directDialRejected": true,
+        "noProviderRequest": true,
+        "auditChain": true
+      },
+      "expected": {
+        "kind": "DENY",
+        "ruleIds": [
+          "B2B_ONLY_CALLS"
+        ]
+      },
+      "permit": {
+        "decision": "DENY",
+        "ruleIds": [
+          "B2B_ONLY_CALLS"
+        ]
+      },
+      "plannerResult": "not_started",
+      "directError": "B2B_ONLY_CALLS",
+      "providerRequests": 0,
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+    },
+    {
+      "id": "C15",
+      "match": true,
+      "checks": {
+        "plannerRule": true,
+        "plannerNoDial": true,
+        "directDialRejected": true,
+        "noProviderRequest": true,
+        "auditChain": true
+      },
+      "expected": {
+        "kind": "ESCALATE",
+        "ruleIds": [
+          "OFAC_STOP"
+        ]
+      },
+      "permit": {
+        "decision": "ESCALATE",
+        "ruleIds": [
+          "OFAC_STOP"
+        ]
+      },
+      "plannerResult": "not_started",
+      "directError": "OFAC_STOP",
+      "providerRequests": 0,
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+    },
+    {
+      "id": "C16",
+      "match": true,
+      "checks": {
+        "plannerRule": true,
+        "plannerNoDial": true,
+        "directDialRejected": true,
+        "noProviderRequest": true,
+        "auditChain": true
+      },
+      "expected": {
+        "kind": "ESCALATE",
+        "ruleIds": [
+          "CLOSED_BUSINESS_STOP"
+        ]
+      },
+      "permit": {
+        "decision": "ESCALATE",
+        "ruleIds": [
+          "CLOSED_BUSINESS_STOP"
+        ]
+      },
+      "plannerResult": "not_started",
+      "directError": "CLOSED_BUSINESS_STOP",
+      "providerRequests": 0,
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+    },
+    {
+      "id": "C22",
+      "match": true,
+      "checks": {
+        "plannerRule": true,
+        "plannerNoDial": true,
+        "directDialRejected": true,
+        "noProviderRequest": true,
+        "auditChain": true
+      },
+      "expected": {
+        "kind": "DENY",
+        "ruleIds": [
+          "CALL_WINDOW"
+        ]
+      },
+      "permit": {
+        "decision": "DENY",
+        "ruleIds": [
+          "CALL_WINDOW"
+        ]
+      },
+      "plannerResult": "not_started",
+      "directError": "CALL_WINDOW",
+      "providerRequests": 0,
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
     }
   ],
   "legacy": {
