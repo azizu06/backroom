@@ -6,6 +6,7 @@ import { listenDemo } from '../tools/demo/listen';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDemoRuntime } from './lib/demo/runtime';
+import { recordVoiceCallEvent } from './lib/calls/lifecycle';
 
 async function main() {
   if (!['memory', 'spacetime'].includes(process.env.STATE_STORE || '')) throw new Error('DEMO_STATE_REQUIRED');
@@ -29,7 +30,7 @@ async function main() {
       if (path === '/__demo/health' && req.method === 'GET') {
         res.end(JSON.stringify(await runtime.health())); return;
       }
-      if (path === '/__demo/voice-call' || path === '/__demo/voice-call-ended' || path === '/__demo/voice-client-stopped') {
+      if (path === '/__demo/voice-call' || path === '/__demo/voice-call-ended' || path === '/__demo/voice-client-stopped' || path === '/__demo/voice-call-event') {
         // Tunnel requests also arrive on loopback: require the private Host as well.
         if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '')
           || req.headers.host !== `127.0.0.1:${port}`) { res.writeHead(403).end('{}'); return; }
@@ -42,7 +43,15 @@ async function main() {
             const body = JSON.parse(raw);
             if (!body || Object.keys(body).length !== 1 || typeof body.sessionId !== 'string') throw new Error('INVALID_SESSION');
             if (path === '/__demo/voice-call-ended') await runtime.endVoiceCall(body.sessionId);
-            else await runtime.registerVoiceCall(body.sessionId);
+            else { await runtime.registerVoiceCall(body.sessionId); recordVoiceCallEvent(body.sessionId, 'registered'); }
+            res.end('{"ok":true}'); return;
+          }
+          if (path.endsWith('voice-call-event') && req.method === 'POST') {
+            // Provider lifecycle for the office desk phone; times only, never call content.
+            let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 1024) throw new Error('TOO_LARGE'); }
+            const body = JSON.parse(raw);
+            if (!body || Object.keys(body).length !== 2 || typeof body.sessionId !== 'string' || !['started', 'completed', 'failed'].includes(body.event)) throw new Error('INVALID_EVENT');
+            recordVoiceCallEvent(body.sessionId, body.event);
             res.end('{"ok":true}'); return;
           }
           res.writeHead(405).end('{}');
