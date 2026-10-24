@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_DESK, NOBODY_NEXT, NO_STOP, TALK_CHIPS, agentTalk, chipForKey, handoffTalk, talkReply } from './agent-talk';
 import type { Handoff } from './handoffs';
+import { mockCycleRows } from './handoff-mock';
 import { createMockOfficeState } from './preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeAgent, type OfficeAudit, type OfficeSnapshot } from './state';
 
@@ -51,6 +52,12 @@ describe('agent talk', () => {
     expect(cited.length).toBeGreaterThan(0);
     expect(cited.every(id => id === 'real-audit-entry-212')).toBe(true);
     expect(JSON.stringify(talk)).not.toContain(row.handoffId);
+  });
+
+  it('carries the working receipt into the greeting', () => {
+    const talk = agentTalk(desk({}, [receipt('real-audit-entry-212', 'DENY', 'Payment blocked')]), alex.id)!;
+    expect(talk.greeting.text).toContain('My last receipt: Payment blocked.');
+    expect(talk.greeting.receiptIds).toEqual(['real-audit-entry-212']);
   });
 
   it('explains an escalation with its rule id and who is next', () => {
@@ -124,5 +131,39 @@ describe('agent talk', () => {
     const talk = handoffTalk({ ...INITIAL_OFFICE, handoffs: [passkey] }, 'human')!;
     expect(talk.speaker.role).toBe('the human approver');
     expect(talkReply(talk, 'next').text).toBe("I'm next on INV-1042: Human approval escalation · waiting for Dana’s passkey.");
+  });
+
+  it.each(['offered', 'accepted'] as const)('keeps a %s human handoff pending', status => {
+    const row = handoff({ fromRole: 'payables', toRole: 'reconciler', status, reason: 'Waiting for Dana’s passkey' });
+    const talk = handoffTalk({ ...INITIAL_OFFICE, handoffs: [row] }, 'human')!;
+    for (const line of [talk.greeting, talk.replies.working, ...talk.lines]) {
+      expect(line.text).toContain('needs me: Waiting for Dana’s passkey.');
+      expect(line.tone).toBe('passkey');
+    }
+  });
+
+  it.each([undefined, 'PASSKEY-42'])('speaks the completed INV-1045 mock handoff in the past with decisionRef %s', decisionRef => {
+    const mock = mockCycleRows(0, 0, 52_000).find(row => row.caseDisplayId === 'INV-1045')!;
+    expect(mock).toMatchObject({ status: 'completed', reason: 'Human approval escalation · waiting for Dana’s passkey', decisionRef: 'PASSKEY-42' });
+    const row = { ...mock, decisionRef };
+    const talk = handoffTalk({ ...INITIAL_OFFICE, handoffs: [row] }, 'human')!;
+    for (const line of [talk.greeting, talk.replies.working, ...talk.lines]) {
+      expect(line.text).toContain('Payables → Reconciler on INV-1045 finished.');
+      expect(line.tone).toBe('info');
+    }
+    const spoken = [talk.greeting.text, ...replies(talk), ...talk.lines.map(line => line.text)].join(' ');
+    expect(spoken).not.toMatch(/needs me|waiting|approved|PASSKEY-42/i);
+  });
+
+  it('speaks a rejected human handoff as returned', () => {
+    const row = handoff({ fromRole: 'payables', toRole: 'reconciler', status: 'rejected', reason: 'Human approval escalation was cancelled', errorCode: 'CASE_STOPPED' });
+    const talk = handoffTalk({ ...INITIAL_OFFICE, handoffs: [row] }, 'human')!;
+    expect(talk.lines[0]).toMatchObject({ text: 'Payables → Reconciler on INV-1042 was returned: Human approval escalation was cancelled.', tone: 'fail', ruleIds: ['CASE_STOPPED'] });
+    for (const line of [talk.greeting, talk.replies.working]) {
+      expect(line.text).toContain(talk.lines[0]!.text);
+      expect(line.tone).toBe('fail');
+    }
+    expect(talk.replies.stopped.text).toBe(talk.lines[0]!.text);
+    expect([talk.greeting.text, ...replies(talk), ...talk.lines.map(line => line.text)].join(' ')).not.toContain('needs me');
   });
 });
