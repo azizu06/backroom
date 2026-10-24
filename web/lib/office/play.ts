@@ -3,6 +3,7 @@
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
+import { OPEN_DOORS, doorCollider, type DoorState } from './doors';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -10,7 +11,8 @@ import { DESKS, DESK_RADIUS, DESK_SIZE } from "./targets/desk";
 import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
-import type { CoworkerSpot, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+import { PHONE_STAND } from "./props/phone";
+import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
 export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
@@ -54,7 +56,7 @@ const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfie
  * `extra` takes footprints of room geometry mounted elsewhere (e.g. a self-contained room at an anchor),
  * so new furniture becomes solid without editing this list.
  */
-export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = []): Box[] {
+export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
   const boxes: Box[] = [...extra];
   for (const x of [-2.5, 2.5]) boxes.push(box(x, -3.15, 0.12, 4.6), box(x, 3.5, 0.12, 3.8));
@@ -64,11 +66,14 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
     // Dana's desk group is rotated by PI, which mirrors the chair offset.
     const facing = room === "dana" ? -1 : 1;
     boxes.push(box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * facing, z - 0.9 * facing, 0.65, 0.6));
+    if (room === "collections") boxes.push(box(PHONE_STAND.x, PHONE_STAND.z, PHONE_STAND.width, PHONE_STAND.depth));
   }
   for (const room of DOORS) {
     if (!visible.has(room)) continue;
     const [x] = OFFICE_ANCHORS[room].center;
     boxes.push(box(x - 0.72, -0.65, 0.14, 0.18), box(x + 0.72, -0.65, 0.14, 0.18));
+    const leaf = doorCollider(doors, room);
+    if (leaf) boxes.push(leaf);
   }
   if (visible.has("treasury")) {
     const [x] = OFFICE_ANCHORS.treasury.center;
@@ -119,6 +124,8 @@ export class PlayInput {
   readonly joystick: [number, number] = [0, 0];
   lookYaw = 0;
   lookPitch = 0;
+  /** Yaw queued by a turn-key tap. Applied on the next frame only if that key is no longer held. */
+  turnTap = 0;
   /** Walking speed multiplier from the viewer's Play settings. */
   speed = 1;
   /** Game-feel switches from the viewer's Play settings; the rig also applies reduced motion. */
@@ -138,8 +145,13 @@ export class PlayInput {
     this.lookPitch = 0;
     return look;
   }
-  clear() { this.held.clear(); this.setJoystick(0, 0); this.consumeLook(); }
-  active() { return this.held.size > 0 || this.joystick[0] !== 0 || this.joystick[1] !== 0 || this.lookYaw !== 0 || this.lookPitch !== 0; }
+  clear() { this.held.clear(); this.setJoystick(0, 0); this.consumeLook(); this.turnTap = 0; }
+  consumeTurnTap(): number {
+    const tap = this.turnTap;
+    this.turnTap = 0;
+    return tap;
+  }
+  active() { return this.held.size > 0 || this.joystick[0] !== 0 || this.joystick[1] !== 0 || this.lookYaw !== 0 || this.lookPitch !== 0 || this.turnTap !== 0; }
 }
 
 /** World-space step for this frame from held keys and the joystick. */
@@ -156,12 +168,24 @@ export function moveIntent(input: PlayInput, yaw: number, dt: number): [number, 
 export function turnIntent(input: PlayInput, dt: number): number {
   return ((input.held.has("turnLeft") ? 1 : 0) - (input.held.has("turnRight") ? 1 : 0)) * TURN_SPEED * Math.max(dt, 0);
 }
+/**
+ * Queue one display frame of yaw for a turn-key tap (left positive, matching turnIntent).
+ * useFrame only samples keys that are still held, so a tap released before that frame would not turn.
+ */
+export function applyTurnTap(input: PlayInput, control: PlayControl): void {
+  if (control === "turnLeft") input.turnTap += TURN_SPEED / 60;
+  else if (control === "turnRight") input.turnTap -= TURN_SPEED / 60;
+}
+/** Mouse look plus either the held turn keys or a queued tap, never both (a keydown queues a tap and also holds the key). */
+export function frameLookYaw(lookYaw: number, keyed: number, tap: number): number {
+  return lookYaw + (keyed !== 0 ? keyed : tap);
+}
 export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: number): { yaw: number; pitch: number } {
   const next = Math.atan2(Math.sin(yaw + dYaw), Math.cos(yaw + dYaw));
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
+export type PlayCandidate = PlayCandidateOf<PlayTarget>;
 export function targetKey(target: PlayTarget | null): string {
   if (!target) return "";
   return playTargetModule(target.kind).key?.(target) ?? target.kind;
@@ -169,35 +193,48 @@ export function targetKey(target: PlayTarget | null): string {
 
 /**
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
- * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
+ * handoff agents, each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
  */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = []): PlayCandidate[] {
-  const context = { agents, visible: new Set(rooms), coworkers };
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = [], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), handoffAgents, coworkers };
   return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 
 /**
- * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone; agents win ties.
+ * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone.
+ * A desk's general inspect prompt yields to an eligible agent (including handoff actors); other targets still compete by distance.
  * Up close the cone widens to the candidate's angular size (asin(radius / distance)), so a target stays
- * picked while the crosshair is anywhere on it.
+ * picked while the crosshair is anywhere on it. Open doors require facing the swung leaf. Open leaves
+ * yield to other targets; closed leaves compete by distance so targets behind them cannot take priority.
  */
 export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCandidate[], range = INTERACT_RANGE, cone = PICK_CONE): PlayTarget | null {
   const [fx, fz] = forwardOf(yaw);
   let best: { target: PlayTarget; distance: number } | null = null;
+  let nonDesk: { target: PlayTarget; distance: number } | null = null;
+  let door: { target: PlayTarget; distance: number } | null = null;
   for (const candidate of candidates) {
     const dx = candidate.position[0] - eye[0], dz = candidate.position[1] - eye[1];
     const distance = Math.hypot(dx, dz);
     if (distance - candidate.radius > range) continue;
     if (distance > 1e-6) {
       const bearing = Math.acos(clamp((dx * fx + dz * fz) / distance, -1, 1));
-      if (bearing > Math.max(cone, Math.asin(Math.min(1, candidate.radius / distance)))) continue;
+      const pickCone = candidate.target.kind === "door" && !candidate.blocksInteraction ? cone : Math.max(cone, Math.asin(Math.min(1, candidate.radius / distance)));
+      if (bearing > pickCone) continue;
+    }
+    if (candidate.target.kind === "door" && !candidate.blocksInteraction) {
+      if (!door || distance < door.distance) door = { target: candidate.target, distance };
+      continue;
     }
     const agent = candidate.target.kind === "agent";
     if (!best || distance < best.distance - 1e-9 || (Math.abs(distance - best.distance) <= 1e-9 && agent && best.target.kind !== "agent")) {
       best = { target: candidate.target, distance };
     }
+    if (candidate.target.kind !== "desk" && (!nonDesk || distance < nonDesk.distance - 1e-9 || (Math.abs(distance - nonDesk.distance) <= 1e-9 && agent && nonDesk.target.kind !== "agent"))) {
+      nonDesk = { target: candidate.target, distance };
+    }
   }
-  return best?.target ?? null;
+  if (best?.target.kind === "desk" && (nonDesk?.target.kind === "agent" || nonDesk?.target.kind === "handoff")) return nonDesk.target;
+  return best?.target ?? door?.target ?? null;
 }
 
 export function headBob(distance: number, moving: boolean, reduced: boolean): number {
@@ -207,8 +244,8 @@ export function headBob(distance: number, moving: boolean, reduced: boolean): nu
 export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;
 
 /** Display data for the interaction panel (from the target's registry module); null when the target is no longer in the snapshot. */
-export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPanel | null {
-  return playTargetModule(target.kind).panel(snapshot, target);
+export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget, handoffFor?: HandoffResolver): PlayPanel | null {
+  return playTargetModule(target.kind).panel(snapshot, target, handoffFor);
 }
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {

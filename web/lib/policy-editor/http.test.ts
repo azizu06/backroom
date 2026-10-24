@@ -18,7 +18,7 @@ it('owner save changes the next gateway offer and both decision audits cite thei
     currentPolicy: () => state.getPolicy() });
   const offer = (id: string, installments = 3) => gateway('propose_plan', new Request(`${origin}/api/tools/propose_plan`, {
     method: 'POST', headers: { authorization: 'Bearer voice-secret', 'content-type': 'application/json' },
-    body: JSON.stringify({ call_id: id === 'after' ? 'next-call' : 'approval-demo', webhook_request_id: id, installments, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 }),
+    body: JSON.stringify({ call_id: id === 'before' ? 'approval-demo' : 'next-call', webhook_request_id: id, installments, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 }),
   }));
   expect(await (await offer('before')).json()).toMatchObject({ kind: 'ESCALATE', can_confirm: false });
   expect((await edit(req({ expectedVersion: 1, limits }))).status).toBe(200);

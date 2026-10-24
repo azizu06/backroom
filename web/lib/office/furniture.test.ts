@@ -3,6 +3,7 @@ import { deskPieces, deskScreenPiece, PLANT_SPOTS } from './furniture';
 import { MONITOR_FACE } from './props/monitors';
 import { OFFICE_ANCHORS } from './state';
 import { DESKS, DESK_SIZE } from './targets/desk';
+import { ROLES } from './palette';
 
 describe('static office furniture', () => {
   it.each(DESKS)('keeps %s furniture at the existing anchor and footprint', room => {
@@ -34,7 +35,7 @@ describe('static office furniture', () => {
     expect(screen.at[2] - casing.at[2]).toBeCloseTo(0.05);
     expect(casing.size).toEqual([MONITOR_FACE.width + 0.1, MONITOR_FACE.height + 0.1, 0.08]);
     expect(screen.size).toEqual([MONITOR_FACE.width + 0.01, MONITOR_FACE.height + 0.01, 0.015]);
-    expect(screen.color).toBe(OFFICE_ANCHORS[room].color);
+    expect(screen.color).toBe(ROLES.screenGlow);
   });
 
   it('retains the three fixed plant footprints', () => {

@@ -3,6 +3,10 @@
  * interacted with, its HUD prompt, and its panel data (read from the snapshot only).
  */
 import type { AnchorId, OfficeSnapshot } from "../state";
+import type { Handoff } from "../handoffs";
+import type { AgentTalk } from "../agent-talk";
+
+export type HandoffResolver = (actor: string) => Handoff | undefined;
 
 export type Vec2 = readonly [x: number, z: number];
 export interface PlayPanelEntry { readonly id: string; readonly decision: string; readonly summary: string; readonly ruleIds: readonly string[] }
@@ -15,16 +19,26 @@ export interface PlayPanelOf<K extends string = string> {
   readonly seated?: readonly { readonly id: string; readonly name: string; readonly state: string }[];
   readonly locked?: string;
   readonly denial?: PlayPanelEntry;
+  readonly handoff?: { readonly from: string; readonly to: string; readonly caseDisplayId: string; readonly reason: string; readonly summary: string; readonly status: string; readonly correction: boolean; readonly errorCode?: string };
+  /** Conversation for agents you can talk to (agent-talk.ts). */
+  readonly talk?: AgentTalk;
   /** Prefilled chat text (coworker "Say hi"). */
   readonly greeting?: string;
   readonly entries: readonly PlayPanelEntry[];
 }
-export interface PlayCandidateOf<T> { readonly target: T; readonly position: Vec2; readonly radius: number }
+export interface PlayCandidateOf<T> {
+  readonly target: T;
+  readonly position: Vec2;
+  readonly radius: number;
+  /** A closed leaf takes priority over targets farther behind it. */
+  readonly blocksInteraction?: boolean;
+}
 /** Another viewer walking in Play (from presence). */
 export interface CoworkerSpot { readonly id: string; readonly name: string; readonly position: Vec2 }
 /** What every target's `candidates` sees: agents at their drawn (motion) positions, the visible rooms and coworkers. */
 export interface TargetContext {
   readonly agents: readonly { id: string; position: Vec2 }[];
+  readonly handoffAgents?: readonly { id: string; position: Vec2 }[];
   readonly visible: ReadonlySet<AnchorId>;
   readonly coworkers?: readonly CoworkerSpot[];
 }
@@ -36,8 +50,10 @@ export interface PlayTargetModule<T extends { kind: string }> {
   key?(target: T): string;
   /** HUD prompt, e.g. "Talk to Ada". */
   label(snapshot: OfficeSnapshot, target: T): string;
+  /** Optional immediate cosmetic action, instead of opening a read-only panel. */
+  activate?(target: T): void;
   /** Panel data; null when the target is no longer in the snapshot. */
-  panel(snapshot: OfficeSnapshot, target: T): PlayPanelOf<T["kind"]> | null;
+  panel(snapshot: OfficeSnapshot, target: T, handoffFor?: HandoffResolver): PlayPanelOf<T["kind"]> | null;
 }
 export function defineTarget<T extends { kind: string }>(target: PlayTargetModule<T>): PlayTargetModule<T> { return target; }
 

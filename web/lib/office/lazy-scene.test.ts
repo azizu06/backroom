@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -12,7 +12,8 @@ function parse(file: string) {
 const office = parse('Office.tsx');
 /** Modules in the initial office bundle; only the lazy scene (and its ./play rig) may load WebGL. */
 const initialBundle = [office, parse('PlayHud.tsx'), parse('RoomEntryLabel.tsx'), parse('FloorPlan.tsx'), parse('RoomInspector.tsx'), parse('ReceiptList.tsx'), parse('ViewBoundary.tsx'), parse('PerfOverlay.tsx'), parse('ProximityChat.tsx'), parse('useProximityChat.ts'), parse('usePresence.ts'), parse('PresenceChip.tsx'),
-  parse('panels/index.ts'), parse('panels/types.ts'), parse('panels/DeskPanel.tsx'), parse('panels/TreasuryPanel.tsx'), parse('panels/PaylinkPanel.tsx'), parse('panels/ServerPanel.tsx'), parse('panels/CoworkerPanel.tsx')];
+  parse('panels/index.ts'), parse('panels/types.ts'), parse('panels/DeskPanel.tsx'), parse('panels/TreasuryPanel.tsx'), parse('panels/PaylinkPanel.tsx'), parse('panels/ServerPanel.tsx'), parse('panels/CoworkerPanel.tsx'), parse('panels/HandoffPanel.tsx'), parse('panels/AgentTalkPanel.tsx'), parse('panels/InboxPanel.tsx'),
+  parse('handoffs/HandoffPresentation.tsx'), parse('handoffs/HandoffLog.tsx'), parse('handoffs/HandoffDetails.tsx'), parse('handoffs/HandoffText.tsx')];
 
 describe('lazy office scene', () => {
   it.each(initialBundle.map(file => [file.fileName, file] as const))('keeps scene and WebGL runtime imports out of %s', (_, file) => {
@@ -29,9 +30,10 @@ describe('lazy office scene', () => {
     expect(runtimeImports.map(statement => statement.getText(file))).toEqual([]);
   });
 
-  it('keeps the phone panel and call store transitive graphs free of WebGL imports', () => {
+  it('keeps the HUD, phone panel and call store transitive graphs free of WebGL imports', () => {
     const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
     const roots = [
+      resolve(webRoot, 'app/office/PlayHud.tsx'),
       resolve(webRoot, 'app/office/props/DeskPhonePanel.tsx'),
       resolve(webRoot, 'lib/office/calls.ts'),
     ];
@@ -42,7 +44,7 @@ describe('lazy office scene', () => {
       if (!specifier.startsWith('.')) return undefined;
       const base = resolve(dirname(from), specifier);
       for (const candidate of [base, ...extensions.map(ext => `${base}${ext}`), ...extensions.map(ext => resolve(base, `index${ext}`))]) {
-        if (existsSync(candidate)) return candidate;
+        if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
       }
       return undefined;
     };

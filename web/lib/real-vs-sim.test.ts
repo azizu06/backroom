@@ -2,95 +2,189 @@ import * as React from 'react';
 // @ts-ignore -- react-dom ships no types and @types/react-dom is not a workspace dependency.
 import * as ReactDOMServer from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { RealVsSim } from '../components/RealVsSim';
-import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, NOT_PROBED_LABEL, panelExpanded, probedServices, toggledPanel, unprobedServices } from './real-vs-sim';
+import { DisclosureRow, RealVsSim } from '../components/RealVsSim';
+import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, NOT_PROBED_LABEL, panelExpanded, probedServices, toggledPanel, unprobedServices, type DemoStatus, type ServiceId } from './real-vs-sim';
 
 const { renderToString } = ReactDOMServer as { renderToString(node: React.ReactNode): string };
 vi.mock('next/navigation', () => ({ usePathname: () => '/office', useSearchParams: () => new URLSearchParams() }));
 
-const unprobed = ['phone', 'claude', 'apify', 'policy', 'spacetime'] as const;
+const realIds = ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'] as const;
 const item = (id: string) => disclosureItems.find(row => row.id === id)!;
+const NOW = Date.parse('2026-10-24T13:10:00.000Z');
+const iso = (ms: number) => new Date(ms).toISOString();
+type Probe = NonNullable<DemoStatus['services']>[ServiceId];
+
+const snapshot = (overrides: Partial<DemoStatus> = {}): DemoStatus => ({
+  measuredAt: iso(NOW), notProbed: [...unprobedServices], llmEnabled: true, gx10: null, ...overrides,
+});
+const withProbe = (id: ServiceId, probe: Probe, overrides: Partial<DemoStatus> = {}) => snapshot({ services: { [id]: probe }, ...overrides });
 
 describe('demo disclosure status', () => {
   it('does not claim live services are online without evidence', () => {
-    expect(getDisclosureStatus(item('gx10'), null).label).toBe('Unverified');
-    for (const id of unprobed) expect(getDisclosureStatus(item(id), null).label).toBe(NOT_PROBED_LABEL);
+    for (const id of realIds) expect(getDisclosureStatus(item(id), null)).toEqual({ label: 'Unverified', tone: 'neutral' });
+  });
+
+  it('probes every real integration, so nothing is listed as never probed', () => {
+    expect([...probedServices].sort()).toEqual([...realIds].sort());
+    expect(unprobedServices).toEqual([]);
+    for (const row of disclosureItems.filter(row => row.kind === 'real')) expect(row.description).not.toMatch(/not yet reported/i);
+  });
+
+  it('labels a verified receipt with its evidence and UTC date', () => {
+    const state = getDisclosureStatus(item('policy'), withProbe('policy', {
+      state: 'verified', source: 'receipt', evidence: 'Receipt: DENY FEES_NON_WAIVABLE, ALLOW IN_BADGE', at: '2026-10-24T09:49:22.179Z',
+    }), NOW);
+    expect(state).toEqual({ label: 'Verified', tone: 'good', detail: 'Receipt: DENY FEES_NON_WAIVABLE, ALLOW IN_BADGE · Oct 24, 09:49 UTC' });
+  });
+
+  it('labels a fresh live probe with a UTC clock time and expires it after 120 s', () => {
+    const probe: Probe = { state: 'verified', source: 'live', evidence: 'GET /models · 5 models', at: '2026-10-24T13:09:12.000Z' };
+    expect(getDisclosureStatus(item('gx10'), withProbe('gx10', probe), NOW))
+      .toEqual({ label: 'Verified', tone: 'good', detail: 'GET /models · 5 models · 13:09:12 UTC' });
+    const later = NOW + 120_000;
+    expect(getDisclosureStatus(item('gx10'), withProbe('gx10', probe, { measuredAt: iso(later) }), later).label).toBe('Unverified');
+  });
+
+  it('never returns Verified without a parseable evidence time', () => {
+    for (const source of ['live', 'receipt'] as const) for (const at of [null, 'not a date']) {
+      const state = getDisclosureStatus(item('apify'), withProbe('apify', { state: 'verified', source, evidence: 'Run x', at }), NOW);
+      expect(state.label).toBe('Unverified');
+      expect(state.tone).toBe('neutral');
+    }
+  });
+
+  it.each([
+    ['simulated', 'Simulated', 'neutral', 'In-memory state fixture'],
+    ['unreachable', 'Unreachable', 'warning', 'Timed out'],
+    ['disabled', 'Disabled', 'warning', 'Disabled by config'],
+    ['unverified', 'Unverified', 'neutral', 'Not configured'],
+  ] as const)('maps %s probes to %s with the evidence as detail', (state, label, tone, evidence) => {
+    expect(getDisclosureStatus(item('spacetime'), withProbe('spacetime', { state, source: 'config', evidence, at: null }), NOW))
+      .toEqual({ label, tone, detail: evidence });
+  });
+
+  it('lets LLM OFF win over probe evidence for model-dependent services only', () => {
+    const verified: Probe = { state: 'verified', source: 'receipt', evidence: 'Route receipt req_1', at: iso(NOW - 3600_000) };
+    for (const id of ['phone', 'claude', 'gx10'] as const) {
+      expect(getDisclosureStatus(item(id), withProbe(id, verified, { llmEnabled: false }), NOW)).toEqual({ label: 'LLM OFF', tone: 'warning' });
+    }
+    for (const id of ['apify', 'policy', 'spacetime'] as const) {
+      expect(getDisclosureStatus(item(id), withProbe(id, verified, { llmEnabled: false }), NOW).label).toBe('Verified');
+    }
+    expect(getDisclosureStatus(item('nessie'), snapshot({ llmEnabled: false }), NOW).label).toBe('Simulated');
+  });
+
+  it('discards stale status snapshots even with verified evidence', () => {
+    const verified: Probe = { state: 'verified', source: 'receipt', evidence: 'Run x', at: iso(NOW - 3600_000) };
+    for (const id of realIds) {
+      expect(getDisclosureStatus(item(id), withProbe(id, verified, { measuredAt: iso(NOW - 31_000), llmEnabled: false }), NOW))
+        .toEqual({ label: 'Unverified', tone: 'neutral' });
+    }
+  });
+
+  it('labels ids the server lists as not probed honestly', () => {
+    for (const id of ['apify', 'policy', 'spacetime'] as const) {
+      expect(getDisclosureStatus(item(id), snapshot({ notProbed: [id] }), NOW)).toEqual({ label: NOT_PROBED_LABEL, tone: 'neutral' });
+    }
+  });
+
+  it('falls back to Unverified when a fresh snapshot has no entry for a service', () => {
+    for (const id of ['phone', 'claude', 'apify', 'policy', 'spacetime'] as const) {
+      expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Unverified', tone: 'neutral' });
+    }
   });
 });
 
-const snapshot = (overrides = {}): import('./real-vs-sim').DemoStatus => ({
-  measuredAt: new Date().toISOString(), notProbed: [...unprobedServices], llmEnabled: true, gx10: null, ...overrides,
+describe('host-reported sandbox rows', () => {
+  const at = iso(NOW - 60_000);
+  it('stay Simulated without a host report or with a stale status', () => {
+    for (const id of ['nessie', 'crs', 'company', 'card']) expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+    const stale = snapshot({ measuredAt: iso(NOW - 60_000), services: { crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
+    expect(getDisclosureStatus(item('crs'), stale, NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+  });
+  it('show the host adapter state when the demo host reports one', () => {
+    const status = snapshot({ services: { nessie: { state: 'simulated', source: 'config', evidence: 'Mock Nessie HTTP transport', at: null },
+      crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
+    expect(getDisclosureStatus(item('nessie'), status, NOW)).toEqual({ label: 'Simulated', tone: 'neutral', detail: 'Mock Nessie HTTP transport' });
+    expect(getDisclosureStatus(item('crs'), status, NOW)).toMatchObject({ label: 'Verified', tone: 'good' });
+  });
 });
 
-it('lists every real integration as either probed here or explicitly not probed', () => {
-  expect([...probedServices]).toEqual(['gx10']);
-  expect([...unprobedServices].sort()).toEqual([...unprobed].sort());
-});
-
-it('labels never-probed services honestly instead of Unverified, even with a fresh or stale snapshot', () => {
-  const old = new Date(Date.now() - 60_000).toISOString();
-  for (const id of unprobed) {
-    for (const status of [snapshot(), snapshot({ measuredAt: old }), snapshot({ gx10: { localEnabled: true, localAvailable: true, checkedAt: new Date().toISOString() } })]) {
-      expect(getDisclosureStatus(item(id), status)).toEqual({ label: NOT_PROBED_LABEL, tone: 'neutral' });
-    }
+it('shows Checking while the first server probe run is pending', () => {
+  for (const id of ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'] as const) {
+    expect(getDisclosureStatus(item(id), snapshot({ notProbed: [], services: {}, probesCheckedAt: null }), NOW)).toEqual({ label: 'Checking…', tone: 'neutral' });
   }
 });
 
-it('still reports the observed LLM OFF switch for unprobed model-dependent services', () => {
-  for (const id of ['phone', 'claude']) expect(getDisclosureStatus(item(id), snapshot({ llmEnabled: false })).label).toBe('LLM OFF');
-  for (const id of ['apify', 'policy', 'spacetime']) expect(getDisclosureStatus(item(id), snapshot({ llmEnabled: false })).label).toBe(NOT_PROBED_LABEL);
+describe('GX10 router health fallback without a probe entry', () => {
+  const gx10 = item('gx10');
+  it('never mistakes the router optimistic initial state for an observed online model', () => {
+    expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: true, localAvailable: true, checkedAt: null } }), NOW).label).toBe('Unverified');
+  });
+
+  it.each([true, false])('reports observed GX10 availability %s', available => {
+    expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: true, localAvailable: available, checkedAt: iso(NOW) } }), NOW).label).toBe(available ? 'Online' : 'Offline');
+  });
+
+  it('discards stale health observations', () => {
+    expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: true, localAvailable: true, checkedAt: iso(NOW - 60_000) } }), NOW).label).toBe('Unverified');
+  });
+
+  it('distinguishes a disabled local model from an offline one', () => {
+    expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: false, localAvailable: false, checkedAt: null } }), NOW).label).toBe('Disabled');
+  });
+
+  it('prefers the probe entry over router health', () => {
+    const status = snapshot({
+      gx10: { localEnabled: true, localAvailable: true, checkedAt: iso(NOW) },
+      services: { gx10: { state: 'unreachable', source: 'live', evidence: 'HTTP 503', at: iso(NOW) } },
+    });
+    expect(getDisclosureStatus(gx10, status, NOW)).toEqual({ label: 'Unreachable', tone: 'warning', detail: 'HTTP 503' });
+  });
 });
 
-it('reserves Unverified for the probed GX10 without a fresh observation', () => {
-  expect(getDisclosureStatus(item('gx10'), snapshot()).label).toBe('Unverified');
-});
-const gx10 = disclosureItems.find(item => item.id === 'gx10')!;
+describe('disclosure rows', () => {
+  const render = (node: React.ReactNode) => {
+    vi.stubGlobal('React', React);
+    try { return renderToString(node); } finally { vi.unstubAllGlobals(); }
+  };
+  const status = withProbe('apify', { state: 'verified', source: 'receipt', evidence: 'Run guBODDnPcXO4bX1Ph', at: '2026-10-24T09:26:09.587Z' });
 
-it('never mistakes the router optimistic initial state for an observed online model', () => {
-  expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: true, localAvailable: true, checkedAt: null } })).label).toBe('Unverified');
-});
+  it.each([false, true])('server-renders the evidence detail line (detailed=%s)', detailed => {
+    const html = render(React.createElement(DisclosureRow, { item: item('apify'), status, detailed, now: NOW }));
+    expect(html).toContain('>Verified<');
+    expect(html).toMatch(/<p class="real-sim-detail-line"[^>]*>Run guBODDnPcXO4bX1Ph · Oct 24, 09:26 UTC<\/p>/);
+    expect(html.includes(item('apify').description)).toBe(detailed);
+  });
 
-it.each([true, false])('reports observed GX10 availability %s', available => {
-  expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: true, localAvailable: available, checkedAt: new Date().toISOString() } })).label).toBe(available ? 'Online' : 'Offline');
-});
-
-it('shows OFF for model-dependent integrations while preserving sandbox disclosure', () => {
-  for (const id of ['phone', 'claude', 'gx10']) {
-    expect(getDisclosureStatus(disclosureItems.find(item => item.id === id)!, snapshot({ llmEnabled: false })).label).toBe('LLM OFF');
-  }
-  expect(getDisclosureStatus(disclosureItems.find(item => item.id === 'nessie')!, snapshot({ llmEnabled: false })).label).toBe('Simulated');
-});
-
-it('discards stale status snapshots and stale health observations', () => {
-  const old = new Date(Date.now() - 60_000).toISOString();
-  expect(getDisclosureStatus(gx10, snapshot({ measuredAt: old, llmEnabled: false })).label).toBe('Unverified');
-  expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: true, localAvailable: true, checkedAt: old } })).label).toBe('Unverified');
-});
-
-it('distinguishes a disabled local model from an offline one', () => {
-  expect(getDisclosureStatus(gx10, snapshot({ gx10: { localEnabled: false, localAvailable: false, checkedAt: null } })).label).toBe('Disabled');
+  it('omits the detail line when there is no evidence', () => {
+    const html = render(React.createElement(DisclosureRow, { item: item('apify'), status: null, detailed: false }));
+    expect(html).toContain('>Unverified<');
+    expect(html).not.toContain('real-sim-detail-line');
+  });
 });
 
 describe('disclosure panel expansion', () => {
-  it('collapses by default only at the narrow breakpoint', () => {
+  it('collapses by default in the office and at the narrow breakpoint', () => {
     expect(NARROW_PANEL_QUERY).toBe('(max-width: 760px)');
     expect(panelExpanded({ detailed: false, narrow: true, userExpanded: null })).toBe(false);
     expect(panelExpanded({ detailed: false, narrow: false, userExpanded: null })).toBe(true);
+    expect(panelExpanded({ detailed: false, narrow: false, officeView: true, userExpanded: null })).toBe(false);
   });
 
   it('keeps the details page expanded regardless of viewport or toggle', () => {
-    for (const narrow of [true, false]) for (const userExpanded of [null, true, false]) {
-      expect(panelExpanded({ detailed: true, narrow, userExpanded })).toBe(true);
+    for (const narrow of [true, false]) for (const officeView of [true, false]) for (const userExpanded of [null, true, false]) {
+      expect(panelExpanded({ detailed: true, narrow, officeView, userExpanded })).toBe(true);
     }
   });
 
   it('flips on toggle and lets the user choice win over the viewport default', () => {
-    for (const narrow of [true, false]) {
-      const initial = panelExpanded({ detailed: false, narrow, userExpanded: null });
-      const toggled = panelExpanded({ detailed: false, narrow, userExpanded: toggledPanel(initial) });
+    for (const narrow of [true, false]) for (const officeView of [true, false]) {
+      const initial = panelExpanded({ detailed: false, narrow, officeView, userExpanded: null });
+      const toggled = panelExpanded({ detailed: false, narrow, officeView, userExpanded: toggledPanel(initial) });
       expect(toggled).toBe(!initial);
-      expect(panelExpanded({ detailed: false, narrow, userExpanded: toggledPanel(toggled) })).toBe(initial);
-      expect(panelExpanded({ detailed: false, narrow: !narrow, userExpanded: toggledPanel(initial) })).toBe(!initial);
+      expect(panelExpanded({ detailed: false, narrow, officeView, userExpanded: toggledPanel(toggled) })).toBe(initial);
+      expect(panelExpanded({ detailed: false, narrow: !narrow, officeView, userExpanded: toggledPanel(initial) })).toBe(!initial);
     }
   });
 
@@ -102,13 +196,15 @@ describe('disclosure panel expansion', () => {
     const button = html.match(/<button[^>]*class="real-sim-toggle"[^>]*>/)?.[0] ?? '';
     const expanded = /aria-expanded="(true|false)"/.exec(button)?.[1];
     const controls = /aria-controls="([^"]+)"/.exec(button)?.[1];
-    expect(expanded).toBe(String(panelExpanded({ detailed: false, narrow: false, userExpanded: null })));
+    expect(expanded).toBe('false');
     expect(controls).toBeTruthy();
     expect(html).toMatch(new RegExp(`<aside[^>]*data-expanded="${expanded}"`));
     const body = html.match(new RegExp(`<div id="${controls}"[^>]*>`))?.[0];
     expect(body).toBeDefined();
-    expect(body).not.toContain('hidden');
-    expect(html).toContain('>Hide<');
-    expect(html).not.toContain('>Show<');
+    expect(body).toContain('hidden');
+    expect(html).toContain('>Show<');
+    expect(html).not.toContain('>Hide<');
+    expect(html).not.toContain('Details ↗');
+    expect(html).toContain('Sandbox items never represent real money or identities.');
   });
 });

@@ -1,0 +1,47 @@
+{
+ "room": "lobby",
+ "boxes": [
+  {
+   "name": "coffee_cabinet",
+   "minX": -4.03,
+   "maxX": -2.67,
+   "minZ": 4.9,
+   "maxZ": 5.46
+  },
+  {
+   "name": "water_cooler",
+   "minX": -4.54,
+   "maxX": -4.16,
+   "minZ": 5.06,
+   "maxZ": 5.44
+  },
+  {
+   "name": "bookshelf",
+   "minX": -4.0,
+   "maxX": -2.7,
+   "minZ": 1.31,
+   "maxZ": 1.63
+  },
+  {
+   "name": "floor_plant",
+   "minX": -3.2,
+   "maxX": -2.7,
+   "minZ": 1.75,
+   "maxZ": 2.25
+  },
+  {
+   "name": "sofa",
+   "minX": -7.925,
+   "maxX": -7.075,
+   "minZ": 2.3,
+   "maxZ": 4.2
+  },
+  {
+   "name": "coffee_table",
+   "minX": -6.91,
+   "maxX": -6.19,
+   "minZ": 2.19,
+   "maxZ": 2.71
+  }
+ ]
+}

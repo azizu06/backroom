@@ -63,24 +63,63 @@ export function callFromProjection(row: unknown): CallState | null {
 }
 
 export const CALL_DISCLOSURE = 'Calls are AI-disclosed and only go to the allowlisted demo number.';
-// SET when Aziz posts the request endpoint
-const CALL_REQUEST_ENDPOINT: string | null = null;
-export type CallRequestResult = { ok: boolean; reason?: 'unavailable' | 'failed'; message: string };
+// Aziz's host routes (web/lib/calls): the operator-session request and the read-only live feed.
+const CALL_REQUEST_ENDPOINT: string | null = '/api/calls/request';
+const CALL_FEED_ENDPOINT = '/api/calls/active';
+export const CALL_UNLOCK_PATH = '/calls';
+export type CallRequestResult = { ok: boolean; reason?: 'unavailable' | 'failed' | 'locked'; message: string };
 export async function requestCall(_input?: unknown): Promise<CallRequestResult> {
   if (!CALL_REQUEST_ENDPOINT) return { ok: false, reason: 'unavailable', message: 'Call requests not available yet' };
+  // The scripted preview never reaches the real dial route.
+  if (typeof window !== 'undefined' && isMockCalls(window.location.search)) return { ok: false, reason: 'unavailable', message: 'Mock preview: no call placed' };
   try {
     const response = await fetch(CALL_REQUEST_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ line: 'collections' }) });
     const body = await response.json() as { message?: unknown };
-    return { ok: response.ok, message: typeof body.message === 'string' ? body.message : response.ok ? 'Call request submitted' : 'Call request unavailable' };
+    return { ok: response.ok, ...(response.status === 401 ? { reason: 'locked' as const } : {}),
+      message: typeof body.message === 'string' ? body.message : response.ok ? 'Call request submitted' : 'Call request unavailable' };
   } catch { return { ok: false, reason: 'failed', message: 'Call request unavailable' }; }
 }
 // PROVISIONAL: replace with the Play settings sound toggle
 export function soundEnabled(): boolean { try { return localStorage['backroom:sound'] === 'on'; } catch { return false; } }
 export function isMockCalls(search: string) { return new URLSearchParams(search).get('calls') === 'mock'; }
 
+const FEED_IDLE_AFTER_FAILURES = 3;
+const FEED_BACKOFF_CAP = 8;
+/** Polls the host's read-only call projection. Pauses while the tab is hidden, the same way office ambience does. A failed poll backs off and drops the phone to idle after a few failures. */
+export function pollCallFeed(apply: (state: CallState) => void, intervalMs = 1500): () => void {
+  let stopped = false, failures = 0, timer: ReturnType<typeof setTimeout> | undefined;
+  const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  const schedule = (delay: number) => { if (!stopped && !hidden()) timer = setTimeout(tick, delay); };
+  const tick = async () => {
+    if (stopped || hidden()) return;
+    try {
+      const response = await fetch(CALL_FEED_ENDPOINT, { cache: 'no-store' });
+      if (!response.ok) throw new Error(String(response.status));
+      const body = await response.json() as { call?: unknown };
+      failures = 0;
+      if (!stopped) apply(callFromProjection(body.call) ?? IDLE_CALL);
+    } catch {
+      failures += 1;
+      if (!stopped && failures === FEED_IDLE_AFTER_FAILURES) apply(IDLE_CALL);
+    }
+    schedule(failures === 0 ? intervalMs : intervalMs * Math.min(2 ** failures, FEED_BACKOFF_CAP));
+  };
+  const onVisibility = () => {
+    if (stopped) return;
+    clearTimeout(timer); timer = undefined;
+    if (!hidden()) void tick();
+  };
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+  void tick();
+  return () => {
+    stopped = true; clearTimeout(timer);
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+  };
+}
+
 let snapshot = IDLE_CALL;
 const listeners = new Set<() => void>();
-let stopMock: (() => void) | undefined;
+let stopFeed: (() => void) | undefined;
 function notify() { listeners.forEach(listener => listener()); }
 export const callStore = {
   subscribe(listener: () => void) {
@@ -88,11 +127,11 @@ export const callStore = {
     if (listeners.size === 1 && typeof window !== 'undefined' && isMockCalls(window.location.search)) {
       const params = new URLSearchParams(window.location.search);
       const speed = params.get('callsSpeed') === 'fast' ? 10 : params.get('callsSpeed') === 'slow' ? 0.25 : 1;
-      stopMock = createMockCallFeed(event => { snapshot = callReducer(snapshot, event); notify(); }, speed);
+      stopFeed = createMockCallFeed(event => { snapshot = callReducer(snapshot, event); notify(); }, speed);
+    } else if (listeners.size === 1 && typeof window !== 'undefined') {
+      stopFeed = pollCallFeed(state => { if (JSON.stringify(state) !== JSON.stringify(snapshot)) { snapshot = state; notify(); } });
     }
-    // TODO: subscribe to the separate public call projection table like the office's other public tables;
-    // map rows with callFromProjection and dispatch snapshot events.
-    return () => { listeners.delete(listener); if (!listeners.size) { stopMock?.(); stopMock = undefined; snapshot = IDLE_CALL; } };
+    return () => { listeners.delete(listener); if (!listeners.size) { stopFeed?.(); stopFeed = undefined; snapshot = IDLE_CALL; } };
   },
   getSnapshot: () => snapshot,
   getServerSnapshot: () => IDLE_CALL,
