@@ -100,6 +100,8 @@ describe('office prop interactions', () => {
       { label: 'Time', value: '09:41' }, { label: 'Audit receipts', value: '2' },
     ]);
     expect(WHITEBOARD_INTERACTION.panel(full, now).rows).toContainEqual({ label: 'Deny', value: '1' });
+    const held = snapshot({ audit: [row('h', 'ESCALATE', 'four installments')] });
+    expect(WHITEBOARD_INTERACTION.panel(held, now).rows).toContainEqual({ label: 'Hold', value: 'four installments' });
   });
 
   it('hide the whiteboard without payables and the clock without lobby or collections', () => {

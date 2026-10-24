@@ -9,6 +9,7 @@ export const PROP_FONT = 'system-ui, sans-serif';
 /**
  * One canvas + CanvasTexture per prop. Redraws only when `deps` change, then requests a single
  * on-demand frame; never draws per frame. The texture is disposed on unmount.
+ * `width` and `height` are fixed at mount; later values are ignored.
  */
 export function useCanvasTexture(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void, deps: unknown[]): CanvasTexture {
   const invalidate = useThree(state => state.invalidate);
@@ -22,14 +23,15 @@ export function useCanvasTexture(width: number, height: number, draw: (ctx: Canv
     return created;
   });
   useLayoutEffect(() => {
-    const ctx = (texture.image as HTMLCanvasElement).getContext('2d');
+    const canvas = texture.image as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     draw(ctx);
     texture.needsUpdate = true;
     invalidate();
     // `draw` is a fresh closure each render; callers list what it reads in `deps`.
-  }, [texture, width, height, invalidate, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [texture, invalidate, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => () => texture.dispose(), [texture]);
   return texture;
 }
