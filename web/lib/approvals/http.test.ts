@@ -7,7 +7,6 @@ import { MemoryGatewayStore } from '../gateway/store';
 import { createApprovalBridge } from './gateway';
 import { approvalDemoCall } from './testing/call';
 import { inboxIds } from './inbox';
-import { TestAuthenticator } from '../../../orchestrator/src/approvals/testing/authenticator';
 
 const origin = 'http://localhost:3020';
 function request(path: string, body: unknown, requestOrigin = origin) {

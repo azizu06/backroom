@@ -48,7 +48,8 @@ valid 12 hours, process-local like the credential. The session only lists pendin
 requests: it cannot decide one, a sign-in assertion cannot be spent as a decision,
 and every Approve/Deny/Counter still needs its own decision-bound assertion. The inbox
 lists escalations created through `createApprovalBridge` (every gateway
-`propose_plan` ESCALATE, including the demo seed) in this server process; intake and
+`propose_plan` ESCALATE, including the demo seed and a caller's one re-ask) in this
+server process, while they are `pending`; an `expired` row leaves the list. Intake and
 payment-review escalations still need their link. Web Push is not wired: the page
 must stay open in the foreground.
 

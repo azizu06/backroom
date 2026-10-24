@@ -177,7 +177,8 @@ describe('M6 server-verified controller authority', () => {
     advance(1);
     await create('e2');
     expect((await service.pending(['e1', 'e2', 'missing'])).map(e => e.id)).toEqual(['e2', 'e1']);
-    advance(60_000);
+    // Live-call rows leave the inbox once the call window expires them.
+    advance(approvalWindowMs());
     expect(await service.pending(['e1', 'e2'])).toEqual([]);
     advance(12 * 60 * 60_000);
     expect(service.hasSession(token)).toBe(false);
