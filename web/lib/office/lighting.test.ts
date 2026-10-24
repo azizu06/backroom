@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LIGHTING } from './lighting';
+import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, MAX_OFFICE_LIGHTS, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LAMPS, OFFICE_LIGHTING, officeLightRig, officeLowPower } from './lighting';
 import { ROLES } from './palette';
 
 function rgb(hex: string) {
@@ -54,6 +54,51 @@ describe('office lighting', () => {
   it('keeps shadow buffers small', () => {
     expect(OFFICE_LIGHTING.key.shadow.mapSize).toBeLessThanOrEqual(1024);
     expect(OFFICE_LIGHTING.contactShadows.resolution).toBeLessThanOrEqual(512);
+  });
+
+  it('caps the complete rig, sharing two non-shadow-casting lamp pools across six emissive lamps', () => {
+    const rig = officeLightRig();
+    const allLights = [rig.key, rig.fill, rig.hemisphere, ...rig.pointLights];
+    expect(allLights.length).toBeLessThanOrEqual(MAX_OFFICE_LIGHTS);
+    expect(MAX_OFFICE_LIGHTS).toBeLessThanOrEqual(6);
+    expect(OFFICE_LAMPS).toHaveLength(6);
+    expect(rig.pointLights).toHaveLength(2);
+    for (const light of rig.pointLights) {
+      expect(light.castShadow).toBe(false);
+      expect(light.color).toBe(ROLES.lampLight);
+      expect(light.decay).toBe(2);
+      expect(light.distance).toBeGreaterThan(0);
+      expect(light.distance).toBeLessThanOrEqual(5);
+      expect(OFFICE_LAMPS.some(lamp => lamp.floor && lamp.room === light.room)).toBe(true);
+    }
+    expect(rig.shadows).toBe('soft');
+  });
+
+  it('drops every point light and both shadow passes in low-power while preserving the room colours and exposure', () => {
+    const normal = officeLightRig();
+    const saving = officeLightRig(true);
+    expect(saving.pointLights).toEqual([]);
+    expect(saving.key.castShadow).toBe(false);
+    expect(saving.fill.castShadow).toBe(false);
+    expect(saving.contactShadows).toBeNull();
+    expect(saving.shadows).toBe(false);
+    expect(saving.hemisphere).toEqual(normal.hemisphere);
+    expect(saving.key.color).toBe(normal.key.color);
+    expect(saving.fill.color).toBe(normal.fill.color);
+    expect(saving.exposure).toBe(normal.exposure);
+    // Switching modes must not mutate the normal rig.
+    expect(officeLightRig()).toEqual(normal);
+    expect(normal.key.castShadow).toBe(true);
+  });
+
+  it('honours explicit low-power, reduced-data and browser data-saver without an override disabling saving', () => {
+    expect(officeLowPower('')).toBe(false);
+    expect(officeLowPower('?lowPower=0')).toBe(false);
+    expect(officeLowPower('?perf=1')).toBe(false);
+    expect(officeLowPower('?lowPower=1')).toBe(true);
+    expect(officeLowPower('', true)).toBe(true);
+    expect(officeLowPower('', false, true)).toBe(true);
+    expect(officeLowPower('?lowPower=0', true, true)).toBe(true);
   });
 
   it('places the contact-shadow plane above the floor pads and keeps pad undersides out of its depth pass', () => {
