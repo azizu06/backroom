@@ -42,14 +42,21 @@ export function OfficeHelp() {
   const guideOpener = useRef<HTMLButtonElement>(null);
   const shortcutRestore = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== '?' || isEditable(event.target)) return;
-      event.preventDefault();
+    function openShortcuts() {
       shortcutRestore.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setShortcutsOpen(true);
     }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== '?' || isEditable(event.target)) return;
+      event.preventDefault();
+      openShortcuts();
+    }
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('office-help', openShortcuts);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('office-help', openShortcuts);
+    };
   }, []);
   function closeGuide() { setGuideOpen(false); guideOpener.current?.focus(); }
   function closeShortcuts() { setShortcutsOpen(false); shortcutRestore.current?.focus(); }
