@@ -6,6 +6,7 @@ import { TreasuryDeny } from './TreasuryDeny';
 import { DeskMonitors } from './DeskMonitors';
 import { WallClock } from './WallClock';
 import { Whiteboard } from './Whiteboard';
+import { DeskPhone } from './DeskPhone';
 
 /**
  * View-only office props; they read the snapshot and never decide anything.
@@ -19,5 +20,6 @@ export function OfficeProps({ snapshot }: { snapshot: OfficeSnapshot }) {
     <RoomDressing snapshot={snapshot} />
     <TreasuryDeny snapshot={snapshot} />
     <DeskMonitors snapshot={snapshot} />
+    <DeskPhone snapshot={snapshot} />
   </>;
 }
