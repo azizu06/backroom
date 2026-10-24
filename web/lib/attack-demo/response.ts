@@ -48,12 +48,14 @@ function evidence(value: unknown, depth = 0): value is EvidenceValue {
 }
 
 /** Rebuild only the display contract. Unknown envelope, step, decision and rule fields are stripped. */
+/** A 2,000-char batch of invoices yields ~3 steps per invoice; bounded well above that. */
+export const MAX_STEPS = 256;
 export function parseAttackResult(value: unknown): AttackResult | null {
   if (!record(value) || (value.mode !== 'mock' && value.mode !== 'live') || value.source !== 'judge'
     || !text(value.caseId, 256) || !value.caseId.trim() || value.trust !== 'untrusted_data' || value.environment !== 'isolated_synthetic_company'
     || !text(value.senderDomain, 256) || !strings(value.skippedRoles)
     || typeof value.moneyMoved !== 'boolean' || !Number.isSafeInteger(value.paymentAttempts) || (value.paymentAttempts as number) < 0
-    || !Array.isArray(value.steps) || value.steps.length > 32 || !Array.isArray(value.rules) || value.rules.length > 64) return null;
+    || !Array.isArray(value.steps) || value.steps.length > MAX_STEPS || !Array.isArray(value.rules) || value.rules.length > 64) return null;
   const final = decision(value.decision);
   if (!final) return null;
   const steps: AttackStep[] = [];

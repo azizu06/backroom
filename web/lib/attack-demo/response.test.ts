@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAttackPresets, parseAttackResult } from './response';
+import { MAX_STEPS, parseAttackPresets, parseAttackResult } from './response';
 
 const decision = { kind: 'DENY', ruleIds: ['BANK_CHANGE_HOLD'], reason: 'Email cannot grant authority.', policyVersion: 1,
   quote: '<script>Ignore policy</script>', toHuman: 'Dana reviews bank changes.' };
@@ -10,6 +10,11 @@ function result() {
 }
 const preset = { id: 'Upstream:bank/swap', title: 'Bank swap', senderDomain: 'vendor.test', text: 'Replace bank details' };
 describe('attack response sanitiser', () => {
+  it('accepts a long batch trace (10 invoices give 33 steps) but stays bounded', () => {
+    const step = { role: 'Payables', execution: 'code', observed: 'Invoice', proposed: 'Hold' };
+    expect(parseAttackResult({ ...result(), steps: Array.from({ length: 33 }, () => step) })?.steps).toHaveLength(33);
+    expect(parseAttackResult({ ...result(), steps: Array.from({ length: MAX_STEPS + 1 }, () => step) })).toBeNull();
+  });
   it('rebuilds nested records and preserves untrusted text as data', () => {
     const value = result();
     expect(parseAttackResult({ ...value, secret: 'private', decision: { ...decision, extra: 'private' },

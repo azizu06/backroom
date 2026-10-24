@@ -9,6 +9,8 @@ const LIVE_HELP = 'Live allows one Haiku activation per service instance, capped
 const BLOCKED_HELP = 'Live is disabled by the demo server. Runs use Mock.';
 
 /** Displays server evidence only. No policy decisions or fabricated offline trace. */
+const INVOICE_LINE_EXAMPLE = 'Invoice #INV-9001. Vendor ID: V-ACME. PO: none. Currency: USD. Total cents: 150000. Bank account reference: BA-NEW-4242. Line items: [{"description":"Consulting","quantity":1,"unitPriceCents":150000}]. Adjustment cents: 0.';
+
 export function AttackDemoPanel() {
   const id = useId();
   const [presets, setPresets] = useState<AttackPresets | null>(null);
@@ -99,7 +101,13 @@ export function AttackDemoPanel() {
       <textarea id={`${id}-text`} rows={8} maxLength={2000} value={text} disabled={running} aria-describedby={`${id}-count ${id}-hint`}
         placeholder='Paste instructions that try to override the agents’ rules…' onChange={event => { setText(event.target.value); setSelected(undefined); }} />
       <p id={`${id}-count`} className='attack-help'>{text.length} / 2,000 characters · Editing a preset runs your custom text.</p>
-      <p id={`${id}-hint`} className='attack-help'>Tip: include a sender, an amount and bank details, like the presets; plain prose is held as INVALID_INPUT.</p>
+      <p id={`${id}-hint`} className='attack-help'>Tip: start from a preset and edit it. Plain prose without the invoice line is held as INVALID_INPUT.</p>
+      <details className='attack-format'>
+        <summary>Invoice line format</summary>
+        <p>The intake parser reads exactly one line in this shape (one invoice per line, any surrounding email text is treated as untrusted data):</p>
+        <pre><code>{INVOICE_LINE_EXAMPLE}</code></pre>
+        <button type='button' onClick={() => { setText(current => current ? `${current}\n${INVOICE_LINE_EXAMPLE}` : INVOICE_LINE_EXAMPLE); setSelected(undefined); }}>Insert example line</button>
+      </details>
       <fieldset className='attack-mode' disabled={running}><legend>Run mode</legend>
         <label><input type='radio' name={`${id}-mode`} value='mock' checked={mode === 'mock'} onChange={() => setMode('mock')} /> Mock</label>
         <label><input type='radio' name={`${id}-mode`} value='live' checked={mode === 'live'} disabled={liveBlocked !== false}
