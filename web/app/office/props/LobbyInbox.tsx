@@ -30,22 +30,23 @@ function Papers({ count }: { count: number }) {
   </instancedMesh>;
 }
 
+/** Upright count plate turned toward the lobby camera; the room chip already says "inbox", so only the number is drawn, large. */
 function Label({ count }: { count: number }) {
-  const text = `Inbox · ${count}`;
-  const texture = useCanvasTexture(256, 64, ctx => {
+  const text = String(Math.max(0, Math.floor(Number.isFinite(count) ? count : 0)));
+  const texture = useCanvasTexture(192, 128, ctx => {
     ctx.fillStyle = '#272f25';
-    ctx.fillRect(0, 0, 256, 64);
+    ctx.fillRect(0, 0, 192, 128);
     ctx.strokeStyle = '#8b987b';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, 252, 60);
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, 186, 122);
     ctx.fillStyle = '#d0d6c6';
-    ctx.font = `700 34px ${PROP_FONT}`;
+    ctx.font = `800 104px ${PROP_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 128, 34, 236);
+    ctx.fillText(text, 96, 68, 170);
   }, [text]);
-  return <mesh position={[0, 0.035, 0.31]} rotation={[-Math.PI / 2, 0, 0]}>
-    <planeGeometry args={[0.3, 0.075]} /><meshBasicMaterial map={texture} toneMapped={false} />
+  return <mesh position={[0.17, 0.1, 0.36]} rotation={[0, Math.PI / 4, 0]}>
+    <planeGeometry args={[0.3, 0.2]} /><meshBasicMaterial map={texture} toneMapped={false} />
   </mesh>;
 }
 
