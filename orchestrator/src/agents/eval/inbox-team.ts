@@ -103,7 +103,7 @@ export async function runInboxTeam() {
       assessment: assessment?.verdict ?? null,
       payment: payment ? { status: payment.status ?? null, verdict: payment.verdict ?? null, ruleIds: paymentRules } : null,
       seatDecision: seatAfter?.decision ?? null, syntheticCostUsd: result?.costUsd ?? null, providerRequests, optOut: optOut.observed,
-      scope: 'Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.' };
+      scope: 'Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. That HTTP entry reads DEMO_PUBLIC_URL and rejects a mismatched Origin. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.' };
   } finally { globalThis.fetch = priorFetch; }
 }
 
@@ -118,10 +118,11 @@ async function runOptOut(sample: InboxNarration) {
   const priorOrigin = process.env.DEMO_PUBLIC_URL;
   process.env.BACKROOM_DEMO = '1';
   process.env.DEMO_AGENTS = '0';
-  process.env.DEMO_PUBLIC_URL = 'http://localhost';
+  process.env.DEMO_PUBLIC_URL = 'https://evil.example';
   let narrated: unknown = 'NOT_CALLED';
   let hostCreated = true;
   let httpStatus = 0;
+  let mismatchedOrigin = 0;
   let agentAudits = true;
   let responseRules: string[] = [];
   let recordedDecision: string | undefined;
@@ -132,10 +133,16 @@ async function runOptOut(sample: InboxNarration) {
     hostCreated = hostSlot().backroomInboxAgents !== undefined;
     const offline = new MemoryStateStore();
     const preset = inboxPresets.find(row => row.id === '4471')!;
-    const form = new FormData();
-    for (const [key, value] of Object.entries({ ...preset, presetId: preset.id })) form.set(key, value);
-    const response = await createInboxHTTP({ store: () => offline, origin: () => 'http://localhost' })(new Request('http://localhost/api/inbox', {
-      method: 'POST', headers: { origin: 'http://localhost' }, body: form }));
+    const formBody = () => {
+      const form = new FormData();
+      for (const [key, value] of Object.entries({ ...preset, presetId: preset.id })) form.set(key, value);
+      return form;
+    };
+    const submit = (body: FormData) => createInboxHTTP({ store: () => offline })(new Request('http://localhost/api/inbox', {
+      method: 'POST', headers: { origin: 'http://localhost' }, body }));
+    mismatchedOrigin = (await submit(formBody())).status;
+    process.env.DEMO_PUBLIC_URL = 'http://localhost';
+    const response = await submit(formBody());
     httpStatus = response.status;
     const body = await response.json() as { decision?: { kind?: string; ruleIds?: string[] } };
     const audits = await offline.listAudit();
@@ -147,8 +154,8 @@ async function runOptOut(sample: InboxNarration) {
     const sameDecision = recordedDecision === body.decision?.kind && JSON.stringify(recordedRules) === JSON.stringify(responseRules);
     return {
       flagMatrix,
-      agentsOff: narrated === undefined && !hostCreated && httpStatus === 200 && responseRules.includes('LOOKALIKE_DOMAIN') && !agentAudits && sameDecision,
-      observed: { narrated: narrated !== undefined, hostCreated, httpStatus, agentAudits: audits.filter(row => row.action.startsWith('agent_')).length,
+      agentsOff: narrated === undefined && !hostCreated && mismatchedOrigin === 403 && httpStatus === 200 && responseRules.includes('LOOKALIKE_DOMAIN') && !agentAudits && sameDecision,
+      observed: { narrated: narrated !== undefined, hostCreated, httpStatus, mismatchedOrigin, agentAudits: audits.filter(row => row.action.startsWith('agent_')).length,
         responseRules, recordedDecision: recordedDecision ?? null, recordedRules },
     };
   } finally {

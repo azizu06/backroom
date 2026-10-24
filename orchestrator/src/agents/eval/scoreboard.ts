@@ -266,7 +266,7 @@ const lines = [
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
-  `| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0) | ${display(rates.inboxTeam)} |`,
+  `| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0, mismatched origin rejected) | ${display(rates.inboxTeam)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
   `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,

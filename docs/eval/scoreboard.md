@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `922e72bbb2fed486a9bc59518dc935632eefa08f`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `cbd21f53a687619841a0920571193eaf454b9301`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -27,7 +27,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | 3/3 (100%) |
 | AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | 9/9 (100%) |
 | Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | 6/6 (100%) |
-| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0) | 1/1 (100%) |
+| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0, mismatched origin rejected) | 1/1 (100%) |
 | P10 Collections dispatcher tool isolation (not policy rule agreement) | 1/1 (100%) |
 | P04 dispatcher bank-change application (software passkey, fixture providers) | 1/1 (100%) |
 | P04 missing/denied/spoken approval guards | 3/3 (100%) |
@@ -53,7 +53,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **gx10Failover**: Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.
 - **pdfExtraction**: Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.
 - **precallStops**: Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.
-- **inboxTeam**: Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.
+- **inboxTeam**: Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. That HTTP entry reads DEMO_PUBLIC_URL and rejects a mismatched Origin. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.
 - **badgeAttack**: Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.
 - **bankChange**: Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.
 - **falseHoldDefinition**: Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.

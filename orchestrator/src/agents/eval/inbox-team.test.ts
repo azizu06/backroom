@@ -34,7 +34,7 @@ it('runs the real inbox roles through createInboxAgents and does not pay or repl
   expect(run.payment).toMatchObject({ status: 'held', verdict: 'ESCALATE', ruleIds: ['INVALID_INPUT'] });
   expect(run.seatDecision).toBe('ALLOW');
   expect(run.providerRequests).toBe(0);
-  expect(run.optOut).toMatchObject({ narrated: false, hostCreated: false, httpStatus: 200, agentAudits: 0, recordedDecision: expect.any(String) });
+  expect(run.optOut).toMatchObject({ narrated: false, hostCreated: false, mismatchedOrigin: 403, httpStatus: 200, agentAudits: 0, recordedDecision: expect.any(String) });
   expect(run.optOut.responseRules).toContain('LOOKALIKE_DOMAIN');
   expect(run.optOut.recordedRules).toEqual(run.optOut.responseRules);
 });
