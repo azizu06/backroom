@@ -187,6 +187,8 @@ export function executeTool(
       };
     }
     const existing = call.links.find((link) => link.planId === plan.id);
+    if (existing?.expiresAt !== undefined && Date.now() >= existing.expiresAt)
+      return deny("PAYMENT_LINK_EXPIRED", "That payment code has expired. Please check a new plan before creating another link.");
     const link = existing ?? {
       id: randomUUID(),
       planId: plan.id,

@@ -144,9 +144,11 @@ Tool-only assistant `call_turn` ids **3, 4, 12, 15, 20, 24** contained `tool_cal
 
 The parser now acknowledges/deduplicates assistant tool-only turns without deriving disclosure or identity from tool claims. Missing caller text and assistant turns lacking both text and tool calls still fail. A regression reproduced HTTP 400 before the fix, then verified 200/dedupe and that disclosure/identity gates stay closed. This fix was applied **after** the phone call, so its live correction is not claimed. Final validation: **29 voice tests** and orchestrator typecheck pass (three added regressions: reused T1 setup, tool-only lifecycle turn, negotiation prompt).
 
-### What delivery exists today
+### Delivery gap observed during this retest
 
-The local M4 runtime (`orchestrator/src/voice/live.ts` + `LocalGatewayStore`) writes the authorized link path and `send_payment_link` outbox item into private `.env.voice/gateway.json`. It has **no outbox delivery consumer, SMS/email transport, public pay-page host, or QR/short-URL handoff**. The caller heard “queued”; no phone delivery receipt exists.
+The follow-up shared-host implementation, QR component contract, expiry rules and headless real-Nessie evidence are documented in [payment-delivery.md](payment-delivery.md). The observations below describe the original call and remain historical evidence, not the current runtime wiring.
+
+At the time of this retest, the local M4 runtime (`orchestrator/src/voice/live.ts` + `LocalGatewayStore`) writes the authorized link path and `send_payment_link` outbox item into private `.env.voice/gateway.json`. It has **no outbox delivery consumer, SMS/email transport, public pay-page host, or QR/short-URL handoff**. The caller heard “queued”; no phone delivery receipt exists.
 
 The repo has a Next `/pay/[linkId]` page and payment authorization lookup, but that runtime reads `getGatewayStore()` in the web process. It does **not automatically read this voice-local file store**. A usable demo handoff first needs a public HTTPS pay origin backed by the same authorized link state. A QR on the demo screen or a spoken short URL can then take the caller there without an SMS provider; neither is wired for this call. Automatic phone delivery would additionally need an outbox worker, a verified contact and consent, an SMS provider/channel, and a persisted delivery result. No provider was added or paid message sent in this task. Payment/reconciliation was not tested.
 
