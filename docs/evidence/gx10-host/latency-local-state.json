@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-24T14:08:14.781Z",
+  "scope": "Mac client; production hosts; fresh Chromium contexts; page over direct host; decision over public tunnel; synthetic duplicate preset; code decision only, no model/bank/dial; server warmed",
+  "results": [
+    {
+      "name": "mac",
+      "origin": "http://127.0.0.1:3350",
+      "decisionOrigin": "https://marble-excitement-owner-pasta.trycloudflare.com",
+      "decision": {
+        "samplesMs": [
+          135,
+          142,
+          85,
+          78,
+          74,
+          63,
+          72,
+          60,
+          148,
+          74
+        ],
+        "medianMs": 78,
+        "p95Ms": 148
+      },
+      "pageLoad": {
+        "samplesMs": [
+          71,
+          67,
+          75,
+          74,
+          72
+        ],
+        "medianMs": 72,
+        "p95Ms": 75
+      },
+      "stateConnected": {
+        "samplesMs": [
+          140,
+          142,
+          142,
+          172,
+          149
+        ],
+        "medianMs": 142,
+        "p95Ms": 172
+      }
+    },
+    {
+      "name": "gx10",
+      "origin": "http://100.117.44.20:3340",
+      "decisionOrigin": "https://presentation-addressed-specially-carbon.trycloudflare.com",
+      "decision": {
+        "samplesMs": [
+          109,
+          77,
+          64,
+          74,
+          139,
+          79,
+          76,
+          56,
+          62,
+          52
+        ],
+        "medianMs": 76,
+        "p95Ms": 139
+      },
+      "pageLoad": {
+        "samplesMs": [
+          218,
+          161,
+          188,
+          143,
+          155
+        ],
+        "medianMs": 161,
+        "p95Ms": 218
+      },
+      "stateConnected": {
+        "samplesMs": [
+          309,
+          253,
+          279,
+          332,
+          374
+        ],
+        "medianMs": 309,
+        "p95Ms": 374
+      }
+    }
+  ],
+  "backends": {
+    "mac": "local",
+    "gx10": "local"
+  }
+}
