@@ -52,6 +52,21 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     const link = await f.tool('send_payment_link', proposed.body.next_delivery_nonce, { plan_id: proposed.body.plan_id });
     expect(link.body).toMatchObject({ kind: 'RECORDED', can_confirm: false, amount_cents: 247500 });
   });
+  it('records tool-only assistant turns without text without unlocking disclosure or identity', async () => {
+    const f = await fixture();
+    const turn = { role: 'assistant', was_interrupted: false, tool_calls: [{ name: 'verify_identity_result', arguments: { result: 'confirmed' }, result: '{}' }] };
+    const receipt = await f.event('tool-only', turn);
+    expect(receipt.status).toBe(200);
+    expect(await (await f.event('tool-only', turn)).json()).toEqual({ duplicate: true });
+    expect((await f.event('missing-user-text', { ...turn, role: 'user' })).status).toBe(400);
+    expect((await f.event('missing-assistant-text', { role: 'assistant' })).status).toBe(400);
+    const blocked = await f.tool('get_invoice_context', 'nonce-1');
+    expect(blocked.body.rule_ids).toEqual(['DISCLOSURE_REQUIRED']);
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('second-tool-only', turn);
+    const identity = await f.tool('verify_identity_result', blocked.body.next_delivery_nonce, { result: 'confirmed' });
+    expect((await f.tool('get_invoice_context', identity.body.next_delivery_nonce)).body.rule_ids).toEqual(['IDENTITY_REQUIRED']);
+  });
   it('ends the identity path after a wrong-person answer even if later tools claim confirmation', async () => {
     const f = await fixture();
     await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });

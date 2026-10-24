@@ -1,6 +1,8 @@
 # T1 Cartesia smoke test
 
-Status: **PARTIAL** (2026-10-24, updated 09:50 UTC): the coordinated M4 phone retest rang but both tools failed with HTTP 502 after the private evidence observer crashed the receiver. No successful phone tool round trip is established. See the retest evidence below. Earlier T1 evidence: connected in 8.2 s PASS; actual `call_turn` receipt PASS; phone mid-call tool round trip PENDING. A separate phone-free WebSocket call successfully exercised the real webhook tool within its 2 s timeout. Firstmate explicitly authorized M4 implementation while the coordinated phone retest waits for Aziz (approximately 02:55 AM PT); no redial while he is away.
+Status: **PARTIAL M4 acceptance** (2026-10-24, updated 13:36 UTC). The second coordinated phone retest completed the exact disclosure, caller identity, invoice context, fee-waiver DENY, two-payment ALLOW, and a queued payment link through five successful real gateway webhooks. Four-payment escalation/passkey and actual link delivery were **not demonstrated**. Six tool-only lifecycle events returned 400; the receiver stayed healthy. Post-call fixes and evidence are below. The earlier observer crash is historical, not the outcome of this call. No automatic redial.
+
+## Original T1 measurements — 07:42–08:06 UTC
 
 | Check | Evidence | Result |
 | --- | --- | --- |
@@ -16,7 +18,7 @@ Status: **PARTIAL** (2026-10-24, updated 09:50 UTC): the coordinated M4 phone re
 
 Firstmate relayed explicit consent and target-and-go at 07:55:42Z. The destination remains only in `.env.local:T1_DIAL_TO`; the private consent fixture records source/text/timestamp and that env reference. `DEMO_OVERRIDE` was logged because the test was outside calling hours. The call ended with `client_hangup`. The configured fixed welcome was verified via API before dialing, but actual speech was repeatedly interrupted, so full disclosure delivery was **not** demonstrated. No financial amounts were sent to or spoken by the agent. No second call was placed automatically.
 
-A retest should coordinate with the phone owner to let the disclosure finish and answer the synthetic Jordan identity check, then verify the echo response and a measured Cartesia tool duration. Until then, report T1 as partial; do not represent the tunnel probe as mid-call evidence. M4 may proceed under firstmate's explicit 07:59:41Z instruction; a phone retest is a follow-up.
+At that checkpoint the phone tool check remained partial; subsequent retests are recorded below. The tunnel probe alone did not establish a mid-call measurement.
 
 ## Phone-free measurement
 
@@ -94,6 +96,61 @@ The test's temporary, uncommitted HTTP observer caused this failure; it was not 
 The private observer has been removed from the launch command. The local receiver now records private `http-evidence.jsonl` through `withVoiceEvidence` in `orchestrator/src/voice/evidence.ts`: redact string values only, preserve numeric timings, omit authentication headers/controller requests, and catch evidence parsing/storage errors after response completion. Regression tests reproduce the numeric-corruption exception and a failing log sink, then verify HTTP responses and subsequent health requests survive. All **26 voice tests** and orchestrator typecheck pass. A public unauthenticated tool probe returned 401, followed by public health 200; these probes are not live-call evidence.
 
 Private evidence remains in `.env.t1/` and `.env.voice/` (`websocket-evidence.json`, `provider-call.json`, `audit.jsonl`, `journal.json`, `gateway.json`, `http-evidence.jsonl`). Destination, callback number, credentials, raw provider response and consent stay uncommitted. Aziz deferred the next phone test at 09:52 UTC; the phone retest is **pending a fresh firstmate go**. Task servers and tunnels were shut down. A new phone call requires a new explicit firstmate dial-go. The disclosure deviation remains a separate observed limitation; no guard was relaxed to accept it.
+
+## Second coordinated M4 retest — 13:29 UTC preparation
+
+The phone-free prerequisite initially exposed a separate setup bug: reusing T1 resource IDs did not update either the echo tool URL or lifecycle webhook URL when the tunnel changed. WebSocket call `ac_65oT12akwB9Um4bp62UdZr` completed the fixed disclosure and Jordan reply, but `t1_echo` reported an unreachable service with unknown outcome; the new receiver had no corresponding tool/event receipts. API readback confirmed both URLs differed from the current tunnel. A direct authenticated probe to the new tunnel returned 200, isolating the stale provider configuration.
+
+`t1.mjs setup` now PATCHes reused tool and webhook resources, including authentication, while retaining their IDs; the create-only tool `type` field is omitted on PATCH. A network-mocked CLI regression reproduces the reused-resource setup and asserts both new URLs and secrets are sent without creating resources. Readback after setup confirmed both endpoints matched the new tunnel.
+
+The phone-free rerun `ac_jr6yh9T4d1KxVRgfuBhmhG` completed the exact fixed welcome without interruption, received the synthetic Jordan reply, and returned actual `t1_echo` `ok:true`. User-turn-end receipt at **13:29:16.849Z** to tool-result receipt at **13:29:17.738Z** was **889 ms**, including inference. The receiver recorded the echo at **13:29:17.701Z**. This is separate WebSocket evidence under the configured 2 s tool timeout, not a phone measurement or exact provider HTTP duration. Private failed/successful transcripts remain in `.env.t1/`.
+
+M4 setup completed with nine tools, four distinct secrets, preserved consent, a private Keychain destination, and visible `DEMO_OVERRIDE=true`. Public health returned 200 and an unauthenticated tool request returned 401. All **27 voice tests** and orchestrator typecheck passed. No direct Anthropic key was needed: the managed Cartesia agent uses its configured Anthropic model. Firstmate provided fresh go at 13:31:23Z; exactly one M4 phone dial followed. No second phone dial was placed.
+
+### Phone result — 13:31–13:34 UTC
+
+Firstmate relayed that Aziz was holding the phone and would answer as Jordan, request a fee waiver/four installments, and accept two. At 13:34:33Z firstmate confirmed Aziz said the call was done. The worker did not listen to the handset; the speech account below comes from Cartesia's full GET call transcript, cross-checked against authenticated lifecycle and tool receipts. Destination and callback numbers are redacted.
+
+Call **`ac_hMadmVGvdQq5s6DNekURX4`**, local session `d606cc29-452a-40d1-8b59-321c2ffdcd35`. Permit persisted **13:31:32.690Z** (`IN_BADGE`, `DEMO_OVERRIDE`); provider start **13:31:37.986525Z** (5.297 s later, a connection bound, not an exact observed ring time). Consent was saved before dial. Completion was **13:34:06.542801Z**, `completed`, `agent_hangup`; the lifecycle completion receipt returned 200 at **13:34:06.704Z**.
+
+| Step | Actual receipt and policy/state result |
+| --- | --- |
+| Disclosure | Complete exact fixed welcome, uninterrupted, call-relative **0.223–8.708 s**. Lifecycle received **13:31:47.563Z**, HTTP 200; `disclosureComplete=true`. Includes explicit AI, Northfield Studio, recording notice and Jordan question. |
+| Identity | Caller “Yes.” at **10.268–10.744 s**, after disclosure. `verify_identity_result` **13:31:50.182Z**, HTTP 200, `RECORDED`; gateway `identityConfirmed=true`. Audit `447a2345-12fd-4937-9361-1472179533d4`, `IDENTITY_RESULT`, actor `code`. |
+| Invoice context | `get_invoice_context` **13:31:50.853Z**, HTTP 200, `CONTEXT`, invoice 1042, **495000 cents**. No separate context audit row is emitted by this gateway; the authenticated receipt and provider result prove it ran after identity. First amount speech starts **12.987 s**. |
+| Fee-waiver proposal | `propose_plan` **13:32:50.682Z**, HTTP 200: **2 installments, 50% first, 30 days, waive_fee=true, discount_pct=0** → `DENY`, `FEES_NON_WAIVABLE`, `can_confirm=false`. Audit `37949157-5a09-4218-875a-f08183306ae1`, policy quote NF-015, actor `code`. Agent then says it cannot waive the fee. |
+| Four-payment proposal | **Absent.** No `installments=4` tool request, no `MAX_INSTALLMENTS` result, no escalation row, no `check_approval`, and no passkey decision. Cannot claim this acceptance check passed. See exact transcript excerpts below. |
+| Allowed proposal | `propose_plan` **13:33:07.253Z**, HTTP 200: **2 installments, 50% first, 30 days, waive_fee=false, discount_pct=0** → `ALLOW`, `IN_BADGE`, `can_confirm=true`. Audit `5733de74-2ec4-4911-ae0d-807b64c06ecc`, actor `code`. Only saved plan: `f7ff8a23-9396-468b-a12f-9a5500b4d4f8`, total **495000 cents**, first **247500 cents**. |
+| Link | After caller reconfirmed, `send_payment_link` **13:33:40.810Z**, HTTP 200, `RECORDED`; gateway audit **ALLOW**, `IN_BADGE`, id `f4f65164-6f34-4edf-afcc-8dc79aa03b2b`, actor `code`. One stored link `32550515-b567-4bd1-a05d-6415c7966760` and one outbox item, **247500 cents**. It was queued, not sent to the phone. |
+| Spoken close | Agent repeated two payments of $2,475, fee retained, correctly said link “queued for delivery,” gave callback **[REDACTED_NUMBER]**, and ended normally. No spoken claim of fee waiver, four-payment approval, delivered link or bank payment. |
+
+All five real gateway requests returned HTTP 200 and their success results appear in Cartesia's transcript. Local handler times were **2.689, 3.314, 5.815, 1.375, and 2.670 ms** respectively; these are **not full provider round-trip latencies**. Tools completed successfully under their configured 2 s timeout. No exact provider HTTP duration was exposed. Health after the call returned 200. The gateway has four audit rows (identity, denied plan, allowed plan, link), five dedupe deliveries, one allowed plan, one link, one outbox item, zero escalations, and no bank payment.
+
+### Spoken negotiation gap and correction
+
+Relevant provider transcript, kept verbatim for the ambiguous installment wording:
+
+- **23.234–30.908 s, caller:** “Um, I would like to skip this payment or split it among multiple payments, but don't want to pay now.”
+- **32.037–44.039 s, agent:** “I can look at a payment plan, but I can't skip the payment entirely. The most I can offer is two installments, with at least half due first and the full balance within 30 days. Would you like me to check whether that works?” **No `propose_plan` had run.**
+- **49.459–58.984 s, agent:** asks for installments “up to two” and first payment “at least half,” again before a proposal tool.
+- **61.633–70.904 s, caller:** “Yes, I'll pay at least half and expect uh accept the 2 payment option, but before that you said it's not possible. Can I try waving the fee and paying for?”
+- The next tool submitted **two**, not four, with `waive_fee=true`; the gateway denied the waiver. The agent then offered two without the waiver, got caller agreement, submitted it, and received ALLOW.
+
+The transcript does not establish an unambiguous request for **four**; it renders the ending as “paying for?”. It does establish a verbal policy decision and negotiation before the required tool. The managed prompt now explicitly requires `propose_plan` before offering, refusing or negotiating terms, submits requested terms even outside the envelope (including four installments and waivers), forbids silently replacing them with two, and asks for clarification of “for”/“four” or missing fields. Stop requests still take priority. A configuration regression locks down these instructions. This is prompt guidance; code continues to enforce financial authority, and no prompt test proves future live speech. Setup updated the managed agent after the call, and API readback confirmed the revised instructions. The revised prompt has **not been phone-retested**; four-payment escalation/passkey remain unproven.
+
+### Lifecycle failure and correction
+
+Tool-only assistant `call_turn` ids **3, 4, 12, 15, 20, 24** contained `tool_calls` and no `text`. The event parser required every turn to have string text and returned **400 `INVALID_TURN`** for all six, including `end_call`. These are separate lifecycle acknowledgments, not failed gateway tools: their associated financial tool requests all returned 200 and committed. The receiver did not crash; normal speech turns and completion persisted.
+
+The parser now acknowledges/deduplicates assistant tool-only turns without deriving disclosure or identity from tool claims. Missing caller text and assistant turns lacking both text and tool calls still fail. A regression reproduced HTTP 400 before the fix, then verified 200/dedupe and that disclosure/identity gates stay closed. This fix was applied **after** the phone call, so its live correction is not claimed. Final validation: **29 voice tests** and orchestrator typecheck pass (three added regressions: reused T1 setup, tool-only lifecycle turn, negotiation prompt).
+
+### What delivery exists today
+
+The local M4 runtime (`orchestrator/src/voice/live.ts` + `LocalGatewayStore`) writes the authorized link path and `send_payment_link` outbox item into private `.env.voice/gateway.json`. It has **no outbox delivery consumer, SMS/email transport, public pay-page host, or QR/short-URL handoff**. The caller heard “queued”; no phone delivery receipt exists.
+
+The repo has a Next `/pay/[linkId]` page and payment authorization lookup, but that runtime reads `getGatewayStore()` in the web process. It does **not automatically read this voice-local file store**. A usable demo handoff first needs a public HTTPS pay origin backed by the same authorized link state. A QR on the demo screen or a spoken short URL can then take the caller there without an SMS provider; neither is wired for this call. Automatic phone delivery would additionally need an outbox worker, a verified contact and consent, an SMS provider/channel, and a persisted delivery result. No provider was added or paid message sent in this task. Payment/reconciliation was not tested.
+
+Private evidence: `.env.voice/provider-call.json`, `http-evidence.jsonl`, `gateway.json`, `journal.json`, `audit.jsonl`, consent file; `.env.t1/retest2-ws-stale-endpoint.json` and successful `websocket-evidence.json`. Raw transcript/provider metadata, destination, callback, credentials and consent remain uncommitted. Task receiver/tunnel are shut down after evidence collection. Fresh firstmate go is required for any additional dial.
 
 ## Sources checked
 
