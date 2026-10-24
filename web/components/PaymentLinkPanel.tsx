@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-type Delivery = { code: string; url: string; amountCents: number; expiresAt: number; qr: string };
+type Delivery = { code: string; url: string; amountCents: number; expiresAt: number; qr: string; localOnly?: boolean };
 /** Read-only projection. Mount in office/lobby; no server secrets or payment authority. */
 export default function PaymentLinkPanel() {
   const [delivery, setDelivery] = useState<Delivery | null>(null);
@@ -22,6 +22,7 @@ export default function PaymentLinkPanel() {
   const active = delivery && delivery.expiresAt > Date.now() ? delivery : null;
   return <section aria-label="Call payment link" style={{ maxWidth: 360, padding: 20, background: "#161a20", color: "#f2f2f2", border: "1px solid #343b46", borderRadius: 12, fontFamily: "system-ui, sans-serif" }}>
     <h2>Scan to pay</h2>
+    {active?.localOnly ? <p>local rehearsal only, not scannable by a phone</p> : null}
     {error ? <p role="status">Payment link unavailable. Reconnecting…</p> : active ? <>
       {/* QR is generated locally; the payment capability is never sent to an image service. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
