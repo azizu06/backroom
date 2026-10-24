@@ -9,7 +9,8 @@
     "test": "vitest run",
     "why:smoke": "tsx src/why/smoke.ts",
     "start": "tsx src/demo.ts",
-    "dev": "tsx src/demo.ts"
+    "dev": "tsx src/demo.ts",
+    "demo:recovery": "tsx src/recovery/demo.ts"
   },
   "dependencies": {
     "@backroom/policy": "workspace:*"
