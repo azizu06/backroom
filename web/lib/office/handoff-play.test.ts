@@ -26,6 +26,8 @@ describe('Play handoff targets', () => {
     expect(latest.entries.map(entry => entry.decision)).toEqual(['REJECTED', 'ACCEPTED']);
     const inFlight = playPanel(snapshot, { kind: 'handoff', actor: 'extractor' }, () => rows[0])!;
     expect(inFlight.handoff?.summary).toBe('first');
+    const refreshed = playPanel(snapshot, { kind: 'handoff', actor: 'extractor' }, () => ({ ...rows[0]!, summary: 'Stale plan text' }))!;
+    expect(refreshed.handoff?.summary).toBe('first');
     expect(playPanel(snapshot, { kind: 'handoff', actor: 'auditor' })).toBeNull();
   });
   it('orders by bigint sequence and limits the panel history to the current case', () => {

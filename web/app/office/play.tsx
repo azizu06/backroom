@@ -1,6 +1,7 @@
 'use client';
 
 import { needsHandoffHuman } from '../../lib/office/handoffs';
+import { useHandoffPresentation } from './handoffs/HandoffPresentation';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -18,7 +19,8 @@ import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Renders on demand: frames continue only while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud, handoffs }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+  const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);

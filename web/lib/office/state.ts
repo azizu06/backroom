@@ -62,7 +62,7 @@ export interface OfficeSnapshot {
   readonly connection: "preview" | "connecting" | "live" | "disconnected" | "replay";
   readonly llmEnabled: boolean | null;
   readonly inboxCount: number;
-  /** Agent-to-agent handoff rows (adapter: handoffs.ts `handoffFromRow`). Absent until the backend table exists. */
+  /** Public agent-to-agent handoff rows (adapter: handoff-subscription.ts); previews may omit them. */
   readonly handoffs?: readonly Handoff[];
 }
 /** Immutable cached row projection. No reducers, policy evaluation or business writes. */

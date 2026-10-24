@@ -1,30 +1,29 @@
 'use client';
 
-import { Component, useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, useTouch } from './PlayHud';
-import { REDUCED_MOTION_QUERY, isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
-import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, type Handoff, type HandoffAgentId } from '../../lib/office/handoffs';
-import { HandoffStage } from '../../lib/office/handoff-plan';
-import { createMockHandoffFeed, type HandoffFeed } from '../../lib/office/handoff-mock';
-import { HandoffVoice, createAudioPlayer, voiceCues } from '../../lib/office/handoff-voice';
-import { getHandoffAudio } from '@backroom/orchestrator/handoff-client';
-import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
+import { roomLabel, seatLabel } from '../../lib/office/a11y';
+import { MotionRegistry } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
-import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
-import { INITIAL_VIEWPORT, boundaryStateForProps, isFixedCamera, reportViewFailure, viewportLayers, viewportReducer, type BoundaryState, type ViewMode } from '../../lib/office/view';
+import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, visibleRooms, type AnchorId, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
+import { INITIAL_VIEWPORT, VIEW_OPTIONS, isFixedCamera, viewportLayers, viewportReducer, type ViewMode } from '../../lib/office/view';
 import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStops } from '../../lib/office/tour';
 import { OfficeLobby } from './OfficeLobby';
+import { PresenceChip } from './PresenceChip';
+import { usePresence } from './usePresence';
+import { FloorPlan } from './FloorPlan';
+import { ReceiptList } from './ReceiptList';
+import { RoomInspector } from './RoomInspector';
+import { ViewBoundary } from './ViewBoundary';
+import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
 import type { AgentTagLookup, RoomLabels } from './scene';
-import type { HandoffTagLookup } from './handoffs/HandoffLayer';
-import { HandoffEntries } from './handoffs/HandoffLog';
 import '../office.css';
 import './a11y.css';
 import './tags.css';
-import './handoffs/handoffs.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -38,160 +37,13 @@ const OfficeScene = dynamic(() => import('./scene').then(module => module.Office
   loading: SceneLoading,
 });
 
-function planLeft(position: readonly number[]) { return `${50 + position[0]! / 16 * 100}%`; }
-function planTop(position: readonly number[]) { return `${50 + position[1]! / 11 * 100}%`; }
-/** Draws the shared motion; Office's MotionRegistry owns re-seating and retargeting. */
-function PlanAgent({ agent, motion, recorded }: { agent: OfficeAgent; motion: WalkMotion; recorded: boolean }) {
-  const marker = useRef<HTMLDivElement>(null);
-  const pos = useRef(agent.pos);
-  pos.current = agent.pos;
-  useEffect(() => {
-    let frame = 0;
-    let previous = performance.now();
-    function draw(now: number) {
-      if (recorded) motion.seat(pos.current);
-      else motion.advance((now - previous) / 1000);
-      previous = now;
-      if (marker.current) {
-        marker.current.style.left = planLeft(motion.position);
-        marker.current.style.top = planTop(motion.position);
-      }
-      frame = requestAnimationFrame(draw);
-    }
-    frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
-  }, [motion, recorded]);
-  return <div ref={marker} className='plan-agent' role='img' aria-label={seatLabel(agent)} data-escalating={!!agent.escalationId}
-    style={{ left: planLeft(motion.position), top: planTop(motion.position) }}>
-    {agent.escalationId && <span aria-hidden='true'>▱ </span>}{agent.name}
-  </div>;
-}
-function FloorPlan({ snapshot, motions, select }: { snapshot: OfficeSnapshot; motions: MotionRegistry; select: (room: AnchorId, opener: HTMLButtonElement) => void }) {
-  return <div className='floor-plan' aria-label='2D office floor plan'>
-    <div className='plan-aisle' aria-hidden='true' />
-    {visibleRooms(snapshot).map(room => <button key={room} className='plan-room' aria-label={roomLabel(room, snapshot)} onClick={event => select(room, event.currentTarget)}
-      style={{ left: `${50 + OFFICE_ANCHORS[room].center[0] / 16 * 100}%`, top: `${50 + OFFICE_ANCHORS[room].center[1] / 11 * 100}%` }}>
-      {OFFICE_ANCHORS[room].name}{room === 'treasury' && ' · Locked'}
-      {matchingDenial(snapshot, room) && <span className='denial-text' data-denial-audit={matchingDenial(snapshot, room)!.auditId}>Entry denied</span>}
-    </button>)}
-    {snapshot.agents.map(agent => <PlanAgent key={agent.id} agent={agent} motion={motions.get(agent)} recorded={snapshot.connection === 'replay'} />)}
-  </div>;
-}
-const NO_HANDOFFS: readonly Handoff[] = [];
-const noSubscription = () => () => {};
-function subscribeReducedMotion(onChange: () => void) {
-  const query = window.matchMedia(REDUCED_MOTION_QUERY);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-/**
- * Handoff rows for the office: the subscribed snapshot's rows, or the fixture stream behind `?handoffs=mock`.
- * Returns the shared stage (null until there is something to draw) and the rows.
- */
-function useHandoffs(snapshot: OfficeSnapshot) {
-  const [mock, setMock] = useState<{ feed: HandoffFeed; stage: HandoffStage } | null>(null);
-  const [live] = useState(() => new HandoffStage());
-  useEffect(() => {
-    const flag = handoffFlag(window.location.search);
-    if (!flag.mock) return;
-    const feed = createMockHandoffFeed({ speed: flag.speed });
-    setMock({ feed, stage: new HandoffStage(flag.speed) });
-    feed.start();
-    return () => feed.stop();
-  }, []);
-  const mockRows = useSyncExternalStore(mock?.feed.subscribe ?? noSubscription, mock?.feed.getRows ?? (() => NO_HANDOFFS), () => NO_HANDOFFS);
-  const rows = snapshot.handoffs ?? (mock ? mockRows : NO_HANDOFFS);
-  const openEscalation = snapshot.agents.some(agent => !!agent.escalationId);
-  const stage = snapshot.handoffs ? live : mock?.stage ?? (openEscalation ? live : null);
-  useEffect(() => { if (stage?.update(rows, Date.now(), openEscalation)) requestSceneFrame(); }, [stage, rows, openEscalation]);
-  return { stage: rows.length || mock || openEscalation ? stage : null, rows };
-}
-/**
- * Optional voices for the handoff bubbles (#133). Off until the viewer turns them on in this visit;
- * any proxy or playback error silences them and the visuals carry on.
- */
-function useHandoffVoice(stage: HandoffStage | null, rows: readonly Handoff[]) {
-  const [, rerender] = useReducer((count: number) => count + 1, 0);
-  const [player] = useState(createAudioPlayer);
-  const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), player.play, rerender));
-  useEffect(() => () => voice.setEnabled(false), [voice]);
-  useEffect(() => {
-    if (!stage || !voice.enabled || voice.failed) return;
-    const now = Date.now();
-    const timers = voiceCues(stage.plan).flatMap(cue => {
-      if (cue.at < now - 1000) { voice.skip(cue.key); return []; }
-      return [setTimeout(() => voice.say(cue), Math.max(0, cue.at - now))];
-    });
-    return () => timers.forEach(clearTimeout);
-  }, [stage, rows, voice, voice.enabled, voice.failed]);
-  return { voice, unlock: player.unlock };
-}
-function SoundToggle({ voice, unlock }: { voice: HandoffVoice; unlock: () => void }) {
-  if (voice.failed) return <p className='handoff-sound' role='status'>Voices unavailable · visuals only</p>;
-  return <button type='button' className='handoff-sound' aria-pressed={voice.enabled} onClick={() => { if (!voice.enabled) unlock(); voice.setEnabled(!voice.enabled); }}>
-    {voice.enabled ? 'Voices on' : 'Voices off'}
-  </button>;
-}
-function HandoffLog({ rows, reduced, sound }: { rows: readonly Handoff[]; reduced: boolean; sound?: ReactNode }) {
-  return <section className='office-audit handoff-log' aria-label='Agent handoffs' data-office-mount='handoffs'>
-    <h2>Agent handoffs <span>{reduced ? 'Reduced motion · listed instead of animated' : 'Folders passed between agent desks'}</span></h2>
-    {sound}
-    {/* The log stays mounted while empty so the first handoff is announced. */}
-    {!rows.length && <p>No handoffs yet.</p>}
-    <ol role='log' aria-live='polite' aria-relevant='additions text'>
-      <HandoffEntries rows={rows} />
-    </ol>
-  </section>;
-}
-/** Contains a render failure to its own region; a changed `resetKey` retries the children. */
-class ViewBoundary extends Component<{ name: string; children: ReactNode; fallback: ReactNode; onFailure?: () => void; resetKey?: unknown }, BoundaryState> {
-  state: BoundaryState = { failed: false, resetKey: this.props.resetKey };
-  static getDerivedStateFromError() { return { failed: true }; }
-  static getDerivedStateFromProps(props: { resetKey?: unknown }, state: BoundaryState) { return boundaryStateForProps(props.resetKey, state); }
-  componentDidCatch(error: unknown) { reportViewFailure(this.props.name, error, this.props.onFailure); }
-  render() { return this.state.failed ? this.props.fallback : this.props.children; }
-}
-function valueText(value: unknown): string {
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
-}
-/** Display exact values from subscribed badge rows, never infer permission from the room. */
-function RoomInspector({ room, snapshot, close, inboxTray }: {
-  room: AnchorId; snapshot: OfficeSnapshot; close: () => void; inboxTray?: ReactNode;
-}) {
-  const closeButton = useRef<HTMLButtonElement>(null);
-  const headingId = useId();
-  useEffect(() => { closeButton.current?.focus(); }, [room]);
-  const badge = snapshot.badges.find(row => row.seatId === room);
-  const denial = matchingDenial(snapshot, room);
-  return <section className='room-inspector' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
-    if (isCloseKey(event.key)) { event.preventDefault(); close(); }
-  }}>
-    <header><h2 id={headingId}>{OFFICE_ANCHORS[room].name}</h2><button ref={closeButton} onClick={close} aria-label={`Close ${OFFICE_ANCHORS[room].name} details`}>×</button></header>
-    {badge ? <>
-      <p>Policy version {badge.policyVersion}</p>
-      <dl>{Object.entries(badge.limits).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{valueText(value)}</dd></div>)}</dl>
-      <p><strong>Allowed rooms</strong><br />{badge.rooms.join(', ')}</p>
-      <details><summary>Allowed actions ({badge.actions.length})</summary><ul>{badge.actions.map(action => <li key={action}>{action}</li>)}</ul></details>
-      {!Object.keys(badge.limits).length && <p>No monetary authority in this badge.</p>}
-    </> : room === 'treasury' ? <p>Locked · Dana only. Entry and money movement require server authorization.</p>
-      : room === 'dana' ? <p>Human review. Approvals require Dana’s passkey on the approval card.</p>
-      : <><h3>Audit wall</h3><p><a href='#office-audit-wall'>Open the audit wall below</a></p>
-        <div data-office-mount='inbox-inspector'><h3>Inbox tray · {snapshot.inboxCount}</h3>{inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <p>Preview contains three fixture items.</p>}</div></>}
-    {denial && <p className='denial-text' role='status'>Entry denied · audit {denial.auditId}</p>}
-  </section>;
-}
-function ReceiptList({ snapshot, title }: { snapshot: OfficeSnapshot; title: string }) {
-  return <><h2>{title} <span>{snapshot.connection === 'preview' ? 'Preview receipts' : snapshot.connection === 'replay' ? 'REPLAY receipts' : 'Subscribed receipts'}</span></h2>
-    {!snapshot.audit.length ? <p>No decisions received.</p> : <ol>{snapshot.audit.slice(-20).reverse().map(entry => <li key={entry.id} data-audit-id={entry.id}>
-      <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br /><code>{entry.id} · {entry.ruleIds.join(', ')}</code>
-    </li>)}</ol>}</>;
-}
 /** All finance state comes through OfficeState. Commands belong to an authenticated controller. */
 export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: {
   source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
-  auditWall?: ReactNode; inboxTray?: ReactNode;
+  auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode;
 }) {
-  const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  const received = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  const { snapshot, presentation } = useOfficeHandoffs(received);
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
   const touch = useTouch();
   const { mode, lostContext, sceneAttempt } = viewport;
@@ -202,6 +54,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
+  const presence = usePresence({ mode, hud: play.hud });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
   function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
@@ -214,16 +67,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
   const tagElements = useRef(new Map<string, HTMLDivElement>());
   const agentTag = useCallback<AgentTagLookup>(id => tagElements.current.get(id), []);
-  const handoffs = useHandoffs(snapshot);
-  const handoffStage = handoffs.stage;
-  const handoffElements = useRef(new Map<HandoffAgentId, HTMLDivElement>());
-  const handoffTag = useCallback<HandoffTagLookup>(id => handoffElements.current.get(id), []);
-  const voice = useHandoffVoice(handoffStage, handoffs.rows);
-  const handoffFor = useCallback((actor: string) => handoffStage?.handoffFor(actor, Date.now()), [handoffStage]);
-  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia(REDUCED_MOTION_QUERY).matches, () => false);
-  // Play panels read handoff rows from the snapshot, whichever source produced them.
-  const playSnapshot = useMemo(() => handoffs.rows === (snapshot.handoffs ?? NO_HANDOFFS) ? snapshot : { ...snapshot, handoffs: handoffs.rows }, [snapshot, handoffs.rows]);
-  const playBridge = useMemo(() => handoffStage ? { ...play, handoffs: handoffStage } : play, [play, handoffStage]);
   const touring = mode === 'tour';
   const [tour, setTour] = useState<{ stops: AnchorId[]; index: number } | null>(null);
   const rooms = visibleRooms(snapshot);
@@ -278,18 +121,18 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
     setFocus(room);
   }
   const plan = mode === 'plan' || lostContext;
-  return <section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
+  return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
+        <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
         <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
-          <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option><option value='tour'>Tour</option>
-          <option value='play'>Play (first person)</option>
+          {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
         </select></label>
       </div>
     </header>
@@ -304,19 +147,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? playBridge : undefined}
-              handoffs={handoffStage ?? undefined} handoffTag={handoffTag} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} presence={presence.peers} />
           </div>
           {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
             ref={element => { if (!element) return; tagElements.current.set(agent.id, element); return () => { if (tagElements.current.get(agent.id) === element) tagElements.current.delete(agent.id); }; }}>
             <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
           </div>)}</div>}
-          {/* Handoff names and speech bubbles; the handoff log in the footer is the accessible version. */}
-          {handoffStage && !layers.floorPlan && <div className='agent-tags handoff-tags' aria-hidden='true'>{([...FLOOR_AGENTS, HUMAN] as HandoffAgentId[]).map(id => <div key={id} className='handoff-tag' data-handoff-actor={id}
-            ref={element => { if (!element) return; handoffElements.current.set(id, element); return () => { if (handoffElements.current.get(id) === element) handoffElements.current.delete(id); }; }}>
-            <p className='handoff-bubble' hidden /><strong>{HANDOFF_AGENTS[id].name}{id === HUMAN ? ' · passkey' : ''}</strong>
-          </div>)}</div>}
+          {!layers.floorPlan && <HandoffTags />}
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
@@ -327,7 +165,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           })}
         </>}
       </ViewBoundary>
-      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={playSnapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} handoffFor={handoffFor} />}
+      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
@@ -342,7 +180,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       </ViewBoundary>
       <section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
         <ViewBoundary name='Audit wall' resetKey={snapshot} fallback={<p role='status'>Audit wall unavailable · open the full audit page for receipts.</p>}>
-        {auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
+        {typeof auditWall === 'function' ? auditWall(snapshot, setFocus) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
         </ViewBoundary>
       </section>
       {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Preview audit receipts'>
@@ -350,22 +188,20 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           <ReceiptList snapshot={snapshot} title='Office receipts' />
         </ViewBoundary>
       </section>}
-      {handoffStage && <ViewBoundary name='Handoff log' resetKey={handoffs.rows} fallback={<p role='status'>Handoff log unavailable.</p>}>
-        <HandoffLog rows={handoffs.rows} reduced={reducedMotion} sound={<SoundToggle voice={voice.voice} unlock={voice.unlock} />} />
-      </ViewBoundary>}
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section>}
+      <ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>
       {controls}
     </footer>
-  </section>;
+  </section></HandoffPresentation>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */
 export function MockOffice() {
   const [mock] = useState(createMockOfficeState);
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
-  return <Office source={mock.source} auditWall={<OfficeLobby />} controls={<div className='mock-controls'>
+  return <Office source={mock.source} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Preview only</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>

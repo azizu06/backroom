@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { HandoffEntries } from '../../app/office/handoffs/HandoffLog';
 import { HandoffDetails } from '../../app/office/handoffs/HandoffDetails';
+import { PLAY_PANEL_VIEWS } from '../../app/office/panels';
 import { handoffText } from './handoff-text';
 import { handoffFromRow, handoffLine } from './handoffs';
 import { planHandoffs, sampleHandoffs } from './handoff-plan';
@@ -24,7 +25,10 @@ describe('public handoff display', () => {
     const panel = playPanel({ ...INITIAL_OFFICE, handoffs: [row] }, { kind: 'handoff', actor: 'extractor' })!;
     const bubbles = sampleHandoffs(planHandoffs([row]), 100).bubbles;
     const html = renderToStaticMarkup(createElement(HandoffEntries, { rows: [row] }))
-      + renderToStaticMarkup(createElement(HandoffDetails, { handoff: panel.handoff! }));
+      + renderToStaticMarkup(createElement(HandoffDetails, { handoff: panel.handoff! }))
+      + renderToStaticMarkup(createElement(PLAY_PANEL_VIEWS.handoff!.Body!, { panel }));
+    expect(html).toContain('aria-label="Case handoffs"');
+    expect(PLAY_PANEL_VIEWS.handoff).toMatchObject({ hideAudit: true, hideAskWhy: true });
     for (const output of [html, JSON.stringify(panel), JSON.stringify(bubbles), handoffLine(row)]) {
       for (const forbidden of [row.handoffId, row.decisionRef!, 'raw-case-secret', 'PRIVATE-CASE', 'PRIVATE-PAYLOAD']) {
         expect(output).not.toContain(forbidden);
@@ -53,5 +57,16 @@ describe('public handoff display', () => {
     const plan = planHandoffs([done]);
     expect(plan.bubbles.every(bubble => bubble.tone === 'info' && bubble.text.includes('done · Vendor verifier finished its turn'))).toBe(true);
     expect(handoffLine(done)).not.toMatch(/success|✓|✔/i);
+  });
+  it('renders rejected history separately from neutral completed handoffs in the registered panel', () => {
+    const done = { ...row, status: 'completed' as const, errorCode: 'STALE_ERROR', summary: 'Turn finished' };
+    const rejected = { ...row, handoffId: 'rejected-private-id', sequence: 2n, status: 'rejected' as const, errorCode: 'CASE_STOPPED' };
+    const panel = playPanel({ ...INITIAL_OFFICE, handoffs: [done, rejected] }, { kind: 'handoff', actor: 'vendor' })!;
+    const html = renderToStaticMarkup(createElement(PLAY_PANEL_VIEWS.handoff!.Body!, { panel }));
+    expect(html).toContain('<strong class="denial-text">REJECTED</strong>');
+    expect(html).toContain('<strong class="">DONE</strong>');
+    expect(html).toContain('CASE_STOPPED');
+    expect(html).not.toContain('STALE_ERROR');
+    expect(html).not.toContain(rejected.handoffId);
   });
 });
