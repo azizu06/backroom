@@ -5,7 +5,13 @@ import type { OfficeSnapshot } from '../../../lib/office/state';
 import { CLOCK_INTERACTION, clockFace, msUntilNextMinute } from '../../../lib/office/props/clock';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 
-const RADIUS = 0.4, TEX = 256;
+const RADIUS = 0.4, FACE = RADIUS - 0.04, TEX = 256;
+/** Texture pixels per world unit on the face. */
+const PX = TEX / 2 / FACE;
+/** The text sits below this radius (px from centre); hand tips stay inside it so no hand ever covers it. */
+const TEXT_TOP = 74;
+const HAND_BACK = 0.03;
+const MINUTE_LENGTH = (TEXT_TOP - 8) / PX + HAND_BACK, HOUR_LENGTH = MINUTE_LENGTH * 0.7;
 
 function drawFace(ctx: CanvasRenderingContext2D, text: string, receipts: number) {
   const c = TEX / 2;
@@ -15,7 +21,9 @@ function drawFace(ctx: CanvasRenderingContext2D, text: string, receipts: number)
   ctx.fill();
   ctx.strokeStyle = '#303d34';
   ctx.lineCap = 'round';
+  // No 6 o'clock tick: the time and receipt text sit there.
   for (let i = 0; i < 12; i++) {
+    if (i === 6) continue;
     const angle = i * Math.PI / 6, major = i % 3 === 0;
     const inner = major ? c - 34 : c - 24;
     ctx.lineWidth = major ? 7 : 4;
@@ -26,16 +34,16 @@ function drawFace(ctx: CanvasRenderingContext2D, text: string, receipts: number)
   }
   ctx.fillStyle = '#303d34';
   ctx.textAlign = 'center';
-  ctx.font = `600 24px ${PROP_FONT}`;
-  ctx.fillText(text, c, c + 52);
+  ctx.font = `600 20px ${PROP_FONT}`;
+  ctx.fillText(text, c, c + TEXT_TOP + 16);
   ctx.fillStyle = '#6b6f63';
-  ctx.font = `500 17px ${PROP_FONT}`;
-  ctx.fillText(`receipts ${receipts}`, c, c + 76);
+  ctx.font = `500 14px ${PROP_FONT}`;
+  ctx.fillText(`receipts ${receipts}`, c, c + TEXT_TOP + 34);
 }
 
 function Hand({ angle, length, width, z }: { angle: number; length: number; width: number; z: number }) {
   return <group rotation={[0, 0, -angle]} position={[0, 0, z]}>
-    <mesh position={[0, length / 2 - 0.03, 0]} receiveShadow>
+    <mesh position={[0, length / 2 - HAND_BACK, 0]} receiveShadow>
       <boxGeometry args={[width, length, 0.012]} /><meshStandardMaterial color='#303d34' />
     </mesh>
   </group>;
@@ -59,11 +67,11 @@ function Clock({ receipts }: { receipts: number }) {
       <cylinderGeometry args={[RADIUS, RADIUS, 0.08, 32]} /><meshStandardMaterial color='#3c4d47' roughness={0.7} />
     </mesh>
     <mesh position={[0, 0, 0.041]} receiveShadow>
-      <circleGeometry args={[RADIUS - 0.04, 32]} />
+      <circleGeometry args={[FACE, 32]} />
       <meshStandardMaterial map={texture} emissiveMap={texture} emissive='#ffffff' emissiveIntensity={0.3} roughness={1} />
     </mesh>
-    <Hand angle={face.hourAngle} length={0.2} width={0.035} z={0.05} />
-    <Hand angle={face.minuteAngle} length={0.3} width={0.022} z={0.058} />
+    <Hand angle={face.hourAngle} length={HOUR_LENGTH} width={0.035} z={0.05} />
+    <Hand angle={face.minuteAngle} length={MINUTE_LENGTH} width={0.022} z={0.058} />
   </group>;
 }
 

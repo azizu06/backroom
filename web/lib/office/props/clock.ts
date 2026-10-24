@@ -25,7 +25,7 @@ export function clockFace(now: number): ClockFace {
 
 /** Milliseconds until the next local minute boundary (always > 0). */
 export function msUntilNextMinute(now: number): number {
-  return 60_000 - (now % 60_000) || 60_000;
+  return 60_000 - (now % 60_000);
 }
 
 /**
