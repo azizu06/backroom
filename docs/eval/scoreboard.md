@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `7f8ff937bdc2c951f93fa579308c01e562404aac`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `b91f1cc6e9f9b7376098e13694b9406a3811d96e`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
