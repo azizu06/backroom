@@ -1,5 +1,5 @@
 /** Pure view decisions for the office viewport. Visual only: nothing here decides business state. */
-export type ViewMode = "walk" | "tween" | "plan";
+export type ViewMode = "walk" | "tween" | "plan" | "play";
 
 /** `sceneAttempt` identifies the mounted 3D scene; a new attempt means a fresh Canvas and WebGL context. */
 export interface ViewportState {
