@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
 import { MeshBasicMaterial, type Group, type Material, type Texture } from 'three';
 import type { SceneMountProps } from './types';
 import { bakedArtRequested } from '../../../lib/office/baked-art';
 
 export { bakedArtRequested };
+
+const noSubscription = () => () => {};
+/** `?art=baked` read on the client (false while server rendering); the query does not change in a session. */
+export function useBakedArtRequested(): boolean {
+  return useSyncExternalStore(noSubscription, () => bakedArtRequested(window.location.search), () => false);
+}
 
 /**
  * Opt-in Blender layer (`/office?art=baked`): baked, bevelled room shells from tools/bake, drawn over the
