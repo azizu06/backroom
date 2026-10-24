@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createBroadcastPresence, getViewerId, PRESENCE_HEARTBEAT, PRESENCE_RATE, PRESENCE_TTL, viewerColor, viewerName, type PresencePeer } from '../../lib/office/presence';
+import { createBroadcastPresence, createSpacetimePresence, presenceTransportKind, getViewerId, PRESENCE_HEARTBEAT, PRESENCE_RATE, PRESENCE_TTL, viewerColor, viewerName, type PresencePeer, type PresenceSource } from '../../lib/office/presence';
+import type { OfficeSnapshot, OfficeState } from '../../lib/office/state';
 import type { ViewMode } from '../../lib/office/view';
 
-export function usePresence({ mode, hud }: { mode: ViewMode; hud: { current: HTMLDivElement | null } }) {
+export function usePresence({ mode, hud, source, connectionMode }: { mode: ViewMode; hud: { current: HTMLDivElement | null }; source: OfficeState & PresenceSource; connectionMode: OfficeSnapshot['connection'] }) {
   const [enabled, setEnabled] = useState(false);
   const [peers, setPeers] = useState<PresencePeer[]>([]);
   const id = useRef('');
@@ -14,7 +15,9 @@ export function usePresence({ mode, hud }: { mode: ViewMode; hud: { current: HTM
   }, []);
   useEffect(() => {
     if (!enabled) { setPeers([]); return; }
-    const transport = createBroadcastPresence('backroom-office-presence');
+    const connection = source.getPresenceConnection?.();
+    const transport = presenceTransportKind(connectionMode, connection) === 'spacetime' && connection
+      ? createSpacetimePresence(connection, id.current) : createBroadcastPresence('backroom-office-presence');
     let last: PresencePeer | undefined;
     let lastAt = 0;
     let received: PresencePeer[] = [];
@@ -36,6 +39,6 @@ export function usePresence({ mode, hud }: { mode: ViewMode; hud: { current: HTM
     const timer = window.setInterval(update, PRESENCE_RATE);
     update();
     return () => { window.clearInterval(timer); unsubscribe(); transport.close(); setPeers([]); };
-  }, [enabled, mode, hud]);
+  }, [enabled, mode, hud, source, connectionMode]);
   return { enabled, setEnabled, peers, selfName: viewerName(id.current) };
 }
