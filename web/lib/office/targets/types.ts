@@ -19,14 +19,19 @@ export interface PlayPanelOf<K extends string = string> {
   readonly locked?: string;
   readonly denial?: PlayPanelEntry;
   readonly handoff?: { readonly from: string; readonly to: string; readonly caseDisplayId: string; readonly reason: string; readonly summary: string; readonly status: string; readonly correction: boolean; readonly errorCode?: string };
+  /** Prefilled chat text (coworker "Say hi"). */
+  readonly greeting?: string;
   readonly entries: readonly PlayPanelEntry[];
 }
 export interface PlayCandidateOf<T> { readonly target: T; readonly position: Vec2; readonly radius: number }
-/** What every target's `candidates` sees: agents at their drawn (motion) positions and the visible rooms. */
+/** Another viewer walking in Play (from presence). */
+export interface CoworkerSpot { readonly id: string; readonly name: string; readonly position: Vec2 }
+/** What every target's `candidates` sees: agents at their drawn (motion) positions, the visible rooms and coworkers. */
 export interface TargetContext {
   readonly agents: readonly { id: string; position: Vec2 }[];
   readonly handoffAgents?: readonly { id: string; position: Vec2 }[];
   readonly visible: ReadonlySet<AnchorId>;
+  readonly coworkers?: readonly CoworkerSpot[];
 }
 export interface PlayTargetModule<T extends { kind: string }> {
   /** Equal to the target's `kind`. */

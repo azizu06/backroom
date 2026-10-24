@@ -15,7 +15,7 @@ describe('Play handoff targets', () => {
     const extractor = stage.sample(0).actors.find(actor => actor.id === 'extractor')!;
     const eye: [number, number] = [extractor.position[0] + 1, extractor.position[1]];
     // Yaw π/2 looks toward -x.
-    const target = pickTarget(eye, Math.PI / 2, interactCandidates([], [], [extractor]));
+    const target = pickTarget(eye, Math.PI / 2, interactCandidates([], [], [], [extractor]));
     expect(target).toEqual({ kind: 'handoff', actor: 'extractor' });
     expect(targetKey(target)).toBe('handoff:extractor');
     expect(targetLabel(snapshot, target!)).toBe('Ask Extractor about the handoff');

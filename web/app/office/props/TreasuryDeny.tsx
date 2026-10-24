@@ -6,6 +6,7 @@ import { MeshBasicMaterial, MeshStandardMaterial, type Group } from 'three';
 import { matchingDenial, type OfficeSnapshot } from '../../../lib/office/state';
 import { DENY_MOMENT_MS, ECHO_START, ECHO_WALK, TREASURY_DOOR, TREASURY_DOOR_INTERACTION, createDenyPose, denyPose, denyReceipt, type DenyReceipt } from '../../../lib/office/props/treasuryDeny';
 import { Bear, createBearRig, poseBear } from '../avatars/Bear';
+import { canvasTextLines } from '../../../lib/office/props/readability';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { useReducedMotion } from './useReducedMotion';
 
@@ -20,29 +21,26 @@ const RING: readonly { at: [number, number, number]; size: [number, number, numb
 ];
 // Free-standing sign on the aisle side of the door, right of the doorway and below the room label; faces +z.
 const SIGN_POS: [number, number, number] = [6.35, 0, 0.55];
-const SIGN_W = 1.6, SIGN_H = 0.72, SIGN_Y = 1.1, TEX_W = 512, TEX_H = Math.round(TEX_W * SIGN_H / SIGN_W);
-
-function fitFont(ctx: CanvasRenderingContext2D, text: string, size: number, maxWidth: number) {
-  ctx.font = `700 ${size}px ${PROP_FONT}`;
-  while (size > 18 && ctx.measureText(text).width > maxWidth) ctx.font = `700 ${--size}px ${PROP_FONT}`;
-}
+const SIGN_W = 1.6, SIGN_H = 1.35, SIGN_Y = 1.25, TEX_W = 512, TEX_H = Math.round(TEX_W * SIGN_H / SIGN_W);
 
 function drawSign(ctx: CanvasRenderingContext2D, text: string) {
   const [head = text, ...rest] = text.split(' · ');
-  const rule = rest.join(' · ');
+  const rule = rest.join(' · ').replace(/[_-]+/g, ' ');
   ctx.fillStyle = DENY_RED;
   ctx.fillRect(0, 0, TEX_W, TEX_H);
-  ctx.strokeStyle = '#ffffff';
+  ctx.strokeStyle = '#272f25';
   ctx.lineWidth = 6;
   ctx.strokeRect(10, 10, TEX_W - 20, TEX_H - 20);
-  ctx.fillStyle = '#ffffff';
+  // Dark ink on the red board has much higher contrast than white on this red.
+  ctx.fillStyle = '#171d16';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (!rule) { fitFont(ctx, head, 96, TEX_W - 48); ctx.fillText(head, TEX_W / 2, TEX_H / 2 + 4); return; }
-  fitFont(ctx, head, 84, TEX_W - 48);
-  ctx.fillText(head, TEX_W / 2, TEX_H * 0.36);
-  fitFont(ctx, rule, 68, TEX_W - 40);
-  ctx.fillText(rule, TEX_W / 2, TEX_H * 0.72);
+  ctx.font = `800 112px ${PROP_FONT}`;
+  const measure = (label: string) => ctx.measureText(label).width;
+  ctx.fillText(canvasTextLines(head, measure, TEX_W - 32, 1)[0] ?? '', TEX_W / 2, 88);
+  ctx.font = `800 120px ${PROP_FONT}`;
+  const lines = canvasTextLines(rule === head ? '' : rule, measure, TEX_W - 64, 2);
+  lines.forEach((label, i) => ctx.fillText(label, TEX_W / 2, 224 + i * 120));
 }
 
 /** One played moment for one DENY receipt; unmounts (via onEnd) when it is over. */
