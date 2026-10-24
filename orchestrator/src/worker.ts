@@ -43,7 +43,22 @@ export class SeatWorker {
     const { store, effects, id, seat } = this.options;
     try {
       signal?.throwIfAborted();
-      this.lease ??= await store.claimTask(id, this.now(), this.leaseMs);
+      if (!this.lease) {
+        const claimed = await store.claimTask(id, this.now(), this.leaseMs);
+        if (claimed && claimed.leaseToken > 1) {
+          // Leases/cursor decide what runs. Audit is evidence, never executable instructions.
+          const prior = (await store.listAudit()).filter(entry =>
+            entry.inputs?.taskId === claimed.id ||
+            (entry.action === 'lease_expired' && entry.refs.includes(claimed.id)));
+          await store.assertLease(claimed, this.now());
+          await store.appendAudit({ ts: this.now(), actor: store.llmEnabled ? 'system' : 'code', seat, action: 'task_resumed',
+            ruleIds: ['LEASE_EXPIRED'], policyVersion: claimed.steps[claimed.cursor]?.context.policyVersion ?? 0,
+            refs: [...claimed.refs, claimed.id], route: 'code', latencyMs: 0, costUsd: 0,
+            inputs: { taskId: claimed.id, workerId: id, leaseToken: claimed.leaseToken,
+              cursor: claimed.cursor, priorAuditIds: prior.map(entry => entry.id) } });
+        }
+        this.lease = claimed;
+      }
       const lease = this.lease;
       if (!lease) return;
       await store.assertLease(lease, this.now());
@@ -68,7 +83,8 @@ export class SeatWorker {
       await store.appendAudit({ ts: this.now(), actor: 'code', seat, action: step.action.type,
         ruleIds: decision.ruleIds, policyVersion: decision.policyVersion, refs: task.refs,
         route: 'code', decision: decision.kind,
-        inputs: { action: step.action, effectInput: step.input, decision }, latencyMs: 0, costUsd: 0 });
+        inputs: { action: step.action, effectInput: step.input, decision, taskId: task.id,
+          workerId: id, leaseToken: lease.leaseToken, cursor: task.cursor }, latencyMs: 0, costUsd: 0 });
       if (decision.kind === 'DENY') {
         await store.completeTask(lease, 'denied', this.now()); this.lease = undefined; return;
       }
@@ -104,7 +120,8 @@ export class SeatWorker {
         { key: task.idempotencyKey!, fingerprint, result }, this.now());
       await store.appendAudit({ ts: this.now(), actor: store.llmEnabled ? 'system' : 'code', seat, action: `${step.kind}_completed`,
         ruleIds: decision.ruleIds, policyVersion: decision.policyVersion, refs: task.refs,
-        route: 'external', latencyMs: 0, costUsd: 0 });
+        route: 'external', inputs: { taskId: task.id, workerId: id, leaseToken: lease.leaseToken,
+          cursor: task.cursor, idempotencyKey: task.idempotencyKey }, latencyMs: 0, costUsd: 0 });
       await store.advanceTask(lease, this.now());
       if (task.cursor + 1 === task.steps.length) {
         await store.completeTask(lease, 'done', this.now()); this.lease = undefined;

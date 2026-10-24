@@ -152,3 +152,51 @@ The smoke script breaks only its own client endpoint (`127.0.0.1:1`) after ten s
 Before wiring workers, the office toggle, or a durable adapter, read
 [the control contract](../docs/llm-control.md). It defines the shared StateStore,
 typed `LLM_OFF` router result, authenticated endpoint, and #15 row mapping.
+
+## C3: kill-the-agent demo
+
+`pnpm --filter orchestrator demo:recovery` runs a four-invoice Payables batch,
+SIGKILLs a separate Node worker after payment 2 has reached the simulated provider
+but before its receipt reaches the worker, then starts a replacement. It prints
+the before/after audit logs and a `PASS recovery` line only after every task is
+`done`, all leases are released, and exactly one simulated payment exists per
+invoice. Failures exit nonzero. No credentials, browser, network, or models are used.
+The parent pins the global model switch OFF for the demo's lifetime; its IPC
+worker exposes the corresponding synchronous OFF fields. Recovery and completion
+audit entries use `actor=code`. This demo adapter does not subscribe to switch changes.
+
+The parent process hosts the reference StateStore and simulated payment provider;
+those services survive the worker crash. The replacement runs the ordinary
+`SeatWorker` through a demo-only IPC adapter. It claims expired leases, reads the
+persisted cursor and related audit entries, appends `task_resumed` with prior audit
+IDs, then reevaluates policy before replay. Audit evidence never authorizes an
+effect. Policy/effect entries now include task ID, worker ID, fencing token and
+cursor in `inputs`; completion entries also include the payment idempotency key.
+The StateStore interface is unchanged.
+
+Configure the demo with environment variables:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RECOVERY_BATCH_SIZE` | `4` | Number of payment tasks |
+| `RECOVERY_KILL_AFTER` | `2` | First invoice ordinal to interrupt, starting at 1 |
+| `RECOVERY_KILLS` | `1` | Number of successive workers to kill, on successive invoices |
+| `RECOVERY_KILL_POINT` | `after_payment` | `before_payment`, `after_payment`, `after_receipt`, or `after_cursor` |
+| `RECOVERY_LEASE_MS` | `1200` | Demo lease duration (production worker default remains 12 s) |
+| `RECOVERY_HEARTBEAT_MS` | `200` | Demo heartbeat interval (production default remains 3 s) |
+
+For example, `RECOVERY_KILLS=2 pnpm --filter orchestrator demo:recovery` kills two
+workers and lets a third finish. Kill points pause after the named service write,
+before its response reaches the worker: reservation, provider payment, saved
+receipt, or saved cursor. Killing after a saved receipt exercises ledger replay;
+killing after a saved cursor resumes completion without replaying that step.
+
+Vitest covers exact lease expiry, stale-owner fencing, audit-linked takeover,
+idempotent replay, two consecutive lease losses on the **same payment**, and real
+process double kills at all four crash windows. Process tests use the same
+simulated services and verify the audit hash chain.
+
+This demonstrates worker-process recovery. It does **not** demonstrate survival
+of a parent/state-service restart, production SpacetimeDB persistence, or real
+Nessie exactly-once transfers. Those require a durable StateStore and a payment
+adapter satisfying the payment recovery boundary above.
