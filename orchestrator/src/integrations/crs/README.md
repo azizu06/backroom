@@ -46,6 +46,14 @@ over `crsSandboxFixtureFetch`, which answers only exact persona bodies with CRS'
 (`CRS_SANDBOX_EXPECTED`). Its evidence is `source: crs_fixture` with a `FAKE: CRS fixture` label, set in code. The counts cannot tell an open bankruptcy (P07)
 from a discharged one (P06).
 
+Outage fallback (spec 6.3, #184): `createCachedCrsClientFromEnv()` with `CRS_CACHE_FILE` (or a `cache` option) keeps the last good
+evidence per product and identity, summary plus hash only. When CRS itself is down (network error,
+429 or 5xx) the client returns it with `cached: true` and the label
+`SANDBOX: test identity #N (cached at HH:MM UTC)`, at most 24 h old. Bad credentials, 4xx and malformed
+responses still fail, a network error at login no longer latches the client as AUTH-failed, and fixture
+clients never cache. `createCrsClientFromEnv()` never caches, so existing consumers (pre-call, vendor)
+and health probes only see live evidence until they carry `cached` and the label into their own audit.
+
 Live probe with only credentials (no module): `CRS_LIVE=1 CRS_USERNAME=… CRS_PASSWORD=…
 CRS_TEST_ID=6 pnpm --filter @backroom/orchestrator crs:live` runs public records then fraud
 risk and prints only evidence. Credentials come from the CRS email invite (a human signup);

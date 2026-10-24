@@ -43,11 +43,13 @@ The receipt audits text, fields and attachment metadata in the shared
 ## Deliberate integration limits
 
 The finance repository is an isolated synthetic Northfield snapshot per
-submission. No debit-capable Nessie adapter or live CRS/Apify checks are installed
-by this public demo form. Clean invoices therefore stay held, and Cedar remains
-held for missing verification. The tray cannot approve, apply a bank change or
-claim a successful payment. Controller passkeys and the private gateway remain
-the authority for those actions. Bind live capabilities only through a trusted
+submission. No debit-capable Nessie adapter is installed. `DEMO_LIVE=1` uses the
+host CRS client (cached fallback when `CRS_CACHE_FILE` is set), the OFAC check,
+and Apify. Any other mode uses the frozen Northfield fixtures and labels them
+simulated. Unknown or missing live results do not count as verified. Clean
+invoices stay held. An unchanged Cedar bank change escalates to Dana’s approval
+card and is written to that submission’s master only after her passkey. The tray
+cannot approve or claim a payment. Bind live capabilities only through a trusted
 server adapter; never accept them from form data.
 
 All uploads are conservatively escalated, including text accompanied by an

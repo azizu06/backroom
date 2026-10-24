@@ -265,7 +265,7 @@ test.describe('play mode on a phone', () => {
   test('caption shows the touch hint and the joystick is visible', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto('/office');
+    await page.goto('/office?view=overview');
     await requireWebGL(page);
     const select = page.getByLabel('Office view');
     await expect(select).toBeEnabled();

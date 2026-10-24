@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { open, readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { ServiceId } from './real-vs-sim';
+import type { ServiceId, StatusId } from './real-vs-sim';
 
 /** Server-only: bounded, read-only evidence for the Real vs simulated panel. Never calls a model or writes anything. */
 export type ProbeState = 'verified' | 'simulated' | 'unreachable' | 'unverified' | 'disabled';
@@ -287,7 +287,7 @@ export function resetDemoProbesForTest() {
   inflight = null;
 }
 
-export type ServiceStatusSnapshot = { checkedAt: string; services: Partial<Record<ServiceId, ServiceProbe>> };
+export type ServiceStatusSnapshot = { checkedAt: string; services: Partial<Record<StatusId, ServiceProbe>> };
 export type ServiceStatusSource = { name: string; read(): Promise<ServiceStatusSnapshot | null> };
 
 export const localProbeSource: ServiceStatusSource = { name: 'local-probes', read: () => getDemoProbes() };

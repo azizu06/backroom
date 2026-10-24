@@ -31,6 +31,40 @@ test('the Enter key starts first person from the splash', async ({ page }) => {
   await expect(surface(page)).toBeFocused();
 });
 
+test('Tab three times stays in the splash, Escape closes it, and focus returns to the opener', async ({ page }) => {
+  // Focus a real control before hydration so the splash's opener is the view select, not the body.
+  await page.addInitScript(() => {
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('office-view')?.focus();
+    });
+  });
+  await page.goto('/office');
+  const gate = splash(page);
+  const enter = gate.getByRole('button', { name: 'Enter', exact: true });
+  const overview = gate.getByRole('button', { name: 'Overview (map view)' });
+  await expect(enter).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(overview).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(enter).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(overview).toBeFocused();
+  await expect(gate.locator(':focus')).toHaveCount(1);
+  const story = page.getByRole('button', { name: 'Story mode' });
+  await expect(page.locator('.office-shell > header')).toHaveAttribute('inert', '');
+  const blocked = await story.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    el.focus();
+    return { covered: hit !== el && !el.contains(hit), focused: document.activeElement === el, inert: el.closest('[inert]') !== null };
+  });
+  expect(blocked).toEqual({ covered: true, focused: false, inert: true });
+  await page.keyboard.press('Escape');
+  await expect(gate).toHaveCount(0);
+  await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await expect(page.getByLabel('Office view')).toBeFocused();
+});
+
 test('the splash traps Tab at both ends and Escape still opens the overview', async ({ page }) => {
   await page.goto('/office');
   const gate = splash(page);

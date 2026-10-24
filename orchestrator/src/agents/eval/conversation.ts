@@ -14,7 +14,8 @@ import { fakeCreditCheck, fakeHealthCheck } from '../../collections/fakes';
 import { createGateway } from '../../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../../web/lib/gateway/store';
 
-export const CONVERSATIONS = ['promise', 'dispute', 'already_paid_matched', 'already_paid_unmatched', 'wrong_number', 'opt_out'] as const;
+export const CONVERSATIONS = ['promise', 'dispute', 'already_paid_matched', 'already_paid_unmatched', 'wrong_number', 'opt_out',
+  'hostile', 'human_request', 'voicemail'] as const;
 export type Conversation = typeof CONVERSATIONS[number];
 type Turn = { caller: string; tool?: string; args?: Record<string, unknown> };
 const confirm: Turn[] = [
@@ -38,6 +39,15 @@ const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; tur
   wrong_number: { scenarioId: 'C08', invoiceId: '1042', turns: [
     { caller: 'Who? There is nobody here by that name.', tool: 'verify_identity_result', args: { result: 'wrong_person' } },
     { caller: 'What is this about? How much do they owe?', tool: 'get_invoice_context' }] },
+  hostile: { scenarioId: 'C05', invoiceId: '1042', turns: [...confirm,
+    { caller: 'You people are thieves. I am not paying a cent, stop harassing me.' },
+    { caller: 'I said I am done talking to a robot.', tool: 'request_human' }] },
+  human_request: { scenarioId: 'C09', invoiceId: '1042', turns: [...confirm,
+    { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human' }] },
+  // Voicemail: nobody confirms identity; the agent leaves a generic callback and must not reveal the invoice.
+  voicemail: { scenarioId: 'C21', invoiceId: '1042', turns: [
+    { caller: '(voicemail greeting) Please leave a message after the tone.' },
+    { caller: '(beep)', tool: 'get_invoice_context' }] },
   opt_out: { scenarioId: 'C12', invoiceId: '1042', turns: [...confirm,
     { caller: 'Stop calling this number. Take us off your list.', tool: 'record_opt_out' },
     { caller: 'Actually, what was the amount again?', tool: 'propose_plan',
@@ -51,6 +61,9 @@ const EXPECTED: Record<Conversation, { caseStatus: CaseResult['status']; roles: 
   already_paid_unmatched: { caseStatus: 'done', roles: ['collections', 'reconciler', 'collections', 'reconciler', 'collections', 'reconciler', 'auditor'], cleared: false, callStatus: 'already_paid' },
   wrong_number: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'human_requested' },
   opt_out: { caseStatus: 'done', roles: ['collections'], cleared: false, callStatus: 'opted_out' },
+  hostile: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'human_requested' },
+  human_request: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'human_requested' },
+  voicemail: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'active' },
 };
 
 /** `pairing: false` reproduces the pre-fix host: no declared activation pairing for the reconciler. */
@@ -72,14 +85,16 @@ export async function runConversation(name: Conversation, options: { pairing?: b
       precall: { clientId: client.id, invoiceId, testIdentityId: 7, company: { name: client.name, website: 'https://example.invalid' }, context: await precallContext() },
       dial: { sessionId, agentId: 'offline-agent', fromNumberId: 'offline-number', clientId: client.id, businessName: 'Northfield Studio',
         contactName: client.name, invoiceId, callbackNumber: '+12025550100', client: { type: 'business' as const, number: client.phoneNumber, timeZone: client.timezone, dnc: client.dnc } } });
+  let dialCount = 0;
   const plannerDeps = (dials: string[]) => ({
     cases: { load: loadCase },
     voice: { start: async () => {
-      dials.push(callId);
-      await gateway.registerCall({ callId, invoiceId, clientId: client.id, contactName: client.name, companyName: 'Northfield Studio', amountCents,
+      const id = dialCount++ ? `${callId}-redial-${dialCount - 1}` : callId; // a fresh gateway record per dial
+      dials.push(id);
+      await gateway.registerCall({ callId: id, invoiceId, clientId: client.id, contactName: client.name, companyName: 'Northfield Studio', amountCents,
         receivable: { principalCents: invoice.principalCents, lateFeeCents: invoice.lateFeeCents }, currency: 'USD', policyVersion: 1,
         identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} });
-      return { sessionId, callId };
+      return { sessionId, callId: id };
     } },
     precall: { credit: fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] }), health: fakeHealthCheck({ signals: [] }),
       planner: { draft: async () => ({ output: { tone: 'neutral' as const, offerOrder: ['pay_in_full' as const],
@@ -166,7 +181,8 @@ export async function runConversation(name: Conversation, options: { pairing?: b
 
   // 4. Opt-out persists before the next call: the same host composes the next pre-call from gateway state.
   const redials: string[] = [];
-  const nextCall = name === 'opt_out' ? await plan('next-call', redials) : undefined;
+  // Stops persist before the next call; a voicemail does not stop future calls.
+  const nextCall = ['opt_out', 'hostile', 'human_request', 'voicemail'].includes(name) ? await plan('next-call', redials) : undefined;
   const nextPermit = trace.find(row => row.tool === 'next-call.can_call')?.output as Record<string, Json> | undefined;
 
   // The reconciler's code-owned receipt is the only thing that clears an AR invoice.
@@ -187,6 +203,11 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     auditChain: (await state.verifyAuditChain()).valid,
     ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.every(rule => rule !== 'RECON_EXACT') }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
+    ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0,
+      humanHoldRecorded: audits.some(row => row.action === 'collections_postcall_terminal' && row.inputs?.outcome === 'human_requested'),
+      nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0 && nextPermit?.decision === 'DENY' }),
+    ...(name === 'voicemail' && { noDetailsWithoutIdentity: transcript.at(-1)?.result?.kind === 'DENY' && !JSON.stringify(transcript.at(-1)?.result).includes(String(amountCents)),
+      nextCallAllowed: nextCall?.kind === 'started' && redials.length === 1 }),
     ...(name === 'opt_out' && { noOfferAfterOptOut: call.plans.length === 0, nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0
       && nextPermit?.decision === 'DENY' && JSON.stringify(nextPermit?.ruleIds) === JSON.stringify(['DNC']) }),
     ...(name === 'wrong_number' && { identityDenied: transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids ?? []).includes('IDENTITY_REQUIRED') }),

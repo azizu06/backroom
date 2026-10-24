@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type Keyboard
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { playOfficeCue } from '../../lib/office/sound-events';
-import { playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
+import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
   DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
 } from '../../lib/office/playSettings';
@@ -13,6 +13,7 @@ import { crosshairView } from '../../lib/office/playFeel';
 import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
+import { useHandoffPresentation } from './handoffs/HandoffPresentation';
 import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
@@ -45,13 +46,21 @@ function releasePointer() {
   if (document.pointerLockElement) document.exitPointerLock?.();
 }
 
-/** Reuses the lobby's single ask-why entry point; never renders its own or calls /api/why. */
-function focusAskWhy() {
+/**
+ * Reuses the lobby's single ask-why entry point; never renders its own or calls /api/why.
+ * A question only prefills the field: the viewer still submits it there.
+ */
+function focusAskWhy(question?: string) {
   const mount = document.querySelector<HTMLElement>("[data-office-mount='ask-why']");
   if (!mount) return;
   mount.scrollIntoView({ block: 'center' });
-  const field = mount.querySelector<HTMLElement>('input:not([type=hidden]):not([disabled]), textarea:not([disabled])')
-    ?? mount.querySelector<HTMLElement>('button:not([disabled])');
+  const input = mount.querySelector<HTMLInputElement>('input:not([type=hidden]):not([disabled])');
+  if (question && input) {
+    // Controlled React input: set through the native setter so its onChange sees the value.
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, question);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  const field = input ?? mount.querySelector<HTMLElement>('textarea:not([disabled])') ?? mount.querySelector<HTMLElement>('button:not([disabled])');
   field?.focus({ preventScroll: true });
 }
 
@@ -96,10 +105,11 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
   </section>;
 }
 
-function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void }) {
+function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: (question?: string) => void }) {
+  const handoffFor = useHandoffPresentation()?.handoffFor;
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
-  const panel = playPanel(snapshot, target);
+  const panel = playPanel(snapshot, target, handoffFor);
   const key = targetKey(target);
   useEffect(() => { closeButton.current?.focus(); }, [key]);
   if (!panel) return null;
@@ -111,12 +121,12 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
     <header>{view.ownHeading ? <p id={headingId}><strong>{panel.title}</strong></p> : <h2 id={headingId}>{panel.title}</h2>}<button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
     {panel.state && <p className='play-panel-state'>{panel.state}</p>}
     {panel.task && <p>{panel.task}</p>}
-    {view.Body && <view.Body panel={panel} />}
+    {view.Body && <view.Body panel={panel} askWhy={askWhy} />}
     {!view.hideAudit && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
       <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
       <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
-    {!view.hideAskWhy && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
+    {!view.hideAskWhy && <button className='play-panel-ask' onClick={() => askWhy()}>Ask why</button>}
   </section>;
 }
 
@@ -130,6 +140,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat, lookOnStar
   lookOnStart?: boolean;
 }) {
   const touch = useTouch();
+  const handoffFor = useHandoffPresentation()?.handoffFor;
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, setSettings] = useState<PlaySettings>(() => loadPlaySettings(viewerStorage()));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -156,8 +167,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat, lookOnStar
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
   useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
   useEffect(() => {
-    if (panel && !playPanel(snapshot, panel)) { setPanel(null); hud.current?.focus(); }
-  }, [panel, snapshot, hud]);
+    if (panel && !playPanel(snapshot, panel, handoffFor)) { setPanel(null); hud.current?.focus(); }
+  }, [panel, snapshot, hud, handoffFor]);
 
   function interact() {
     const current = targetRef.current;
@@ -198,11 +209,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat, lookOnStar
     setPanel(null);
     hud.current?.focus();
   }
-  function askWhy() {
+  function askWhy(question?: string) {
     setPanel(null);
     releasePointer();
     onExit();
-    focusAskWhy();
+    focusAskWhy(question);
   }
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -225,6 +236,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat, lookOnStar
     const held = control(event);
     if (!held) return;
     event.preventDefault();
+    // A tap (keydown then keyup before the next frame) still has to yaw. Repeats keep turning via turnIntent.
+    if (!event.repeat) applyTurnTap(input, held);
     input.press(held);
     requestSceneFrame();
   }
@@ -293,6 +306,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat, lookOnStar
     <p className='play-prompt' aria-live='polite'>{prompt}</p>
     <button className='play-exit' onClick={onExit}>Overview</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
+    <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
         onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>

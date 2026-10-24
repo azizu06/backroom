@@ -8,7 +8,8 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "live": "tsx --env-file=../../.env.local src/live.ts"
+    "live": "tsx --env-file=../../.env.local src/live.ts",
+    "balance-proof": "tsx --env-file=../../.env.local src/balance-proof-cli.ts"
   },
   "devDependencies": {
     "@types/node": "20.19.39",
