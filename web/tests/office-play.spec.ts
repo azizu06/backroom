@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 const HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -32,6 +33,19 @@ async function holdUntil(page: Page, key: string, done: () => Promise<boolean>, 
     await page.keyboard.up(key);
   }
 }
+/**
+ * Holds a key for exactly one rendered frame: keyup is dispatched from the next animation frame,
+ * after the on-demand rig has run once with the first-frame dt. Deterministic small steps, so slow
+ * headless frames cannot overshoot fine adjustments.
+ */
+async function tap(page: Page, key: string) {
+  await surface(page).evaluate(async (element, key) => {
+    const init = { key, code: key.length === 1 ? `Key${key.toUpperCase()}` : key, bubbles: true, cancelable: true };
+    element.dispatchEvent(new KeyboardEvent('keydown', init));
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    element.dispatchEvent(new KeyboardEvent('keyup', init));
+  }, key);
+}
 const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
 /** Yaw 0 looks toward -z; forward = (-sin yaw, -cos yaw). */
 async function bearingTo(page: Page, x: number, z: number) {
@@ -51,9 +65,8 @@ async function face(page: Page, x: number, z: number, tolerance = 0.08) {
         return Math.abs(now) <= 0.3 || Math.sign(now) !== Math.sign(diff);
       });
     } else {
-      // Fine: hold only until the rig has rendered one turning frame.
-      const { yaw } = await player(page);
-      await holdUntil(page, key, async () => (await player(page)).yaw !== yaw);
+      // Fine: one turning frame (about 0.04 rad).
+      await tap(page, key);
     }
   }
   const { diff } = await bearingTo(page, x, z);
@@ -63,10 +76,16 @@ async function walkTo(page: Page, x: number, z: number, tolerance = 0.15) {
   for (let leg = 0; leg < 12; leg++) {
     if ((await bearingTo(page, x, z)).distance <= tolerance) return;
     await face(page, x, z);
+    // Hold for the long stretch, then finish with single frames (0.05 m each) so slow frames cannot overshoot.
     await holdUntil(page, 'w', async () => {
       const { diff, distance } = await bearingTo(page, x, z);
-      return distance <= tolerance || Math.abs(diff) > 0.2;
+      return distance <= tolerance + 0.4 || Math.abs(diff) > 0.2;
     });
+    for (let step = 0; step < 40; step++) {
+      const { diff, distance } = await bearingTo(page, x, z);
+      if (distance <= tolerance || Math.abs(diff) > 0.2) break;
+      await tap(page, 'w');
+    }
   }
   expect((await bearingTo(page, x, z)).distance).toBeLessThanOrEqual(tolerance * 2);
 }
@@ -143,5 +162,55 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   await expect(dialog).toContainText('NOT_IN_BADGE');
   await expect(dialog).toContainText('DENY');
   await expect(dialog.locator('code')).toHaveText(/^preview-denial-\d+$/);
+  expect(errors).toEqual([]);
+});
+
+test('play mode walks to the GX10 server room and reads live telemetry read-only', async ({ page }) => {
+  // Longest walk in the suite; headless software WebGL renders slowly.
+  test.setTimeout(60_000);
+  const methods: string[] = [];
+  await page.route('**/api/gx10', async route => {
+    methods.push(route.request().method());
+    const now = new Date().toISOString();
+    const status: Gx10Status = {
+      measuredAt: now, reachable: true, models: ['qwen2.5:7b'], gpuUtilization: null,
+      telemetry: {
+        scope: 'process-local, last 200 HTTP attempts', totalCalls: 4, localCalls: 3, localShare: 0.75,
+        pricedLocalCalls: 3, estimatedSavingsUsd: 0.0012, comparisonModel: 'claude-haiku-4-5',
+        recent: { at: now, latencyMs: 900, tokensPerSecond: 42.5 },
+      },
+    };
+    await route.fulfill({ json: status });
+  });
+  const errors = await startPlay(page);
+
+  // Around the partitions and door posts: lobby aisle, along z 0.45, then in front of the server.
+  await walkTo(page, -4.6, 0.45);
+  await walkTo(page, 5, 0.45);
+  await walkTo(page, 7.1, 0.4);
+  await face(page, 7.1, -0.8);
+  const prompt = page.getByText('E · Check GX10 server');
+  await expect(prompt).toBeVisible();
+  const at = await player(page);
+  // The server box (z -1.325..-0.275) is solid: the player stays in front of its face.
+  expect(at.z).toBeGreaterThan(-0.275);
+
+  await page.keyboard.press('e');
+  const dialog = page.getByRole('dialog', { name: 'GX10 server' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Close/ })).toBeFocused();
+  await expect(dialog.getByTestId('play-gx10-speed')).toHaveText('42.5 tok/s');
+  await expect(dialog).toContainText('Online');
+  await expect(dialog).toContainText('qwen2.5:7b');
+  await expect(dialog).toContainText('0.90 s');
+  await expect(dialog).toContainText('75%');
+  await expect(dialog).toContainText('3/4 attempts local');
+  await expect(dialog).toContainText('Read-only');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
+  expect(methods.length).toBeGreaterThan(0);
+  expect(methods.every(method => method === 'GET')).toBe(true);
   expect(errors).toEqual([]);
 });
