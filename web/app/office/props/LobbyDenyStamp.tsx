@@ -1,13 +1,34 @@
 'use client';
 
-import { Html } from '@react-three/drei';
+import { useEffect } from 'react';
+import { useThree } from '@react-three/fiber';
 import { visibleRooms } from '../../../lib/office/state';
 import { latestDenyRule } from '../../../lib/office/props/lobbyDeny';
 import type { SceneMountProps } from '../mounts/types';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 
+/**
+ * Screen-reader and test hook for the stamp. Created and removed imperatively next to the canvas, never through a
+ * drei `Html` portal, whose React-owned container is detached while the view switches and throws on `removeChild`.
+ */
+function useStampNode(text: string) {
+  const host = useThree(state => state.gl.domElement.parentElement);
+  useEffect(() => {
+    if (!host) return;
+    const node = document.createElement('span');
+    node.className = 'visually-hidden';
+    node.setAttribute('role', 'img');
+    node.setAttribute('aria-label', text);
+    node.dataset.testid = 'lobby-deny-stamp';
+    node.textContent = text;
+    host.appendChild(node);
+    return () => node.remove();
+  }, [host, text]);
+}
+
 function Stamp({ rule }: { rule: string }) {
   const text = `DENIED · ${rule}`;
+  useStampNode(text);
   const texture = useCanvasTexture(768, 192, ctx => {
     ctx.strokeStyle = ctx.fillStyle = '#ed6252';
     ctx.lineWidth = 9;
@@ -23,9 +44,6 @@ function Stamp({ rule }: { rule: string }) {
     <mesh>
       <planeGeometry args={[1.75, 0.44]} /><meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
     </mesh>
-    <Html center style={{ pointerEvents: 'none' }}>
-      <span className='visually-hidden' role='img' aria-label={text} data-testid='lobby-deny-stamp'>{text}</span>
-    </Html>
   </group>;
 }
 
