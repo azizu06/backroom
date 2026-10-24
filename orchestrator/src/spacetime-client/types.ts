@@ -201,6 +201,7 @@ export type Signal = __Infer<typeof Signal>;
 
 export const Task = __t.object("Task", {
   id: __t.string(),
+  queueSeq: __t.u64(),
   seatId: __t.string(),
   status: __t.string(),
   leaseOwner: __t.option(__t.string()),

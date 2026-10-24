@@ -44,10 +44,18 @@ async function main() {
     }
     assert(started, 'local server did not start');
     const database = `backroom-state-${Date.now()}`;
-    for (const suffix of ['', '-on', '-off', '-ap', '-parity']) execFileSync(cli, [...prefix, 'publish', database + suffix, '--server', http, '--module-path', 'spacetime', '--yes'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+    for (const suffix of ['', '-on', '-off', '-ap', '-parity', '-seed']) execFileSync(cli, [...prefix, 'publish', database + suffix, '--server', http, '--module-path', 'spacetime', '--yes'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
     // This CLI config belongs solely to this disposable run. Never print its token.
     const token = /^spacetimedb_token\s*=\s*"([^"]+)"/m.exec(readFileSync(config, 'utf8'))?.[1];
     assert(token, 'local publisher token missing');
+    const seedTransport = new SpacetimeTransport({ uri, database: database + '-seed', token });
+    const seeded = new SpacetimeStateStore({ transport: seedTransport }); stores.push(seeded);
+    const fixture = JSON.parse(readFileSync(resolve(root, 'fixtures/company/northfield.json'), 'utf8'));
+    await seedTransport.seedCompany(fixture);
+    await seedTransport.seedCompany(fixture);
+    await assert.rejects(seeded.insertInvoice({ id: '1042', kind: 'ar', state: 'overdue' }), /INVOICE_EXISTS/);
+    assert.equal((await seeded.listAudit()).filter(entry => entry.action === 'seed_company').length, 1);
+    console.log('PASS: canonical company seed loads on the server and replays idempotently');
     const tape: { method: string; values: unknown[] }[] = [];
     const transport = new SpacetimeTransport({ uri, database: database + '-parity', token });
     const recording: StateTransport = {
@@ -113,7 +121,7 @@ async function main() {
     assert(output.includes('PASS: core loop,'));
     assert(output.includes('AUDIT chain valid=true'));
     writeFileSync(resolve(scratch, 'demo.log'), output);
-    writeFileSync(resolve(scratch, 'proof.json'), JSON.stringify({ local: true, database, auditEntries: run.entries.length, auditParity: true, crossClientOff: true, reconnect: true, anonymousRejected: true, demoCore: true, maincloud: 'deferred: browser authentication required' }, null, 2));
+    writeFileSync(resolve(scratch, 'proof.json'), JSON.stringify({ local: true, database, auditEntries: run.entries.length, auditParity: true, crossClientOff: true, reconnect: true, anonymousRejected: true, demoCore: true, seeded: true, subscriptionMaxMs: Math.max(...auditLagMs), maincloud: 'deferred: browser authentication required' }, null, 2));
     console.log(`PASS: STATE_STORE=spacetime pnpm demo:core; evidence ${scratch}/proof.json`);
     server.kill('SIGTERM');
     for (let i = 0; i < 100 && durable.llmEnabled; i++) await delay(10);
