@@ -34,7 +34,7 @@ test('judge selects each server preset and sees its trace, policy and money evid
       await route.fulfill({ json: { presets, defaultMode: 'mock', liveBlocked: true } });
       return;
     }
-    expect(route.request().postDataJSON()).toEqual({ text: presets[index]!.text, presetId: presets[index]!.id, mode: 'mock' });
+    expect(route.request().postDataJSON()).toEqual({ presetId: presets[index]!.id, mode: 'mock' });
     await route.fulfill({ json: result(index) });
   });
   await page.goto('/attack');
@@ -61,8 +61,10 @@ test('judge selects each server preset and sees its trace, policy and money evid
     await expect(page.getByText('Policy version v1', { exact: true })).toBeVisible();
     await expect(page.getByText('Money moved: no · Payment attempts: 0', { exact: true })).toBeVisible();
     await page.getByText('Model evidence', { exact: true }).click();
-    await expect(page.getByText(modelText, { exact: true })).toBeVisible();
-    await expect(page.getByText('<img src=x onerror=alert(1)>', { exact: true })).toHaveCount(2);
+    await expect(page.locator('.attack-results').getByText(modelText, { exact: true }).first()).toBeVisible();
+    const results = page.locator('.attack-results');
+    await expect(results.getByText('<img src=x onerror=alert(1)>', { exact: true })).toHaveCount(3);
+    await expect(results.locator('img')).toHaveCount(0);
     await expect(page.getByText('raw-internal-case-id', { exact: true })).toHaveCount(0);
     await expect(page.locator('.attack-panel script, .attack-panel img')).toHaveCount(0);
   }
