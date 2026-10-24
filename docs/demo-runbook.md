@@ -21,7 +21,7 @@ pnpm demo:reset            # fresh DB, seed_company, scripted public gateway/red
 
 For a phone passkey use `pnpm demo:up` with the default HTTPS tunnel instead.
 Reset immediately before the pitch, reopen the printed approval/pay URLs, and
-reload the office. The 60-second approval starts during reset. A fresh publish
+reload the office. The approval stays open for the live call, up to five minutes, and closes when the call ends. It starts during reset. A fresh publish
 can take longer than a few seconds: keep the labeled offline replay ready.
 Stop only this worktree's host with `pnpm demo:down` before changing modes.
 
@@ -103,8 +103,9 @@ running with mock effects. No fixture consent is permission to call a real perso
 
 Reset preserves controller enrollment in the running process, the tunnel URL and
 server secrets. It replaces the installed StateStore, approvals, payment links, receipts and
-mock deposits; reopen the new printed links. The approval request expires after
-**60 seconds**: reset immediately before the pitch and decide early. Stop/start
+mock deposits; reopen the new printed links. The seeded approval stays open for
+the call, up to five minutes (`APPROVAL_WINDOW_MS`), and closes when the call
+ends: reset immediately before the pitch. Stop/start
 loses process-local passkey enrollment and changes the quick-tunnel origin;
 enroll again. Reset does **not** cancel a real call, clear a real opt-out, delete
 `.env.voice/`, touch `.nessie-state/`, or undo sponsor bank transactions.
@@ -228,7 +229,7 @@ phone holds the passkey. Run `demo:reset` immediately before the opening.
 | Time | Speaker / operator | Action and claim |
 | --- | --- | --- |
 | 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” Open the new approval URL on Dana's enrolled phone. |
-| 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion before the 60-second request expires. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
+| 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion while the request is open. It stays open for the call, up to five minutes, and closes when the call ends. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
 | 0:45–1:15 | Demo operator; presenter | Open the printed pay URL, press Pay with simulated card, then show `partially_paid` and the exact-match reconciliation audit. “The real policy, SDK and reducer path ran over an in-memory mock HTTP transport.” No card data and no real money. |
 | 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Use the frozen #4419 or #4471 preset for the trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
 | 1:45–2:15 | Presenter; audit operator | On `/audit`, select a cited event and ask why. LLM defaults OFF, so this is a cited deterministic answer. Show saved policy text and code/human attribution. Do not claim cloud narration was exercised. |
@@ -493,7 +494,7 @@ directory.
    approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
    credential copy or passkey registration belongs in this minute.
 2. For fresh seeded links, run `pnpm demo:reset` on the **local** standby, then
-   reopen its printed links (the approval expires after 60 seconds).
+   reopen its printed links (the approval stays open for the call, up to five minutes, and closes when the call ends).
 3. When GX10 health recovers, switch back to its saved URLs after a read-only
    health check. Do not stop/restart either origin during a live take.
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { ControllerApprovals } from './service';
+import { approvalWindowMs } from './window';
 import { MemoryStateStore } from '../store';
 import type { VerifiedApproval } from './verified';
 import { TestAuthenticator } from './testing/authenticator';
@@ -95,16 +96,56 @@ describe('M6 server-verified controller authority', () => {
     expect((await service.get('e1')).status).toBe('pending');
   });
 
-  it('times out at 60 seconds, logs pending_owner once, and rejects a late valid signature', async () => {
+  it('keeps a live call open through the approval window, then expires it and rejects a late valid signature', async () => {
     const { service, auth, store, advance } = await setup();
+    const windowMs = approvalWindowMs();
+    expect((await store.getEscalation('e1'))?.expiresAt).toBe(1000 + windowMs);
     const { options, challengeId } = await service.decisionOptions('e1', { kind: 'Approve' });
-    advance(59_999);
+    advance(60_000);
+    expect((await service.get('e1')).status).toBe('pending');
+    advance(windowMs - 60_000 - 1);
     expect((await service.get('e1')).status).toBe('pending');
     advance(1);
-    expect((await service.get('e1')).status).toBe('pending_owner');
+    expect((await service.get('e1')).status).toBe('expired');
     await expect(service.decide('e1', challengeId, auth.assertion(options.challenge))).rejects.toThrow();
     await service.get('e1');
+    expect((await store.listAudit()).filter(e => e.action === 'escalation_expired')).toHaveLength(1);
+    expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(0);
+  });
+
+  it('records pending_owner when the call ends after the window already expired', async () => {
+    const { store, advance } = await setup();
+    const windowMs = approvalWindowMs();
+    advance(windowMs);
+    const at = 1000 + windowMs;
+    await store.expireEscalations(at);
+    expect((await store.getEscalation('e1'))?.status).toBe('expired');
+    expect((await store.listAudit()).filter(e => e.action === 'escalation_expired')).toHaveLength(1);
+    expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(0);
+    await store.registerAgent('worker', 'collections', at);
+    await store.enqueueTask({ id: 'follow-up', seatId: 'collections', refs: ['1042'], steps: [] });
+    const lease = (await store.claimTask('worker', at, 10_000))!;
+    await expect(store.transitionInvoice(lease, '1042', 'pending_owner', 'promised', at)).rejects.toThrow('INVALID_INVOICE_TRANSITION');
+    await store.expireEscalations(at, 'c1');
+    await store.expireEscalations(at, 'c1');
+    expect((await store.getEscalation('e1'))?.status).toBe('expired');
+    expect((await store.listAudit()).filter(e => e.action === 'escalation_expired')).toHaveLength(1);
     expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(1);
+    await store.transitionInvoice(lease, '1042', 'pending_owner', 'promised', at);
+  });
+
+  it('expires a live call when the call ends and still rejects a passkey that is not a valid assertion', async () => {
+    const { service, auth, store, advance } = await setup();
+    advance(1_000);
+    await expect(service.decide('e1', 'missing', {} as AuthenticationResponseJSON)).rejects.toThrow();
+    expect((await store.getEscalation('e1'))?.status).toBe('pending');
+    const { options, challengeId } = await service.decisionOptions('e1', { kind: 'Approve' });
+    await store.expireEscalations(1000 + 1_000, 'c1');
+    expect((await service.get('e1')).status).toBe('expired');
+    await expect(service.decide('e1', challengeId, auth.assertion(options.challenge))).rejects.toThrow();
+    expect((await store.getEscalation('e1'))?.method).toBeUndefined();
+    expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(1);
+    expect((await store.listAudit()).filter(e => e.action === 'decide_escalation')).toHaveLength(0);
   });
 
   it('writes a worker escalation and desk target in one turn without the renderer', async () => {
