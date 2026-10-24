@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, type OfficeAudit, type OfficeSnapshot } from '../state';
-import { AUDIT_WALL_MAX_ROWS, RECEIPT_ID_MAX, auditWallText, auditWallView, auditWallVisible, shortReceipt } from './auditWall';
+import { AUDIT_WALL_MAX_ROWS, AUDIT_WALL_NOTICE, RECEIPT_ID_MAX, auditWallText, auditWallView, auditWallVisible, shortReceipt } from './auditWall';
 
 const row = (id: string, over: Partial<OfficeAudit> = {}): OfficeAudit =>
   ({ id, agentId: 'a', seatId: 'payables', action: 'pay', decision: 'ALLOW', ruleIds: [], summary: `row ${id}`, ...over });
@@ -33,16 +33,19 @@ describe('audit wall rows', () => {
     expect(auditWallView(snap([])).rows).toEqual([]);
     expect(auditWallText(auditWallView(snap([])))).toBe('');
   });
-  it('paints rows only for the live audit log; other snapshots get a notice and no receipt-looking rows', () => {
-    for (const connection of ['preview', 'replay', 'connecting', 'disconnected'] as const) {
-      const view = auditWallView(snap([row('preview-denial-0', { decision: 'DENY' })], { connection }));
+  it('paints no rows for preview or replay feeds, which are not the audit log', () => {
+    for (const connection of ['preview', 'replay'] as const) {
+      const view = auditWallView(snap([row('preview-denial-1', { decision: 'DENY' })], { connection }));
       expect(view.rows).toEqual([]);
       expect(view.total).toBe(0);
-      expect(view.notice).toBeTruthy();
-      expect(auditWallText(view)).toBe(view.notice);
-      expect(auditWallText(view)).not.toContain('preview-denial-0');
+      expect(view.notice).toBe(AUDIT_WALL_NOTICE);
+      expect(auditWallText(view)).toBe('');
     }
-    expect(auditWallView(snap([row('a')])).notice).toBeUndefined();
+    for (const connection of ['live', 'connecting', 'disconnected'] as const) {
+      const view = auditWallView(snap([row('a')], { connection }));
+      expect(view.rows).toHaveLength(1);
+      expect(view.notice).toBeUndefined();
+    }
   });
   it('is shown only while the lobby is visible', () => {
     expect(auditWallVisible(snap([], { rooms: undefined }))).toBe(true); // preview keeps the fixture floor

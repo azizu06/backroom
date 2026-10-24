@@ -85,7 +85,7 @@ async function startPlay(page: Page) {
   return errors;
 }
 
-test('the audit wall hangs in the lobby and, outside the live feed, says it is not the audit log', async ({ page }) => {
+test('the audit wall hangs in the lobby and, on a preview feed, paints no receipts and says so', async ({ page }) => {
   test.setTimeout(60_000);
   const errors = await startPlay(page);
   const canvas = page.getByTestId('office-viewport').locator('canvas');
@@ -96,12 +96,13 @@ test('the audit wall hangs in the lobby and, outside the live feed, says it is n
   const at = await player(page);
   expect(at.x).toBeLessThan(-6.5);
 
-  // Preview state is not the audit log, so the wall says so instead of painting its rows as receipts.
-  // Live rows with receipt ids are covered by the auditWall unit tests (no live feed in this suite).
-  const wall = await canvas.getAttribute('data-audit-wall');
-  expect(wall).toBe('Preview · simulated state, not the audit log');
-  expect(await canvas.getAttribute('aria-description')).toContain('Preview · simulated state');
-  await expect(page.locator('[data-audit-id]').first()).toBeAttached(); // the footer list still carries the preview receipt
+  // Preview rows are not the audit log, so the wall paints none of them and says so (live ids are covered by the unit tests).
+  expect(await canvas.getAttribute('data-audit-wall')).toBe('');
+  const description = await canvas.getAttribute('aria-description');
+  expect(description).toContain('Preview feed: no audit entries');
+  const denialId = await page.locator('[data-audit-id]').first().getAttribute('data-audit-id');
+  expect(denialId).not.toBeNull();
+  expect(description).not.toContain(denialId!);
   await expect(page.locator('.play-prompt')).toHaveText(''); // reading needs no interaction
   expect(errors).toEqual([]);
 });
@@ -122,13 +123,13 @@ test('the inbox tray sits on the Payables desk: walk up, see E: open, open the i
 
   await walkTo(page, -0.8, -2.15);
   await face(page, -0.8, -2.7);
-  await expect(page.getByText('E · Open inbox tray · 3 items')).toBeVisible();
+  await expect(page.getByText('E · Open inbox tray · 3 in inbox')).toBeVisible();
   await expect(canvas).toHaveAttribute('data-inbox-prompt', 'E: open');
 
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: 'Inbox tray' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('3 items in the inbox');
+  await expect(dialog).toContainText('3 in inbox');
   await expect(dialog).toContainText('3 intake items are counted'); // preview carries no receipts; not shown as an empty inbox
   await expect(dialog.getByRole('button', { name: /^Close/ })).toBeFocused();
   expect(errors).toEqual([]);
