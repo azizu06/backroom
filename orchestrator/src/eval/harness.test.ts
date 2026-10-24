@@ -24,6 +24,10 @@ describe('eval run', () => {
     expect(lead).toMatchObject({ outcome: 'ALLOW', answerKeyMatch: true, seams: expect.arrayContaining(['gateway:payment_link', 'state:audit']) });
     expect(payable?.seams).toEqual(expect.arrayContaining(['state:audit', 'simulated:nessie']));
     expect(duplicate?.outcome).toBe('ESCALATE');
+    expect(result.reports.find(report => report.id === 'C06')).toMatchObject({ outcome: 'EXACT_PAYMENT_MATCH', seams: expect.arrayContaining(['reconciliation:fixture-feed']) });
+    expect(result.reports.find(report => report.id === 'C07')).toMatchObject({ outcome: 'RECON_UNMATCHED' });
+    expect(result.reports.find(report => report.id === 'C19')).toMatchObject({ outcome: 'RECON_SHORT' });
+    expect(result.reports.find(report => report.id === 'C20')).toMatchObject({ outcome: 'RECON_DUPLICATE' });
     expect(duplicate?.seams).not.toContain('simulated:nessie');
     expect(result.reports.filter(report => report.answerKeyMatch)).toHaveLength(result.reports.length);
   });

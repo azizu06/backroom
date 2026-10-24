@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { evaluate, type ActionRequest, type Badge, type Context } from '@backroom/policy';
 import { FakeEffects, MemoryStateStore, SeatWorker, type AuditInput } from '../index';
 import { MemoryFinanceRepository } from '../payables/repository';
+import { inspectPaymentEvidence, reconcileAlreadyPaid, type BankEvidence } from '../payments';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
 
@@ -178,6 +179,39 @@ async function directPolicy(scenario: Scenario, step: PolicyStep, seed: any): Pr
   return { kind: decision.kind, ruleIds: decision.ruleIds, seams: ['state:audit', 'policy:evaluate'] };
 }
 
+function bankFeed(seed: any): BankEvidence[] {
+  return seed.bankTransactions.map((row: any) => ({ _id: row.id, amount: row.amountCents / 100, description: row.memo,
+    paymentLinkRef: row.paymentLinkRef, status: 'completed', medium: 'balance', transaction_date: String(row.postedAt).slice(0, 10) }));
+}
+
+async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any): Promise<{ kind: string; seams: string[] } | undefined> {
+  const operation = step.operation;
+  const feed = bankFeed(seed);
+  const now = Date.parse('2026-10-24T09:00:00Z');
+  if (operation === 'match_seed-credit-1043_to_ar_invoice_1043_before_clearing' || operation === 'record_claim_keep_open_escalate_unmatched_99000c_credit_no_blind_clear') {
+    const invoiceId = scenario.invoiceId ?? '';
+    const invoice = seed.arInvoices.find((row: any) => row.id === invoiceId);
+    const store = new MemoryStateStore();
+    await store.registerAgent('eval-recon', 'collections', now);
+    await store.insertInvoice({ id: invoiceId, kind: 'ar', state: 'overdue' });
+    await store.enqueueTask({ id: `eval-${invoiceId}`, seatId: 'collections', refs: [invoiceId], steps: [], idempotencyKey: `ar:${invoiceId}:1` });
+    const lease = await store.claimTask('eval-recon', now, 12000);
+    if (!lease || !invoice) return { kind: 'SETUP_FAILED', seams: ['reconciliation:fixture-feed'] };
+    const result = await reconcileAlreadyPaid({ invoiceId, totalCents: invoice.principalCents + invoice.lateFeeCents,
+      expectedMemo: `Harbor Media payment invoice ${invoiceId}`, policyVersion: seed.policyVersion }, feed, store, lease, 'overdue', now);
+    const kind = result.status === 'paid' ? 'EXACT_PAYMENT_MATCH' : result.ruleId;
+    return { kind, seams: ['reconciliation:fixture-feed', 'state:audit'] };
+  }
+  const linkId = operation?.startsWith('match_seed-short-1044') ? 'link-short-1044'
+    : operation?.startsWith('two_distinct_bank_deposits') ? 'link-duplicate-1045' : undefined;
+  if (!linkId) return undefined;
+  const link = seed.paymentLinks.find((row: any) => row.id === linkId);
+  if (!link) return { kind: 'SETUP_FAILED', seams: ['reconciliation:fixture-feed'] };
+  const evidence = inspectPaymentEvidence({ linkId, amountCents: link.amountCents,
+    memo: `backroom:invoice=${link.invoiceId}:installment=1` }, feed);
+  return { kind: evidence.ruleId ?? 'EXACT_PAYMENT_MATCH', seams: ['reconciliation:fixture-feed'] };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -202,7 +236,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        seams.add('integration:not_executed');
+        const planted = await plantedBankCase(scenario, step, seed);
+        if (!planted) seams.add('integration:not_executed');
+        else {
+          planted.seams.forEach(seam => seams.add(seam));
+          outcomes.push(planted.kind);
+          if (planted.kind === 'SETUP_FAILED') violations.push(`${scenario.id}/${index}: reconciliation setup failed`);
+        }
         continue;
       }
       const actual = step.action === 'pay_invoice'
