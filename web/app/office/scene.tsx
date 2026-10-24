@@ -178,11 +178,11 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
       blur={contactShadows.blur} opacity={contactShadows.opacity} far={contactShadows.far} color={contactShadows.color} />
     <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
-    {/* Room shell: peach floor, cream walls, lavender partitions, blush rugs (room pads and the aisle runner). */}
+    {/* Room shell: peach floor, cream walls, lavender partitions, cream room pads and a blush aisle runner. */}
     <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color={ROLES.floor} />
     <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color={ROLES.wall} />
     <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color={ROLES.wall} />
-    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color={ROLES.rug} />
+    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color={ROLES.aisle} />
     {[-2.5, 2.5].map(x => <group key={x}>
       <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
       <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color={ROLES.partition} />
@@ -190,7 +190,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     {visibleRooms(snapshot).map(room => {
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
-        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : ROLES.rug} />
+        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : ROLES.roomPad} />
         <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
       </group>;
     })}

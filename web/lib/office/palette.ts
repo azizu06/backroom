@@ -31,6 +31,10 @@ export const ROLES = {
   shadow: PALETTE.slate,
   deny: PALETTE.coral,
   background: PALETTE.cream,
+  roomPad: PALETTE.cream,
+  aisle: PALETTE.blush,
+  statusOk: PALETTE.mint,
+  statusWarn: PALETTE.butter,
 } as const;
 
 export type RoleName = keyof typeof ROLES;
