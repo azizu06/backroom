@@ -31,10 +31,14 @@ describe('private audit HTTP boundary', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toMatchObject({ chain: { valid: true, length: 1 }, entries: [{ id: 'audit:1', decision: 'ESCALATE' }] });
     expect(JSON.stringify(await (await handle('entries', request('entries', undefined, cookie))).json())).not.toContain(secret);
-    expect((await handle('session', request('session', { code: 'wrong' }))).status).toBe(403);
+    const wrongCode = await handle('session', request('session', { code: 'wrong' }));
+    expect(wrongCode.status).toBe(403);
+    expect(await wrongCode.json()).toEqual({ error: 'Operator code rejected.' });
     const crossOrigin = request('session', { code: secret });
     crossOrigin.headers.set('origin', 'https://attacker.example');
-    expect((await handle('session', crossOrigin)).status).toBe(403);
+    const foreign = await handle('session', crossOrigin);
+    expect(foreign.status).toBe(403);
+    expect(await foreign.json()).toEqual({ error: 'Origin rejected.' });
     expect((await handle('entries', request('entries', undefined, `${cookie}forged`))).status).toBe(401);
   });
 
@@ -45,10 +49,50 @@ describe('private audit HTTP boundary', () => {
     const login = await handle('session', request('session', { code: secret }));
     const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
     expect(login.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Strict');
+    expect(login.headers.get('set-cookie')).not.toContain('Secure');
     clock += 8 * 60 * 60 * 1000;
     expect((await handle('entries', request('entries', undefined, cookie))).status).toBe(401);
     const unavailable = createAuditHTTP({ store: () => store, secret: () => undefined, origin: () => origin });
     expect((await unavailable('entries', request('entries', undefined, cookie))).status).toBe(503);
+  });
+});
+
+describe('audit session origins', () => {
+  const PUBLIC = 'https://demo.example';
+  const LOOPBACK = 'http://127.0.0.1:3477';
+  const post = (handle: Awaited<ReturnType<typeof setup>>['handle'], code: string, originHeader: string) => handle('session', new Request(`${PUBLIC}/api/audit/session`, {
+    method: 'POST', headers: { origin: originHeader, 'content-type': 'application/json' }, body: JSON.stringify({ code }),
+  }));
+
+  it('authorizes the declared loopback office with the operator code and an http cookie', async () => {
+    const store = new MemoryStateStore();
+    const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC, loopbackOrigin: () => LOOPBACK });
+    const login = await post(handle, secret, LOOPBACK);
+    expect(login.status).toBe(200);
+    expect(await login.json()).toEqual({ authorized: true });
+    const setCookie = login.headers.get('set-cookie')!;
+    expect(setCookie).toContain('HttpOnly; SameSite=Strict');
+    expect(setCookie).not.toContain('Secure');
+    const cookie = setCookie.split(';')[0]!;
+    expect((await handle('entries', new Request(`${LOOPBACK}/api/audit/entries`, { headers: { cookie } }))).status).toBe(200);
+    const wrong = await post(handle, 'wrong', LOOPBACK);
+    expect(wrong.status).toBe(403);
+    expect(await wrong.json()).toEqual({ error: 'Operator code rejected.' });
+  });
+
+  it('rejects every other origin and still secures the public https session', async () => {
+    const store = new MemoryStateStore();
+    const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC, loopbackOrigin: () => LOOPBACK });
+    for (const originHeader of ['https://attacker.example', 'http://localhost:3477', 'http://127.0.0.1:3478', 'https://127.0.0.1:3477', 'http://127.0.0.2:3477']) {
+      const rejected = await post(handle, secret, originHeader);
+      expect(rejected.status).toBe(403);
+      expect(await rejected.json()).toEqual({ error: 'Origin rejected.' });
+    }
+    const login = await post(handle, secret, PUBLIC);
+    expect(login.status).toBe(200);
+    expect(login.headers.get('set-cookie')).toContain('Secure');
+    const unset = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC });
+    expect((await post(unset, secret, LOOPBACK)).status).toBe(403);
   });
 });
 
