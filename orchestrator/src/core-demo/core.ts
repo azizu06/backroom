@@ -67,7 +67,7 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
   await store.appendAudit({ ts: NOW, actor: 'system', seat: 'collections', action: 'fake_pre_call_signals',
     ruleIds: ['DEMO_FIXTURE'], policyVersion: 1, refs: ['1042'], route: 'test_stub',
     inputs: { simulated: true, context, apify: options.apify ?? 'fake' }, latencyMs: 0, costUsd: 0 });
-  const fixtureRouter = createRouter({ stateStore: store, cloudApiKey: 'test-fixture', cloudModel: 'scripted-fixture',
+  const fixtureRouter = createRouter({ stateStore: store, cloudProvider: 'openrouter', cloudApiKey: 'test-fixture', cloudModel: 'scripted-fixture',
     now: () => NOW, fetch: async () => Response.json({ choices: [{ message: { content: JSON.stringify({
       confidence: 1, output: { tone: 'neutral', offerOrder: ['pay_in_full', 'installments'],
         plan: { installments: 2, firstPaymentPct: 50, totalDays: 30, waiveFees: false, discountPct: 0 } },

@@ -1,0 +1,98 @@
+{
+  "startedAt": "2026-10-24T09:49:44.622Z",
+  "passed": true,
+  "provider": "anthropic",
+  "spendCapUsd": 3,
+  "reservedMaximumUsd": 0.75,
+  "totalCostUsd": 0.01105,
+  "requests": [
+    {
+      "requestId": "req_011CgLrTZCr8XsByckkknfe6",
+      "status": 200,
+      "model": "claude-sonnet-5-5",
+      "usage": {
+        "input_tokens": 343,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 673,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      },
+      "costUsd": 0.007416
+    },
+    {
+      "requestId": "req_011CgLrU2YQCLmCcqfwBv3E7",
+      "status": 200,
+      "model": "claude-sonnet-5-5",
+      "usage": {
+        "input_tokens": 892,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 185,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+      },
+      "costUsd": 0.003634
+    }
+  ],
+  "results": [
+    {
+      "route": "cloud",
+      "model": "claude-sonnet-5-5",
+      "latencyMs": 6561.259292,
+      "costUsd": 0.007416
+    },
+    {
+      "route": "cloud",
+      "model": "claude-sonnet-5-5",
+      "latencyMs": 1960.9937499999996,
+      "costUsd": 0.003634
+    }
+  ],
+  "callPlan": {
+    "output": {
+      "opening": "Hello, this is an automated AI assistant calling on behalf of Northfield Studio. I'm an AI, not a human. I'm calling about an account matter and would like to speak with an authorized contact for Synthetic B2B Client. Is now a good time for a brief call?",
+      "identityCheck": "Before sharing any account details or amounts, ask the person to confirm their full name, their role at Synthetic B2B Client, and that they are authorized to discuss the account. Do not state the balance, invoice details, or any amount until identity is confirmed. If they cannot or will not confirm, or if they are not the right contact, do not disclose account details. Offer to leave a callback request with Northfield Studio contact information and end the call politely.",
+      "steps": [
+        "Open by disclosing that this is an AI assistant calling for Northfield Studio, and ask whether it is a good time to talk.",
+        "Ask for the authorized contact and complete the identity check. Share no amounts or account specifics until identity is confirmed (currently not confirmed).",
+        "If identity is confirmed, briefly state the purpose: a follow-up on an outstanding account balance. Then share the amount owed as recorded by Northfield Studio.",
+        "Ask whether they are aware of the balance and whether there are questions or a dispute. Listen and note their response accurately.",
+        "Ask about their expected timing for payment, and record any commitment or stated reason for delay without judging or pressuring.",
+        "If they request a fee waiver, discount, payment plan approval, or any exception, say that the AI assistant cannot approve or grant these. Offer to pass the request to the Northfield Studio team for review, and make no promises about the outcome.",
+        "Do not take or approve payments on the call. Direct them to Northfield Studio's official payment channels as provided in their invoice or by the team.",
+        "Summarize what was discussed and any next steps, confirm the best callback contact details, and thank them for their time.",
+        "End the call courteously. Log the outcome, including identity status, any dispute or request, and follow-up needed, for human review."
+      ]
+    },
+    "route": "cloud",
+    "model": "claude-sonnet-5-5",
+    "latencyMs": 6561.259292,
+    "costUsd": 0.007416
+  },
+  "why": {
+    "question": "Why didn't you pay invoice #4419?",
+    "answer": "Invoice #4419 was not paid because it was held as a suspected duplicate. The payables duplicate check matched it to invoice #4402 from vendor acme under the DUPLICATE_INVOICE rule, with an amount difference of 37 [entry:212]. The invoice was then held and the matter was escalated, with controller:dana listed in the evidence references [entry:213]. The entries do not record a final resolution, and they do not say whether the invoice was later paid or released.",
+    "citations": [
+      "212",
+      "213"
+    ],
+    "source": "model"
+  }
+}
