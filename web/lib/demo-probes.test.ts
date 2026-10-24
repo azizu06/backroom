@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  getDemoProbes, localProbeSource, PROBE_CACHE_TTL_MS, PROBE_TIMEOUT_MS, probeServices, readServiceStatus, resetDemoProbesForTest,
+  getDemoProbes, localProbeSource, PROBE_CACHE_MAX_AGE_MS, PROBE_CACHE_TTL_MS, PROBE_TIMEOUT_MS, probeServices, readServiceStatus, resetDemoProbesForTest,
   setServiceStatusSource, type ProbeDeps,
 } from './demo-probes';
 
@@ -82,7 +82,7 @@ describe('probeServices', () => {
     const { deps: d, fetch } = deps();
     const result = await probeServices(d);
     expect(result).toEqual({
-      gx10: { state: 'verified', source: 'live', evidence: 'GET /v1/models · 3 models', at: new Date(NOW).toISOString() },
+      gx10: { state: 'verified', source: 'live', evidence: 'GET /models · 3 models', at: new Date(NOW).toISOString() },
       claude: { state: 'verified', source: 'receipt', evidence: 'Route receipt req_good1', at: ago(4 * HOUR) },
       apify: { state: 'verified', source: 'receipt', evidence: 'Run runABC123', at: ago(5 * HOUR) },
       policy: { state: 'verified', source: 'receipt', evidence: 'Receipt: DENY FEES_NON_WAIVABLE, ALLOW IN_BADGE', at: ago(3 * HOUR) },
@@ -130,9 +130,9 @@ describe('probeServices', () => {
       expect(gx10).toEqual({ state: 'disabled', source: 'config', evidence: 'Disabled by config', at: null });
       expect(urls(fetch).some(url => url.endsWith('/models'))).toBe(false);
     });
-    it('is unverified when not configured', async () => {
-      const { deps: d } = deps();
-      expect((await probeServices({ ...d, env: env({ GX10_BASE_URL: undefined }) })).gx10).toEqual({ state: 'unverified', source: 'config', evidence: 'Not configured', at: null });
+    it('defaults to the router GX10 base URL when unset', async () => {
+      const unset = deps(); await probeServices({ ...unset.deps, env: env({ GX10_BASE_URL: undefined }) });
+      expect(urls(unset.fetch)[0]).toBe('http://100.117.44.20:11434/v1/models');
     });
   });
 
@@ -164,6 +164,39 @@ describe('probeServices', () => {
       const { deps: d, fetch } = deps({ files, listDir: async () => ['live-a.json', 'live-b.json', 'live-c.json'] });
       expect((await probeServices(d)).claude).toMatchObject({ state: 'unverified', evidence: 'No fresh route receipt' });
       expect(urls(fetch).some(url => /anthropic/i.test(url))).toBe(false);
+    });
+  });
+
+  describe('claude provider', () => {
+    it('is not verified when the router cloud provider is not direct Anthropic', async () => {
+      const { deps: d } = deps();
+      expect((await probeServices({ ...d, env: env({ LLM_CLOUD_PROVIDER: 'openrouter' }) })).claude)
+        .toEqual({ state: 'unverified', source: 'config', evidence: 'Cloud route is not direct Anthropic', at: null });
+    });
+  });
+
+  describe('phone bounded read', () => {
+    it('reads only the tail of a large voice log through readTail', async () => {
+      const readTail = vi.fn(async (_path: string, bytes: number) => bytes === 64 * 1024 ? voiceLine(ago(HOUR), 204) : null);
+      const { deps: d } = deps();
+      expect((await probeServices({ ...d, readTail })).phone).toEqual({ state: 'verified', source: 'receipt', evidence: 'Call webhook HTTP 204', at: ago(HOUR) });
+      expect(readTail).toHaveBeenCalledWith('/voice/a.jsonl', 64 * 1024);
+    });
+    it('default readTail drops the partial first line of a real file larger than the window', async () => {
+      const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+      const { tmpdir } = await import('node:os');
+      const { join } = await import('node:path');
+      const dir = await mkdtemp(join(tmpdir(), 'probe-tail-'));
+      try {
+        const file = join(dir, 'http-evidence.jsonl');
+        const filler = Array.from({ length: 2000 }, () => voiceLine(ago(2 * HOUR), 500)).join('\n');
+        await writeFile(file, `${filler}\n${voiceLine(ago(HOUR), 200)}\n`);
+        resetDemoProbesForTest();
+        const { deps: d } = deps();
+        const { readText: _r, readTail: _t, ...rest } = d;
+        const result = await getDemoProbes({ ...rest, voiceEvidencePaths: [file] });
+        expect(result?.services.phone).toEqual({ state: 'verified', source: 'receipt', evidence: 'Call webhook HTTP 200', at: ago(HOUR) });
+      } finally { resetDemoProbesForTest(); await rm(dir, { recursive: true, force: true }); }
     });
   });
 
@@ -234,9 +267,9 @@ describe('probeServices', () => {
         ? new Response('', { status: 404 }) : new Response('{"data":[]}', { status: 200 }));
       const result = await probeServices(deps({ fetch: fetch as unknown as typeof globalThis.fetch }).deps);
       expect(result.spacetime).toEqual({ state: 'unreachable', source: 'live', evidence: 'HTTP 404', at: new Date(NOW).toISOString() });
-      expect(result.gx10).toMatchObject({ state: 'verified', evidence: 'GET /v1/models · 0 models' });
+      expect(result.gx10).toMatchObject({ state: 'verified', evidence: 'GET /models · 0 models' });
     });
-    it('is unverified when not configured', async () => {
+    it('defaults to the router GX10 base URL when unset', async () => {
       const { deps: d } = deps();
       expect((await probeServices({ ...d, env: env({ SPACETIMEDB_DATABASE: undefined }) })).spacetime).toEqual({ state: 'unverified', source: 'config', evidence: 'Not configured', at: null });
     });
@@ -275,7 +308,18 @@ describe('getDemoProbes cache', () => {
     release();
     await vi.waitFor(async () => expect(await getDemoProbes(d)).not.toBe(first));
     expect(fetch).toHaveBeenCalledTimes(4);
-    expect((await getDemoProbes(d))?.services.gx10.evidence).toBe('GET /v1/models · 0 models');
+    expect((await getDemoProbes(d))?.services.gx10.evidence).toBe('GET /models · 0 models');
+  });
+
+  it('never serves a snapshot older than the hard max age; it waits for a fresh run instead', async () => {
+    let now = NOW;
+    const { deps: d, fetch } = deps({ now: () => now });
+    const first = await getDemoProbes(d);
+    now += PROBE_CACHE_MAX_AGE_MS + 1;
+    fetch.mockImplementation(async () => new Response('{"data":[]}', { status: 200 }));
+    const next = await getDemoProbes(d);
+    expect(next).not.toBe(first);
+    expect(next?.checkedAt).toBe(new Date(now).toISOString());
   });
 
   it('shares one run between concurrent first callers', async () => {

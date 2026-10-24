@@ -27,6 +27,7 @@ export const unprobedServices = disclosureItems
   .filter(item => item.kind === 'real' && !(probedServices as readonly string[]).includes(item.id))
   .map(item => item.id as ServiceId);
 export const NOT_PROBED_LABEL = 'Not probed in this process';
+export const CHECKING_LABEL = 'Checking…';
 
 /** At or below this width the overlay starts collapsed so it does not cover the office. */
 export const NARROW_PANEL_QUERY = '(max-width: 760px)';
@@ -98,5 +99,7 @@ export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | n
       return status.gx10.localAvailable ? { label: 'Online', tone: 'good' } : { label: 'Offline', tone: 'warning' };
     }
   }
+  // services present but probesCheckedAt null: the server's first probe run has not finished yet.
+  if (status.services && status.probesCheckedAt === null) return { label: CHECKING_LABEL, tone: 'neutral' };
   return unverified;
 }
