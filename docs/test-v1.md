@@ -1,9 +1,10 @@
 # Test v1 yourself
 
 **Ready now:** a phone-free app rehearsal with real local SpacetimeDB, policy,
-passkey verification, inbox, audit/why, policy editing and office views. The web
-pay page uses mock bank HTTP; a separate live script exercises GX10 + Nessie.
-Claude also has a separate live smoke. The full phone → Dana → bank demo is pending. Refs #29 #32.
+passkey verification, inbox, audit/why, policy editing and office views. Default
+mode uses mock bank HTTP and LLM OFF. Opt-in live mode runs the same web app
+against GX10, Anthropic, Nessie sandbox and capped Apify pre-call checks. The full
+phone → Dana → bank demo is pending. Refs #29 #32.
 
 From the repository root, with Node 22+, pnpm, cloudflared and SpacetimeDB CLI
 **2.13.0** installed ([setup](demo-runbook.md)):
@@ -48,7 +49,57 @@ controller **and audit** use `CONTROLLER_ENROLLMENT_SECRET`; policy uses
    Dana and locked Treasury. Use room buttons for a manual tour; try **Fixed
    camera**, then **Floor plan**. Both use the same subscribed state.
 
-Optional live checks (no phone; keep Nessie claims between runs):
+## Live web mode (no phone)
+
+Stop the owned rehearsal before changing modes. Keep `.nessie-state/claims`
+between starts; changing links, resetting the company or retrying payment reuses
+`backroom:invoice=1042:installment=1`, never deliberately posts another installment.
+
+```sh
+pnpm demo:down
+DEMO_LIVE=1 pnpm demo:up
+pnpm demo:health --live
+node tools/demo/rehearse.mjs --live
+pnpm demo:down
+```
+
+For laptop-only verification, add `DEMO_TUNNEL=0 DEMO_PORT=3310
+DEMO_STATE_PORT=3125` to the startup command. The live startup reads
+`ANTHROPIC_API_KEY` from ignored `.env.local`; if absent on macOS it imports
+Keychain service `backroom-anthropic-key` into that file without printing it.
+Nessie requires `NESSIE_API_KEY`; `NESSIE_ACCOUNT_ID` is optional because startup
+can find/seed the sandbox Northfield account with durable claims.
+
+The live flag enables the web host's shared LLM switch (unless `DEMO_LLM=off`),
+GX10 routine routing and Anthropic hard-call routing. Repeat steps 1–6 above:
+the pay page now uses **real Nessie sandbox HTTP**, and ask-why should show
+**Model explanation · verified citations**. The amount, passkey boundary, holds,
+and honest account-balance-plus-posted-deposits label are unchanged. Sandbox
+posted deposits are not settlement; the card and caller remain simulated.
+
+Apify uses `PRECALL_APIFY=live`: one pinned website-only Actor attempt per owned
+host, capped at **$0.10**, with no retry after an ambiguous start. Company resets
+reuse that attempt; restarting the host can initiate a fresh attempt. Public
+company input remains separate from CRS's synthetic identity. CRS uses
+`createCrsClientFromEnv()` when both credentials exist, otherwise the explicitly
+**FAKE** fixture client. Only public-record and fraud-risk products are available;
+the event sandbox offers no business credit or OFAC. No result grants dial or
+payment authority.
+
+`demo:health --live` asks the running web process for its actual adapter probes.
+It never infers live Nessie usage from the CLI's keys. GX10 model listing is
+read-only; cloud configuration alone is explicitly **not** an inference receipt.
+`getDemoHostServices()` in `web/lib/demo/services.ts` exposes a safe server-only
+observation for Diego's panel work. `/real-vs-sim` and `/api/demo-status` remain
+owned by Diego; until his probe wiring lands they can still say “Not probed”
+even when this walkthrough proves the web service worked.
+
+The headless live walkthrough requires actual GX10 classification, local-first
+routed field extraction and an Anthropic-backed cited answer; it also exercises the same passkey, bank,
+inbox traps, policy v2 and office views as the default walkthrough. See the
+[live evidence](evidence/test-v1/live/README.md). No phone is dialed.
+
+Optional independent service checks (keep Nessie claims between runs):
 
 ```sh
 gx10 gpu
@@ -59,7 +110,7 @@ pnpm demo:down
 
 `demo:live` uses fresh owned DBs, scripted call turns and a software test passkey;
 it checks all three moments with actual GX10 inference and Nessie sandbox
-read/deposit/reconciliation. It does **not** change the web host's mock bank.
+read/deposit/reconciliation. It does **not** change the web host's selected bank mode.
 For the separately verified Claude smoke, use the private-key setup and bounded
 command in [the Anthropic guide](evidence/anthropic/README.md).
 Apify starts one website-only Actor run, capped at $0.10 with no retries; do not
@@ -67,8 +118,10 @@ repeat an ambiguous start. Always finish with `pnpm demo:down`.
 
 **Verified October 24:** [receipts/screenshots](evidence/test-v1/README.md).
 Remaining gaps: phone round-trip awaits Aziz's dial go;
-team env has no CRS credentials (the client has separate sandbox evidence, but
-business-credit/OFAC and core wiring remain absent). Automated Tour is pending
-Diego's branch. The parity smoke currently fails at the lobby's audit unlock;
-reported to Diego. Real human phone biometrics, voice disclosure/tool round-trip,
+team env has no CRS credentials for this host. Public-record/fraud-risk sandbox
+evidence exists at `docs/evidence/crs/live-run.json`; a credentialed probe of the
+new pre-call/vendor wiring is separate. Business credit and OFAC are unavailable
+in the Cal Hacks sandbox (#4). Automated Tour is pending Diego's branch. The
+parity lobby-unlock regression is fixed on main by #110. Real human phone
+biometrics, voice disclosure/tool round-trip,
 and the full live phone/shared-state/bank loop remain unproven.

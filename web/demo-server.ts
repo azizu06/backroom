@@ -19,11 +19,14 @@ async function main() {
   let resetting = false;
   const server = createServer(async (req, res) => {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
-    if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end('demo mock bank; ' + process.env.STATE_STORE + ' state'); return; }
+    if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end(`demo ${runtime.status().bank}; ${process.env.STATE_STORE} state`); return; }
     if (path.startsWith('/__demo/')) {
       const actual = Buffer.from(req.headers.authorization || ''), expected = Buffer.from(`Bearer ${process.env.DEMO_CONTROL_SECRET}`);
       if (!process.env.DEMO_CONTROL_SECRET || actual.length !== expected.length || !timingSafeEqual(actual, expected)) { res.writeHead(401).end(); return; }
       res.setHeader('Cache-Control', 'no-store'); res.setHeader('Content-Type', 'application/json');
+      if (path === '/__demo/health' && req.method === 'GET') {
+        res.end(JSON.stringify(await runtime.health())); return;
+      }
       if (path === '/__demo/status' && req.method === 'GET') {
         try { await runtime.check();
           let voice = false;
@@ -75,7 +78,7 @@ async function main() {
     if (closing) return; closing = true;
     server.close(); void runtime.stop().then(() => app.close()).finally(() => process.exit(0));
   });
-  console.log('Demo ready: shared state, mock bank, no phone call placed.');
+  console.log(`Demo ready: shared state, ${runtime.status().bank}, no phone call placed.`);
 
 }
 main().catch(() => { console.error('DEMO_WEB_START_FAILED'); process.exit(1); });
