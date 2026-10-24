@@ -32,6 +32,9 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(wall!.height).toBeLessThanOrEqual(900);
   expect(wall!.x + wall!.width).toBeLessThanOrEqual(footer!.x + footer!.width - 680);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await expect(page.getByRole('region', { name: 'Preview audit receipts' })).toContainText('DENY');
+  await expect(lobby.locator('[data-audit-id]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

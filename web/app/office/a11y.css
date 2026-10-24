@@ -21,3 +21,6 @@
   white-space: nowrap;
   border: 0;
 }
+
+#office-preview-receipts { min-width: 0; }
+#office-preview-receipts code { overflow-wrap: anywhere; }
