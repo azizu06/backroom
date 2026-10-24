@@ -74,12 +74,22 @@ export class VendorSeat {
       if (!change) throw new Error('PROPOSAL_NOT_FOUND');
       return repo.withVendorLock(`vendor:${change.fields.vendorId}`, async () => {
         if (['approved', 'rejected'].includes(change.result.status) || !change.result.escalationId) return change.result;
-        const approval = await this.options.controller.get(change.result.escalationId);
+        await this.options.state.expireEscalations((this.options.now ?? Date.now)());
+        const approval = await this.options.state.getEscalation(change.result.escalationId);
+        if (approval && ['counter', 'pending_owner'].includes(approval.status)) {
+          change.result.status = 'held';
+          await repo.saveBankChange(change);
+          return change.result;
+        }
         if (!approval || !['approved', 'denied'].includes(approval.status)) return change.result;
         const vendor = await repo.getVendor(change.fields.vendorId);
         const bound = approval.id === change.result.escalationId && approval.evidenceRefs.includes(change.id) &&
-          approval.toHuman === DEFAULT_POLICY.toHuman && approval.ruleIds.some(rule => change.result.decision.ruleIds.some(expected => expected === rule));
-        const passkey = approval.method === 'passkey' && Number.isFinite(approval.decidedAt);
+          approval.toHuman === DEFAULT_POLICY.toHuman && approval.policyVersion === change.result.decision.policyVersion &&
+          approval.ruleIds.some(rule => change.result.decision.ruleIds.some(expected => expected === rule));
+        const passkey = approval.method === 'passkey' && typeof approval.credentialId === 'string' && !!approval.credentialId &&
+          typeof approval.decidedAt === 'number' && Number.isFinite(approval.decidedAt) &&
+          approval.decidedAt >= approval.createdAt && approval.decidedAt < approval.expiresAt &&
+          approval.decision?.kind === (approval.status === 'approved' ? 'Approve' : 'Deny');
         if (!bound || !passkey) return change.result;
         if (approval.status === 'denied') change.result.status = 'rejected';
         else if (!change.verified || change.result.status !== 'awaiting_controller') return change.result;

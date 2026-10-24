@@ -26,9 +26,7 @@ export function controllerForLease(store: StateStore, lease: Lease, now = Date.n
       await store.assertLease(lease, now());
       if (!refs.every(ref => lease.refs.includes(ref))) throw new Error('ESCALATION_REFS_NOT_IN_TASK');
       const escalation = await store.createEscalation(lease, decision, now());
-      await store.setAgentTarget(lease, `${decision.toHuman}_desk`, now());
       return escalation.id;
     },
-    get: id => store.getEscalation(id),
   };
 }

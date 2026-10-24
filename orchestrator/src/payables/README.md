@@ -34,14 +34,20 @@ processInbox(email/invoice)
   **before** requesting a controller decision. Verification cannot pay or write
   master bank details.
 - `VendorSeat.apply(inboxId)` reads its exact escalation from authoritative state.
-  It requires approval, `method: passkey`, decision timestamp, controller identity,
-  matching evidence reference/rule, and the original master revision. Only then
-  does `commitApprovedChange` atomically update the master and proposal to
-  `approved`. Denial rejects; a stale revision holds for a fresh proposal.
+  It uses #51's `StateStore.expireEscalations/getEscalation` APIs and requires a
+  recorded `{ kind: 'Approve' }` decision, `method: passkey`, credential ID,
+  timestamp within the approval window, matching policy version/controller/
+  evidence/rule, and the original master revision. A valid approval lets
+  `commitApprovedChange` atomically update the master and proposal to `approved`.
+  Counter and pending_owner outcomes remain held; denial rejects; a stale
+  revision holds for a fresh proposal.
 - `controllerForLease(state, lease)` bridges the exported StateStore APIs.
   Enqueue/claim a task for the correct seat before binding it. Task refs must
   include the inbox ID and invoice ID for AP tasks, or the inbox ID for vendor
-  tasks. An escalation sets the agent target to the controller's desk. The controller/passkey service owns decision writes. Never deserialize
+  tasks. Shared `createEscalation` atomically sets the controller desk target.
+  `ControllerApprovals` owns decision writes through the shared
+  `StateStore.decideEscalation(VerifiedApproval, now)` reducer; this binding only
+  requests review and never mints approval capabilities. Never deserialize
   `ControllerPort`, a policy context, or a verification callback from a request.
 - All model calls use exported `route()` and strict schemas. Router owns two
   local schema attempts, cloud fallback, and route/model/latency/cost metadata.
@@ -73,7 +79,8 @@ unknown evidence holds. No guessed provider endpoints or fabricated clearances.
 ## Validation
 
 `pnpm --filter @backroom/orchestrator exec vitest run src/payables src/vendor`
-uses network-free public-seam tests. AP/vendor cases are clearly marked
+uses network-free public-seam tests, including real P-256 signed approvals
+through the shared ControllerApprovals verifier and StateStore reducer. AP/vendor cases are clearly marked
 **temporary synthetic fixtures**; canonical #14 fixtures were absent from main
 when this implementation began. Existing policy/worker tests also cover
 cross-seat denial and lease recovery. Canonical fixture replay, live CRS/Apify,

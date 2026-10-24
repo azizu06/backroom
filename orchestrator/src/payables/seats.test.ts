@@ -12,7 +12,7 @@ function setup() {
   const repository = new MemoryFinanceRepository({ vendors: [vendor], purchaseOrders: [{ id: 'PO-1', vendorId: 'acme', amountCents: 64000, lineItems: items }] });
   const state = new MemoryStateStore();
   const payment = vi.fn<PayablesClient['payInvoice']>(async () => ({ id: 'nessie-receipt', status: 'completed' }));
-  const controller = { request: vi.fn(async () => 'esc-1'), get: vi.fn(async () => undefined) };
+  const controller = { request: vi.fn(async () => 'esc-1') };
   const seat = new PayablesSeat({ repository, state, nessie: { payInvoice: payment }, controller });
   return { repository, state, payment, controller, seat };
 }

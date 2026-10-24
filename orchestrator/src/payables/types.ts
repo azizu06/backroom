@@ -1,5 +1,5 @@
 import type { APInvoice, Decision, LineItem } from '@backroom/policy';
-import type { Escalation, StateStore } from '../store';
+import type { StateStore } from '../store';
 
 export interface InboxSource { id: string; source: 'seed' | 'judge'; senderDomain: string }
 /** senderDomain comes from trusted envelope metadata, never extraction output. */
@@ -49,12 +49,12 @@ export interface PayablesClient {
     sourceAccount: string; destinationAccountId: string;
   }): Promise<{ id: string; status: 'completed' | 'pending' }>;
 }
-/** This is a trusted server capability. Never construct it from an HTTP/model boolean. */
+/** Request-only binding to StateStore.createEscalation. Decisions are written only
+ * by the shared ControllerApprovals service and read directly from StateStore. */
 export interface ControllerPort {
   request(decision: Extract<Decision, { kind: 'ESCALATE' }>, evidenceRefs: string[]): Promise<string>;
-  get(id: string): Promise<Escalation | undefined>;
 }
 export interface SeatOptions {
-  repository: FinanceRepository; state: Pick<StateStore, 'appendAudit'>;
+  repository: FinanceRepository; state: Pick<StateStore, 'appendAudit' | 'getEscalation' | 'expireEscalations'>;
   controller: ControllerPort; now?: () => number;
 }
