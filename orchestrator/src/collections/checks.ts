@@ -32,10 +32,11 @@ export async function boundedCreditCheck(check: CreditCheck, testIdentityId: num
       new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), 40_000); }),
     ]);
     if (!result || result.testIdentityId !== testIdentityId || !['clear', 'hit', 'unknown'].includes(result.ofacStatus)) return;
-    return { testIdentityId, ofacStatus: result.ofacStatus,
+    return { testIdentityId, ofacStatus: result.ofacStatus, bankruptcy: result.bankruptcy === true,
+      ...(result.ofacAvailability === 'not available in sandbox' ? { ofacAvailability: result.ofacAvailability } : {}),
       activeSignals: result.activeSignals.filter(name => /^[a-z_]{1,80}$/.test(name)),
       evidence: result.evidence.map(evidence => ({ product: evidence.product, checkedAt: evidence.checkedAt,
-        responseHash: evidence.responseHash, ...(evidence.creditScore === undefined ? {} : { creditScore: evidence.creditScore }) })),
+        responseHash: evidence.responseHash, ...(evidence.bankruptcies === undefined ? {} : { bankruptcies: evidence.bankruptcies }), ...(evidence.creditScore === undefined ? {} : { creditScore: evidence.creditScore }) })),
     };
   } catch { return; }
   finally { clearTimeout(timer); }
