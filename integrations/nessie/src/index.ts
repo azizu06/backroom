@@ -95,9 +95,14 @@ export class NessieClient {
         }
         throw new NessieError(`${method} ${path} failed`, response.status, response.status === 429 || response.status >= 500);
       }
-      // A reachable bank that answers with a body we cannot read is invalid data, not an outage.
+      // A dropped or stalled body is a transport outage; a complete body that is not JSON is invalid data.
+      let text: string;
+      try { text = await response.text(); } catch {
+        if (method === 'GET' && attempt + 1 < attempts) { await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue; }
+        throw new NessieError(`${method} ${path} response uncertain`, undefined, true);
+      }
       let result: unknown;
-      try { result = await response.json(); } catch {
+      try { result = JSON.parse(text); } catch {
         if (method !== 'GET') throw new NessieError(`${method} ${path} response uncertain`);
         throw new NessieError(`${method} ${path} returned an unreadable body`);
       }

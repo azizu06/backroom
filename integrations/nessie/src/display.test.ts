@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE_CACHE_MAX_AGE_MS, MemoryBalanceDisplayCache, NessieClient, NessieError } from './index.js';
 
-type Mode = 'up' | 'network' | 503 | 404 | 'negative' | 'garbled';
+type Mode = 'up' | 'network' | 503 | 404 | 'negative' | 'garbled' | 'dropped';
 function bank() {
   const state = { mode: 'up' as Mode, now: Date.parse('2026-10-24T13:05:00Z') };
   const fetch: typeof globalThis.fetch = async input => {
     if (state.mode === 'network') throw new TypeError('fetch failed');
     if (typeof state.mode === 'number') return new Response('{}', { status: state.mode });
     if (state.mode === 'garbled') return new Response('not json', { status: 200 });
+    if (state.mode === 'dropped') return new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"bal')); c.error(new TypeError('socket hang up')); } }), { status: 200 });
     const path = new URL(String(input)).pathname;
     if (path.endsWith('/deposits')) return Response.json([{ _id: 'dep-1', status: 'completed', medium: 'balance', amount: 2475 }]);
     return Response.json({ _id: 'acct-1', balance: state.mode === 'negative' ? -5 : 10000 });
@@ -19,7 +20,7 @@ function bank() {
 }
 
 describe('readBalanceDisplay outage fallback (spec 6.3)', () => {
-  it.each(['network', 503] as const)('serves the last good figures, labelled cached, when Nessie is down (%s)', async mode => {
+  it.each(['network', 503, 'dropped'] as const)('serves the last good figures, labelled cached, when Nessie is down (%s)', async mode => {
     const b = bank();
     const live = await b.client.readBalanceDisplay('acct-1');
     expect(live).toMatchObject({ cached: false, freshness: 'live', displayTotal: 12475 });
