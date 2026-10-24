@@ -7,6 +7,7 @@ export function createGateway(options: {
   secret: () => string | undefined;
   store: GatewayStore;
   decide?: DecidePlan;
+  approvalBridge?: (call: import("./store").GatewayCall, input: import("./parser").Invocation, result?: import("./store").ToolResult) => Promise<void>;
 }) {
   return async (tool: string, request: Request) => {
     const secret = options.secret();
@@ -33,7 +34,7 @@ export function createGateway(options: {
       const fingerprint = createHash("sha256")
         .update(JSON.stringify(input))
         .digest("hex");
-      const result = await options.store.transact(input.callId, (call) => {
+      const result = await options.store.transact(input.callId, async (call) => {
         const existing = Object.hasOwn(call.deliveries, input.webhookRequestId)
           ? call.deliveries[input.webhookRequestId]
           : undefined;
@@ -47,7 +48,9 @@ export function createGateway(options: {
             speak: "This delivery was already processed.",
           };
         }
+        await options.approvalBridge?.(call, input);
         const result = executeTool(call, input, options.decide);
+        await options.approvalBridge?.(call, input, result);
         Object.defineProperty(call.deliveries, input.webhookRequestId, {
           value: { fingerprint },
           enumerable: true,

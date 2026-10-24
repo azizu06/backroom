@@ -51,6 +51,7 @@ export class SeatWorker {
       if (task.escalationId) {
         // Controller approval never grants blanket permission to replay the effect.
         // A subsequent action must be a new policy-checked task from the controller service.
+        await store.expireEscalations(this.now());
         const escalation = await store.getEscalation(task.escalationId);
         if (!escalation) throw new Error('ESCALATION_NOT_FOUND');
         if (escalation?.status === 'pending') {
