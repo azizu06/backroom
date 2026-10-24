@@ -81,6 +81,7 @@ export function identityReply(text: string, contactName: string): 'confirmed' | 
   const reply = normalize(text), name = normalize(contactName);
   if (/\b(no|not|wrong|isnt|is not)\b/.test(reply)) return 'wrong_person';
   const accepted = ['yes', 'yep', 'yeah', 'speaking', 'thats me', 'yes thats me', 'yes speaking',
-    `this is ${name}`, `${name} here`, `yes this is ${name}`, `yes this is ${name} speaking`, `youre speaking to ${name}`];
+    `this is ${name}`, `${name} here`, `yes this is ${name}`, `yes this is ${name} speaking`, `youre speaking to ${name}`,
+    `yeah this is ${name}`, `yeah this is ${name} speaking`, `yep this is ${name}`, `yep this is ${name} speaking`];
   return accepted.includes(reply) ? 'confirmed' : 'uncertain';
 }

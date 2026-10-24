@@ -95,6 +95,21 @@ describe('demo disclosure status', () => {
   });
 });
 
+describe('host-reported sandbox rows', () => {
+  const at = iso(NOW - 60_000);
+  it('stay Simulated without a host report or with a stale status', () => {
+    for (const id of ['nessie', 'crs', 'company', 'card']) expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+    const stale = snapshot({ measuredAt: iso(NOW - 60_000), services: { crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
+    expect(getDisclosureStatus(item('crs'), stale, NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+  });
+  it('show the host adapter state when the demo host reports one', () => {
+    const status = snapshot({ services: { nessie: { state: 'simulated', source: 'config', evidence: 'Mock Nessie HTTP transport', at: null },
+      crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
+    expect(getDisclosureStatus(item('nessie'), status, NOW)).toEqual({ label: 'Simulated', tone: 'neutral', detail: 'Mock Nessie HTTP transport' });
+    expect(getDisclosureStatus(item('crs'), status, NOW)).toMatchObject({ label: 'Verified', tone: 'good' });
+  });
+});
+
 it('shows Checking while the first server probe run is pending', () => {
   for (const id of ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'] as const) {
     expect(getDisclosureStatus(item(id), snapshot({ notProbed: [], services: {}, probesCheckedAt: null }), NOW)).toEqual({ label: 'Checking…', tone: 'neutral' });
@@ -150,25 +165,26 @@ describe('disclosure rows', () => {
 });
 
 describe('disclosure panel expansion', () => {
-  it('collapses by default only at the narrow breakpoint', () => {
+  it('collapses by default in the office and at the narrow breakpoint', () => {
     expect(NARROW_PANEL_QUERY).toBe('(max-width: 760px)');
     expect(panelExpanded({ detailed: false, narrow: true, userExpanded: null })).toBe(false);
     expect(panelExpanded({ detailed: false, narrow: false, userExpanded: null })).toBe(true);
+    expect(panelExpanded({ detailed: false, narrow: false, officeView: true, userExpanded: null })).toBe(false);
   });
 
   it('keeps the details page expanded regardless of viewport or toggle', () => {
-    for (const narrow of [true, false]) for (const userExpanded of [null, true, false]) {
-      expect(panelExpanded({ detailed: true, narrow, userExpanded })).toBe(true);
+    for (const narrow of [true, false]) for (const officeView of [true, false]) for (const userExpanded of [null, true, false]) {
+      expect(panelExpanded({ detailed: true, narrow, officeView, userExpanded })).toBe(true);
     }
   });
 
   it('flips on toggle and lets the user choice win over the viewport default', () => {
-    for (const narrow of [true, false]) {
-      const initial = panelExpanded({ detailed: false, narrow, userExpanded: null });
-      const toggled = panelExpanded({ detailed: false, narrow, userExpanded: toggledPanel(initial) });
+    for (const narrow of [true, false]) for (const officeView of [true, false]) {
+      const initial = panelExpanded({ detailed: false, narrow, officeView, userExpanded: null });
+      const toggled = panelExpanded({ detailed: false, narrow, officeView, userExpanded: toggledPanel(initial) });
       expect(toggled).toBe(!initial);
-      expect(panelExpanded({ detailed: false, narrow, userExpanded: toggledPanel(toggled) })).toBe(initial);
-      expect(panelExpanded({ detailed: false, narrow: !narrow, userExpanded: toggledPanel(initial) })).toBe(!initial);
+      expect(panelExpanded({ detailed: false, narrow, officeView, userExpanded: toggledPanel(toggled) })).toBe(initial);
+      expect(panelExpanded({ detailed: false, narrow: !narrow, officeView, userExpanded: toggledPanel(initial) })).toBe(!initial);
     }
   });
 
@@ -180,13 +196,15 @@ describe('disclosure panel expansion', () => {
     const button = html.match(/<button[^>]*class="real-sim-toggle"[^>]*>/)?.[0] ?? '';
     const expanded = /aria-expanded="(true|false)"/.exec(button)?.[1];
     const controls = /aria-controls="([^"]+)"/.exec(button)?.[1];
-    expect(expanded).toBe(String(panelExpanded({ detailed: false, narrow: false, userExpanded: null })));
+    expect(expanded).toBe('false');
     expect(controls).toBeTruthy();
     expect(html).toMatch(new RegExp(`<aside[^>]*data-expanded="${expanded}"`));
     const body = html.match(new RegExp(`<div id="${controls}"[^>]*>`))?.[0];
     expect(body).toBeDefined();
-    expect(body).not.toContain('hidden');
-    expect(html).toContain('>Hide<');
-    expect(html).not.toContain('>Show<');
+    expect(body).toContain('hidden');
+    expect(html).toContain('>Show<');
+    expect(html).not.toContain('>Hide<');
+    expect(html).not.toContain('Details ↗');
+    expect(html).toContain('Sandbox items never represent real money or identities.');
   });
 });

@@ -28,9 +28,11 @@ import { RoomInspector } from './RoomInspector';
 import { ViewBoundary } from './ViewBoundary';
 import { PlaySplash } from './PlaySplash';
 import { COMPACT_QUERY, readStartView, saveStartView, startView } from '../../lib/office/start-mode';
+import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
+import './lobby.css';
 import './tags.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
@@ -50,7 +52,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
   auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode; storyStart?: boolean; storyPreview?: (preview: StoryChapter['preview']) => void;
 }) {
-  const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  const received = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  const { snapshot, presentation } = useOfficeHandoffs(received);
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
   const touch = useTouch();
   const { mode, lostContext, sceneAttempt } = viewport;
@@ -73,7 +76,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const [splash, setSplash] = useState(false);
   const [lookOnEnter, setLookOnEnter] = useState(false);
   function enterPlay() { setSplash(false); saveStartView('play'); setLookOnEnter(true); pickMode('play'); }
-  function enterOverview() { setSplash(false); saveStartView('overview'); document.getElementById('office-view')?.focus(); }
+  function enterOverview() { setSplash(false); saveStartView('overview'); }
   function chooseView(next: ViewMode) { saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next); }
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
@@ -144,12 +147,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setFocus(room);
   }
   const plan = mode === 'plan' || lostContext;
-  return <section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
+  return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
         {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Enter first person</button>}
+        <a href='/operator'>Operator</a>
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
@@ -180,6 +184,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             ref={element => { if (!element) return; tagElements.current.set(agent.id, element); return () => { if (tagElements.current.get(agent.id) === element) tagElements.current.delete(agent.id); }; }}>
             <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
           </div>)}</div>}
+          {!layers.floorPlan && <HandoffTags />}
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
@@ -218,9 +223,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section>}
+      <ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>
       {controls}
     </footer>
-  </section>;
+  </section></HandoffPresentation>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */
 export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
@@ -229,6 +235,8 @@ export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
   return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Preview only</span>
+    <a href='/inbox'>Judge inbox</a>
+    <span>Receipts there are not synced into this static scene.</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>
   </div>} />;

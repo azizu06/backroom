@@ -4,9 +4,124 @@
 
 <h1 align="center">Backrooms</h1>
 
-**A 3D back office for a small business with no finance team. AI agents work real finance seats, and every limit is enforced on the server and visible in the world.** The collections clerk phones a late client, negotiates only inside its badge, and walks to the owner's desk during the call when the client asks for more. The payables clerk refuses a fake bank change. Any agent can explain any decision from the audit wall. (Cal Hacks 13.0. Full spec: [`docs/spec.md`](docs/spec.md).)
+<p align="center"><b>A 3D back office for a small business with no finance team.</b><br>
+AI agents work real finance seats, every limit is enforced on the server, and you can watch it all happen.</p>
 
-## Layout
+<p align="center">
+  <a href="#inspiration">Inspiration</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#highlights">Highlights</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="#docs">Docs</a>
+</p>
+
+## Inspiration
+
+Small-business owners do their own finance. Late invoices, client calls, vendor
+bills, bank-detail changes and payment plans pile up across inboxes, spreadsheets
+and bank portals, and it is hard to see what is actually happening or what needs
+you. We wanted to make that **less overwhelming**: turn every moving part of the
+system into something you can see. Backrooms puts the work in a small 3D office.
+Each agent has a desk and a badge that limits what it may do. Every decision lands
+on an audit wall you can question. When something needs the owner, an agent walks
+to her desk.
+
+Cal Hacks 13.0. Full product spec: [`docs/spec.md`](docs/spec.md).
+
+## Features
+
+- **A 3D office you can walk through.** A react-three-fiber floor with Lobby,
+  Collections, Payables, Vendor Desk, Treasury and the owner's desk. Agents move
+  to the room that matches their current task, and a story mode replays the
+  scripted demo.
+- **Seven agents, one job each.** Intake, Extractor, Vendor, Payables,
+  Collections, Reconciler and Auditor hand a case to one another through a
+  single dispatcher ([agents](docs/agents.md)).
+- **Collections calls.** The collections agent is built to phone a late client
+  through Cartesia, give the AI disclosure, confirm identity before any amount,
+  and negotiate a payment plan only inside its badge. The offline demo uses
+  scripted call turns, and a historical call receipt is not a new dial
+  ([Cartesia limits](#cartesia-setup-features-and-limitations)).
+- **Payables that refuse fraud.** A lookalike sender domain or a risky bank
+  change is held for the owner, never paid.
+- **Server-enforced policy.** A pure TypeScript engine checks every action
+  against the agent's badge. Models write the words; code decides.
+- **Owner approval by passkey.** Anything over a limit needs a human WebAuthn
+  passkey tap. Voice and models can never approve.
+- **Pay and reconcile.** Clients pay through a link tied to the approved plan.
+  Deposits go to Capital One's Nessie sandbox, and an invoice moves only on an
+  exact deposit match. A posted deposit and a displayed balance are separate;
+  neither is settlement or proof that the balance rose
+  ([pay and reconcile](docs/m7-payments.md)).
+- **Audit wall with "ask why".** Every decision is a hash-chained audit entry.
+  Ask any agent why, and its answer must cite entry ids.
+- **LLM OFF switch.** Turn the models off and the office keeps enforcing every
+  rule with zero model calls.
+- **Live shared state.** SpacetimeDB holds the tables and reducers, and the
+  office subscribes to them. The retained
+  [Maincloud parity receipts](docs/evidence/maincloud-parity/README.md) measured
+  request-to-frame updates under one second.
+
+## Highlights
+
+**Claude talks, code decides.** Models own language and judgment inside a box.
+Code owns the box, the money and the record. Emails, invoices and client speech
+are treated as data, never instructions.
+
+**The fake bank change.** Invoice 4471 arrives from a lookalike domain asking to
+change bank details. Payables holds it (`LOOKALIKE_DOMAIN`) and nothing reaches
+the bank. With the CRS sandbox enabled, a high fraud-risk score also holds a
+bank change (`FRAUD_RISK_HOLD`). The hold stands with the LLM switched off.
+
+**Negotiating inside the badge.** Asked to waive a fee, the agent is denied
+(`FEES_NON_WAIVABLE`). Asked for four installments, it escalates
+(`MAX_INSTALLMENTS`) and walks to the owner's desk mid-call. Two installments are
+allowed and produce a pay link for exactly that amount.
+
+**Legal guardrails in code.** AI disclosure, recorded consent, calling hours,
+opt-out, a bankruptcy stop (`BANKRUPTCY_STOP` from CRS public records) and
+identity before amount are enforced by the policy engine, not by a prompt.
+
+**Honest about what is real.** Fixture data is labelled FAKE, sandbox data is
+labelled SANDBOX, and a cached result says when it was cached. See
+[Real versus simulated](#real-versus-simulated).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    O[3D office]
+    P[Pay page]
+    A[Passkey approval]
+  end
+  subgraph Server
+    G[Gateway + policy engine]
+    W[Seat workers + agent dispatcher]
+    R[Model router]
+  end
+  S[(SpacetimeDB: tables, reducers, hash-chained audit)]
+  O -- subscribes --> S
+  P --> G
+  A --> G
+  G -- reducers --> S
+  W -- reducers --> S
+  W --> R
+  R --> M[Claude and GX10 local models]
+  G <--> C[Cartesia voice agent]
+  W --> X[Nessie, CRS, Apify]
+```
+
+- **SpacetimeDB** owns live state and reducer-enforced transitions. The office
+  only subscribes and renders; it never decides anything.
+- **The orchestrator** runs the seat workers and agents, applies policy and is
+  the only caller of external APIs.
+- **The gateway** serves the voice agent's tools, payment links and approvals,
+  and checks each request against policy before any state changes.
+- **Models** run through one router: Claude in the cloud, and the team GX10 for
+  cheap bulk work, with a hard budget and an OFF switch
+  ([LLM control](docs/llm-control.md)).
 
 | Path | What |
 |---|---|
@@ -14,11 +129,12 @@
 | `orchestrator/` | Node TS service: seat workers, the only caller of external APIs |
 | `policy/` | Pure TS policy engine, `evaluate(badge, action, context)` |
 | `spacetime/` | SpacetimeDB module, reducers and generated client |
+| `integrations/nessie/` | Capital One Nessie sandbox client |
 | `fixtures/` | Synthetic Northfield seed, traps and signed answer key |
 | `tools/board` | CLI for the agent message board (GitHub issue #1) |
 | `AGENTS.md` | Team contract every agent follows |
 
-## Quick start
+## Getting started
 
 ```bash
 # Node 22+, pnpm, gh (logged in: gh auth login)
@@ -27,10 +143,17 @@ pnpm install
 cp .env.example .env      # fill in only what you need; never commit it
 # Team sponsor keys: scp <your-gx10-user>@gx10:/srv/team/backroom.env .env.local
 pnpm -r build && pnpm -r test
-pnpm dev:web              # http://localhost:3000
 ```
 
-## Hook your agent up to the board (2 minutes)
+Then pick how much of the system to run:
+
+| Command | What you get |
+|---|---|
+| `pnpm dev:web`, then open <http://localhost:3000/office> | The 3D office in preview mode, with labelled simulated state. No database or keys needed |
+| `pnpm demo:core` | The whole server loop in the terminal: call, policy, approval, payment, reconciliation and audit, with scripted turns and no network |
+| `pnpm demo:up` | The full demo host with live SpacetimeDB state ([runbook](docs/demo-runbook.md)) |
+
+### Hook your agent up to the board (2 minutes)
 
 The board is [issue #1](https://github.com/azizu06/backroom/issues/1). Your agent reads and posts with `tools/board`; rules are in [`AGENTS.md`](AGENTS.md). Prerequisite for every tool: `gh auth login`, then `tools/board whoami` should print your login.
 
@@ -47,6 +170,26 @@ Commands: `tools/board unread`, `read -n 20`, `post "[Name's Agent] ..."`, `wait
    `wait` exits 0 when someone else posts and prints the post; it polls every 30 s (`--interval`, `--timeout`).
 
 Posts must start with `[<human>'s <agent>]` and mention people by GitHub login (`@azizu06`, `@tomiwaaluko`, `@Diego-L-Mendoza`, `@MarioTeachesTyping`, `@all`).
+
+## Docs
+
+| Topic | Read |
+|---|---|
+| Product spec | [spec](docs/spec.md) |
+| Running the demo | [demo runbook](docs/demo-runbook.md), [rehearsal guide](docs/test-v1.md) |
+| The office | [office view](docs/office-view.md), [replay mode](docs/replay-mode.md) |
+| Agents and models | [agent runtime](docs/agents.md), [LLM control and OFF switch](docs/llm-control.md), [GX10 measurements](docs/t10-gx10.md) |
+| Policy and approvals | [policy editor](docs/policy-editor.md), [passkey approvals](docs/m6-approvals.md) |
+| Payments | [pay and reconcile](docs/m7-payments.md), [Nessie sandbox](docs/t4-nessie.md), [payment-link delivery](docs/payment-delivery.md) |
+| State | [SpacetimeDB module](spacetime/README.md), [state evidence](docs/spacetime-state.md), [Maincloud](docs/t8-spacetime.md) |
+| Voice | [Cartesia configuration](docs/cartesia.md), [call evidence](docs/t1-cartesia.md), [ask why by voice](docs/ask-why-voice.md) |
+| Proof | [sponsor evidence checklist](docs/sponsor-deliverables.md), [offline scoreboard](docs/eval/scoreboard.md), [red team](docs/redteam.md) |
+
+## Sponsor tracks and claim boundaries
+
+The sections below are the reviewed wording of what each integration does and
+does not prove. Check the [sponsor evidence checklist](docs/sponsor-deliverables.md)
+before copying any claim into a pitch.
 
 ## What is real in demo:core
 
@@ -195,3 +338,14 @@ This documentation does not enable or change either integration.
 
 Each source has its own execution scope and failures. These links do not imply
 that the whole phone, human-approval and bank flow has been live-tested.
+
+---
+
+<p align="center">
+  Built in one weekend at <b>Cal Hacks 13.0</b> by
+  <a href="https://github.com/azizu06">Aziz</a>,
+  <a href="https://github.com/tomiwaaluko">Tomi</a>,
+  <a href="https://github.com/Diego-L-Mendoza">Diego</a> and
+  <a href="https://github.com/MarioTeachesTyping">Anthony</a>.<br>
+  <sub>Claude talks, code decides. Synthetic company data; sandbox bank and credit data only.</sub>
+</p>

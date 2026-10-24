@@ -2,7 +2,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { MemoryStateStore, SpacetimeStateStore, SpacetimeTransport, type SpacetimeOptions, installStateStore, getStateStore, SeatWorker, FakeEffects,
-  northfield, createNorthfieldRepository, PaymentService, type Seat, type InvoiceState } from '@backroom/orchestrator';
+  northfield, createNorthfieldRepository, PaymentService, mirrorBankFeed, type Seat, type InvoiceState } from '@backroom/orchestrator';
+import { installInboxAgents, resetInboxAgents } from './agents';
 import { createDemoServices, installDemoServiceStatus } from './services';
 import { createGateway } from '../gateway/http';
 import { installGatewayStore } from '../gateway/runtime';
@@ -23,12 +24,33 @@ export async function createDemoRuntime() {
   let failed = false;
   let gatewayStore: MemoryGatewayStore;
   let collectionTail = Promise.resolve();
+  let retryTimer: ReturnType<typeof setInterval> | undefined;
+  let retryEpoch = 0;
+  const RETRY_MS = 5_000;
+  function disarmRetry() {
+    retryEpoch += 1;
+    if (retryTimer !== undefined) clearInterval(retryTimer);
+    retryTimer = undefined;
+  }
+  /** One pending-reconciliation sweep at a time. A failure is logged and the host stays up. */
+  function armRetry(service: PaymentService) {
+    disarmRetry();
+    const epoch = retryEpoch;
+    let active = false;
+    retryTimer = setInterval(() => {
+      if (epoch !== retryEpoch || active) return;
+      active = true;
+      void service.retryPending().catch(error => {
+        console.error('demo pending reconciliation retry failed', error);
+      }).finally(() => { active = false; });
+    }, RETRY_MS);
+  }
   async function collections<T>(work: () => Promise<T>): Promise<T> {
     const prior = collectionTail; let release!: () => void;
     collectionTail = new Promise<void>(resolve => { release = resolve; });
     await prior; try { return await work(); } finally { release(); }
   }
-  async function stop() { abort.abort(); await Promise.all(jobs); jobs = []; }
+  async function stop() { disarmRetry(); await resetInboxAgents(); abort.abort(); await Promise.all(jobs); jobs = []; }
   async function reset(next?: SpacetimeOptions) {
     if (next) config = next;
     await stop();
@@ -39,6 +61,7 @@ export async function createDemoRuntime() {
     const state = transport ? new SpacetimeStateStore({ transport }) : new MemoryStateStore();
     const prior = getStateStore();
     await installStateStore(state);
+    installInboxAgents(state, transport);
     if (prior instanceof SpacetimeStateStore) await prior.close();
     await state.setLlmEnabled(process.env.DEMO_LLM === 'on' || (process.env.DEMO_LIVE === '1' && process.env.DEMO_LLM !== 'off'));
     await services.prepare(state);
@@ -76,18 +99,25 @@ export async function createDemoRuntime() {
     await state.transitionInvoice(promiseLease, invoice.id, 'overdue', 'in_collection', Date.now());
     await state.transitionInvoice(promiseLease, invoice.id, 'in_collection', 'promised', Date.now());
     await state.completeTask(promiseLease, 'done', Date.now());
+    const mirrorFeed = () => mirrorBankFeed(services.bank, state, services.accountId).catch(error => {
+      console.error('demo bank feed mirror failed', error);
+    });
     const service: PaymentService = new PaymentService({ bank: services.bank, accountId: services.accountId,
       lookup: async id => { const stored = await gatewayStore.findPaymentCall(id); return stored && authorizedPaymentLink(stored, id); },
       onPosted: id => collections(async () => {
+        // After the pay posts, and again after reconcile. `recorded` also counts replays, so nothing rings from it.
+        await mirrorFeed();
         const agent = 'demo:reconcile';
         await state.heartbeat(agent, Date.now());
         await state.enqueueTask({ id: `demo:reconcile:${id}`, seatId: 'collections', refs: [invoice.id], idempotencyKey: `ar:${invoice.id}:1`, steps: [] });
         const lease = await state.claimTask(agent, Date.now(), 12000);
         if (!lease) throw new Error('DEMO_RECONCILIATION_LEASE');
         await service.reconcile(id, state, lease, 'promised');
+        await mirrorFeed();
         await state.completeTask(lease, 'done', Date.now());
       }) });
     installPaymentService(service);
+    armRetry(service);
     const effects = new FakeEffects(await createNorthfieldRepository());
     const seats: Seat[] = ['collections', 'payables', 'vendor_onboarding'];
     const workers = seats.map(seat => new SeatWorker({ id: `demo:worker:${seat}`, seat, store: state, effects }));
@@ -110,6 +140,10 @@ export async function createDemoRuntime() {
   await reset();
   return { reset, stop, health: () => services.health(),
     clientStopped: () => gatewayStore.clientStopped('northfield-jordan'),
+    endVoiceCall: async (sessionId: string) => {
+      if (!/^[a-f0-9-]{36}$/.test(sessionId)) throw new Error('INVALID_SESSION');
+      await getStateStore().expireEscalations(Date.now(), sessionId);
+    },
     registerVoiceCall: async (sessionId: string) => {
       // Trusted synthetic invoice only. HTTP cannot supply identity, plans or amounts.
       if (!/^[a-f0-9-]{36}$/.test(sessionId)) throw new Error('INVALID_SESSION');
@@ -119,7 +153,7 @@ export async function createDemoRuntime() {
         clientId: 'northfield-jordan', contactName: 'Jordan', companyName: northfield.company.name,
         amountCents: invoice.principalCents + invoice.lateFeeCents,
         receivable: { principalCents: invoice.principalCents, lateFeeCents: invoice.lateFeeCents },
-        currency: 'USD', policyVersion: (await getStateStore().getPolicy()).policyVersion,
+        currency: 'USD', policyVersion: (await getStateStore().getPolicy()).policyVersion, scenarioSource: 'judge',
         identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} });
     }, check: () => getStateStore().getPolicy(), status: (): DemoStatus => ({
     llmEnabled: getStateStore().llmEnabled, stateStore: mode, voice: process.env.DEMO_VOICE_RUNNING === '1',

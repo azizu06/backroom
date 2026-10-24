@@ -16,6 +16,23 @@ export interface CrsOptions {
   products?: Partial<Record<CrsProduct, CrsProductAdapter>>;
   /** Offline fixture transport: evidence is marked crs_fixture / FAKE so it can never pass as a live sandbox call. */
   fixture?: boolean;
+  /** Opt-in outage fallback (spec 6.3): last good evidence, served only when CRS itself is down. */
+  cache?: CrsEvidenceCache;
+  cacheMaxAgeMs?: number;
+  now?: () => number;
+}
+
+/** Stores projected evidence only (summary + hash), never request bodies or provider responses. */
+export interface CrsEvidenceCache {
+  get(key: string): Promise<CrsEvidence | undefined>;
+  set(key: string, evidence: CrsEvidence): Promise<void>;
+}
+export const CRS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** An outage, not a misconfiguration: network failure, rate limit or a CRS server error. */
+export function isCrsOutage(error: unknown): boolean {
+  return error instanceof CrsError && (error.code === 'TRANSPORT' ||
+    (error.code === 'HTTP' && error.status !== undefined && (error.status === 429 || error.status >= 500)));
 }
 
 /** publicRecords (PitchPoint) and fraudRisk (Fraud Finder) are the products the Cal Hacks sandbox serves; see ./sandbox.ts. */
@@ -51,6 +68,8 @@ export interface CrsEvidence {
   checkedAt: string;
   responseHash: string;
   summary: CrsSummary;
+  /** Set only on an outage fallback; checkedAt is then the original observation time. */
+  cached?: true;
 }
 
 /** Server only. Tokens and provider response bodies never leave this boundary. */
@@ -65,10 +84,17 @@ export class CrsClient {
   #renewing?: Promise<void>;
   readonly #credentials: { username: string; password: string };
   readonly #fixture: boolean;
+  readonly #cache?: CrsEvidenceCache;
+  readonly #cacheMaxAgeMs: number;
+  readonly #now: () => number;
   constructor(options: CrsOptions) {
     this.#credentials = { username: options.username, password: options.password };
     this.#fetch = options.fetch ?? fetch;
     this.#fixture = options.fixture === true;
+    // Fixture evidence must never be replayed as sandbox evidence, so fixture clients never cache.
+    this.#cache = this.#fixture ? undefined : options.cache;
+    this.#cacheMaxAgeMs = options.cacheMaxAgeMs ?? CRS_CACHE_MAX_AGE_MS;
+    this.#now = options.now ?? Date.now;
     this.#identities = structuredClone(options.identities ?? []);
     this.#products = options.products ? Object.fromEntries(Object.entries(options.products).map(([key, value]) => [key, { ...value }])) : undefined;
   }
@@ -85,8 +111,11 @@ export class CrsClient {
 
   async #json(response: Response): Promise<Record<string, unknown>> {
     if (!response.ok) throw new CrsError('HTTP', response.status);
+    // A body dropped or timed out mid-read is an outage; a body that arrives but is not JSON is bad data.
+    let text: string;
+    try { text = await response.text(); } catch { throw new CrsError('TRANSPORT'); }
     try {
-      const value: unknown = await response.json();
+      const value: unknown = JSON.parse(text);
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
       return value as Record<string, unknown>;
     } catch { throw new CrsError('RESPONSE'); }
@@ -102,6 +131,8 @@ export class CrsClient {
           const body = await this.#json(await this.#post('/users/login', this.#credentials));
           this.#setTokens(body);
         } catch (error) {
+          // An outage is not a rejected login: report it and allow a later retry.
+          if (isCrsOutage(error)) throw error;
           // CRS warns repeated failed logins disable the account. New client required after correction.
           this.#authFailed = true;
           throw new CrsError('AUTH', error instanceof CrsError ? error.status : undefined);
@@ -116,19 +147,19 @@ export class CrsClient {
     if (this.#token !== staleToken) return;
     if (!this.#renewing) {
       this.#renewing = (async () => {
-        try {
-          if (this.#refreshToken) {
+        if (this.#refreshToken) {
+          try {
             this.#setTokens(await this.#json(await this.#post('/users/refresh-token', { refreshToken: this.#refreshToken })));
-          } else {
-            this.#token = undefined;
-            await this.login();
+            return;
+          } catch (error) {
+            // A refresh that hits an outage keeps the refresh token and can retry once CRS is back.
+            if (isCrsOutage(error)) throw error;
+            // A rejected refresh token is not a rejected credential: log in once; login() latches a real rejection.
           }
-        } catch {
-          this.#token = undefined;
-          this.#refreshToken = undefined;
-          this.#authFailed = true;
-          throw new CrsError('AUTH');
         }
+        this.#token = undefined;
+        this.#refreshToken = undefined;
+        await this.login();
       })().finally(() => { this.#renewing = undefined; });
     }
     return this.#renewing;
@@ -161,6 +192,24 @@ export class CrsClient {
       !/^\/[a-zA-Z0-9_/-]+$/.test(adapter.path) || adapter.path.includes('..') || adapter.path.startsWith('//') || adapter.path.startsWith('/users')) {
       throw new CrsError('CONFIGURATION');
     }
+    const key = `${product}:${testIdentityId}`;
+    let evidence: CrsEvidence;
+    try {
+      evidence = await this.#live(product, testIdentityId, adapter, request);
+    } catch (error) {
+      if (!this.#cache || !isCrsOutage(error)) throw error;
+      const hit = await this.#cache.get(key).catch(() => undefined);
+      const observed = hit ? Date.parse(hit.checkedAt) : NaN;
+      if (!hit || hit.source !== 'crs_sandbox' || hit.product !== product || hit.testIdentityId !== testIdentityId ||
+        !Number.isFinite(observed) || this.#now() - observed > this.#cacheMaxAgeMs) throw error;
+      const at = new Date(observed).toISOString().slice(11, 16);
+      return { ...hit, label: `SANDBOX: test identity #${testIdentityId} (cached at ${at} UTC)`, cached: true };
+    }
+    if (this.#cache) await this.#cache.set(key, evidence).catch(() => undefined);
+    return evidence;
+  }
+
+  async #live(product: CrsProduct, testIdentityId: number, adapter: CrsProductAdapter, request: Record<string, unknown>): Promise<CrsEvidence> {
     await this.login();
     const token = this.#token!;
     let response = await this.#post(adapter.path, request, token);
@@ -178,7 +227,7 @@ export class CrsClient {
     return {
       source: this.#fixture ? 'crs_fixture' : 'crs_sandbox', product, testIdentityId,
       label: this.#fixture ? `FAKE: CRS fixture, test identity #${testIdentityId}` : `SANDBOX: test identity #${testIdentityId}`,
-      checkedAt: new Date().toISOString(),
+      checkedAt: new Date(this.#now()).toISOString(),
       responseHash: createHash('sha256').update(JSON.stringify(body)).digest('hex'), summary,
     };
   }
