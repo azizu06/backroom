@@ -92,7 +92,8 @@ describe('handoff engine', () => {
     const row = engine.toPublicHandoff(state, record);
     expect(Object.keys(row).sort()).toEqual(['caseDisplayId', 'correction', 'createdAt', 'decisionRef', 'fromAgentId', 'fromRole', 'fromVoiceRole',
       'handoffId', 'line', 'reason', 'sequence', 'status', 'summary', 'toAgentId', 'toRole', 'toVoiceRole']);
-    expect(row).toMatchObject({ fromRole: 'extractor', toRole: 'vendor', toVoiceRole: 'vendor_verifier', toAgentId: 'vendor-agent' });
+    expect(row).toMatchObject({ fromRole: 'extractor', fromVoiceRole: 'extractor', toRole: 'vendor', toVoiceRole: 'vendor_verifier', toAgentId: 'vendor-agent' });
+    expect(row.line).toBe(row.summary); // The author’s summary stays paired with fromVoiceRole.
     expect(row.line).not.toMatch(/[<>\x00-\x1f]|123456789|evil\.example/);
     expect(row.line).toContain('••6789');
     expect(Array.from(row.line).length).toBeLessThanOrEqual(240);

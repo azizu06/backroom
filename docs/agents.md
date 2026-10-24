@@ -59,7 +59,7 @@ same row shape from `MemoryHandoffStore.subscribe`. Matching `audit_entry` rows 
 | `status` | `offered` (A walks to B with the folder), `accepted` (B starts), `completed` (B finished its turn), `rejected` (return trip) |
 | `correction` | Backward edge (missing evidence / fix request) |
 | `reason`, `summary` | Redacted text (no control chars or `<>`, digit runs and emails masked), ≤120 and ≤160 chars |
-| `line` | Speech line; POST `{ role: toVoiceRole, text: line }` to `/api/handoff` |
+| `line` | Author’s speech line; while `offered`, POST `{ role: fromVoiceRole, text: line }` to `/api/handoff` |
 | `createdAt`, `acceptedAt?`, `completedAt?` | ms timestamps (database time) |
 | `decisionRef?`, `errorCode?` | Target activation id; rule code on `rejected` |
 

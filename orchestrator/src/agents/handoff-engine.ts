@@ -55,7 +55,7 @@ export interface AgentHandoffPublic {
   fromAgentId: string; toAgentId: string; fromRole: Role; toRole: Role;
   fromVoiceRole: HandoffRole; toVoiceRole: HandoffRole;
   status: HandoffRow['status']; correction: boolean; reason: string; summary: string;
-  /** Cartesia-safe speech line for `toRole`'s voice, ≤240 chars, no control chars or angle brackets. */
+  /** Cartesia-safe speech line for the author's `fromVoiceRole`, ≤240 chars, no control chars or angle brackets. */
   line: string; createdAt: number; acceptedAt?: number; completedAt?: number;
   decisionRef?: string; errorCode?: string;
 }
