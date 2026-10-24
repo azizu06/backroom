@@ -21,6 +21,8 @@ export interface AgentCaseStore extends HandoffStore {
   finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string): Promise<void>;
   stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string): Promise<void>;
   resumeCase(caseId: string): Promise<void>;
+  /** Explicit expiry takeover. Optional until a durable adapter implements the same contract. */
+  recoverExpired?(caseId: string): Promise<boolean>;
   getCase(caseId: string): Promise<CaseState | undefined>;
   listPublic(sinceSequence?: number): Promise<AgentHandoffPublic[]>;
 }
@@ -31,7 +33,10 @@ export class MemoryHandoffStore implements AgentCaseStore {
   private readonly cases = new Map<string, CaseState>();
   private sequence = 0;
   private readonly listeners = new Set<(row: AgentHandoffPublic) => void>();
-  constructor(private readonly options: { audit?: StateStore; now?: () => number } = {}) {}
+  constructor(private readonly options: { audit?: StateStore; now?: () => number; activationLeaseMs?: number } = {}) {
+    const ms = options.activationLeaseMs ?? 120_000;
+    if (!Number.isSafeInteger(ms) || ms <= 0) throw new engine.AgentStateError('INVALID_ACTIVATION_LEASE');
+  }
   /** Office/voice feed for the in-process demo; SpacetimeDB clients subscribe to the table instead. */
   subscribe(listener: (row: AgentHandoffPublic) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private now() { return (this.options.now ?? Date.now)(); }
@@ -52,29 +57,54 @@ export class MemoryHandoffStore implements AgentCaseStore {
     this.cases.set(input.caseId, state);
     return structuredClone(state);
   }
-  startActivation(caseId: string, leaseOwner: string) { return this.apply(caseId, s => engine.startActivation(s, { leaseOwner, now: this.now() })); }
-  async assertActive(a: Activation) { await this.apply(a.caseId, s => { engine.assertActive(s, claim(a)); }); }
-  recordArtifacts(ctx: ToolContext, refs: string[]) { return this.apply(ctx.activation.caseId, s => engine.recordArtifacts(s, claim(ctx.activation), refs)); }
+  startActivation(caseId: string, leaseOwner: string) { return this.apply(caseId, s => engine.startActivation(s,
+    { leaseOwner, now: this.now(), leaseMs: this.options.activationLeaseMs ?? 120_000 })); }
+  private async fenced<T>(a: Activation, operation: string, work: () => Promise<T>): Promise<T> {
+    try { return await work(); }
+    catch (error) {
+      if (error instanceof engine.AgentStateError && ['AGENT_LEASE_EXPIRED', 'AGENT_LEASE_STALE',
+        'AGENT_ACTIVATION_NOT_ACTIVE', 'AGENT_CASE_NOT_OPEN'].includes(error.message)) {
+        await this.options.audit?.appendAudit({ ts: this.now(), actor: 'code', seat: 'controller',
+          action: 'agent_activation_write_rejected', ruleIds: [error.message], policyVersion: 0,
+          refs: [a.caseId, a.activationId], route: 'code', latencyMs: 0, costUsd: 0,
+          inputs: { operation, rejectedToken: a.leaseToken, currentToken: this.cases.get(a.caseId)?.leaseToken } });
+      }
+      throw error;
+    }
+  }
+  async assertActive(a: Activation) { await this.fenced(a, 'assert', () => this.apply(a.caseId, s => { engine.assertActive(s, claim(a), this.now()); })); }
+  recordArtifacts(ctx: ToolContext, refs: string[]) { return this.fenced(ctx.activation, 'record_artifacts', () => this.apply(ctx.activation.caseId, s => {
+    engine.assertActive(s, claim(ctx.activation), this.now());
+    engine.recordArtifacts(s, claim(ctx.activation), refs);
+  })); }
   async commit(ctx: ToolContext, request: HandoffRequest): Promise<HandoffRecord> {
-    const result = await this.apply(ctx.activation.caseId, s =>
-      engine.commitHandoff(s, { ...claim(ctx.activation), request, now: this.now(), sequence: this.sequence + 1 }));
+    const result = await this.fenced(ctx.activation, 'commit', () => this.apply(ctx.activation.caseId, s =>
+      engine.commitHandoff(s, { ...claim(ctx.activation), request, now: this.now(), sequence: this.sequence + 1 })));
     if (!result.ok || !result.replayed) this.sequence = Math.max(this.sequence, result.record.sequence);
     if (!result.ok) throw new HandoffRejectedError(result.record);
     return result.record;
   }
   async reject(ctx: ToolContext, request: HandoffRequest, errorCode: string): Promise<HandoffRecord> {
-    const record = await this.apply(ctx.activation.caseId, s =>
-      engine.rejectHandoff(s, { ...claim(ctx.activation), request, errorCode, now: this.now(), sequence: this.sequence + 1 }));
+    const record = await this.fenced(ctx.activation, 'reject', () => this.apply(ctx.activation.caseId, s =>
+      engine.rejectHandoff(s, { ...claim(ctx.activation), request, errorCode, now: this.now(), sequence: this.sequence + 1 })));
     this.sequence = Math.max(this.sequence, record.sequence);
     return record;
   }
   finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string) {
-    return this.apply(ctx.activation.caseId, s => engine.finishActivation(s, { ...claim(ctx.activation), outcome, reason, now: this.now() }));
+    return this.fenced(ctx.activation, 'finish', () => this.apply(ctx.activation.caseId,
+      s => engine.finishActivation(s, { ...claim(ctx.activation), outcome, reason, now: this.now() })));
   }
   stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string) {
     return this.apply(caseId, s => engine.stopCase(s, { status, reason, now: this.now() }));
   }
   resumeCase(caseId: string) { return this.apply(caseId, s => engine.resumeCase(s)); }
+  async recoverExpired(caseId: string): Promise<boolean> {
+    const recovered = await this.apply(caseId, s => engine.recoverExpiredActivation(s, this.now()));
+    if (recovered) await this.options.audit?.appendAudit({ ts: this.now(), actor: 'code', seat: 'controller',
+      action: 'agent_activation_recovered', ruleIds: ['LEASE_EXPIRED'], policyVersion: 0, refs: [caseId, recovered.expiredActivationId],
+      route: 'code', latencyMs: 0, costUsd: 0, inputs: recovered });
+    return !!recovered;
+  }
   async getCase(caseId: string) { const s = this.cases.get(caseId); return s && structuredClone(s); }
   async listPublic(sinceSequence = 0) {
     return [...this.cases.values()].flatMap(s => s.handoffs.map(r => engine.toPublicHandoff(s, r)))

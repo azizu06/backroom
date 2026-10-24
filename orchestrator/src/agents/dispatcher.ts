@@ -51,18 +51,33 @@ export class Dispatcher {
     await this.options.store.resumeCase(request.caseId);
     return this.drive(request);
   }
+  /** Explicit server-owned takeover; adapters without expiry support fail closed. */
+  async recoverCase(request: CaseRequest): Promise<CaseResult> {
+    const recover = this.options.store.recoverExpired;
+    const refused = (reason: string): CaseResult => ({ caseId: request.caseId, status: 'held', reason,
+      artifactRefs: [], activations: [], handoffs: [], costUsd: 0 });
+    if (!recover) return refused('AGENT_RECOVERY_UNAVAILABLE');
+    if (!await recover.call(this.options.store, request.caseId)) return refused('AGENT_LEASE_NOT_EXPIRED');
+    return this.drive(request);
+  }
 
   private async drive(request: CaseRequest): Promise<CaseResult> {
     const { store, ledger, control, runtime } = this.options;
     const mode = this.options.mode ?? 'development';
     const caseTimer = AbortSignal.timeout(this.options.caseTimeoutMs ?? 120_000);
     const result: CaseResult = { caseId: request.caseId, status: 'failed', artifactRefs: [], activations: [], handoffs: [], costUsd: 0 };
+    let activeContext: ToolContext | undefined;
     const finish = (status: CaseOutcome, reason?: string, refs: string[] = []) => {
       Object.assign(result, { status, artifactRefs: refs, ...(reason ? { reason } : {}) });
       this.options.onEvent?.({ type: 'case_finished', result });
       return result;
     };
     const stop = async (status: Exclude<CaseOutcome, 'done'>, reason: string) => {
+      // An old query's late cancellation must not cancel a replacement's activation.
+      if (activeContext) {
+        try { await store.assertActive(activeContext.activation); }
+        catch (error) { return finish('failed', code(error, 'STALE_STOP')); }
+      }
       await store.stopCase(request.caseId, status, reason);
       return finish(status, reason);
     };
@@ -73,6 +88,7 @@ export class Dispatcher {
     };
     let input = request.input;
     for (;;) {
+      activeContext = undefined;
       if (request.signal?.aborted) return stop('cancelled', 'CANCELLED');
       if (caseTimer.aborted) return stop('held', 'CASE_TIMEOUT');
       if (!control.llmEnabled || control.llmSignal.aborted) return stop('paused', 'LLM_OFF');
@@ -101,6 +117,7 @@ export class Dispatcher {
           await store.assertActive(activation);
         },
       };
+      activeContext = ctx;
       this.options.onEvent?.({ type: 'activation_started', caseId: request.caseId, activationId: activation.activationId, role: activation.role });
       if (started.inbound) input = { caseId: request.caseId, handoff: { from: started.inbound.from, reason: started.inbound.reason,
         summary: started.inbound.summary, artifactRefs: started.inbound.artifactRefs },
