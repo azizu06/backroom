@@ -99,6 +99,8 @@ export interface GatewayStore {
   clientStopped?(clientId: string): Promise<boolean>;
   findPaymentCode?(code: string): Promise<GatewayCall | undefined>;
   activePaymentCall?(): Promise<GatewayCall | undefined>;
+  /** Most recently registered live voice call (`voice:collections`), for the office's read-only projection. */
+  latestVoiceCall?(): Promise<GatewayCall | undefined>;
   findPaymentCall?(linkId: string): Promise<GatewayCall | undefined>;
   transact<T>(
     callId: string,
@@ -143,6 +145,10 @@ export class MemoryGatewayStore implements GatewayStore {
     await this.tail;
     return structuredClone([...this.calls.values()].filter(call => call.status === 'active' && call.links.length)
       .sort((a, b) => (b.links.at(-1)?.createdAt ?? 0) - (a.links.at(-1)?.createdAt ?? 0))[0]);
+  }
+  async latestVoiceCall() {
+    await this.tail;
+    return structuredClone([...this.calls.values()].filter(call => call.agentId === 'voice:collections').at(-1));
   }
   async findPaymentCall(linkId: string): Promise<GatewayCall | undefined> {
     await this.tail;
