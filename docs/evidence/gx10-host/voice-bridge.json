@@ -1,0 +1,9 @@
+{
+  "measuredAt": "2026-10-24T15:06:26.490Z",
+  "bindHost": "100.117.44.20",
+  "privateVoiceClientStopped": "authenticated boolean response over loopback",
+  "externalPrivateAdmin": "403 on non-loopback socket",
+  "bridgeGateway": "200 CONTEXT (authorized; seeded synthetic invoice 1042 read)",
+  "publicVoiceToolCallback": "404 SESSION_NOT_FOUND (authorized; unknown synthetic session)",
+  "scope": "Records one synthetic gateway delivery receipt. No registration, dial, provider request, approval/payment or live-call mutation. Both handler/auth gates exercised; this is not a live call receipt."
+}
