@@ -14,6 +14,8 @@ export interface CrsOptions {
   fetch?: typeof fetch;
   identities?: readonly CrsSandboxIdentity[];
   products?: Partial<Record<CrsProduct, CrsProductAdapter>>;
+  /** Offline fixture transport: evidence is marked crs_fixture / FAKE so it can never pass as a live sandbox call. */
+  fixture?: boolean;
 }
 
 /** publicRecords (PitchPoint) and fraudRisk (Fraud Finder) are the products the Cal Hacks sandbox serves; see ./sandbox.ts. */
@@ -42,7 +44,7 @@ export interface CrsProductAdapter {
   summarize(body: Record<string, unknown>): CrsSummary;
 }
 export interface CrsEvidence {
-  source: 'crs_sandbox';
+  source: 'crs_sandbox' | 'crs_fixture';
   product: CrsProduct;
   testIdentityId: number;
   label: string;
@@ -62,9 +64,11 @@ export class CrsClient {
   readonly #products: CrsOptions['products'];
   #renewing?: Promise<void>;
   readonly #credentials: { username: string; password: string };
+  readonly #fixture: boolean;
   constructor(options: CrsOptions) {
     this.#credentials = { username: options.username, password: options.password };
     this.#fetch = options.fetch ?? fetch;
+    this.#fixture = options.fixture === true;
     this.#identities = structuredClone(options.identities ?? []);
     this.#products = options.products ? Object.fromEntries(Object.entries(options.products).map(([key, value]) => [key, { ...value }])) : undefined;
   }
@@ -172,8 +176,9 @@ export class CrsClient {
     // Project only numeric/enum values; raw names, addresses and other response fields cannot escape.
     const summary = project(product, parsed);
     return {
-      source: 'crs_sandbox', product, testIdentityId,
-      label: `SANDBOX: test identity #${testIdentityId}`, checkedAt: new Date().toISOString(),
+      source: this.#fixture ? 'crs_fixture' : 'crs_sandbox', product, testIdentityId,
+      label: this.#fixture ? `FAKE: CRS fixture, test identity #${testIdentityId}` : `SANDBOX: test identity #${testIdentityId}`,
+      checkedAt: new Date().toISOString(),
       responseHash: createHash('sha256').update(JSON.stringify(body)).digest('hex'), summary,
     };
   }
