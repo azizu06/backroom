@@ -10,6 +10,14 @@ const completion = (value: unknown) => new Response(JSON.stringify({ choices: [{
 const mockModel = (value: unknown = valid) => vi.fn<typeof fetch>(async () => completion(value));
 
 describe("askWhy", () => {
+  it("cites the StateStore audit:seq identifiers through projection and model validation", async () => {
+    const entry = { ...entries[0]!, id: "audit:1" };
+    const fetcher = mockModel({ answer: "Held as a duplicate [entry:audit:1].", citations: ["audit:1"] });
+    expect(await askWhy(question, [entry], { apiKey: "test", fetch: fetcher })).toMatchObject({
+      source: "model", citations: ["audit:1"],
+    });
+  });
+
   it.each(answerKey)("grounds scripted question: $question", async scenario => {
     const fetcher = mockModel({ answer: scenario.modelAnswer, citations: scenario.correctIds });
     const result = await askWhy(scenario.question, entries, { apiKey: "test", fetch: fetcher });

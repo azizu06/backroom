@@ -1,12 +1,11 @@
 import { consumeVerifiedApproval, type VerifiedApproval } from './approvals/verified';
-import { createHash } from 'node:crypto';
+import { AuditLog } from './audit';
 import type { Decision } from '@backroom/policy';
 import type { Agent, AgentState, AuditEntry, AuditInput, Escalation, Invoice, InvoiceState,
   CallEscalation, Lease, NewTask, PaymentReceipt, Seat, StateStore, Task } from './store';
 
 const copy = <T>(value: T): T => structuredClone(value);
-export const hashAudit = (entry: Omit<AuditEntry, 'hash'>): string =>
-  createHash('sha256').update(JSON.stringify(entry)).digest('hex');
+export { hashAudit } from './audit';
 
 /** Single-process reducer analogue: no awaits inside read/check/write sections. */
 export class MemoryStateStore implements StateStore {
@@ -27,7 +26,7 @@ export class MemoryStateStore implements StateStore {
   private agents = new Map<string, Agent>();
   private tasks = new Map<string, Task>();
   private escalations = new Map<string, Escalation>();
-  private audit: AuditEntry[] = [];
+  private audit = new AuditLog();
   private payments = new Map<string, PaymentReceipt>();
   private paymentFingerprints = new Map<string, string>();
   private invoices = new Map<string, Invoice>();
@@ -186,12 +185,12 @@ export class MemoryStateStore implements StateStore {
     return this.append(input);
   }
   private append(input: AuditInput) {
-    const body = { ...copy(input), seq: this.audit.length + 1, id: `audit:${this.audit.length + 1}`,
-      prevHash: this.audit.at(-1)?.hash ?? '0'.repeat(64) };
-    const entry = { ...body, hash: hashAudit(body) }; this.audit.push(entry);
-    return copy(entry);
+    return this.audit.append(input);
   }
-  async listAudit() { return copy(this.audit); }
+  async appendAudits(inputs: readonly AuditInput[]) { return this.audit.appendMany(inputs); }
+  async listAudit(sinceSeq = 0) { return this.audit.list(sinceSeq); }
+  async getAudit(id: string) { return this.audit.get(id); }
+  async verifyAuditChain() { return this.audit.verifyChain(); }
   async getPayment(key: string) { return copy(this.payments.get(key)); }
   async reservePayment(lease: Lease, key: string, fingerprint: string, now: number) {
     const task = this.owned(lease, now);
