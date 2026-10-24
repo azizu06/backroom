@@ -4,7 +4,7 @@ import type { OfficePropInteraction } from './interact';
 /** How long the Treasury door "DENY moment" plays before the door settles. */
 export const DENY_MOMENT_MS = 4000;
 export const DENY_FALLBACK_COLOR = '#9aa38f';
-/** Floor (x, z) of the Treasury doorway; the door faces +z toward the aisle. */
+/** Floor (x, z) of the Treasury doorway; the aisle is on its -z side, the vault room on its +z side. */
 export const TREASURY_DOOR: readonly [x: number, z: number] = [5, 1.15];
 /** Where the denied agent's echo stands on the aisle side of the door. */
 export const ECHO_START: readonly [x: number, z: number] = [5, 0.55];
