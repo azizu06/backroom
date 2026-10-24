@@ -70,6 +70,8 @@ For model calls, the OFF switch, or the #15 state adapter, read `docs/llm-contro
 
 `web/` Next.js + R3F, `orchestrator/` Node TS, `policy/` pure TS (`evaluate`), `spacetime/` module (placeholder), `fixtures/`, `tools/board`. Install `pnpm install`; check `pnpm -r build`, `pnpm -r test`.
 
+Passkey escalation setup and StateStore/gateway integration: `docs/m6-approvals.md`.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.

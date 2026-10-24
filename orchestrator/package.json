@@ -13,7 +13,8 @@
     "demo:recovery": "tsx src/recovery/demo.ts"
   },
   "dependencies": {
-    "@backroom/policy": "workspace:*"
+    "@backroom/policy": "workspace:*",
+    "@simplewebauthn/server": "^14.0.3"
   },
   "devDependencies": {
     "@types/node": "20.19.39",
@@ -22,5 +23,8 @@
     "vitest": "3.2.7"
   },
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "engines": {
+    "node": ">=22"
+  }
 }

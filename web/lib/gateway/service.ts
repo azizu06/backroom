@@ -116,15 +116,20 @@ export function executeTool(
         "I cannot find that approval request.",
       );
     const status =
+      escalation.status === "pending_owner" ? "pending_owner" :
       escalation.status === "pending" || escalation.method !== "passkey"
         ? "pending"
         : escalation.status;
     return {
       kind: status === "pending" ? "PENDING" : "RECORDED",
+      decision: escalation.method === "passkey" ? escalation.decision : undefined,
+      counter_terms: escalation.decision?.kind === "Counter" ? escalation.decision.terms : undefined,
       can_confirm: false,
       approval_status: status,
       speak:
-        status === "pending"
+        status === "pending_owner"
+          ? "Dana will confirm by email today."
+          : status === "pending"
           ? "I am still waiting for Dana. Dana will confirm by email today if needed."
           : status === "denied"
             ? "Dana did not approve those terms."

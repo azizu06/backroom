@@ -9,3 +9,8 @@ dist
 .claude/settings.local.json
 .DS_Store
 web/next-env.d.ts
+
+# Headless browser verification artifacts
+web/test-results/
+web/playwright-report/
+.playwright/
