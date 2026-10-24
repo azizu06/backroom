@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PAYLINK_KIOSK, PAYLINK_RADIUS, PITCH_LIMIT, PLAYER_RADIUS, SERVER_ROOM, SERVER_ROOM_BOX, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
-  interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
+  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PAYLINK_KIOSK, PAYLINK_RADIUS, PITCH_LIMIT, PLAYER_RADIUS, SERVER_ROOM, SERVER_ROOM_BOX, SPAWN, TREASURY_DOOR, TURN_SPEED, PlayInput, applyLook, headBob, insideAny,
+  applyTurnTap, frameLookYaw, interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
   type PlayCandidate, type Vec2,
 } from "./play";
 import { createMockOfficeState } from "./preview";
@@ -136,6 +136,22 @@ describe("input", () => {
     input.clear();
     input.press("turnLeft");
     expect(turnIntent(input, 1)).toBeGreaterThan(0);
+  });
+
+  it("a released turn-key tap still yaws one frame", () => {
+    const input = new PlayInput();
+    applyTurnTap(input, "turnLeft");
+    applyTurnTap(input, "forward");
+    input.press("turnLeft");
+    expect(input.active()).toBe(true);
+    input.release("turnLeft");
+    expect(turnIntent(input, 1 / 60)).toBe(0);
+    expect(input.consumeTurnTap()).toBeCloseTo(TURN_SPEED / 60);
+    applyTurnTap(input, "turnRight");
+    expect(input.consumeTurnTap()).toBeCloseTo(-TURN_SPEED / 60);
+    // A keydown both queues a tap and holds the key. The held frame wins so the tap is not applied twice.
+    expect(frameLookYaw(0.1, TURN_SPEED / 60, TURN_SPEED / 60)).toBeCloseTo(0.1 + TURN_SPEED / 60);
+    expect(frameLookYaw(0.1, 0, -TURN_SPEED / 60)).toBeCloseTo(0.1 - TURN_SPEED / 60);
   });
 
   it("clamps look pitch", () => {
