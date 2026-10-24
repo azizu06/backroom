@@ -83,3 +83,12 @@ The live command returns nonzero when T4 fails. Repeated runs reuse the same
 resources and deposit. `.nessie-state/` is ignored, but must be preserved across
 restarts. API host and contract: [official docs](https://prod.nessieisreal.com/docs)
 and [published OpenAPI](https://prod.nessieisreal.com/nessie-openapi-spec.yaml).
+
+## Outage fallback for the balance display (spec 6.3, #184)
+
+`readBalanceDisplay(accountId)` is `readBalanceWithPostedDeposits` plus freshness: live first, and with a
+`displayCache` option it returns the last good figures with `cached: true` and
+`freshness: 'cached at HH:MM UTC'` during a Nessie outage (network, timeout, 429 or 5xx; at most 24 h old).
+Invalid data and refusals still throw. `NessieError.outage` marks outage failures. Never use the cached
+display for deposits, reconciliation or health probes; those keep the live methods.
+

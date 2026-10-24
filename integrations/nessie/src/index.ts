@@ -38,11 +38,27 @@ export class FileClaims implements Claims {
   }
 }
 export class NessieError extends Error {
-  constructor(message: string, readonly status?: number) { super(`${SANDBOX_LABEL}: ${message}`); }
+  /** outage: the bank was unreachable or failing (network, timeout, 429/5xx), as opposed to invalid data or a refusal. */
+  constructor(message: string, readonly status?: number, readonly outage = false) { super(`${SANDBOX_LABEL}: ${message}`); }
 }
+/** Balance display with its freshness: live, or the last good read during a Nessie outage (spec 6.3). */
+export type BalanceDisplay = PostedDepositsDisplay & { cached: boolean; observedAt: string; freshness: string };
+/** Holds display figures only (balances, deposit IDs); never a deposit request or a reconciliation input. */
+export interface BalanceDisplayCache {
+  get(accountId: string): Promise<{ display: PostedDepositsDisplay; observedAt: string } | undefined>;
+  set(accountId: string, entry: { display: PostedDepositsDisplay; observedAt: string }): Promise<void>;
+}
+export class MemoryBalanceDisplayCache implements BalanceDisplayCache {
+  private readonly rows = new Map<string, { display: PostedDepositsDisplay; observedAt: string }>();
+  async get(accountId: string) { const row = this.rows.get(accountId); return row && structuredClone(row); }
+  async set(accountId: string, entry: { display: PostedDepositsDisplay; observedAt: string }) { this.rows.set(accountId, structuredClone(entry)); }
+}
+export const BALANCE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export interface ClientOptions {
   apiKey: string; claims: Claims; fetch?: typeof fetch; baseUrl?: string;
   readAttempts?: number; timeoutMs?: number;
+  /** Opt-in outage fallback for readBalanceDisplay only. */
+  displayCache?: BalanceDisplayCache; displayCacheMaxAgeMs?: number; now?: () => number;
   observe?: (event: { method: string; path: string; status: number; elapsedMs: number; shape: unknown }) => void;
 }
 const segment = (value: string) => encodeURIComponent(value);
@@ -64,26 +80,37 @@ export class NessieClient {
     const attempts = method === 'GET' ? (this.options.readAttempts ?? 3) : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
       const started = performance.now();
+      let response: Response;
       try {
-        const response = await this.fetcher(url, { method, headers: { 'Content-Type': 'application/json' },
+        response = await this.fetcher(url, { method, headers: { 'Content-Type': 'application/json' },
           body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(this.options.timeoutMs ?? 10000) });
-        // Never propagate provider response text or fetch errors: they may contain the key-bearing URL.
-        if (!response.ok) {
-          if (method === 'GET' && (response.status === 429 || response.status >= 500) && attempt + 1 < attempts) {
-            await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue;
-          }
-          throw new NessieError(`${method} ${path} failed`, response.status);
-        }
-        const result = await response.json();
-        this.options.observe?.({ method, path, status: response.status, elapsedMs: Math.round(performance.now() - started), shape: result });
-        return result as T;
-      } catch (error) {
-        if (error instanceof NessieError) throw error;
+      } catch {
+        // Network failure or timeout: the only transport outage. Never propagate fetch errors: they may contain the key-bearing URL.
         if (method === 'GET' && attempt + 1 < attempts) { await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue; }
-        throw new NessieError(`${method} ${path} response uncertain`);
+        throw new NessieError(`${method} ${path} response uncertain`, undefined, true);
       }
+      if (!response.ok) {
+        if (method === 'GET' && (response.status === 429 || response.status >= 500) && attempt + 1 < attempts) {
+          await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue;
+        }
+        throw new NessieError(`${method} ${path} failed`, response.status, response.status === 429 || response.status >= 500);
+      }
+      // A dropped or stalled body is a transport outage; a complete body that is not JSON is invalid data.
+      let text: string;
+      try { text = await response.text(); } catch {
+        if (method === 'GET' && attempt + 1 < attempts) { await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue; }
+        throw new NessieError(`${method} ${path} response uncertain`, undefined, true);
+      }
+      let result: unknown;
+      try { result = JSON.parse(text); } catch {
+        if (method !== 'GET') throw new NessieError(`${method} ${path} response uncertain`);
+        throw new NessieError(`${method} ${path} returned an unreadable body`);
+      }
+      try { this.options.observe?.({ method, path, status: response.status, elapsedMs: Math.round(performance.now() - started), shape: result }); }
+      catch { /* An observer must never change the bank result. */ }
+      return result as T;
     }
-    throw new NessieError('read attempts exhausted');
+    throw new NessieError('read attempts exhausted', undefined, true);
   }
   private async create<T>(path: string, body: unknown): Promise<T> {
     const response = await this.request<T | { objectCreated: T }>('POST', path, body);
@@ -115,6 +142,27 @@ export class NessieClient {
     if (!Number.isSafeInteger(displayTotal)) throw new NessieError('invalid posted deposit total');
     return { label: POSTED_DEPOSITS_LABEL, sandboxLabel: SANDBOX_LABEL, accountBalance, postedDepositsTotal,
       displayTotal, postedDepositIds: [...ids] };
+  }
+  /**
+   * readBalanceWithPostedDeposits for display, live first. During a Nessie outage only, it returns the last good
+   * figures labelled "cached at HH:MM UTC" (at most 24 h old). Invalid data and refusals still throw. Health probes,
+   * deposits and reconciliation must keep using the live methods.
+   */
+  async readBalanceDisplay(accountId: string): Promise<BalanceDisplay> {
+    const now = this.options.now ?? Date.now;
+    try {
+      const display = await this.readBalanceWithPostedDeposits(accountId);
+      const observedAt = new Date(now()).toISOString();
+      await this.options.displayCache?.set(accountId, { display, observedAt }).catch(() => undefined);
+      return { ...display, cached: false, observedAt, freshness: 'live' };
+    } catch (error) {
+      const cache = this.options.displayCache;
+      if (!cache || !(error instanceof NessieError) || !error.outage) throw error;
+      const hit = await cache.get(accountId).catch(() => undefined);
+      const observed = hit ? Date.parse(hit.observedAt) : NaN;
+      if (!hit || !Number.isFinite(observed) || now() - observed > (this.options.displayCacheMaxAgeMs ?? BALANCE_CACHE_MAX_AGE_MS)) throw error;
+      return { ...hit.display, cached: true, observedAt: hit.observedAt, freshness: `cached at ${new Date(observed).toISOString().slice(11, 16)} UTC` };
+    }
   }
   listDeposits(accountId: string) { return this.request<Transaction[]>('GET', `/accounts/${segment(accountId)}/deposits`); }
   /** Bank feed: each collection remains tagged; no fictional aggregate /transactions endpoint. */
