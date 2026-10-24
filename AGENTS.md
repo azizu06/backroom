@@ -72,6 +72,8 @@ For model calls, the OFF switch, or the #15 state adapter, read `docs/llm-contro
 
 Passkey escalation setup and StateStore/gateway integration: `docs/m6-approvals.md`.
 
+Seven-role agent runtime (Claude Agent SDK), dispatcher, handoff store and office handoff projection: `docs/agents.md`. Never add a second dispatcher, runtime or handoff store; register roles in `orchestrator/src/agents/roles/index.ts`.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
