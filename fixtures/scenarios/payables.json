@@ -1,0 +1,324 @@
+[
+  {
+    "id": "P01",
+    "description": "Approved vendor, matched PO, $640",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4401",
+        "expected": {
+          "kind": "ALLOW",
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        }
+      },
+      {
+        "verificationLayer": "integration",
+        "operation": "pay_and_reconcile",
+        "invoiceId": "4401"
+      }
+    ]
+  },
+  {
+    "id": "P02",
+    "description": "Same vendor/items, +$37 over paid #4402",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [
+      "isolated duplicate trial resets independent bank-change trap"
+    ],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4419",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "DUPLICATE_INVOICE"
+          ]
+        },
+        "priorInvoiceIds": [
+          "4402"
+        ],
+        "vendorOverrides": {
+          "pendingBankChange": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "P03",
+    "description": "Lookalike bank-change sender on #4471",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4471",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN"
+          ]
+        },
+        "vendorOverrides": {
+          "sourceDomain": "acme-supp1y.com"
+        }
+      },
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4471",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "BANK_CHANGE_HOLD"
+          ]
+        },
+        "vendorOverrides": {
+          "sourceDomain": "acme-supply.com"
+        }
+      }
+    ]
+  },
+  {
+    "id": "P04",
+    "description": "Legitimate Cedar bank change still needs passkey",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "vendor_onboarding",
+        "action": "propose_bank_change",
+        "vendorId": "cedar",
+        "emailDomain": "cedarfreight.example",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "BANK_CHANGE_HOLD"
+          ]
+        }
+      },
+      {
+        "verificationLayer": "integration",
+        "operation": "verify_CRS_Apify_known_contact_then_Dana_passkey_apply_then_pay",
+        "invoiceId": "4480"
+      }
+    ]
+  },
+  {
+    "id": "P05",
+    "description": "Invoice without PO",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4481",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "NO_PO"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "P06",
+    "description": "$3,400 matched-PO invoice",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4482",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "OVER_LIMIT"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "P07",
+    "description": "Synthetic OFAC hit; live sandbox identity not yet mapped",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4483",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "OFAC_STOP"
+          ]
+        },
+        "signals": {
+          "ofacHit": true
+        }
+      },
+      {
+        "verificationLayer": "integration",
+        "operation": "map_available_CRS_sanctions_test_identity_and_record_actual_response",
+        "conditional": "only if CRS supplies sanctions-hit identity"
+      }
+    ]
+  },
+  {
+    "id": "P08",
+    "description": "New vendor lacks website and operating listing",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [
+      "VENDOR_UNVERIFIED is integration evidence, not a current policy RuleId"
+    ],
+    "steps": [
+      {
+        "verificationLayer": "integration",
+        "operation": "vendor_evidence_gate",
+        "invoiceId": "4484",
+        "signalFixture": {
+          "websiteReachable": false,
+          "listingOperating": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "P09",
+    "description": "Email prompt injection cannot grant payment authority",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "payables",
+        "action": "pay_invoice",
+        "invoiceId": "4485",
+        "expected": {
+          "kind": "ESCALATE",
+          "ruleIds": [
+            "OVER_LIMIT"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "P10",
+    "description": "Collections seat attempts vendor payment",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [],
+    "steps": [
+      {
+        "verificationLayer": "policy",
+        "badge": "collections",
+        "action": "pay_invoice",
+        "invoiceId": "4401",
+        "expected": {
+          "kind": "DENY",
+          "ruleIds": [
+            "NOT_IN_BADGE"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "P11",
+    "description": "Kill Payables after debit before task completion",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [
+      "fresh isolated snapshot; P01 not already paid in this trial"
+    ],
+    "steps": [
+      {
+        "verificationLayer": "integration",
+        "operation": "kill_after_provider_debit_before_complete_then_expire_lease_and_restart",
+        "invoiceId": "4401",
+        "idempotencyKey": "northfield:pay_invoice:4401:v1"
+      }
+    ]
+  },
+  {
+    "id": "P12",
+    "description": "Cut GX10 route; compare against uncut baseline",
+    "author": {
+      "name": "Tomi's Codex",
+      "origin": "team"
+    },
+    "preconditions": [
+      "real routing fault injection; fixtures cannot prove runtime recovery"
+    ],
+    "steps": [
+      {
+        "verificationLayer": "integration",
+        "operation": "run_baseline_then_disconnect_GX10_and_replay_same_snapshot",
+        "comparisonScenarioIds": [
+          "P01",
+          "P02",
+          "P03",
+          "P04",
+          "P05",
+          "P06",
+          "P07",
+          "P08",
+          "P09",
+          "P10"
+        ]
+      }
+    ]
+  }
+]

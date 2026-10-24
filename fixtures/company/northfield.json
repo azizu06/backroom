@@ -1,0 +1,3917 @@
+{
+  "schemaVersion": 1,
+  "company": {
+    "id": "northfield",
+    "name": "Northfield Studio",
+    "controller": "Dana",
+    "currency": "USD"
+  },
+  "synthetic": true,
+  "snapshotAt": "2026-10-24T09:00:00Z",
+  "amountUnit": "integer_cents",
+  "policyVersion": 1,
+  "importContract": "Fixture interchange only; reducer import shape awaits stream C. IDs are stable local references, not live provider IDs.",
+  "vendors": [
+    {
+      "id": "acme",
+      "name": "Acme Supply",
+      "knownDomain": "acme-supply.com",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": true,
+      "approvedBankRef": "bank-master:acme",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-001",
+        "last4": "6100"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "papertrail",
+      "name": "Papertrail Print Co",
+      "knownDomain": "papertrail.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:papertrail",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-002",
+        "last4": "6101"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "cedar",
+      "name": "Cedar Freight",
+      "knownDomain": "cedarfreight.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": true,
+      "approvedBankRef": "bank-master:cedar",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-003",
+        "last4": "6102"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "baylight",
+      "name": "Baylight Lighting",
+      "knownDomain": "baylight.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:baylight",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-004",
+        "last4": "6103"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "studio-clean",
+      "name": "Studio Clean Services",
+      "knownDomain": "studioclean.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:studio-clean",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-005",
+        "last4": "6104"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "loom",
+      "name": "Loom Textile Works",
+      "knownDomain": "loomtextile.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:loom",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-006",
+        "last4": "6105"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "mint",
+      "name": "Mint Office Plants",
+      "knownDomain": "mintplants.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:mint",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-007",
+        "last4": "6106"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "harbor",
+      "name": "Harbor Hardware",
+      "knownDomain": "harborhardware.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:harbor",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-008",
+        "last4": "6107"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "pixel",
+      "name": "Pixel Equipment Rental",
+      "knownDomain": "pixelrental.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:pixel",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-009",
+        "last4": "6108"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "oak",
+      "name": "Oak Desk Repair",
+      "knownDomain": "oakdesk.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:oak",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-010",
+        "last4": "6109"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "atlas",
+      "name": "Atlas Courier",
+      "knownDomain": "atlascourier.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:atlas",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-011",
+        "last4": "6110"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "cobalt",
+      "name": "Cobalt Cloud Hosting",
+      "knownDomain": "cobaltcloud.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:cobalt",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-012",
+        "last4": "6111"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "maple",
+      "name": "Maple Catering",
+      "knownDomain": "maplecatering.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:maple",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-013",
+        "last4": "6112"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "echo",
+      "name": "Echo Acoustic Panels",
+      "knownDomain": "echopanels.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:echo",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-014",
+        "last4": "6113"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "stone",
+      "name": "Stone Street Storage",
+      "knownDomain": "stonestorage.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:stone",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-015",
+        "last4": "6114"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "sable",
+      "name": "Sable Packaging",
+      "knownDomain": "sablepack.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:sable",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-016",
+        "last4": "6115"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "northstar",
+      "name": "Northstar Safety",
+      "knownDomain": "northstarsafety.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:northstar",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-017",
+        "last4": "6116"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "birch",
+      "name": "Birch Bookkeeping",
+      "knownDomain": "birchbooks.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:birch",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-018",
+        "last4": "6117"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "silver",
+      "name": "Silverline Signage",
+      "knownDomain": "silverline.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:silver",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-019",
+        "last4": "6118"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "river",
+      "name": "River Water Service",
+      "knownDomain": "riverwater.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:river",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-020",
+        "last4": "6119"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "juniper",
+      "name": "Juniper IT Support",
+      "knownDomain": "juniperit.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:juniper",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-021",
+        "last4": "6120"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "spark",
+      "name": "Spark Electrical",
+      "knownDomain": "sparkelectric.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:spark",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-022",
+        "last4": "6121"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "beacon",
+      "name": "Beacon Insurance",
+      "knownDomain": "beaconcover.example",
+      "inMaster": true,
+      "approved": true,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:beacon",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-023",
+        "last4": "6122"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "sanctions-test",
+      "name": "Synthetic OFAC Test Vendor",
+      "knownDomain": "sanctionstest.example",
+      "inMaster": false,
+      "approved": false,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:sanctions-test",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-024",
+        "last4": "6123"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": true,
+        "listingOperating": true
+      }
+    },
+    {
+      "id": "unverified",
+      "name": "Unverified Pop-up Supplies",
+      "knownDomain": "unverified.example",
+      "inMaster": false,
+      "approved": false,
+      "pendingBankChange": false,
+      "approvedBankRef": "bank-master:unverified",
+      "bankDetails": {
+        "accountLabel": "SYNTHETIC-025",
+        "last4": "6124"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "footprint": {
+        "source": "synthetic_fixture",
+        "websiteReachable": false,
+        "listingOperating": false
+      }
+    }
+  ],
+  "purchaseOrders": [
+    {
+      "id": "PO-4402",
+      "vendorId": "acme",
+      "amountCents": 120000,
+      "lineItems": [
+        {
+          "description": "Archive paper cartons",
+          "quantity": 20,
+          "unitPriceCents": 5000
+        },
+        {
+          "description": "Presentation sleeve packs",
+          "quantity": 10,
+          "unitPriceCents": 2000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3001",
+      "vendorId": "papertrail",
+      "amountCents": 30900,
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 30900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3002",
+      "vendorId": "cedar",
+      "amountCents": 33800,
+      "lineItems": [
+        {
+          "description": "Cedar Freight - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 33800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3003",
+      "vendorId": "baylight",
+      "amountCents": 36700,
+      "lineItems": [
+        {
+          "description": "Baylight Lighting - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 36700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3004",
+      "vendorId": "studio-clean",
+      "amountCents": 39600,
+      "lineItems": [
+        {
+          "description": "Studio Clean Services - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 39600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3005",
+      "vendorId": "loom",
+      "amountCents": 42500,
+      "lineItems": [
+        {
+          "description": "Loom Textile Works - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 42500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3006",
+      "vendorId": "mint",
+      "amountCents": 45400,
+      "lineItems": [
+        {
+          "description": "Mint Office Plants - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 45400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3007",
+      "vendorId": "harbor",
+      "amountCents": 48300,
+      "lineItems": [
+        {
+          "description": "Harbor Hardware - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 48300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3008",
+      "vendorId": "pixel",
+      "amountCents": 51200,
+      "lineItems": [
+        {
+          "description": "Pixel Equipment Rental - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 51200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3009",
+      "vendorId": "oak",
+      "amountCents": 54100,
+      "lineItems": [
+        {
+          "description": "Oak Desk Repair - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 54100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3010",
+      "vendorId": "atlas",
+      "amountCents": 57000,
+      "lineItems": [
+        {
+          "description": "Atlas Courier - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 57000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3011",
+      "vendorId": "cobalt",
+      "amountCents": 59900,
+      "lineItems": [
+        {
+          "description": "Cobalt Cloud Hosting - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 59900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3012",
+      "vendorId": "maple",
+      "amountCents": 62800,
+      "lineItems": [
+        {
+          "description": "Maple Catering - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 62800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3013",
+      "vendorId": "echo",
+      "amountCents": 65700,
+      "lineItems": [
+        {
+          "description": "Echo Acoustic Panels - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 65700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3014",
+      "vendorId": "stone",
+      "amountCents": 68600,
+      "lineItems": [
+        {
+          "description": "Stone Street Storage - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 68600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3015",
+      "vendorId": "sable",
+      "amountCents": 71500,
+      "lineItems": [
+        {
+          "description": "Sable Packaging - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 71500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3016",
+      "vendorId": "northstar",
+      "amountCents": 74400,
+      "lineItems": [
+        {
+          "description": "Northstar Safety - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 74400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3017",
+      "vendorId": "birch",
+      "amountCents": 77300,
+      "lineItems": [
+        {
+          "description": "Birch Bookkeeping - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 77300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3018",
+      "vendorId": "silver",
+      "amountCents": 80200,
+      "lineItems": [
+        {
+          "description": "Silverline Signage - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 80200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3019",
+      "vendorId": "river",
+      "amountCents": 83100,
+      "lineItems": [
+        {
+          "description": "River Water Service - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 83100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3020",
+      "vendorId": "juniper",
+      "amountCents": 86000,
+      "lineItems": [
+        {
+          "description": "Juniper IT Support - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 86000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3021",
+      "vendorId": "spark",
+      "amountCents": 88900,
+      "lineItems": [
+        {
+          "description": "Spark Electrical - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 88900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3022",
+      "vendorId": "beacon",
+      "amountCents": 91800,
+      "lineItems": [
+        {
+          "description": "Beacon Insurance - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 91800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3023",
+      "vendorId": "sanctions-test",
+      "amountCents": 94700,
+      "lineItems": [
+        {
+          "description": "Synthetic OFAC Test Vendor - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 94700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-3024",
+      "vendorId": "unverified",
+      "amountCents": 97600,
+      "lineItems": [
+        {
+          "description": "Unverified Pop-up Supplies - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 97600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-07-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4000",
+      "vendorId": "acme",
+      "amountCents": 29700,
+      "lineItems": [
+        {
+          "description": "Acme Supply - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 29700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4001",
+      "vendorId": "papertrail",
+      "amountCents": 32600,
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 32600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4002",
+      "vendorId": "cedar",
+      "amountCents": 35500,
+      "lineItems": [
+        {
+          "description": "Cedar Freight - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 35500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4003",
+      "vendorId": "baylight",
+      "amountCents": 38400,
+      "lineItems": [
+        {
+          "description": "Baylight Lighting - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 38400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4004",
+      "vendorId": "studio-clean",
+      "amountCents": 41300,
+      "lineItems": [
+        {
+          "description": "Studio Clean Services - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 41300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4005",
+      "vendorId": "loom",
+      "amountCents": 44200,
+      "lineItems": [
+        {
+          "description": "Loom Textile Works - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 44200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4006",
+      "vendorId": "mint",
+      "amountCents": 47100,
+      "lineItems": [
+        {
+          "description": "Mint Office Plants - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 47100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4007",
+      "vendorId": "harbor",
+      "amountCents": 50000,
+      "lineItems": [
+        {
+          "description": "Harbor Hardware - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 50000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4008",
+      "vendorId": "pixel",
+      "amountCents": 52900,
+      "lineItems": [
+        {
+          "description": "Pixel Equipment Rental - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 52900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4009",
+      "vendorId": "oak",
+      "amountCents": 55800,
+      "lineItems": [
+        {
+          "description": "Oak Desk Repair - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 55800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4010",
+      "vendorId": "atlas",
+      "amountCents": 58700,
+      "lineItems": [
+        {
+          "description": "Atlas Courier - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 58700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4011",
+      "vendorId": "cobalt",
+      "amountCents": 61600,
+      "lineItems": [
+        {
+          "description": "Cobalt Cloud Hosting - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 61600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4012",
+      "vendorId": "maple",
+      "amountCents": 64500,
+      "lineItems": [
+        {
+          "description": "Maple Catering - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 64500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4013",
+      "vendorId": "echo",
+      "amountCents": 67400,
+      "lineItems": [
+        {
+          "description": "Echo Acoustic Panels - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 67400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4014",
+      "vendorId": "stone",
+      "amountCents": 70300,
+      "lineItems": [
+        {
+          "description": "Stone Street Storage - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 70300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4015",
+      "vendorId": "sable",
+      "amountCents": 73200,
+      "lineItems": [
+        {
+          "description": "Sable Packaging - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 73200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4016",
+      "vendorId": "northstar",
+      "amountCents": 76100,
+      "lineItems": [
+        {
+          "description": "Northstar Safety - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 76100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4017",
+      "vendorId": "birch",
+      "amountCents": 79000,
+      "lineItems": [
+        {
+          "description": "Birch Bookkeeping - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 79000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4018",
+      "vendorId": "silver",
+      "amountCents": 81900,
+      "lineItems": [
+        {
+          "description": "Silverline Signage - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 81900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4019",
+      "vendorId": "river",
+      "amountCents": 84800,
+      "lineItems": [
+        {
+          "description": "River Water Service - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 84800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4020",
+      "vendorId": "juniper",
+      "amountCents": 87700,
+      "lineItems": [
+        {
+          "description": "Juniper IT Support - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 87700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4021",
+      "vendorId": "spark",
+      "amountCents": 90600,
+      "lineItems": [
+        {
+          "description": "Spark Electrical - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 90600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4022",
+      "vendorId": "beacon",
+      "amountCents": 93500,
+      "lineItems": [
+        {
+          "description": "Beacon Insurance - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 93500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4023",
+      "vendorId": "sanctions-test",
+      "amountCents": 96400,
+      "lineItems": [
+        {
+          "description": "Synthetic OFAC Test Vendor - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 96400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4024",
+      "vendorId": "unverified",
+      "amountCents": 99300,
+      "lineItems": [
+        {
+          "description": "Unverified Pop-up Supplies - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 99300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-08-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5000",
+      "vendorId": "acme",
+      "amountCents": 31400,
+      "lineItems": [
+        {
+          "description": "Acme Supply - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 31400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4401",
+      "vendorId": "papertrail",
+      "amountCents": 64000,
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 64000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5002",
+      "vendorId": "cedar",
+      "amountCents": 37200,
+      "lineItems": [
+        {
+          "description": "Cedar Freight - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 37200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5003",
+      "vendorId": "baylight",
+      "amountCents": 40100,
+      "lineItems": [
+        {
+          "description": "Baylight Lighting - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 40100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5004",
+      "vendorId": "studio-clean",
+      "amountCents": 43000,
+      "lineItems": [
+        {
+          "description": "Studio Clean Services - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 43000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5005",
+      "vendorId": "loom",
+      "amountCents": 45900,
+      "lineItems": [
+        {
+          "description": "Loom Textile Works - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 45900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5006",
+      "vendorId": "mint",
+      "amountCents": 48800,
+      "lineItems": [
+        {
+          "description": "Mint Office Plants - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 48800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5007",
+      "vendorId": "harbor",
+      "amountCents": 51700,
+      "lineItems": [
+        {
+          "description": "Harbor Hardware - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 51700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5008",
+      "vendorId": "pixel",
+      "amountCents": 54600,
+      "lineItems": [
+        {
+          "description": "Pixel Equipment Rental - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 54600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5009",
+      "vendorId": "oak",
+      "amountCents": 57500,
+      "lineItems": [
+        {
+          "description": "Oak Desk Repair - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 57500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5010",
+      "vendorId": "atlas",
+      "amountCents": 60400,
+      "lineItems": [
+        {
+          "description": "Atlas Courier - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 60400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5011",
+      "vendorId": "cobalt",
+      "amountCents": 63300,
+      "lineItems": [
+        {
+          "description": "Cobalt Cloud Hosting - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 63300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5012",
+      "vendorId": "maple",
+      "amountCents": 66200,
+      "lineItems": [
+        {
+          "description": "Maple Catering - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 66200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5013",
+      "vendorId": "echo",
+      "amountCents": 69100,
+      "lineItems": [
+        {
+          "description": "Echo Acoustic Panels - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 69100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5014",
+      "vendorId": "stone",
+      "amountCents": 72000,
+      "lineItems": [
+        {
+          "description": "Stone Street Storage - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 72000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5015",
+      "vendorId": "sable",
+      "amountCents": 74900,
+      "lineItems": [
+        {
+          "description": "Sable Packaging - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 74900
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5016",
+      "vendorId": "northstar",
+      "amountCents": 77800,
+      "lineItems": [
+        {
+          "description": "Northstar Safety - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 77800
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5017",
+      "vendorId": "birch",
+      "amountCents": 80700,
+      "lineItems": [
+        {
+          "description": "Birch Bookkeeping - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 80700
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5018",
+      "vendorId": "silver",
+      "amountCents": 83600,
+      "lineItems": [
+        {
+          "description": "Silverline Signage - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 83600
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5019",
+      "vendorId": "river",
+      "amountCents": 86500,
+      "lineItems": [
+        {
+          "description": "River Water Service - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 86500
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5020",
+      "vendorId": "juniper",
+      "amountCents": 89400,
+      "lineItems": [
+        {
+          "description": "Juniper IT Support - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 89400
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5021",
+      "vendorId": "spark",
+      "amountCents": 92300,
+      "lineItems": [
+        {
+          "description": "Spark Electrical - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 92300
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5022",
+      "vendorId": "beacon",
+      "amountCents": 95200,
+      "lineItems": [
+        {
+          "description": "Beacon Insurance - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 95200
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5023",
+      "vendorId": "sanctions-test",
+      "amountCents": 98100,
+      "lineItems": [
+        {
+          "description": "Synthetic OFAC Test Vendor - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 98100
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-5024",
+      "vendorId": "unverified",
+      "amountCents": 101000,
+      "lineItems": [
+        {
+          "description": "Unverified Pop-up Supplies - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 101000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4419",
+      "vendorId": "acme",
+      "amountCents": 123700,
+      "lineItems": [
+        {
+          "description": "Archive paper cartons",
+          "quantity": 20,
+          "unitPriceCents": 5000
+        },
+        {
+          "description": "Presentation sleeve packs",
+          "quantity": 10,
+          "unitPriceCents": 2000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4471",
+      "vendorId": "acme",
+      "amountCents": 89000,
+      "lineItems": [
+        {
+          "description": "September packing bench supplies",
+          "quantity": 1,
+          "unitPriceCents": 89000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4480",
+      "vendorId": "cedar",
+      "amountCents": 98000,
+      "lineItems": [
+        {
+          "description": "Rush freight - project Marigold",
+          "quantity": 1,
+          "unitPriceCents": 98000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4482",
+      "vendorId": "pixel",
+      "amountCents": 340000,
+      "lineItems": [
+        {
+          "description": "Camera package - October launch shoot",
+          "quantity": 1,
+          "unitPriceCents": 340000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4483",
+      "vendorId": "sanctions-test",
+      "amountCents": 72000,
+      "lineItems": [
+        {
+          "description": "Synthetic sanctions test shipment",
+          "quantity": 1,
+          "unitPriceCents": 72000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4484",
+      "vendorId": "unverified",
+      "amountCents": 55000,
+      "lineItems": [
+        {
+          "description": "Pop-up display stock",
+          "quantity": 1,
+          "unitPriceCents": 55000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    },
+    {
+      "id": "PO-4485",
+      "vendorId": "baylight",
+      "amountCents": 280000,
+      "lineItems": [
+        {
+          "description": "Launch stage lighting package",
+          "quantity": 1,
+          "unitPriceCents": 280000
+        }
+      ],
+      "approvedBy": "Dana",
+      "approvedAt": "2026-09-01T16:00:00Z"
+    }
+  ],
+  "apInvoices": [
+    {
+      "id": "4402",
+      "vendorId": "acme",
+      "amountCents": 120000,
+      "lineItems": [
+        {
+          "description": "Archive paper cartons",
+          "quantity": 20,
+          "unitPriceCents": 5000
+        },
+        {
+          "description": "Presentation sleeve packs",
+          "quantity": 10,
+          "unitPriceCents": 2000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4402",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4402.pdf",
+      "emailRef": "company/sources/emails/4402.eml"
+    },
+    {
+      "id": "3001",
+      "vendorId": "papertrail",
+      "amountCents": 30900,
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 30900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3001",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3001.pdf",
+      "emailRef": "company/sources/emails/3001.eml"
+    },
+    {
+      "id": "3002",
+      "vendorId": "cedar",
+      "amountCents": 33800,
+      "lineItems": [
+        {
+          "description": "Cedar Freight - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 33800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3002",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3002.pdf",
+      "emailRef": "company/sources/emails/3002.eml"
+    },
+    {
+      "id": "3003",
+      "vendorId": "baylight",
+      "amountCents": 36700,
+      "lineItems": [
+        {
+          "description": "Baylight Lighting - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 36700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3003",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3003.pdf",
+      "emailRef": "company/sources/emails/3003.eml"
+    },
+    {
+      "id": "3004",
+      "vendorId": "studio-clean",
+      "amountCents": 39600,
+      "lineItems": [
+        {
+          "description": "Studio Clean Services - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 39600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3004",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3004.pdf",
+      "emailRef": "company/sources/emails/3004.eml"
+    },
+    {
+      "id": "3005",
+      "vendorId": "loom",
+      "amountCents": 42500,
+      "lineItems": [
+        {
+          "description": "Loom Textile Works - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 42500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3005",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3005.pdf",
+      "emailRef": "company/sources/emails/3005.eml"
+    },
+    {
+      "id": "3006",
+      "vendorId": "mint",
+      "amountCents": 45400,
+      "lineItems": [
+        {
+          "description": "Mint Office Plants - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 45400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3006",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3006.pdf",
+      "emailRef": "company/sources/emails/3006.eml"
+    },
+    {
+      "id": "3007",
+      "vendorId": "harbor",
+      "amountCents": 48300,
+      "lineItems": [
+        {
+          "description": "Harbor Hardware - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 48300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3007",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3007.pdf",
+      "emailRef": "company/sources/emails/3007.eml"
+    },
+    {
+      "id": "3008",
+      "vendorId": "pixel",
+      "amountCents": 51200,
+      "lineItems": [
+        {
+          "description": "Pixel Equipment Rental - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 51200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3008",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3008.pdf",
+      "emailRef": "company/sources/emails/3008.eml"
+    },
+    {
+      "id": "3009",
+      "vendorId": "oak",
+      "amountCents": 54100,
+      "lineItems": [
+        {
+          "description": "Oak Desk Repair - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 54100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3009",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3009.pdf",
+      "emailRef": "company/sources/emails/3009.eml"
+    },
+    {
+      "id": "3010",
+      "vendorId": "atlas",
+      "amountCents": 57000,
+      "lineItems": [
+        {
+          "description": "Atlas Courier - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 57000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3010",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3010.pdf",
+      "emailRef": "company/sources/emails/3010.eml"
+    },
+    {
+      "id": "3011",
+      "vendorId": "cobalt",
+      "amountCents": 59900,
+      "lineItems": [
+        {
+          "description": "Cobalt Cloud Hosting - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 59900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3011",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3011.pdf",
+      "emailRef": "company/sources/emails/3011.eml"
+    },
+    {
+      "id": "3012",
+      "vendorId": "maple",
+      "amountCents": 62800,
+      "lineItems": [
+        {
+          "description": "Maple Catering - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 62800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3012",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3012.pdf",
+      "emailRef": "company/sources/emails/3012.eml"
+    },
+    {
+      "id": "3013",
+      "vendorId": "echo",
+      "amountCents": 65700,
+      "lineItems": [
+        {
+          "description": "Echo Acoustic Panels - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 65700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3013",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3013.pdf",
+      "emailRef": "company/sources/emails/3013.eml"
+    },
+    {
+      "id": "3014",
+      "vendorId": "stone",
+      "amountCents": 68600,
+      "lineItems": [
+        {
+          "description": "Stone Street Storage - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 68600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3014",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3014.pdf",
+      "emailRef": "company/sources/emails/3014.eml"
+    },
+    {
+      "id": "3015",
+      "vendorId": "sable",
+      "amountCents": 71500,
+      "lineItems": [
+        {
+          "description": "Sable Packaging - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 71500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3015",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3015.pdf",
+      "emailRef": "company/sources/emails/3015.eml"
+    },
+    {
+      "id": "3016",
+      "vendorId": "northstar",
+      "amountCents": 74400,
+      "lineItems": [
+        {
+          "description": "Northstar Safety - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 74400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3016",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3016.pdf",
+      "emailRef": "company/sources/emails/3016.eml"
+    },
+    {
+      "id": "3017",
+      "vendorId": "birch",
+      "amountCents": 77300,
+      "lineItems": [
+        {
+          "description": "Birch Bookkeeping - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 77300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3017",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3017.pdf",
+      "emailRef": "company/sources/emails/3017.eml"
+    },
+    {
+      "id": "3018",
+      "vendorId": "silver",
+      "amountCents": 80200,
+      "lineItems": [
+        {
+          "description": "Silverline Signage - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 80200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3018",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3018.pdf",
+      "emailRef": "company/sources/emails/3018.eml"
+    },
+    {
+      "id": "3019",
+      "vendorId": "river",
+      "amountCents": 83100,
+      "lineItems": [
+        {
+          "description": "River Water Service - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 83100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3019",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3019.pdf",
+      "emailRef": "company/sources/emails/3019.eml"
+    },
+    {
+      "id": "3020",
+      "vendorId": "juniper",
+      "amountCents": 86000,
+      "lineItems": [
+        {
+          "description": "Juniper IT Support - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 86000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3020",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3020.pdf",
+      "emailRef": "company/sources/emails/3020.eml"
+    },
+    {
+      "id": "3021",
+      "vendorId": "spark",
+      "amountCents": 88900,
+      "lineItems": [
+        {
+          "description": "Spark Electrical - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 88900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3021",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3021.pdf",
+      "emailRef": "company/sources/emails/3021.eml"
+    },
+    {
+      "id": "3022",
+      "vendorId": "beacon",
+      "amountCents": 91800,
+      "lineItems": [
+        {
+          "description": "Beacon Insurance - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 91800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3022",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/3022.pdf",
+      "emailRef": "company/sources/emails/3022.eml"
+    },
+    {
+      "id": "3023",
+      "vendorId": "sanctions-test",
+      "amountCents": 94700,
+      "lineItems": [
+        {
+          "description": "Synthetic OFAC Test Vendor - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 94700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3023",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "received",
+      "rawRef": "company/sources/invoices/3023.pdf",
+      "emailRef": "company/sources/emails/3023.eml"
+    },
+    {
+      "id": "3024",
+      "vendorId": "unverified",
+      "amountCents": 97600,
+      "lineItems": [
+        {
+          "description": "Unverified Pop-up Supplies - 07/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 97600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-3024",
+      "account": "operating",
+      "issuedAt": "2026-07-15",
+      "dueAt": "2026-08-14",
+      "status": "received",
+      "rawRef": "company/sources/invoices/3024.pdf",
+      "emailRef": "company/sources/emails/3024.eml"
+    },
+    {
+      "id": "4000",
+      "vendorId": "acme",
+      "amountCents": 29700,
+      "lineItems": [
+        {
+          "description": "Acme Supply - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 29700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4000",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4000.pdf",
+      "emailRef": "company/sources/emails/4000.eml"
+    },
+    {
+      "id": "4001",
+      "vendorId": "papertrail",
+      "amountCents": 32600,
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 32600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4001",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4001.pdf",
+      "emailRef": "company/sources/emails/4001.eml"
+    },
+    {
+      "id": "4002",
+      "vendorId": "cedar",
+      "amountCents": 35500,
+      "lineItems": [
+        {
+          "description": "Cedar Freight - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 35500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4002",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4002.pdf",
+      "emailRef": "company/sources/emails/4002.eml"
+    },
+    {
+      "id": "4003",
+      "vendorId": "baylight",
+      "amountCents": 38400,
+      "lineItems": [
+        {
+          "description": "Baylight Lighting - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 38400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4003",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4003.pdf",
+      "emailRef": "company/sources/emails/4003.eml"
+    },
+    {
+      "id": "4004",
+      "vendorId": "studio-clean",
+      "amountCents": 41300,
+      "lineItems": [
+        {
+          "description": "Studio Clean Services - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 41300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4004",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4004.pdf",
+      "emailRef": "company/sources/emails/4004.eml"
+    },
+    {
+      "id": "4005",
+      "vendorId": "loom",
+      "amountCents": 44200,
+      "lineItems": [
+        {
+          "description": "Loom Textile Works - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 44200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4005",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4005.pdf",
+      "emailRef": "company/sources/emails/4005.eml"
+    },
+    {
+      "id": "4006",
+      "vendorId": "mint",
+      "amountCents": 47100,
+      "lineItems": [
+        {
+          "description": "Mint Office Plants - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 47100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4006",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4006.pdf",
+      "emailRef": "company/sources/emails/4006.eml"
+    },
+    {
+      "id": "4007",
+      "vendorId": "harbor",
+      "amountCents": 50000,
+      "lineItems": [
+        {
+          "description": "Harbor Hardware - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 50000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4007",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4007.pdf",
+      "emailRef": "company/sources/emails/4007.eml"
+    },
+    {
+      "id": "4008",
+      "vendorId": "pixel",
+      "amountCents": 52900,
+      "lineItems": [
+        {
+          "description": "Pixel Equipment Rental - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 52900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4008",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4008.pdf",
+      "emailRef": "company/sources/emails/4008.eml"
+    },
+    {
+      "id": "4009",
+      "vendorId": "oak",
+      "amountCents": 55800,
+      "lineItems": [
+        {
+          "description": "Oak Desk Repair - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 55800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4009",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4009.pdf",
+      "emailRef": "company/sources/emails/4009.eml"
+    },
+    {
+      "id": "4010",
+      "vendorId": "atlas",
+      "amountCents": 58700,
+      "lineItems": [
+        {
+          "description": "Atlas Courier - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 58700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4010",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4010.pdf",
+      "emailRef": "company/sources/emails/4010.eml"
+    },
+    {
+      "id": "4011",
+      "vendorId": "cobalt",
+      "amountCents": 61600,
+      "lineItems": [
+        {
+          "description": "Cobalt Cloud Hosting - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 61600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4011",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4011.pdf",
+      "emailRef": "company/sources/emails/4011.eml"
+    },
+    {
+      "id": "4012",
+      "vendorId": "maple",
+      "amountCents": 64500,
+      "lineItems": [
+        {
+          "description": "Maple Catering - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 64500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4012",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4012.pdf",
+      "emailRef": "company/sources/emails/4012.eml"
+    },
+    {
+      "id": "4013",
+      "vendorId": "echo",
+      "amountCents": 67400,
+      "lineItems": [
+        {
+          "description": "Echo Acoustic Panels - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 67400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4013",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4013.pdf",
+      "emailRef": "company/sources/emails/4013.eml"
+    },
+    {
+      "id": "4014",
+      "vendorId": "stone",
+      "amountCents": 70300,
+      "lineItems": [
+        {
+          "description": "Stone Street Storage - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 70300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4014",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4014.pdf",
+      "emailRef": "company/sources/emails/4014.eml"
+    },
+    {
+      "id": "4015",
+      "vendorId": "sable",
+      "amountCents": 73200,
+      "lineItems": [
+        {
+          "description": "Sable Packaging - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 73200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4015",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4015.pdf",
+      "emailRef": "company/sources/emails/4015.eml"
+    },
+    {
+      "id": "4016",
+      "vendorId": "northstar",
+      "amountCents": 76100,
+      "lineItems": [
+        {
+          "description": "Northstar Safety - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 76100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4016",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4016.pdf",
+      "emailRef": "company/sources/emails/4016.eml"
+    },
+    {
+      "id": "4017",
+      "vendorId": "birch",
+      "amountCents": 79000,
+      "lineItems": [
+        {
+          "description": "Birch Bookkeeping - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 79000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4017",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4017.pdf",
+      "emailRef": "company/sources/emails/4017.eml"
+    },
+    {
+      "id": "4018",
+      "vendorId": "silver",
+      "amountCents": 81900,
+      "lineItems": [
+        {
+          "description": "Silverline Signage - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 81900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4018",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4018.pdf",
+      "emailRef": "company/sources/emails/4018.eml"
+    },
+    {
+      "id": "4019",
+      "vendorId": "river",
+      "amountCents": 84800,
+      "lineItems": [
+        {
+          "description": "River Water Service - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 84800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4019",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4019.pdf",
+      "emailRef": "company/sources/emails/4019.eml"
+    },
+    {
+      "id": "4020",
+      "vendorId": "juniper",
+      "amountCents": 87700,
+      "lineItems": [
+        {
+          "description": "Juniper IT Support - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 87700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4020",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4020.pdf",
+      "emailRef": "company/sources/emails/4020.eml"
+    },
+    {
+      "id": "4021",
+      "vendorId": "spark",
+      "amountCents": 90600,
+      "lineItems": [
+        {
+          "description": "Spark Electrical - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 90600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4021",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4021.pdf",
+      "emailRef": "company/sources/emails/4021.eml"
+    },
+    {
+      "id": "4022",
+      "vendorId": "beacon",
+      "amountCents": 93500,
+      "lineItems": [
+        {
+          "description": "Beacon Insurance - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 93500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4022",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "rawRef": "company/sources/invoices/4022.pdf",
+      "emailRef": "company/sources/emails/4022.eml"
+    },
+    {
+      "id": "4023",
+      "vendorId": "sanctions-test",
+      "amountCents": 96400,
+      "lineItems": [
+        {
+          "description": "Synthetic OFAC Test Vendor - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 96400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4023",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4023.pdf",
+      "emailRef": "company/sources/emails/4023.eml"
+    },
+    {
+      "id": "4024",
+      "vendorId": "unverified",
+      "amountCents": 99300,
+      "lineItems": [
+        {
+          "description": "Unverified Pop-up Supplies - 08/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 99300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4024",
+      "account": "operating",
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4024.pdf",
+      "emailRef": "company/sources/emails/4024.eml"
+    },
+    {
+      "id": "5000",
+      "vendorId": "acme",
+      "amountCents": 31400,
+      "lineItems": [
+        {
+          "description": "Acme Supply - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 31400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5000",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5000.pdf",
+      "emailRef": "company/sources/emails/5000.eml"
+    },
+    {
+      "id": "4401",
+      "vendorId": "papertrail",
+      "amountCents": 64000,
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 64000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4401",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4401.pdf",
+      "emailRef": "company/sources/emails/4401.eml"
+    },
+    {
+      "id": "5002",
+      "vendorId": "cedar",
+      "amountCents": 37200,
+      "lineItems": [
+        {
+          "description": "Cedar Freight - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 37200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5002",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5002.pdf",
+      "emailRef": "company/sources/emails/5002.eml"
+    },
+    {
+      "id": "5003",
+      "vendorId": "baylight",
+      "amountCents": 40100,
+      "lineItems": [
+        {
+          "description": "Baylight Lighting - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 40100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5003",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5003.pdf",
+      "emailRef": "company/sources/emails/5003.eml"
+    },
+    {
+      "id": "5004",
+      "vendorId": "studio-clean",
+      "amountCents": 43000,
+      "lineItems": [
+        {
+          "description": "Studio Clean Services - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 43000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5004",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5004.pdf",
+      "emailRef": "company/sources/emails/5004.eml"
+    },
+    {
+      "id": "5005",
+      "vendorId": "loom",
+      "amountCents": 45900,
+      "lineItems": [
+        {
+          "description": "Loom Textile Works - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 45900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5005",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5005.pdf",
+      "emailRef": "company/sources/emails/5005.eml"
+    },
+    {
+      "id": "5006",
+      "vendorId": "mint",
+      "amountCents": 48800,
+      "lineItems": [
+        {
+          "description": "Mint Office Plants - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 48800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5006",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5006.pdf",
+      "emailRef": "company/sources/emails/5006.eml"
+    },
+    {
+      "id": "5007",
+      "vendorId": "harbor",
+      "amountCents": 51700,
+      "lineItems": [
+        {
+          "description": "Harbor Hardware - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 51700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5007",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5007.pdf",
+      "emailRef": "company/sources/emails/5007.eml"
+    },
+    {
+      "id": "5008",
+      "vendorId": "pixel",
+      "amountCents": 54600,
+      "lineItems": [
+        {
+          "description": "Pixel Equipment Rental - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 54600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5008",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5008.pdf",
+      "emailRef": "company/sources/emails/5008.eml"
+    },
+    {
+      "id": "5009",
+      "vendorId": "oak",
+      "amountCents": 57500,
+      "lineItems": [
+        {
+          "description": "Oak Desk Repair - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 57500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5009",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5009.pdf",
+      "emailRef": "company/sources/emails/5009.eml"
+    },
+    {
+      "id": "5010",
+      "vendorId": "atlas",
+      "amountCents": 60400,
+      "lineItems": [
+        {
+          "description": "Atlas Courier - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 60400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5010",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5010.pdf",
+      "emailRef": "company/sources/emails/5010.eml"
+    },
+    {
+      "id": "5011",
+      "vendorId": "cobalt",
+      "amountCents": 63300,
+      "lineItems": [
+        {
+          "description": "Cobalt Cloud Hosting - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 63300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5011",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5011.pdf",
+      "emailRef": "company/sources/emails/5011.eml"
+    },
+    {
+      "id": "5012",
+      "vendorId": "maple",
+      "amountCents": 66200,
+      "lineItems": [
+        {
+          "description": "Maple Catering - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 66200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5012",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5012.pdf",
+      "emailRef": "company/sources/emails/5012.eml"
+    },
+    {
+      "id": "5013",
+      "vendorId": "echo",
+      "amountCents": 69100,
+      "lineItems": [
+        {
+          "description": "Echo Acoustic Panels - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 69100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5013",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5013.pdf",
+      "emailRef": "company/sources/emails/5013.eml"
+    },
+    {
+      "id": "5014",
+      "vendorId": "stone",
+      "amountCents": 72000,
+      "lineItems": [
+        {
+          "description": "Stone Street Storage - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 72000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5014",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5014.pdf",
+      "emailRef": "company/sources/emails/5014.eml"
+    },
+    {
+      "id": "5015",
+      "vendorId": "sable",
+      "amountCents": 74900,
+      "lineItems": [
+        {
+          "description": "Sable Packaging - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 74900
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5015",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5015.pdf",
+      "emailRef": "company/sources/emails/5015.eml"
+    },
+    {
+      "id": "5016",
+      "vendorId": "northstar",
+      "amountCents": 77800,
+      "lineItems": [
+        {
+          "description": "Northstar Safety - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 77800
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5016",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5016.pdf",
+      "emailRef": "company/sources/emails/5016.eml"
+    },
+    {
+      "id": "5017",
+      "vendorId": "birch",
+      "amountCents": 80700,
+      "lineItems": [
+        {
+          "description": "Birch Bookkeeping - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 80700
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5017",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5017.pdf",
+      "emailRef": "company/sources/emails/5017.eml"
+    },
+    {
+      "id": "5018",
+      "vendorId": "silver",
+      "amountCents": 83600,
+      "lineItems": [
+        {
+          "description": "Silverline Signage - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 83600
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5018",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5018.pdf",
+      "emailRef": "company/sources/emails/5018.eml"
+    },
+    {
+      "id": "5019",
+      "vendorId": "river",
+      "amountCents": 86500,
+      "lineItems": [
+        {
+          "description": "River Water Service - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 86500
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5019",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5019.pdf",
+      "emailRef": "company/sources/emails/5019.eml"
+    },
+    {
+      "id": "5020",
+      "vendorId": "juniper",
+      "amountCents": 89400,
+      "lineItems": [
+        {
+          "description": "Juniper IT Support - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 89400
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5020",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5020.pdf",
+      "emailRef": "company/sources/emails/5020.eml"
+    },
+    {
+      "id": "5021",
+      "vendorId": "spark",
+      "amountCents": 92300,
+      "lineItems": [
+        {
+          "description": "Spark Electrical - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 92300
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5021",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5021.pdf",
+      "emailRef": "company/sources/emails/5021.eml"
+    },
+    {
+      "id": "5022",
+      "vendorId": "beacon",
+      "amountCents": 95200,
+      "lineItems": [
+        {
+          "description": "Beacon Insurance - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 95200
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5022",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5022.pdf",
+      "emailRef": "company/sources/emails/5022.eml"
+    },
+    {
+      "id": "5023",
+      "vendorId": "sanctions-test",
+      "amountCents": 98100,
+      "lineItems": [
+        {
+          "description": "Synthetic OFAC Test Vendor - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 98100
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5023",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5023.pdf",
+      "emailRef": "company/sources/emails/5023.eml"
+    },
+    {
+      "id": "5024",
+      "vendorId": "unverified",
+      "amountCents": 101000,
+      "lineItems": [
+        {
+          "description": "Unverified Pop-up Supplies - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 101000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-5024",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/5024.pdf",
+      "emailRef": "company/sources/emails/5024.eml"
+    },
+    {
+      "id": "4419",
+      "vendorId": "acme",
+      "amountCents": 123700,
+      "lineItems": [
+        {
+          "description": "Archive paper cartons",
+          "quantity": 20,
+          "unitPriceCents": 5000
+        },
+        {
+          "description": "Presentation sleeve packs",
+          "quantity": 10,
+          "unitPriceCents": 2000
+        }
+      ],
+      "adjustmentCents": 3700,
+      "poMatched": true,
+      "poId": "PO-4419",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4419.pdf",
+      "emailRef": "company/sources/emails/4419.eml"
+    },
+    {
+      "id": "4471",
+      "vendorId": "acme",
+      "amountCents": 89000,
+      "lineItems": [
+        {
+          "description": "September packing bench supplies",
+          "quantity": 1,
+          "unitPriceCents": 89000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4471",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4471.pdf",
+      "emailRef": "company/sources/emails/4471.eml"
+    },
+    {
+      "id": "4480",
+      "vendorId": "cedar",
+      "amountCents": 98000,
+      "lineItems": [
+        {
+          "description": "Rush freight - project Marigold",
+          "quantity": 1,
+          "unitPriceCents": 98000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4480",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4480.pdf",
+      "emailRef": "company/sources/emails/4480.eml"
+    },
+    {
+      "id": "4481",
+      "vendorId": "harbor",
+      "amountCents": 85000,
+      "lineItems": [
+        {
+          "description": "Unplanned shelf fittings",
+          "quantity": 1,
+          "unitPriceCents": 85000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": false,
+      "poId": null,
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4481.pdf",
+      "emailRef": "company/sources/emails/4481.eml"
+    },
+    {
+      "id": "4482",
+      "vendorId": "pixel",
+      "amountCents": 340000,
+      "lineItems": [
+        {
+          "description": "Camera package - October launch shoot",
+          "quantity": 1,
+          "unitPriceCents": 340000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4482",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4482.pdf",
+      "emailRef": "company/sources/emails/4482.eml"
+    },
+    {
+      "id": "4483",
+      "vendorId": "sanctions-test",
+      "amountCents": 72000,
+      "lineItems": [
+        {
+          "description": "Synthetic sanctions test shipment",
+          "quantity": 1,
+          "unitPriceCents": 72000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4483",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4483.pdf",
+      "emailRef": "company/sources/emails/4483.eml"
+    },
+    {
+      "id": "4484",
+      "vendorId": "unverified",
+      "amountCents": 55000,
+      "lineItems": [
+        {
+          "description": "Pop-up display stock",
+          "quantity": 1,
+          "unitPriceCents": 55000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4484",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4484.pdf",
+      "emailRef": "company/sources/emails/4484.eml"
+    },
+    {
+      "id": "4485",
+      "vendorId": "baylight",
+      "amountCents": 280000,
+      "lineItems": [
+        {
+          "description": "Launch stage lighting package",
+          "quantity": 1,
+          "unitPriceCents": 280000
+        }
+      ],
+      "adjustmentCents": 0,
+      "poMatched": true,
+      "poId": "PO-4485",
+      "account": "operating",
+      "issuedAt": "2026-09-15",
+      "dueAt": "2026-10-15",
+      "status": "received",
+      "rawRef": "company/sources/invoices/4485.pdf",
+      "emailRef": "company/sources/emails/4485.eml"
+    }
+  ],
+  "clients": [
+    {
+      "id": "client-01",
+      "name": "Marigold Works",
+      "type": "business",
+      "phoneNumber": "+12025550101",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-01",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550101"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-02",
+      "name": "Summit Design Partners",
+      "type": "business",
+      "phoneNumber": "+12025550102",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-02",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550102"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-03",
+      "name": "Harbor Media LLC",
+      "type": "business",
+      "phoneNumber": "+12025550103",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-03",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550103"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-04",
+      "name": "Elm Street Labs",
+      "type": "business",
+      "phoneNumber": "+12025550104",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-04",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550104"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-05",
+      "name": "Copperline Events",
+      "type": "business",
+      "phoneNumber": "+12025550105",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-05",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550105"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-06",
+      "name": "Lantern Foods",
+      "type": "business",
+      "phoneNumber": "+12025550106",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-06",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550106"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-07",
+      "name": "Fieldnote Agency",
+      "type": "business",
+      "phoneNumber": "+12025550107",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-07",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550107"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-08",
+      "name": "Bluebird Retail",
+      "type": "business",
+      "phoneNumber": "+12025550108",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-08",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550108"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-09",
+      "name": "Westward Press",
+      "type": "business",
+      "phoneNumber": "+12025550109",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-09",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550109"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    },
+    {
+      "id": "client-10",
+      "name": "Mosaic Build Co",
+      "type": "business",
+      "phoneNumber": "+12025550110",
+      "timezone": "America/Los_Angeles",
+      "dnc": false,
+      "dialable": false,
+      "consent": {
+        "source": "synthetic-contract:client-10",
+        "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+        "timestamp": "2026-07-01T17:00:00Z",
+        "number": "+12025550110"
+      },
+      "crsIdentityMapping": {
+        "status": "unmapped",
+        "sandboxIdentityId": null
+      },
+      "publicCompanyUrl": null
+    }
+  ],
+  "arInvoices": [
+    {
+      "id": "1041",
+      "clientId": "client-01",
+      "principalCents": 180000,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "paid",
+      "account": "receivables"
+    },
+    {
+      "id": "1042",
+      "clientId": "client-02",
+      "principalCents": 480000,
+      "lateFeeCents": 15000,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1043",
+      "clientId": "client-03",
+      "principalCents": 76000,
+      "lateFeeCents": 0,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1044",
+      "clientId": "client-04",
+      "principalCents": 97500,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1045",
+      "clientId": "client-05",
+      "principalCents": 230000,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1046",
+      "clientId": "client-06",
+      "principalCents": 242500,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1047",
+      "clientId": "client-07",
+      "principalCents": 255000,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1048",
+      "clientId": "client-08",
+      "principalCents": 267500,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1049",
+      "clientId": "client-09",
+      "principalCents": 280000,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    },
+    {
+      "id": "1050",
+      "clientId": "client-10",
+      "principalCents": 292500,
+      "lateFeeCents": 2500,
+      "issuedAt": "2026-08-15",
+      "dueAt": "2026-09-14",
+      "status": "overdue",
+      "account": "receivables"
+    }
+  ],
+  "bankChanges": [
+    {
+      "id": "bc-lookalike",
+      "vendorId": "acme",
+      "invoiceId": "4471",
+      "senderDomain": "acme-supp1y.com",
+      "proposedBankRef": "SYNTHETIC-ATTACK-9911",
+      "status": "pending",
+      "approvedEscalationId": null,
+      "rawRef": "company/sources/emails/4471.eml"
+    },
+    {
+      "id": "bc-legitimate",
+      "vendorId": "cedar",
+      "invoiceId": "4480",
+      "senderDomain": "cedarfreight.example",
+      "proposedBankRef": "SYNTHETIC-CEDAR-8822",
+      "status": "pending",
+      "approvedEscalationId": null,
+      "rawRef": "company/sources/emails/4480.eml"
+    }
+  ],
+  "bankAccounts": [
+    {
+      "id": "operating",
+      "label": "Northfield operating",
+      "nessieId": null,
+      "balanceCents": 18000000,
+      "provisioningStatus": "not_provisioned"
+    },
+    {
+      "id": "receivables",
+      "label": "Northfield AR clearing",
+      "nessieId": null,
+      "balanceCents": 2400000,
+      "provisioningStatus": "not_provisioned"
+    }
+  ],
+  "bankTransactions": [
+    {
+      "id": "seed-credit-1043",
+      "nessieId": null,
+      "direction": "credit",
+      "account": "receivables",
+      "amountCents": 76000,
+      "memo": "Harbor Media payment invoice 1043",
+      "postedAt": "2026-10-20T18:00:00Z",
+      "matchedRef": null
+    },
+    {
+      "id": "seed-credit-unmatched",
+      "nessieId": null,
+      "direction": "credit",
+      "account": "receivables",
+      "amountCents": 99000,
+      "memo": "ACH CREDIT - REF 77219 - payer unknown",
+      "postedAt": "2026-10-21T18:00:00Z",
+      "matchedRef": null
+    },
+    {
+      "id": "seed-credit-matched",
+      "nessieId": null,
+      "direction": "credit",
+      "account": "receivables",
+      "amountCents": 182500,
+      "memo": "Marigold Works prior settled remittance",
+      "postedAt": "2026-10-19T18:00:00Z",
+      "matchedRef": "ar_invoice:1041"
+    },
+    {
+      "id": "seed-short-1044",
+      "nessieId": null,
+      "direction": "credit",
+      "account": "receivables",
+      "amountCents": 40000,
+      "memo": "Elm Street Labs installment",
+      "postedAt": "2026-10-22T18:00:00Z",
+      "matchedRef": null,
+      "paymentLinkRef": "link-short-1044"
+    },
+    {
+      "id": "seed-duplicate-a",
+      "nessieId": null,
+      "direction": "credit",
+      "account": "receivables",
+      "amountCents": 116250,
+      "memo": "Copperline Events installment",
+      "postedAt": "2026-10-22T18:01:00Z",
+      "matchedRef": null,
+      "paymentLinkRef": "link-duplicate-1045"
+    },
+    {
+      "id": "seed-duplicate-b",
+      "nessieId": null,
+      "direction": "credit",
+      "account": "receivables",
+      "amountCents": 116250,
+      "memo": "Copperline Events installment repeated",
+      "postedAt": "2026-10-22T18:02:00Z",
+      "matchedRef": null,
+      "paymentLinkRef": "link-duplicate-1045"
+    }
+  ],
+  "paymentLinks": [
+    {
+      "id": "link-short-1044",
+      "invoiceId": "1044",
+      "amountCents": 50000,
+      "providerId": null,
+      "status": "synthetic_reconciliation_input"
+    },
+    {
+      "id": "link-duplicate-1045",
+      "invoiceId": "1045",
+      "amountCents": 116250,
+      "providerId": null,
+      "status": "synthetic_reconciliation_input"
+    }
+  ],
+  "signals": [
+    {
+      "id": "synthetic-ofac-4483",
+      "source": "synthetic_fixture",
+      "type": "ofac_hit",
+      "vendorId": "sanctions-test",
+      "value": true,
+      "sourceUrl": null,
+      "observedAt": "2026-10-24T09:00:00Z",
+      "confidence": 1,
+      "providerEvidenceStatus": "not_a_CRS_response"
+    }
+  ]
+}

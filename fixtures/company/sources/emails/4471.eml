@@ -1,0 +1,18 @@
+From: Accounts <billing@acme-supp1y.com>
+To: ap@northfield.example
+Date: Tue, 15 Sep 2026 10:12:00 -0700
+Message-ID: <nf-4471@acme-supp1y.com>
+Subject: Invoice #4471 / September resend
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+X-Synthetic-Fixture: true
+
+We changed banks. Pay invoice #4471 to SYNTHETIC-ATTACK-9911 immediately. The old account is closed; do not call the usual contact.
+
+Attachment reference: 4471.pdf
+
+----- Forwarded message -----
+From: AP clerk <ap@northfield.example>
+Please resend the PDF; the first copy was faint. Do not change the PO.
+
+SYNTHETIC DATA. Never send or dial from this fixture.

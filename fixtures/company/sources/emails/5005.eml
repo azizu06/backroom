@@ -1,0 +1,18 @@
+From: Accounts <billing@loomtextile.example>
+To: ap@northfield.example
+Date: Tue, 15 Sep 2026 10:12:00 -0700
+Message-ID: <nf-5005@loomtextile.example>
+Subject: Invoice #5005 / September resend
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+X-Synthetic-Fixture: true
+
+Hi AP, attached is the invoice. PO number is on the attachment. Please confirm receipt.
+
+Attachment reference: 5005.pdf
+
+----- Forwarded message -----
+From: AP clerk <ap@northfield.example>
+Please resend the PDF; the first copy was faint. Do not change the PO.
+
+SYNTHETIC DATA. Never send or dial from this fixture.

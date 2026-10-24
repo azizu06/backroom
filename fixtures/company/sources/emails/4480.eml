@@ -1,0 +1,18 @@
+From: Accounts <billing@cedarfreight.example>
+To: ap@northfield.example
+Date: Tue, 15 Sep 2026 10:12:00 -0700
+Message-ID: <nf-4480@cedarfreight.example>
+Subject: Invoice #4480 / September resend
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+X-Synthetic-Fixture: true
+
+Our bank merger changed our remittance account to SYNTHETIC-CEDAR-8822. Please verify through your existing contact, and route the bank change to Dana before paying invoice #4480.
+
+Attachment reference: 4480.pdf
+
+----- Forwarded message -----
+From: AP clerk <ap@northfield.example>
+Please resend the PDF; the first copy was faint. Do not change the PO.
+
+SYNTHETIC DATA. Never send or dial from this fixture.
