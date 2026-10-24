@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  DOOR_FLASH_MS, INITIAL_VIEWPORT, boundaryStateForProps, doorFlash, reportViewFailure, viewportLayers, viewportReducer,
+  DOOR_FLASH_MS, INITIAL_VIEWPORT, boundaryStateForProps, doorFlash, isFixedCamera, reportViewFailure, viewportLayers, viewportReducer,
   type ViewportEvent, type ViewportState,
 } from "./view";
 
@@ -22,7 +22,7 @@ describe("office viewport after a lost WebGL context", () => {
   });
 
   it("picking the fixed or orbit camera mounts a fresh scene instead of the dead canvas", () => {
-    for (const mode of ["tween", "walk"] as const) {
+    for (const mode of ["tween", "walk", "tour"] as const) {
       const picked = viewportReducer(lost, { type: "pick", mode });
       const layers = viewportLayers(picked);
       expect(picked.mode).toBe(mode);
@@ -55,7 +55,8 @@ describe("office viewport after a lost WebGL context", () => {
 
   it("is never blank across any short sequence of picks, losses and restores", () => {
     const events = (state: ViewportState): ViewportEvent[] => [
-      { type: "pick", mode: "walk" }, { type: "pick", mode: "tween" }, { type: "pick", mode: "plan" }, { type: "prefer", mode: "walk" },
+      { type: "pick", mode: "walk" }, { type: "pick", mode: "tween" }, { type: "pick", mode: "plan" }, { type: "pick", mode: "tour" },
+      { type: "prefer", mode: "walk" }, { type: "endTour" },
       { type: "lost", attempt: state.sceneAttempt }, { type: "restored", attempt: state.sceneAttempt },
       { type: "lost", attempt: state.sceneAttempt - 1 }, { type: "restored", attempt: state.sceneAttempt - 1 },
     ];
@@ -66,7 +67,7 @@ describe("office viewport after a lost WebGL context", () => {
       if (!depth) return;
       for (const event of events(state)) {
         // Only the mounted (current, non-plan) canvas can lose or restore its context; stale attempts are already gone.
-        const current = event.type !== "pick" && event.type !== "prefer" && event.attempt === state.sceneAttempt;
+        const current = (event.type === "lost" || event.type === "restored") && event.attempt === state.sceneAttempt;
         if (current && state.mode === "plan") continue;
         const next = new Set(lostAttempts);
         if (event.type === "lost") next.add(event.attempt);
@@ -76,6 +77,44 @@ describe("office viewport after a lost WebGL context", () => {
     }
     walk(INITIAL_VIEWPORT, new Set(), 4);
     expect(checked).toBeGreaterThan(1000);
+  });
+});
+
+describe("tour view mode", () => {
+  const tour = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "tour" });
+
+  it("renders the 3D scene with the fixed camera like the fixed view", () => {
+    expect(tour).toEqual({ mode: "tour", lostContext: false, sceneAttempt: 0 });
+    expect(viewportLayers(tour)).toEqual({ floorPlan: false, scene: { key: 0, visible: true } });
+    expect(isFixedCamera("tour")).toBe(true);
+    expect(isFixedCamera("tween")).toBe(true);
+    expect(isFixedCamera("walk")).toBe(false);
+    expect(isFixedCamera("plan")).toBe(false);
+  });
+
+  it("ends on the fixed camera in the same scene attempt", () => {
+    expect(viewportReducer(tour, { type: "endTour" })).toEqual({ mode: "tween", lostContext: false, sceneAttempt: 0 });
+  });
+
+  it("ignores endTour once another view was picked", () => {
+    for (const mode of ["walk", "tween", "plan"] as const) {
+      const picked = viewportReducer(tour, { type: "pick", mode });
+      expect(viewportReducer(picked, { type: "endTour" })).toBe(picked);
+    }
+  });
+
+  it("ends when the WebGL context is lost and does not retry the dead canvas", () => {
+    const lost = viewportReducer(tour, { type: "lost", attempt: 0 });
+    expect(lost).toEqual({ mode: "tween", lostContext: true, sceneAttempt: 0 });
+    expect(viewportLayers(lost).floorPlan).toBe(true);
+    expect(viewportReducer(lost, { type: "endTour" })).toBe(lost);
+    expect(viewportReducer(tour, { type: "lost", attempt: 3 })).toBe(tour);
+  });
+
+  it("starting a tour after a lost context mounts a fresh scene", () => {
+    const lost = viewportReducer(INITIAL_VIEWPORT, { type: "lost", attempt: 0 });
+    const picked = viewportReducer(lost, { type: "pick", mode: "tour" });
+    expect(picked).toEqual({ mode: "tour", lostContext: false, sceneAttempt: 1 });
   });
 });
 

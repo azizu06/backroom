@@ -1,14 +1,14 @@
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createServer as httpServer } from 'node:http';
 import { createServer as netServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, closeSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, closeSync, unlinkSync, appendFileSync, chmodSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
-import { probeDependencies, type DemoStatus } from './health';
+import { probeDependencies, type DemoStatus, type HealthRow } from './health';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
@@ -20,12 +20,12 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const command = process.argv[2];
 interface Owner { port: number; token: string; pid: number }
 const owner = (): Owner => JSON.parse(readFileSync(recordFile, 'utf8'));
-async function control(action: string) {
+async function control<T = DemoStatus & { publicUrl: string; localUrl: string }>(action: string) {
   const record = owner();
-  const response = await fetch(`http://127.0.0.1:${record.port}/${action}`, { method: action === 'status' ? 'GET' : 'POST',
-    headers: { authorization: `Bearer ${record.token}` }, signal: AbortSignal.timeout(action === 'reset' ? 30000 : 10000) });
+  const response = await fetch(`http://127.0.0.1:${record.port}/${action}`, { method: action === 'status' || action === 'health' ? 'GET' : 'POST',
+    headers: { authorization: `Bearer ${record.token}` }, signal: AbortSignal.timeout(action === 'reset' ? 130000 : action === 'health' ? 30000 : 10000) });
   if (!response.ok) throw new Error('DEMO_CONTROL_FAILED');
-  return response.json() as Promise<DemoStatus & { publicUrl: string; localUrl: string }>;
+  return response.json() as Promise<T>;
 }
 function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string }) {
   console.log(`Local office: ${status.localUrl}/office`);
@@ -33,7 +33,7 @@ function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string })
     'Policy editor': '/policy', Controller: '/controller', Approve: status.approvePath, Pay: status.payPath, 'Real vs simulated': '/real-vs-sim' })) {
     console.log(`${label}: ${status.publicUrl}${path || '/ (not seeded)'}`);
   }
-  console.log(`StateStore=${status.stateStore}; mock bank; synthetic preverified caller; LLM OFF by default. See docs/demo-runbook.md.`);
+  console.log(`StateStore=${status.stateStore}; ${status.bank}; synthetic preverified caller; LLM ${status.llmEnabled ? 'ON' : 'OFF'}. See docs/test-v1.md.`);
 }
 async function waitFor(check: () => Promise<boolean>, ms: number) {
   const deadline = Date.now() + ms;
@@ -50,8 +50,12 @@ async function supervise() {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   closeSync(openSync(lockFile, 'wx', 0o600));
   const token = randomBytes(32).toString('hex');
-  const env = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'spacetime',
+  const env: NodeJS.ProcessEnv = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'spacetime',
     BACKROOM_DEMO: '1', BACKROOM_APPROVAL_DEMO: '0', BACKROOM_PAYMENT_DEMO: '0', DEMO_CONTROL_SECRET: token };
+  if (env.DEMO_LIVE === '1') {
+    env.PRECALL_APIFY = 'live';
+    env.PRECALL_CRS = env.CRS_USERNAME?.trim() && env.CRS_PASSWORD ? 'live' : 'fake'; env.VENDOR_CRS = env.PRECALL_CRS; env.LLM_CLOUD_PROVIDER = 'anthropic'; env.GX10_ENABLED = 'true';
+  }
   const children = new OwnedProcesses(root, env);
   let stopping = false;
   let base = '', publicUrl = '';
@@ -61,7 +65,7 @@ async function supervise() {
   const queryWeb = async (action: string) => {
     const response = await fetch(`${base}/__demo/${action}`, { method: action === 'reset' ? 'POST' : 'GET',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      ...(action === 'reset' ? { body: JSON.stringify(stateConfig || {}) } : {}), signal: AbortSignal.timeout(25000) });
+      ...(action === 'reset' ? { body: JSON.stringify(stateConfig || {}) } : {}), signal: AbortSignal.timeout(action === 'reset' ? 125000 : action === 'health' ? 28000 : 5000) });
     if (!response.ok) throw new Error('DEMO_WEB_UNAVAILABLE');
     return response.json() as Promise<DemoStatus>;
   };
@@ -70,13 +74,14 @@ async function supervise() {
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) { res.writeHead(401).end(); return; }
     try {
       if (req.url === '/down' && req.method === 'POST') { res.end('{}'); void stop(); return; }
-      if ((req.url === '/status' && req.method === 'GET') || (req.url === '/reset' && req.method === 'POST')) {
+      if (((req.url === '/status' || req.url === '/health') && req.method === 'GET') || (req.url === '/reset' && req.method === 'POST')) {
         if (req.url === '/reset') {
           if (resetting) { res.writeHead(409).end(); return; }
           resetting = true;
           try { if (env.STATE_STORE === 'spacetime') stateConfig = await database.publish(); }
           catch { resetting = false; throw new Error('DEMO_PUBLISH_FAILED'); }
         }
+        if (req.url === '/health') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(await queryWeb('health'))); return; }
         let status: DemoStatus;
         try { status = await queryWeb(req.url === '/reset' ? 'reset' : 'status'); }
         finally { if (req.url === '/reset') resetting = false; }
@@ -139,8 +144,8 @@ async function supervise() {
       env.DEMO_VOICE_RUNNING = '1';
     }
     children.start(process.execPath, ['--import', loader, 'web/demo-server.ts'], join(dir, 'web.log'));
-    await waitFor(async () => { try { return !!await queryWeb('status'); } catch { return false; } }, 30000);
-    console.log(`Ready. Mock bank; ${env.STATE_STORE} state. No call placed.`);
+    await waitFor(async () => { try { return !!await queryWeb('status'); } catch { return false; } }, 90000);
+    console.log(`Ready. ${env.DEMO_LIVE === '1' ? 'Live sandbox services' : 'Mock bank'}; ${env.STATE_STORE} state. No call placed.`);
   } catch (error) {
     const message = error instanceof Error && error.message.startsWith('DEMO_') ? error.message : 'DEMO_START_FAILED';
     console.error(message); await stop();
@@ -150,6 +155,14 @@ async function main() {
   if (command === '_supervise') { await supervise(); return; }
   if (command === 'up') {
     if (!existsSync(recordFile) && !existsSync(lockFile)) {
+      if (process.env.DEMO_LIVE === '1' && !process.env.ANTHROPIC_API_KEY) {
+        try {
+          const key = execFileSync('security', ['find-generic-password', '-s', 'backroom-anthropic-key', '-w'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+          if (!key || /[\r\n]/.test(key)) throw new Error();
+          appendFileSync(join(root, '.env.local'), `\nANTHROPIC_API_KEY=${key}\n`, { mode: 0o600 }); chmodSync(join(root, '.env.local'), 0o600);
+          process.env.ANTHROPIC_API_KEY = key;
+        } catch { throw new Error('DEMO_ANTHROPIC_KEY_REQUIRED: configure Keychain backroom-anthropic-key or .env.local'); }
+      }
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       const log = openSync(join(dir, 'supervisor.log'), 'a', 0o600);
       const child = spawn(process.execPath, ['--import', loader, fileURLToPath(import.meta.url), '_supervise'], {
@@ -159,7 +172,9 @@ async function main() {
         try { await control('status'); return true; } catch { if (child.exitCode !== null) throw new Error('DEMO_START_FAILED'); return false; }
       }, 180000);
     }
-    printUrls(await control('status')); return;
+    const status = await control('status');
+    if ((process.env.DEMO_LIVE === '1') !== (status.live === true)) throw new Error('DEMO_MODE_MISMATCH: stop this owned demo before changing DEMO_LIVE');
+    printUrls(status); return;
   }
   if (command === 'down') {
     if (!existsSync(recordFile)) {
@@ -172,7 +187,8 @@ async function main() {
   if (command === 'reset') { printUrls(await control('reset')); return; }
   if (command === 'health') {
     const status = await control('status');
-    const rows = await probeDependencies({ env: { ...process.env, DEMO_PUBLIC_URL: status.publicUrl }, status, live: process.argv.includes('--live') });
+    const hostRows = process.argv.includes('--live') ? await control<HealthRow[]>('health') : undefined;
+    const rows = await probeDependencies({ hostRows, env: { ...process.env, DEMO_PUBLIC_URL: status.publicUrl }, status, live: process.argv.includes('--live') });
     for (const row of rows) console.log(`${row.ok ? '\u001b[32mGREEN' : '\u001b[31mRED'}\u001b[0m ${row.name}: ${row.detail}`);
     return;
   }
