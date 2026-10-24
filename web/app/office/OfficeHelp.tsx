@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { DEMO_GUIDE_STEPS, OFFICE_SHORTCUTS } from '../../lib/office/guide';
 import './help.css';
 
@@ -21,7 +21,7 @@ export function KeyboardShortcuts({ open, onClose }: { open: boolean; onClose: (
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current;
     if (!element) return;
     if (open && !element.open) {
@@ -31,6 +31,17 @@ export function KeyboardShortcuts({ open, onClose }: { open: boolean; onClose: (
   }, [open]);
   return <dialog ref={dialog} className='office-help office-shortcuts' aria-labelledby={headingId}
     onCancel={event => { event.preventDefault(); onClose(); }}
+    onKeyDown={event => {
+      // showModal makes the page inert, but Tab past the last control can still leave the document.
+      if (event.key !== 'Tab') return;
+      const focusables = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'));
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey ? document.activeElement === first : document.activeElement === last) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    }}
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
       <header><h2 id={headingId}>Keyboard shortcuts</h2><button ref={closeButton} type='button' onClick={onClose}>Close</button></header>
       <dl>{OFFICE_SHORTCUTS.map((shortcut, index) => <div key={`${shortcut.mode}-${index}`}><dt>{shortcut.keys.map((key, keyIndex) => <kbd key={`${key}-${keyIndex}`}>{key}</kbd>)}</dt><dd>{shortcut.action}</dd></div>)}</dl>
