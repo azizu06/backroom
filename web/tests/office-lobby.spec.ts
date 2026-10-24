@@ -1,12 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// Preview office (STATE_STORE=memory) on a production build, started with the audit test env, e.g.
-//   WEBAUTHN_ORIGIN=http://localhost:3033 WEBAUTHN_RP_ID=localhost CONTROLLER_ENROLLMENT_SECRET=local-audit-test-only \
-//   TOOL_GATEWAY_SECRET=local-tool-test-only OPENROUTER_API_KEY= pnpm exec next start --port 3033
-//   OFFICE_LOBBY_URL=http://localhost:3033 pnpm exec playwright test tests/office-lobby.spec.ts
-const base = process.env.OFFICE_LOBBY_URL ?? 'http://localhost:3033';
+// Run via test:office:browser after building the web app.
 const code = process.env.OFFICE_LOBBY_OPERATOR_CODE ?? 'local-audit-test-only';
-test.use({ baseURL: base, viewport: { width: 1440, height: 1000 } });
+if (process.env.OFFICE_LOBBY_URL) test.use({ baseURL: process.env.OFFICE_LOBBY_URL });
 
 test('office lobby mounts the live audit wall and ask-why without breaking the office layout', async ({ page }) => {
   const errors: string[] = [], audit: string[] = [];
@@ -23,6 +19,8 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   await lobby.getByRole('button', { name: 'Open audit wall' }).click();
   await expect(lobby.getByText(/^Chain verified · \d+ entries$/)).toBeVisible();
   expect(audit).toContain('/api/audit/entries');
+  await expect(lobby.getByRole('heading', { name: 'Audit wall', exact: true, level: 3 })).toBeVisible();
+  await expect(lobby.locator('.audit-why')).toHaveCount(0);
   const ask = lobby.getByRole('region', { name: 'Ask why by voice' });
   await expect(ask.getByRole('button', { name: 'Hold to ask why' })).toBeVisible();
   await expect(ask.getByRole('button', { name: 'Ask why', exact: true })).toBeDisabled();
@@ -35,4 +33,29 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(wall!.x + wall!.width).toBeLessThanOrEqual(footer!.x + footer!.width - 680);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('office ask-why pauses on a broken chain and resumes when verified', async ({ page }) => {
+  let valid = false;
+  await page.route('**/api/audit/entries', route => route.fulfill({ json: {
+    entries: [], chain: { valid, length: 0, ...(valid ? {} : { firstBrokenSeq: 1, reason: 'hash mismatch' }) },
+    measuredAt: '2026-10-24T12:00:00Z',
+  } }));
+  await page.goto('/office');
+  const lobby = page.locator('#office-audit-wall');
+  const ask = lobby.getByRole('region', { name: 'Ask why by voice' });
+  await expect(ask).toContainText('The audit chain is broken');
+  await expect(ask.getByRole('button', { name: 'Hold to ask why' })).toBeDisabled();
+  await expect(ask.getByRole('textbox')).toBeDisabled();
+  await expect(ask.getByRole('button', { name: 'Ask why', exact: true })).toBeDisabled();
+  await expect(lobby.locator('.audit-why')).toHaveCount(0);
+  valid = true;
+  await expect(ask.getByRole('button', { name: 'Hold to ask why' })).toBeEnabled();
+  await expect(ask.getByRole('textbox')).toBeEnabled();
+  await expect(ask).not.toContainText('The audit chain is broken');
+  await page.route('**/api/why', route => route.fulfill({ status: 409, json: { error: 'AUDIT_CHAIN_BROKEN' } }));
+  await ask.getByRole('textbox').fill('Why was payment paused?');
+  await ask.getByRole('button', { name: 'Ask why', exact: true }).click();
+  await expect(ask.getByRole('alert')).toContainText('The audit chain is broken');
+  await expect(ask.getByRole('alert')).toContainText('AUDIT_CHAIN_BROKEN');
 });

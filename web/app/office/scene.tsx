@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useRef, type ComponentRef, type RefObject } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
-import { WalkMotion } from '../../lib/office/motion';
-import { OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
+import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
+import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
+import { doorFlash } from '../../lib/office/view';
+import { registerSceneFrameRequester } from '../../lib/office/frame';
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const deskIds = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
+// Office (in the initial bundle) requests on-demand frames through this bridge.
+registerSceneFrameRequester(invalidate);
 
 function Block({ at, size, color, rotation = 0 }: { at: [number, number, number]; size: [number, number, number]; color: string; rotation?: number }) {
   return <Instance position={at} rotation={[0, rotation, 0]} scale={size} color={color} />;
@@ -49,13 +53,15 @@ function Plant({ x, z }: { x: number; z: number }) {
 function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) {
   const denial = matchingDenial(snapshot, room);
   const door = useRef<Mesh>(null);
+  const invalidate = useThree(state => state.invalidate);
   const [x] = OFFICE_ANCHORS[room].center;
-  useFrame(() => {
+  useEffect(() => { if (denial) invalidate(); }, [denial, invalidate]);
+  useFrame(({ invalidate }) => {
     if (!door.current) return;
-    const age = denial ? Date.now() - denial.at : Infinity;
-    const flash = age >= 0 && age < 4500 && Math.floor(age / 300) % 2 === 0;
-    door.current.visible = age >= 0 && age < 4500;
-    (door.current.material as MeshBasicMaterial).opacity = flash ? 0.95 : 0.65;
+    const flash = doorFlash(Date.now(), denial?.at);
+    door.current.visible = flash.visible;
+    if (flash.visible) invalidate();
+    (door.current.material as MeshBasicMaterial).opacity = flash.bright ? 0.95 : 0.65;
   });
   if (room === 'lobby' || room === 'dana') return null;
   const z = room === 'treasury' ? 1.15 : -0.65;
@@ -69,27 +75,24 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
     <mesh ref={door} visible={false} position={[x, 0.65, z]}><boxGeometry args={[1.5, 1.3, 0.2]} /><meshBasicMaterial color='#ed6252' transparent opacity={0.85} /></mesh>
   </group>;
 }
-function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean; recorded: boolean }) {
+/** Draws the shared motion; Office's MotionRegistry owns re-seating, retargeting and the wake-up frame. */
+function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean }) {
   const body = useRef<Group>(null);
   const legs = useRef<Group>(null);
-  const motion = useRef(new WalkMotion(agent.pos));
-  useEffect(() => {
-    motion.current.position[0] = agent.pos[0]; motion.current.position[1] = agent.pos[1];
-    motion.current.moveTo(agent.targetAnchor);
-  }, [agent.pos[0], agent.pos[1]]);
-  useEffect(() => { motion.current.moveTo(agent.targetAnchor); }, [agent.targetAnchor]);
-  useFrame((_, delta) => {
-    const walk = motion.current;
-    if (recorded) walk.position.splice(0, 2, ...agent.pos);
+  useFrame((state, delta) => {
+    const walk = motion;
+    if (paused) return;
+    if (recorded) walk.seat(agent.pos);
     else walk.advance(delta);
+    if (walk.moving) state.invalidate();
     if (!body.current) return;
     body.current.position.set(walk.position[0], 0, walk.position[1]);
     const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
     if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = walk.moving && !tween && !recorded ? Math.sin(walk.distance * 9 + i * Math.PI) * 0.38 : 0; });
   });
-  const color = OFFICE_ANCHORS[agent.seatId].color;
-  return <group ref={body} position={[agent.pos[0], 0, agent.pos[1]]}>
+  const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
+  return <group ref={body} position={[motion.position[0], 0, motion.position[1]]}>
     <Block at={[0, 0.83, 0]} size={[0.43, 0.6, 0.28]} color={color} />
     <Block at={[0, 1.3, 0]} size={[0.34, 0.36, 0.32]} color='#c58d67' />
     <Block at={[0, 1.49, -0.02]} size={[0.36, 0.1, 0.35]} color='#3c342e' />
@@ -104,9 +107,10 @@ function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean
   </group>;
 }
 function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean }) {
-  const { camera, size } = useThree();
+  const { camera, size, invalidate } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const moving = useRef(true);
+  const orbiting = useRef(false);
   const target = useRef(new Vector3());
   const destination = useRef(new Vector3(13, 15, 17));
   useEffect(() => {
@@ -114,9 +118,12 @@ function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean })
     target.current.set(center[0]!, 0.2, center[1]!);
     destination.current.copy(target.current).add(new Vector3(13, 15, 17));
     moving.current = true;
-  }, [focus, size, fixed]);
-  useFrame((_, delta) => {
+    invalidate();
+  }, [focus, size, fixed, invalidate]);
+  useFrame((state, delta) => {
+    if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
+    state.invalidate();
     const alpha = 1 - Math.exp(-7 * Math.min(delta, 0.1));
     camera.position.lerp(destination.current, alpha);
     controls.current.target.lerp(target.current, alpha);
@@ -126,22 +133,33 @@ function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean })
     controls.current.update();
     if (camera.position.distanceTo(destination.current) < 0.005 && Math.abs(camera.zoom - zoom) < 0.01) moving.current = false;
   });
-  return <OrbitControls ref={controls} enablePan={false} enableZoom={false} enableRotate={!fixed}
+  return <OrbitControls ref={controls} onStart={() => { orbiting.current = true; invalidate(); }} onEnd={() => { orbiting.current = false; invalidate(); }} enablePan={false} enableZoom={false} enableRotate={!fixed}
     minPolarAngle={0.45} maxPolarAngle={1.1} minAzimuthAngle={-0.7} maxAzimuthAngle={0.9} />;
 }
-function ContextLoss({ onFailure }: { onFailure: () => void }) {
+function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
+  const invalidate = useThree(state => state.invalidate);
   useEffect(() => {
     const canvas = gl.domElement;
+    const restored = () => { onRestored(); invalidate(); };
     canvas.addEventListener('webglcontextlost', onFailure);
-    return () => canvas.removeEventListener('webglcontextlost', onFailure);
-  }, [gl, onFailure]);
+    canvas.addEventListener('webglcontextrestored', restored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', onFailure);
+      canvas.removeEventListener('webglcontextrestored', restored);
+    };
+  }, [gl, invalidate, onFailure, onRestored]);
   return null;
 }
-export function OfficeScene({ snapshot, fixed, focus, labels, onFailure }: {
-  snapshot: OfficeSnapshot; fixed: boolean; focus: AnchorId | null; labels: RoomLabels; onFailure: () => void;
+/**
+ * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
+ * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
+ */
+export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, labels, onFailure, onRestored }: {
+  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
+  onFailure: () => void; onRestored: () => void;
 }) {
-  return <Canvas shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
+  return <Canvas frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
     <color attach='background' args={['#202620']} />
     <ambientLight intensity={1.7} />
@@ -178,8 +196,8 @@ export function OfficeScene({ snapshot, fixed, focus, labels, onFailure }: {
     <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
     </group>}
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
-    {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} tween={fixed} recorded={snapshot.connection === 'replay'} />)}
+    {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />)}
     </Instances>
-    <CameraRig focus={focus} fixed={fixed} /><ContextLoss onFailure={onFailure} />
+    <CameraRig focus={focus} fixed={fixed} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }

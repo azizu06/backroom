@@ -7,6 +7,14 @@ export const OFFICE_ANCHORS = {
   treasury: { name: "Treasury", position: [5, 0.6] as const, center: [5, 3.4] as const, color: "#788b85" },
 } as const;
 export type AnchorId = keyof typeof OFFICE_ANCHORS;
+/** Live rows carry free-form anchor strings; never index OFFICE_ANCHORS without this guard. */
+export function isAnchorId(id: unknown): id is AnchorId {
+  return typeof id === "string" && Object.hasOwn(OFFICE_ANCHORS, id);
+}
+/** Display name for an anchor, falling back to the raw id for unknown anchors. */
+export function anchorLabel(id: string): string {
+  return isAnchorId(id) ? OFFICE_ANCHORS[id].name : String(id);
+}
 export type SeatId = "collections" | "payables" | "vendor_onboarding";
 export type FloorPosition = readonly [x: number, z: number];
 export interface OfficeAgent {
