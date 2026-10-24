@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
@@ -14,6 +14,7 @@ import {
   pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
+import { interactionStore } from '../../lib/office/interactions';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 
 function playEye([x, z]: readonly [number, number]): IntroPose {
@@ -47,7 +48,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
   const reduced = useRef(window.matchMedia(REDUCED_MOTION_QUERY).matches);
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
-  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
+  // Refresh movement barriers immediately when a viewer opens or closes a cosmetic door.
+  const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
+  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX], local.doors), [roomsKey, local.doors]);
   const [spawn] = useState(() => playSpawn(location.search, colliders));
   const [eye] = useState(() => playEye(spawn));
   const position = useRef<[number, number]>(spawn);

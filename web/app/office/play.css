@@ -10,6 +10,10 @@
 .play-crosshair::after { top: 9px; left: 0; height: 2px; width: 20px; }
 .play-prompt { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); margin: 0; padding: 5px 10px; background: #30382df2; border: 1px solid #839175; font-size: 13px; font-weight: 600; white-space: nowrap; color: #f3dfb9; }
 .play-prompt:empty { padding: 0; border: 0; }
+.play-prompt { opacity: 0; transition: opacity 140ms ease; }
+.play-prompt[data-visible='true'] { opacity: 1; }
+.play-prompt kbd { display: inline-block; padding: 0 4px; border: 1px solid #c3b68e; border-radius: 3px; font: inherit; }
+@media (prefers-reduced-motion: reduce) { .play-prompt { transition: none; } }
 .office-shell .play-exit { position: absolute; top: 12px; right: 18px; padding: 6px 12px; background: #30382df2; border: 1px solid #839175; font-weight: 600; }
 .play-joystick { position: absolute; left: 20px; bottom: 44px; width: 112px; height: 112px; border-radius: 50%; background: #30382d99; border: 1px solid #839175; touch-action: none; display: grid; place-items: center; }
 .play-joystick span { width: 44px; height: 44px; border-radius: 50%; background: #c3ccb8cc; pointer-events: none; }

@@ -9,6 +9,8 @@ import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
 import { AuditWallMount } from './AuditWallMount';
 import { Desks } from './Desks';
 import { Doors } from './Doors';
+import { InteractiveDoors } from './InteractiveDoors';
+import { CarryFolder } from './CarryFolder';
 import { InboxTrayMount } from './InboxTrayMount';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
@@ -20,6 +22,8 @@ import type { SceneMount } from './types';
 export type { SceneMount, SceneMountProps } from './types';
 export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'doors', instanced: true, Component: Doors },
+  { id: 'interactive-doors', instanced: false, Component: InteractiveDoors },
+  { id: 'carry-folder', instanced: false, Component: CarryFolder },
   { id: 'desks', instanced: true, Component: Desks },
   { id: 'lobby-counter', instanced: true, Component: LobbyCounter },
   { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
