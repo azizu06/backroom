@@ -51,13 +51,21 @@ function releasePointer() {
   if (document.pointerLockElement) document.exitPointerLock?.();
 }
 
-/** Reuses the lobby's single ask-why entry point; never renders its own or calls /api/why. */
-function focusAskWhy() {
+/**
+ * Reuses the lobby's single ask-why entry point; never renders its own or calls /api/why.
+ * A question only prefills the field: the viewer still submits it there.
+ */
+function focusAskWhy(question?: string) {
   const mount = document.querySelector<HTMLElement>("[data-office-mount='ask-why']");
   if (!mount) return;
   mount.scrollIntoView({ block: 'center' });
-  const field = mount.querySelector<HTMLElement>('input:not([type=hidden]):not([disabled]), textarea:not([disabled])')
-    ?? mount.querySelector<HTMLElement>('button:not([disabled])');
+  const input = mount.querySelector<HTMLInputElement>('input:not([type=hidden]):not([disabled])');
+  if (question && input) {
+    // Controlled React input: set through the native setter so its onChange sees the value.
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, question);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  const field = input ?? mount.querySelector<HTMLElement>('textarea:not([disabled])') ?? mount.querySelector<HTMLElement>('button:not([disabled])');
   field?.focus({ preventScroll: true });
 }
 
@@ -102,7 +110,7 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
   </section>;
 }
 
-function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void }) {
+function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: (question?: string) => void }) {
   const handoffFor = useHandoffPresentation()?.handoffFor;
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -118,12 +126,12 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
     <header>{view.ownHeading ? <p id={headingId}><strong>{panel.title}</strong></p> : <h2 id={headingId}>{panel.title}</h2>}<button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
     {panel.state && <p className='play-panel-state'>{panel.state}</p>}
     {panel.task && <p>{panel.task}</p>}
-    {view.Body && <view.Body panel={panel} />}
+    {view.Body && <view.Body panel={panel} askWhy={askWhy} />}
     {!view.hideAudit && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
       <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
       <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
-    {!view.hideAskWhy && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
+    {!view.hideAskWhy && <button className='play-panel-ask' onClick={() => askWhy()}>Ask why</button>}
   </section>;
 }
 
@@ -217,11 +225,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
     setPanel(null);
     hud.current?.focus();
   }
-  function askWhy() {
+  function askWhy(question?: string) {
     setPanel(null);
     releasePointer();
     onExit();
-    focusAskWhy();
+    focusAskWhy(question);
   }
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
