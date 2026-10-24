@@ -4,6 +4,7 @@
  */
 import { OfficeProps } from '../props/OfficeProps';
 import { BakedArt } from './BakedArt';
+import { BakedCharacters } from './BakedCharacters';
 import { LobbyInbox } from '../props/LobbyInbox';
 import { ReceiptPrinter } from '../props/ReceiptPrinter';
 import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
@@ -27,6 +28,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'baked-art', instanced: false, Component: BakedArt },
+  { id: 'baked-characters', instanced: false, Component: BakedCharacters },
   { id: 'audit-wall', instanced: false, Component: AuditWallMount },
   { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },
   { id: 'props', instanced: false, Component: OfficeProps },

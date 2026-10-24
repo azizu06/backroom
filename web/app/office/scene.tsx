@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, Instances, OrbitControls } from '@react-three/drei';
 import { Group, MathUtils, Vector3 } from 'three';
@@ -13,6 +13,7 @@ import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 import { ROLES } from '../../lib/office/palette';
+import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
 import { PresenceGhosts } from './PresenceGhosts';
@@ -69,19 +70,24 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
     if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = legSwing(walk.distance, i, walk.moving && !tween && !recorded, reduced); });
   });
+  const bakedVersion = useSyncExternalStore(subscribeBakedCharacters, bakedCharacterVersion, () => 0);
+  // The character mount sets this only after that agent's GLB clone exists. Otherwise the blocks stay.
+  const showGlb = bakedVersion > 0 && bakedCharacterReady(agent.id);
   const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
-  return <group ref={body} position={[motion.position[0], 0, motion.position[1]]}>
-    <Block at={[0, 0.83, 0]} size={[0.43, 0.6, 0.28]} color={color} />
-    <Block at={[0, 1.3, 0]} size={[0.34, 0.36, 0.32]} color='#c58d67' />
-    <Block at={[0, 1.49, -0.02]} size={[0.36, 0.1, 0.35]} color='#3c342e' />
-    {[-1, 1].map(side => <Block key={side} at={[side * 0.3, 0.84, 0]} size={[0.14, 0.48, 0.18]} color={color} />)}
+  return <group ref={body} name={`agent:${agent.id}`} position={[motion.position[0], 0, motion.position[1]]}>
+    {showGlb ? null : <>
+      <Block at={[0, 0.83, 0]} size={[0.43, 0.6, 0.28]} color={color} />
+      <Block at={[0, 1.3, 0]} size={[0.34, 0.36, 0.32]} color='#c58d67' />
+      <Block at={[0, 1.49, -0.02]} size={[0.36, 0.1, 0.35]} color='#3c342e' />
+      {[-1, 1].map(side => <Block key={side} at={[side * 0.3, 0.84, 0]} size={[0.14, 0.48, 0.18]} color={color} />)}
+    </>}
     {agent.escalationId && <group name={`folder:${agent.escalationId}`}>
       <Block at={[0.36, 0.68, 0.14]} size={[0.1, 0.43, 0.5]} color='#e0b365' />
       <Block at={[0.37, 0.77, 0.14]} size={[0.11, 0.04, 0.34]} color='#f3dfb9' />
     </group>}
-    <group ref={legs}>{[-1, 1].map(side => <mesh key={side} position={[side * 0.12, 0.3, 0]} castShadow>
+    {showGlb ? null : <group ref={legs}>{[-1, 1].map(side => <mesh key={side} position={[side * 0.12, 0.3, 0]} castShadow>
       <boxGeometry args={[0.18, 0.55, 0.22]} /><meshStandardMaterial color='#414b43' />
-    </mesh>)}</group>
+    </mesh>)}</group>}
   </group>;
 }
 /** Tour moves start from wherever the camera is when the frame after a focus change renders. */
