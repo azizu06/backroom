@@ -41,7 +41,7 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
   const officeFlows = useMediaQuery('(max-width: 1100px)', true);
   const narrow = useMediaQuery(NARROW_PANEL_QUERY, false);
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
-  const expanded = panelExpanded({ detailed, narrow, userExpanded });
+  const expanded = panelExpanded({ detailed, narrow, officeView, userExpanded });
   const bodyId = useId();
 
   useEffect(() => {
@@ -89,7 +89,7 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
       <header className="real-sim-header">
         {detailed ? <h1>Real vs. simulated</h1> : <h2>Real vs. simulated</h2>}
         {!detailed && <div className="real-sim-actions">
-          <a href="/real-vs-sim">Details ↗</a>
+          {(!officeView || expanded) && <a href="/real-vs-sim">Details ↗</a>}
           <button type="button" className="real-sim-toggle" aria-expanded={expanded} aria-controls={bodyId} onClick={() => setUserExpanded(toggledPanel(expanded))}>
             {expanded ? 'Hide' : 'Show'}<span className="real-sim-visually-hidden"> real versus simulated status</span>
           </button>
@@ -108,6 +108,7 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
         ))}
       </div>
       </div>
+      {/* The sandbox disclosure stays visible even while the office overlay is collapsed. */}
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
       {detailed && <p className="real-sim-note">Status refreshes every 10 seconds; service probes are cached for about 45 seconds. Verified means a fresh live probe or a committed receipt (its time is shown). Simulated means a fixture stands in for the service. Unreachable means the probe failed. Unverified means no fresh evidence is available. LLM control reflects this server process; separate processes need the shared state adapter.</p>}
     </aside>
