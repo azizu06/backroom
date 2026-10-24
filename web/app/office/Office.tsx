@@ -5,6 +5,7 @@ import { LlmToggle } from '../../components/LlmToggle';
 import { WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
+import { OfficeLobby } from './OfficeLobby';
 import { OfficeScene, type RoomLabels } from './scene';
 import '../office.css';
 
@@ -133,7 +134,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {OFFICE_ANCHORS[agent.targetAnchor].name}</span>}
       </div>)}</div>
-      <section id='office-audit-wall' className='office-audit' aria-label='Office audit receipts' data-office-mount='audit-wall'>
+      <section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
         {auditWall ?? <><h2>Lobby audit wall <span>{snapshot.connection === 'preview' ? 'Preview receipts' : snapshot.connection === 'replay' ? 'REPLAY receipts' : 'Subscribed receipts'}</span></h2>
           {!snapshot.audit.length ? <p>No decisions received.</p> : <ol>{snapshot.audit.slice(-20).reverse().map(entry => <li key={entry.id} data-audit-id={entry.id}>
             <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br /><code>{entry.id} · {entry.ruleIds.join(', ')}</code>
@@ -149,7 +150,7 @@ export function MockOffice() {
   const [mock] = useState(createMockOfficeState);
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
-  return <Office source={mock.source} controls={<div className='mock-controls'>
+  return <Office source={mock.source} auditWall={<OfficeLobby />} controls={<div className='mock-controls'>
     <span>Preview only</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>
