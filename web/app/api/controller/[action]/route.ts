@@ -1,7 +1,8 @@
 import { createApprovalHTTP } from '../../../../lib/approvals/http';
 import { controllerApprovals } from '../../../../lib/approvals/runtime';
+import { inboxIds } from '../../../../lib/approvals/inbox';
 export const runtime = 'nodejs';
-const handle = createApprovalHTTP(controllerApprovals, () => process.env.WEBAUTHN_ORIGIN);
+const handle = createApprovalHTTP(controllerApprovals, () => process.env.WEBAUTHN_ORIGIN, inboxIds);
 type Context = { params: Promise<{ action: string }> };
 export async function GET(request: Request, context: Context) {
   return handle('controller', '', (await context.params).action, request);
