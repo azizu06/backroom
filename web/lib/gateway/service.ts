@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import type { Invocation } from "./parser";
 import {
   decidePlan,
@@ -193,6 +193,9 @@ export function executeTool(
       auditId: entry.id,
       amountCents: plan.firstPaymentCents,
       path: "",
+      shortCode: randomBytes(5).toString("hex").toUpperCase(),
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 15 * 60_000,
     };
     if (!existing) {
       link.path = `/pay/${link.id}`;
@@ -206,6 +209,8 @@ export function executeTool(
       speak: "The payment link is queued for delivery.",
       link_path: link.path,
       amount_cents: link.amountCents,
+      short_code: link.shortCode,
+      expires_at: link.expiresAt,
     };
   }
   if (input.tool === "propose_plan") {

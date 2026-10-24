@@ -2,12 +2,11 @@
 import { createServer } from 'node:http';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { DEFAULT_POLICY } from '@backroom/policy';
-import { createGateway } from '../../../web/lib/gateway/http';
+import { createDemoVoiceBridge } from './demo-bridge';
 import { dialCollectionCall, type DialInput } from './index';
 import { provisionVoice, type VoiceTool } from './tools';
 import { createVoiceHandler, VoiceJournal } from './server';
-import { LocalGatewayStore } from './local-store';
+
 import { withVoiceEvidence } from './evidence';
 
 const required = (name: string) => { const v = process.env[name]; if (!v) throw new Error(`Missing ${name}`); return v; };
@@ -28,9 +27,11 @@ if (command === 'setup') {
   console.log('Dial accepted; watch private call events. No automatic retry.');
 } else if (command === 'serve') {
   if (!resources.agentId) throw new Error('Run setup before serve');
-  const journal = new VoiceJournal(`${root}/journal.json`), store = new LocalGatewayStore(`${root}/gateway.json`);
+  const journal = new VoiceJournal(`${root}/journal.json`);
+  const bridge = createDemoVoiceBridge({ port: Number(process.env.DEMO_PORT || 3000),
+    controlSecret: required('DEMO_CONTROL_SECRET'), publicOrigin: required('DEMO_PUBLIC_URL') });
   const gatewaySecret = required('TOOL_GATEWAY_SECRET');
-  const gateway = createGateway({ secret: () => gatewaySecret, store });
+  const gateway = bridge.gateway;
   const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId });
   const adminDigest = createHash('sha256').update(`Bearer ${required('VOICE_ADMIN_SECRET')}`).digest();
   createServer(withVoiceEvidence(async (req, res) => {
@@ -38,7 +39,7 @@ if (command === 'setup') {
       if (req.method === 'GET' && req.url === '/health') { res.end('ok'); return; }
       if (req.method === 'POST' && req.url === '/_admin/dial') {
         if (!timingSafeEqual(createHash('sha256').update(req.headers.authorization || '').digest(), adminDigest)) { res.writeHead(401).end(); return; }
-        if (await store.clientStopped('northfield-jordan')) { res.writeHead(409).end('CLIENT_STOPPED'); return; }
+        if (await bridge.clientStopped()) { res.writeHead(409).end('CLIENT_STOPPED'); return; }
         const t1 = JSON.parse(readFileSync('.env.t1/resources.json', 'utf8')) as { number_id: string; callback_number: string };
         const number = required('T1_DIAL_TO');
         const demo = process.env.DEMO_OVERRIDE === 'true';
@@ -52,9 +53,7 @@ if (command === 'setup') {
           audit: async entry => { appendFileSync(`${root}/audit.jsonl`, JSON.stringify(entry) + '\n', { mode: 0o600 }); },
           prepare: async (session, trusted) => {
             // Synthetic demo invoice; amounts go ONLY into the identity-gated server store.
-            await store.add({ callId: session.id, invoiceId: trusted.invoiceId, clientId: trusted.clientId, contactName: trusted.contactName,
-              companyName: trusted.businessName, amountCents: 495000, receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD',
-              policyVersion: DEFAULT_POLICY.policyVersion, identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} });
+            await bridge.register(session.id);
             await journal.register(session);
             writeFileSync(`${root}/consent-${session.id}.json`, JSON.stringify({ ...trusted.client.consent, number: undefined, number_reference: '.env.local:T1_DIAL_TO' }), { mode: 0o600 });
           } });

@@ -30,3 +30,26 @@ it('resets synthetic company, gateway approvals and payments into one shared sta
   expect(await getStateStore().getEscalation(id)).toBeUndefined();
   expect((await getStateStore().verifyAuditChain()).valid).toBe(true);
 });
+it('registers an unverified voice call into the same gateway and reconciles its ALLOW link', async () => {
+  const { getGatewayStore, handleTool } = await import('../gateway/runtime');
+  const { resolvePaymentCode } = await import('../payments/delivery');
+  const { randomUUID } = await import('node:crypto');
+  process.env.TOOL_GATEWAY_SECRET = 'voice-test';
+  runtime = await createDemoRuntime();
+  const callId = randomUUID();
+  await runtime.registerVoiceCall(callId);
+  const invoke = async (tool: string, args = {}) => (await handleTool(tool, new Request('http://localhost', {
+    method: 'POST', headers: { authorization: 'Bearer voice-test' },
+    body: JSON.stringify({ call_id: callId, webhook_request_id: randomUUID(), ...args }),
+  }))).json();
+  expect((await invoke('get_invoice_context')).rule_ids).toEqual(['IDENTITY_REQUIRED']);
+  await invoke('verify_identity_result', { result: 'confirmed' });
+  const plan = await invoke('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+  const sent = await invoke('send_payment_link', { plan_id: plan.plan_id });
+  const link = await resolvePaymentCode(getGatewayStore(), sent.short_code);
+  expect(link?.amountCents).toBe(247500);
+  const id = link!.path.split('/').at(-1)!;
+  expect((await getPaymentService().pay(id)).status).toBe('partially_paid');
+  expect((await getStateStore().getPayment('ar:1042:1'))?.result.amountCents).toBe(247500);
+  delete process.env.TOOL_GATEWAY_SECRET;
+});
