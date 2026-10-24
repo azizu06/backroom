@@ -53,7 +53,8 @@ export function AuditWall() {
       try {
         const next: Snapshot = await api('entries', undefined, controller.signal);
         setSnapshot(next); setLocked(false); setError('');
-        setSelected(current => current ?? next.entries.at(-1)?.id);
+        const requested = new URLSearchParams(window.location.search).get('entry');
+        setSelected(current => current ?? (requested || next.entries.at(-1)?.id));
       } catch (e) {
         if (controller.signal.aborted) return;
         if ((e as { status?: number }).status === 401) {
