@@ -1,0 +1,7 @@
+{
+  "at": "2026-10-24T14:18:02.380Z",
+  "macCallbackUpdateMs": 6295,
+  "gx10CallbackRestoreMs": 11610,
+  "activeDestination": "gx10",
+  "scope": "Existing agent/tool/webhook IDs updated only; no phone dial or active call/journal migration; setup used memory store to avoid unused subscription"
+}
