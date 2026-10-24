@@ -45,12 +45,13 @@ const outcomes = ["held", "escalated", "denied", "allowed", "approved", "rejecte
 const stringInputs = ["invoiceId", "relatedInvoiceId", "vendorId", "senderDomain", "vendorDomain"] as const;
 const numberInputs = ["amountDelta", "requestedInstallments", "maxInstallments"] as const;
 const identifier = /^[A-Za-z0-9_-]{1,80}$/;
+const entryIdentifier = /^[A-Za-z0-9_.:-]{1,200}$/;
 const boundedText = (value: unknown): value is string => typeof value === "string" && value.length <= 200;
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 
 // Do not spread caller records: raw email, invoice text, prompt, and extra metadata never leave here.
 function project(value: unknown): WhyAuditEntry | undefined {
-  if (!record(value) || typeof value.id !== "string" || !identifier.test(value.id) ||
+  if (!record(value) || typeof value.id !== "string" || !entryIdentifier.test(value.id) ||
       !actors.includes(value.actor as string) || !seats.includes(value.seat as string) ||
       !outcomes.includes(value.outcome as string) || !boundedText(value.action) ||
       !Number.isSafeInteger(value.policyVersion) || Number(value.policyVersion) < 0 || !record(value.inputs)) return;
@@ -112,10 +113,10 @@ function validate(content: unknown, entries: WhyAuditEntry[]): WhyAnswer | undef
         !Array.isArray(value.citations) || !value.citations.length) return;
     const allowed = new Set(entries.map(entry => entry.id));
     if (!value.citations.every(id => typeof id === "string" && allowed.has(id))) return;
-    const inline = [...value.answer.matchAll(/\[entry:([A-Za-z0-9_-]+)\]/g)].map(match => match[1]!);
+    const inline = [...value.answer.matchAll(/\[entry:([A-Za-z0-9_.:-]+)\]/g)].map(match => match[1]!);
     const citations = [...new Set(value.citations as string[])];
     if (!inline.length || inline.some(id => !citations.includes(id)) || citations.some(id => !inline.includes(id)) ||
-        /entry\s*:/i.test(value.answer.replace(/\[entry:[A-Za-z0-9_-]+\]/g, ""))) return;
+        /entry\s*:/i.test(value.answer.replace(/\[entry:[A-Za-z0-9_.:-]+\]/g, ""))) return;
     return { answer: value.answer, citations, source: "model" };
   } catch { return; }
 }

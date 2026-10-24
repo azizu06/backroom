@@ -1,4 +1,5 @@
 export * from './store';
+export * from './audit';
 export * from './effects';
 export * from './worker';
 export * from './policy-gate';

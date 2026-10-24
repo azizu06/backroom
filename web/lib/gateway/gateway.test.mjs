@@ -1,6 +1,7 @@
 import { createGateway } from "./http";
 import { MemoryGatewayStore } from "./store";
 import { DEFAULT_POLICY, savePolicy } from "../../../policy/src/index";
+import { MemoryStateStore } from "@backroom/orchestrator";
 
 const seed = () => ({
   callId: "call-1",
@@ -29,6 +30,35 @@ const request = (body, token = "test-secret") =>
   });
 
 describe("Cartesia tool gateway", () => {
+  it("commits gateway evidence to the shared chain with the same citation id, once per delivery", async () => {
+    const audit = new MemoryStateStore();
+    await audit.setLlmEnabled(false);
+    const store = new MemoryGatewayStore([seed()], audit);
+    const gateway = createGateway({ secret: () => "test-secret", store });
+    const body = { call_id: "call-1", webhook_request_id: "chained", result: "confirmed" };
+    await gateway("verify_identity_result", request(body));
+    await gateway("verify_identity_result", request(body));
+    const [local] = await store.transact("call-1", call => call.audits);
+    expect(await audit.getAudit(local.id)).toMatchObject({
+      actor: "code", seat: "collections", action: "verify_identity_result", seq: 2,
+      refs: ["call-1", "inv-1", "client-1"], inputs: { webhookRequestId: "chained", kind: "RECORDED" },
+    });
+    expect(await audit.listAudit()).toHaveLength(2);
+    expect(await audit.verifyAuditChain()).toMatchObject({ valid: true, length: 2 });
+  });
+
+  it("withholds confirmation and rolls back the call if shared audit persistence fails", async () => {
+    const call = { ...seed(), identityConfirmed: true };
+    const store = new MemoryGatewayStore([call], { appendAudits: async () => { throw new Error("STORE_UNAVAILABLE"); } });
+    const gateway = createGateway({ secret: () => "test-secret", store });
+    const response = await gateway("propose_plan", request({ call_id: "call-1", webhook_request_id: "failed-audit",
+      installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 }));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ can_confirm: false });
+    expect(await store.transact("call-1", saved => ({ audits: saved.audits, plans: saved.plans, deliveries: saved.deliveries })))
+      .toEqual({ audits: [], plans: [], deliveries: {} });
+  });
+
   it("records deterministic gateway decisions as code", async () => {
     const store = new MemoryGatewayStore([seed()]);
     const gateway = createGateway({ secret: () => "test-secret", store });
