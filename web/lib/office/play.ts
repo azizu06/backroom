@@ -81,11 +81,16 @@ function sweep(from: number, delta: number, other: number, colliders: readonly B
 }
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
 
-/** Axis-separated move (x then z) so the player slides along walls; never ends inside a collider. */
+/**
+ * Axis-separated move (x then z) so the player slides along walls; never ends inside a new collider.
+ * A box that already overlaps the player (e.g. a room that became visible on top of them) does not
+ * block, so the player can always walk out of it.
+ */
 export function movePlayer(position: Vec2, step: Vec2, colliders: readonly Box[], radius = PLAYER_RADIUS): [number, number] {
   const x = clamp(sweep(position[0], step[0], position[1], colliders, radius, 0), FLOOR.minX + radius, FLOOR.maxX - radius);
   const z = clamp(sweep(position[1], step[1], x, colliders, radius, 1), FLOOR.minZ + radius, FLOOR.maxZ - radius);
-  return insideAny([x, z], colliders, radius) ? [position[0], position[1]] : [x, z];
+  const blocking = colliders.filter(box => !insideAny(position, [box], radius));
+  return insideAny([x, z], blocking, radius) ? [position[0], position[1]] : [x, z];
 }
 
 export type PlayControl = "forward" | "back" | "left" | "right" | "turnLeft" | "turnRight";
