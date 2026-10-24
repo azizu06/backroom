@@ -1,7 +1,8 @@
 // Single local process: Next route chunks, seats, gateway and controller share globals.
 import next from 'next';
 import { demoBindHost, voiceRelayPath } from '../tools/demo/host';
-import { createServer, request as proxyRequest } from 'node:http';
+import { request as proxyRequest, type RequestListener } from 'node:http';
+import { listenDemo } from '../tools/demo/listen';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDemoRuntime } from './lib/demo/runtime';
@@ -18,7 +19,7 @@ async function main() {
   const handle = app.getRequestHandler();
   const active = new Set<Promise<void>>();
   let resetting = false;
-  const server = createServer(async (req, res) => {
+  const handler: RequestListener = async (req, res) => {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
     if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end(`demo ${runtime.status().bank}; ${process.env.STATE_STORE} state`); return; }
     if (path.startsWith('/__demo/')) {
@@ -92,12 +93,14 @@ async function main() {
     const settled = () => { active.delete(done); finish(); };
     res.once('finish', settled); res.once('close', settled);
     try { await handle(req, res); } catch { if (!res.headersSent) res.writeHead(500); res.end('Demo request failed'); }
-  });
-  server.listen(port, demoBindHost(process.env), () => console.log(`Demo bound: ${demoBindHost(process.env)}:${port}`));
+  };
+  const host = demoBindHost(process.env);
+  const listeners = await listenDemo(handler, port, host);
+  console.log(`Demo bound: ${host}:${port}${host === '127.0.0.1' ? '' : ` and 127.0.0.1:${port}`}`);
   let closing = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
     if (closing) return; closing = true;
-    server.close(); void runtime.stop().then(() => app.close()).finally(() => process.exit(0));
+    void listeners.close().then(() => runtime.stop()).then(() => app.close()).finally(() => process.exit(0));
   });
   console.log(`Demo ready: shared state, ${runtime.status().bank}, no phone call placed.`);
 

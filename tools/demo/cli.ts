@@ -105,7 +105,9 @@ async function supervise() {
     remote = externalState(env); bindHost = demoBindHost(env);
     if (!['memory', 'spacetime'].includes(env.STATE_STORE)) throw new Error('DEMO_INVALID_STATE_STORE');
     const port = Number(env.DEMO_PORT || 3000), voicePort = Number(env.VOICE_PORT || 8788);
-    await available(port, bindHost); base = `http://${bindHost.includes(':') ? `[${bindHost}]` : bindHost}:${port}`;
+    await available(port, bindHost);
+    if (bindHost !== '127.0.0.1') await available(port);
+    base = `http://${bindHost.includes(':') ? `[${bindHost}]` : bindHost}:${port}`;
     if (env.DEMO_VOICE === '1') await available(voicePort);
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();

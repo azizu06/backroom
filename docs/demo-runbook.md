@@ -363,7 +363,9 @@ StateStore; hosting does not prove phone → passkey → payment integration.
 Actual callbacks `/api/voice/tools/*` and `/api/voice/cartesia` also proxy to the
 authenticated receiver; `/_cartesia/*` remains available for relay health.
 
-Web binds **100.117.44.20:3340**, local fallback DB **100.117.44.20:3341**,
+Web binds **100.117.44.20:3340** and **127.0.0.1:3340** with the same
+handler/authentication. The loopback socket is required by the private voice
+bridge; both listeners close together. Local fallback DB binds **100.117.44.20:3341**,
 voice **127.0.0.1:3342**. Startup prints `ss -ltn`; the runner checks each selected
 port before launch. The quick tunnel forwards HTTPS pages and `/_cartesia/*` to
 web. From the Mac, use the printed Tailscale `/office` URL when the DB is local:
@@ -458,3 +460,15 @@ The reproducible opt-in `tools/demo/measure-hosts.ts` writes synthetic duplicate
 inbox/audit rows only; it requires `MAC_PUBLIC_URL` / `GX10_PUBLIC_URL` for the
 same-origin decision endpoints. Page loads use direct host URLs. It performs
 no model inference, bank request, approval or dial.
+
+After a host/listener change, exercise the authenticated bridge as well as health:
+
+```sh
+ssh gx10 'cd ~/work/backroom-judge-host/app; PATH="$HOME/work/backroom-judge-host/.runtime/bin:$PATH" node --import ./orchestrator/node_modules/tsx/dist/loader.mjs tools/demo/voice-bridge-live.ts --confirm-owned-demo'
+```
+
+This calls the private loopback client-stop read and an authenticated gateway tool
+for a deliberately unknown synthetic call (404 `CALL_NOT_FOUND`), plus the signed
+public voice-tool callback for an unknown session (404 `SESSION_NOT_FOUND`). It
+never registers a call, dials, pays, or contacts a provider. A relay `/health` or
+unsigned 401 alone does not prove bridge → web connectivity.
