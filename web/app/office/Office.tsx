@@ -4,13 +4,13 @@ import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalSt
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
-import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
+import { PlayInput, type PlayBridge, type PlayGuide, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, useTouch } from './PlayHud';
 import { roomLabel, seatLabel } from '../../lib/office/a11y';
 import { MotionRegistry } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, visibleRooms, type AnchorId, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
-import { INITIAL_VIEWPORT, VIEW_OPTIONS, isFixedCamera, viewportLayers, viewportReducer, type ViewMode } from '../../lib/office/view';
+import { INITIAL_VIEWPORT, viewportLayers, viewportReducer } from '../../lib/office/view';
 import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStops } from '../../lib/office/tour';
 import { OfficeLobby } from './OfficeLobby';
 import { StoryMode } from './StoryMode';
@@ -48,51 +48,51 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode; storyStart?: boolean; storyPreview?: (preview: StoryChapter['preview']) => void;
 }) {
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
+  // First person is the only view; the floor plan below is drawn only while WebGL is lost or unavailable.
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
   const touch = useTouch();
-  const { mode, lostContext, sceneAttempt } = viewport;
+  const { lostContext, sceneAttempt, touring } = viewport;
   const layers = viewportLayers(viewport);
   const [focus, setFocus] = useState<AnchorId | null>(null);
+  // Room buttons, tour stops and story chapters walk the Play camera to the room (a new seq re-walks the same room).
+  const [guide, setGuide] = useState<PlayGuide | null>(null);
+  const focusRoom = useCallback((room: AnchorId | null) => {
+    setFocus(room);
+    setGuide(current => room ? { room, seq: (current?.seq ?? 0) + 1 } : null);
+  }, []);
   const [inspecting, setInspecting] = useState<AnchorId | null>(null);
   const [motions] = useState(() => new MotionRegistry());
-  // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
-  const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection });
-  const prePlay = useRef<ViewMode>('walk');
-  useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
-  function exitPlay() { saveStartView('overview'); setLookOnEnter(false); pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
-  // First person is the default start; the splash supplies the user gesture pointer lock and audio need.
+  const presence = usePresence({ mode: touring ? 'tour' : 'play', hud: play.hud, source, connectionMode: snapshot.connection });
+  const textView = useRef<HTMLElement>(null);
+  /** The exit from first person: every seat, receipt and the inbox as plain text below the office. */
+  function showTextView() {
+    if (document.pointerLockElement) document.exitPointerLock?.();
+    textView.current?.focus();
+  }
+  // The splash supplies the user gesture pointer lock and audio need; the HUD waits behind it.
   const [splash, setSplash] = useState(false);
-  const [lookOnEnter, setLookOnEnter] = useState(false);
-  function enterPlay() { setSplash(false); saveStartView('play'); setLookOnEnter(true); pickMode('play'); }
-  function enterOverview() { setSplash(false); saveStartView('overview'); document.getElementById('office-view')?.focus(); }
-  function chooseView(next: ViewMode) { saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next); }
+  const [hudStart, setHudStart] = useState({ look: false, focus: false });
+  function enterPlay() { setSplash(false); saveStartView('play'); setHudStart({ look: true, focus: true }); }
+  function enterText() { setSplash(false); saveStartView('overview'); showTextView(); }
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
   useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
   const labels: RoomLabels = { lobby: useRef(null), collections: useRef(null), payables: useRef(null), vendor_onboarding: useRef(null), dana: useRef(null), treasury: useRef(null) };
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
-  function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
   const tagElements = useRef(new Map<string, HTMLDivElement>());
   const agentTag = useCallback<AgentTagLookup>(id => tagElements.current.get(id), []);
-  const touring = mode === 'tour';
   const [tour, setTour] = useState<{ stops: AnchorId[]; index: number } | null>(null);
   const rooms = visibleRooms(snapshot);
   const { storyActive, reducedMotion, chapters, closeStory, changeStoryChapter, startStory, viewportRef } = useStoryMode({
-    rooms, storyStart, setFocus, setInspecting, setTour, pickMode,
+    rooms, storyStart, setFocus: focusRoom, setInspecting, setTour,
   });
   const roomsRef = useRef(rooms);
   roomsRef.current = rooms;
   const stopTour = useCallback(() => dispatch({ type: 'endTour' }), []);
-  const viewSelect = useRef<HTMLSelectElement>(null);
-  // Any input ends the tour, except the view select's own navigation keys: its onChange picks the next view.
-  const interruptTour = useCallback((event: Event) => {
-    if (event instanceof KeyboardEvent && event.target === viewSelect.current && /^(Arrow|Home$|End$|Page)/.test(event.key)) return;
-    stopTour();
-  }, [stopTour]);
-  // The tour only moves the camera: each stop is a focus change, and finishing returns to the full floor.
+  // The tour walks the Play camera: each stop is a guided walk, and finishing leaves the viewer where it stopped.
   useEffect(() => {
     if (!touring || storyActive) return;
     const stops = tourStops(roomsRef.current);
@@ -107,21 +107,20 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         return;
       }
       setTour({ stops, index });
-      setFocus(stops[index]!);
+      focusRoom(stops[index]!);
       timer = setTimeout(step, Math.max(0, started + (index + 1) * TOUR_STEP_MS - performance.now()));
     }
     step();
     return () => { clearTimeout(timer); setTour(null); };
-  }, [touring, storyActive]);
-  // Added after the switch to the tour commits, so the select interaction that started it does not cancel it.
+  }, [touring, storyActive, focusRoom]);
+  // Any input ends the tour. Added after the tour commits, so the click that started it does not cancel it.
   useEffect(() => {
     if (!touring || storyActive) return;
-    for (const type of TOUR_INTERRUPT_EVENTS) window.addEventListener(type, interruptTour, { capture: true, passive: true });
-    return () => { for (const type of TOUR_INTERRUPT_EVENTS) window.removeEventListener(type, interruptTour, { capture: true }); };
-  }, [touring, interruptTour, storyActive]);
+    for (const type of TOUR_INTERRUPT_EVENTS) window.addEventListener(type, stopTour, { capture: true, passive: true });
+    return () => { for (const type of TOUR_INTERRUPT_EVENTS) window.removeEventListener(type, stopTour, { capture: true }); };
+  }, [touring, stopTour, storyActive]);
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
-    if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
     if (storyStart || source.getSnapshot().connection === 'replay') return;
     if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') setSplash(true);
   // Decided once on mount; later prop changes never reopen the splash.
@@ -136,37 +135,34 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setInspecting(room);
     setFocus(room);
   }
-  const plan = mode === 'plan' || lostContext;
   return <section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
-        {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Enter first person</button>}
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
-        <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
+        <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={touring ? 'tour' : 'play'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
         <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
-        <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
-          {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
-        </select></label>
+        {!touring && <button type='button' className='office-start-tour' onClick={() => dispatch({ type: 'startTour' })}>Tour</button>}
+        <a className='office-text-link' href='#office-text-view' onClick={event => { event.preventDefault(); showTextView(); }}>Text view</a>
       </div>
     </header>
     <nav className='room-navigation' aria-label='Room camera presets'>
-      <button aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); }}>Full floor</button>
-      {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
+      <button aria-pressed={focus === null} onClick={() => { focusRoom(null); setInspecting(null); }}>Full floor</button>
+      {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { focusRoom(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
     </nav>
     <div ref={viewportRef} className='office-viewport' data-testid='office-viewport'>
       <SoundToggle snapshot={snapshot} />
-      <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
+      <p className='visually-hidden'>First-person 3D office. Use the room buttons to walk to a room, or the Text view link for every seat and receipt as text.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
-        {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
-          {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
+        <>
+          {/* Keyed by attempt: retrying after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} presence={presence.peers} />
+            <OfficeScene snapshot={snapshot} motions={motions} paused={!layers.scene.visible} focus={focus} guide={guide} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={play} presence={presence.peers} />
           </div>
           {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
@@ -181,18 +177,21 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
               </button>
             </div>;
           })}
-        </>}
+        </>
       </ViewBoundary>
-      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} lookOnStart={lookOnEnter} />}
+      {layers.scene.visible && !splash && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={showTextView} lookOnStart={hudStart.look} focusOnStart={hudStart.focus} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : touch ? PLAY_TOUCH_HINT : PLAY_HINT}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
+      {lostContext && <button type='button' className='tour-stop' onClick={() => dispatch({ type: 'retry' })}>Retry 3D</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
-    {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
-    <footer className='office-footer'>
+    {splash && <PlaySplash onEnter={enterPlay} onText={enterText} />}
+    <footer ref={textView} id='office-text-view' className='office-footer' tabIndex={-1}>
+      <h2 className='visually-hidden'>Text view</h2>
+      {layers.scene.visible && <button type='button' className='office-text-back' onClick={() => play.hud.current?.focus()}>Back to first person</button>}
       <ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
       <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}

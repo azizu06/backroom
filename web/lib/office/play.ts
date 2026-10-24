@@ -35,11 +35,36 @@ export const LOOK_SENSITIVITY = 0.0025;
 /** Lobby aisle, facing -z toward the Collections desk. */
 export const SPAWN = { position: [-5, 0.9] as const, yaw: 0 } as const;
 export const FLOOR = { minX: -8, maxX: 8, minZ: -5.5, maxZ: 5.5 } as const;
+/** Guided walks (room buttons, tour, story mode) stop in the open aisle (this z) in front of a room, looking slightly down at it. */
+export const GUIDE_AISLE_Z = 0.6;
+export const GUIDE_PITCH = -0.18;
 export interface Box { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 
 /** Camera convention: yaw 0 looks toward -z. */
 export function forwardOf(yaw: number): [number, number] { return [-Math.sin(yaw), -Math.cos(yaw)]; }
 export function rightOf(yaw: number): [number, number] { return [Math.cos(yaw), -Math.sin(yaw)]; }
+/** Yaw that looks from `eye` toward `at` (inverse of forwardOf). */
+export function yawToward(eye: Vec2, at: Vec2): number { return Math.atan2(-(at[0] - eye[0]), -(at[1] - eye[1])); }
+
+export interface PlayPose { readonly position: Vec2; readonly yaw: number; readonly pitch: number }
+/** A requested guided walk to `room`; a new `seq` restarts the walk to the same room. */
+export interface PlayGuide { readonly room: AnchorId; readonly seq: number }
+/** Where a guided walk to `room` ends: the aisle in front of the room, facing its centre. */
+export function guidePose(room: AnchorId): PlayPose {
+  const center = OFFICE_ANCHORS[room].center;
+  const position: Vec2 = [center[0], GUIDE_AISLE_Z];
+  return { position, yaw: yawToward(position, [center[0], center[1]]), pitch: GUIDE_PITCH };
+}
+/** Pose `progress` (0..1, already eased) of the way from `from` to `to`; yaw turns the short way round. */
+export function lerpPose(from: PlayPose, to: PlayPose, progress: number): PlayPose {
+  const t = Math.min(1, Math.max(0, progress));
+  const turn = Math.atan2(Math.sin(to.yaw - from.yaw), Math.cos(to.yaw - from.yaw));
+  return {
+    position: [from.position[0] + (to.position[0] - from.position[0]) * t, from.position[1] + (to.position[1] - from.position[1]) * t],
+    yaw: Math.atan2(Math.sin(from.yaw + turn * t), Math.cos(from.yaw + turn * t)),
+    pitch: from.pitch + (to.pitch - from.pitch) * t,
+  };
+}
 
 function box(x: number, z: number, width: number, depth: number): Box {
   return { minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 };

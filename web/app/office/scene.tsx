@@ -1,16 +1,15 @@
 'use client';
 
-import { Fragment, useEffect, useRef, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Instances, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Instances } from '@react-three/drei';
 import { Group, MathUtils, Vector3 } from 'three';
-import { cameraAlpha, legSwing } from '../../lib/office/a11y';
+import { legSwing } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
-import type { PlayBridge } from '../../lib/office/play';
+import type { PlayBridge, PlayGuide } from '../../lib/office/play';
 import { PlayRig } from './play';
 import { OFFICE_ANCHORS, isAnchorId, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
-import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
@@ -50,7 +49,7 @@ function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkM
   return null;
 }
 /** Draws the shared motion; Office's MotionRegistry owns re-seating, retargeting and the wake-up frame. */
-function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean }) {
+function Avatar({ agent, motion, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; recorded: boolean; paused: boolean }) {
   const reduced = useReducedMotion();
   const body = useRef<Group>(null);
   const legs = useRef<Group>(null);
@@ -64,7 +63,7 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     body.current.position.set(walk.position[0], 0, walk.position[1]);
     const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = legSwing(walk.distance, i, walk.moving && !tween && !recorded, reduced); });
+    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = legSwing(walk.distance, i, walk.moving && !recorded, reduced); });
   });
   const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
   return <group ref={body} position={[motion.position[0], 0, motion.position[1]]}>
@@ -80,58 +79,6 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
       <boxGeometry args={[0.18, 0.55, 0.22]} /><meshStandardMaterial color='#414b43' />
     </mesh>)}</group>
   </group>;
-}
-/** Tour moves start from wherever the camera is when the frame after a focus change renders. */
-interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number }
-function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: boolean; tour: boolean }) {
-  const reduced = useReducedMotion();
-  const { camera, size, invalidate } = useThree();
-  const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
-  const moving = useRef(true);
-  const orbiting = useRef(false);
-  const target = useRef(new Vector3());
-  const destination = useRef(new Vector3(13, 15, 17));
-  const tourMove = useRef<TourMove>({ startedAt: null, position: new Vector3(), target: new Vector3(), zoom: 1 });
-  useEffect(() => {
-    const center = focus ? OFFICE_ANCHORS[focus].center : [0, 0];
-    target.current.set(center[0]!, 0.2, center[1]!);
-    destination.current.copy(target.current).add(new Vector3(13, 15, 17));
-    tourMove.current.startedAt = null;
-    moving.current = true;
-    invalidate();
-  }, [focus, size, fixed, tour, invalidate]);
-  useFrame((state, delta) => {
-    if (orbiting.current) state.invalidate();
-    if (!moving.current || !controls.current) return;
-    state.invalidate();
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
-    if (tour) {
-      const move = tourMove.current;
-      if (move.startedAt === null) {
-        move.startedAt = performance.now();
-        move.position.copy(camera.position);
-        move.target.copy(controls.current.target);
-        move.zoom = camera.zoom;
-      }
-      const progress = tourProgress(performance.now() - move.startedAt, reduced);
-      camera.position.lerpVectors(move.position, destination.current, progress);
-      controls.current.target.lerpVectors(move.target, target.current, progress);
-      camera.zoom = MathUtils.lerp(move.zoom, zoom, progress);
-      camera.updateProjectionMatrix();
-      controls.current.update();
-      if (progress >= 1) moving.current = false;
-      return;
-    }
-    const alpha = cameraAlpha(delta, reduced);
-    camera.position.lerp(destination.current, alpha);
-    controls.current.target.lerp(target.current, alpha);
-    camera.zoom = MathUtils.lerp(camera.zoom, zoom, alpha);
-    camera.updateProjectionMatrix();
-    controls.current.update();
-    if (camera.position.distanceTo(destination.current) < 0.005 && Math.abs(camera.zoom - zoom) < 0.01) moving.current = false;
-  });
-  return <OrbitControls ref={controls} onStart={() => { orbiting.current = true; invalidate(); }} onEnd={() => { orbiting.current = false; invalidate(); }} enablePan={false} enableZoom={false} enableRotate={!fixed}
-    minPolarAngle={0.45} maxPolarAngle={1.1} minAzimuthAngle={-0.7} maxAzimuthAngle={0.9} />;
 }
 function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
@@ -152,12 +99,13 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [] }: {
-  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
-  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[];
+export function OfficeScene({ snapshot, motions, paused = false, focus, guide = null, labels, agentTag, onFailure, onRestored, play, presence = [] }: {
+  snapshot: OfficeSnapshot; motions: MotionRegistry; paused?: boolean; focus: AnchorId | null; guide?: PlayGuide | null; labels: RoomLabels;
+  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play: PlayBridge; presence?: PresencePeer[];
 }) {
+  // The orthographic default camera is only the Play intro's starting pose; PlayRig's first-person camera takes over.
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
-    gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
+    gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. The text view below the office lists every seat and receipt.</span>}>
     <color attach='background' args={['#202620']} />
     <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
     <directionalLight position={keyLight.position} color={keyLight.color} intensity={keyLight.intensity} castShadow={keyLight.castShadow}
@@ -193,12 +141,12 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}
     {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     {snapshot.agents.map(agent => <Fragment key={agent.id}>
-      <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />
+      <Avatar agent={agent} motion={motions.get(agent)} recorded={snapshot.connection === 'replay'} paused={paused} />
       {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
     </Fragment>)}
     </Instances>
     {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     <PresenceGhosts peers={presence} />
-    {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
+    <PlayRig {...play} motions={motions} snapshot={snapshot} guide={guide} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }

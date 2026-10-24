@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PAYLINK_KIOSK, PAYLINK_RADIUS, PITCH_LIMIT, PLAYER_RADIUS, SERVER_ROOM, SERVER_ROOM_BOX, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
-  interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
+  forwardOf, guidePose, interactCandidates, lerpPose, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent, yawToward,
   type PlayCandidate, type Vec2,
 } from "./play";
 import { createMockOfficeState } from "./preview";
@@ -319,5 +319,34 @@ describe("panels", () => {
     expect(targetKey({ kind: "server" })).toBe("server");
     expect(targetLabel(snapshot, { kind: "server" })).toBe("Check GX10 server");
     expect(playPanel(snapshot, { kind: "server" })).toEqual({ kind: "server", title: "GX10 server", entries: [] });
+  });
+});
+
+describe("guided walks", () => {
+  it("stop in the open aisle in front of every room, facing its centre", () => {
+    for (const room of ALL) {
+      const pose = guidePose(room);
+      const [cx, cz] = OFFICE_ANCHORS[room].center;
+      expect(pose.position[0]).toBe(cx);
+      const blocked = officeColliders(ALL, [SERVER_ROOM_BOX]).filter(box => insideAny(pose.position, [box], PLAYER_RADIUS));
+      expect(blocked, room).toEqual([]);
+      const [fx, fz] = forwardOf(pose.yaw);
+      const distance = Math.hypot(cx - pose.position[0], cz - pose.position[1]);
+      expect(fx * (cx - pose.position[0]) + fz * (cz - pose.position[1])).toBeCloseTo(distance, 6);
+    }
+  });
+
+  it("interpolate position and pitch and turn the short way round", () => {
+    const from = { position: [0, 0] as Vec2, yaw: Math.PI - 0.1, pitch: 0 };
+    const to = { position: [2, 4] as Vec2, yaw: -Math.PI + 0.1, pitch: -0.2 };
+    expect(lerpPose(from, to, 0)).toEqual(from);
+    const half = lerpPose(from, to, 0.5);
+    expect(half.position).toEqual([1, 2]);
+    expect(Math.abs(half.yaw)).toBeCloseTo(Math.PI, 6);
+    expect(half.pitch).toBeCloseTo(-0.1, 6);
+    const end = lerpPose(from, to, 2);
+    expect(end.position).toEqual([2, 4]);
+    expect(end.yaw).toBeCloseTo(to.yaw, 6);
+    expect(yawToward([0, 0], [0, -1])).toBeCloseTo(0, 6);
   });
 });

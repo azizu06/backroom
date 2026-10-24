@@ -5,10 +5,18 @@
 .room-inspector button:focus-visible,
 .room-inspector summary:focus-visible,
 .room-inspector a:focus-visible,
-.office-toolbar select:focus-visible {
+.office-toolbar select:focus-visible,
+.office-toolbar a:focus-visible,
+.office-text-back:focus-visible,
+#office-text-view:focus-visible {
   outline: 2px solid #f3dfb9;
   outline-offset: 2px;
 }
+
+/* The exit from first person: the footer is the office as text. */
+.office-shell .office-text-link { color: #f3dfb9; font-size: 13px; align-self: center; }
+.office-shell .office-text-back { align-self: flex-start; }
+#office-text-view:focus { outline: 2px solid #f3dfb9; outline-offset: -2px; }
 
 .office-shell .visually-hidden {
   position: absolute;

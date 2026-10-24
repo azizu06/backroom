@@ -4,14 +4,13 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { storyChapters, type StoryChapter } from '../../lib/office/story';
 import type { AnchorId } from '../../lib/office/state';
-import type { ViewMode } from '../../lib/office/view';
 
-export function useStoryMode({ rooms, storyStart, setFocus, setInspecting, setTour, pickMode }: {
+/** Story chapters are guided walks in Play: `setFocus` walks the first-person camera to each chapter's room. */
+export function useStoryMode({ rooms, storyStart, setFocus, setInspecting, setTour }: {
   rooms: readonly AnchorId[]; storyStart: boolean;
   setFocus: (room: AnchorId | null) => void;
   setInspecting: (room: AnchorId | null) => void;
   setTour: (tour: { stops: AnchorId[]; index: number } | null) => void;
-  pickMode: (mode: ViewMode) => void;
 }): {
   storyActive: boolean; reducedMotion: boolean; chapters: StoryChapter[];
   closeStory: () => void; changeStoryChapter: (index: number) => void; startStory: () => void;
@@ -40,16 +39,17 @@ export function useStoryMode({ rooms, storyStart, setFocus, setInspecting, setTo
     setTour({ stops: chapters.map(item => item.anchor), index });
   }, [chapters, setFocus, setInspecting, setTour]);
   const startStory = useCallback(() => {
-    pickMode('walk'); setStoryActive(true); changeStoryChapter(0);
-  }, [changeStoryChapter, pickMode]);
+    setStoryActive(true); changeStoryChapter(0);
+  }, [changeStoryChapter]);
   useEffect(() => {
     if (!storyActive) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
-    let canvas: HTMLCanvasElement | null = null;
+    // A press on the scene pauses the story: the Play surface covers the canvas whenever the HUD is up.
+    let canvas: HTMLElement | null = null;
     const pause = () => window.dispatchEvent(new CustomEvent('office-story-pause'));
     const attach = () => {
-      const next = viewport.querySelector('canvas');
+      const next = viewport.querySelector<HTMLElement>('.play-surface') ?? viewport.querySelector('canvas');
       if (next === canvas) return;
       canvas?.removeEventListener('pointerdown', pause);
       canvas = next;

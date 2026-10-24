@@ -10,7 +10,8 @@ Add one new file, then add one line to a registry. Leave `Office.tsx`, `scene.ts
 | Something you can walk up to and press E on in Play | `web/lib/office/targets/myThing.ts` exporting `defineTarget<{ kind: 'myThing' }>({ id, candidates, label, panel })` (pure, no React) | `web/lib/office/targets/index.ts`: add it to `PLAY_TARGETS` |
 | Custom dialog UI for that target (optional) | `web/app/office/panels/MyThingPanel.tsx` exporting a `PlayPanelView` (`Body`, `ownHeading`, `hideAudit`, `hideAskWhy`) | `web/app/office/panels/index.ts`: `myThing: myThingPanel` in `PLAY_PANEL_VIEWS` |
 | A view-only prop that reads the snapshot | `web/app/office/props/MyProp.tsx` | `web/app/office/props/OfficeProps.tsx` |
-| A view menu entry | — | `web/lib/office/view.ts`: the `ViewMode` member plus one `VIEW_OPTIONS` entry |
+
+The office is first person only (`web/lib/office/view.ts`): there is no view menu. Room buttons, the tour and story mode are guided walks of the Play camera (`guidePose` in `web/lib/office/play.ts`). The 2D floor plan is drawn only while WebGL is lost or unavailable, and the footer (`#office-text-view`) is the text view that Escape, the HUD's Text view button and the toolbar link lead to.
 
 Rules:
 

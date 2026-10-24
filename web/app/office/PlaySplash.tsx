@@ -9,14 +9,14 @@ const CONTROLS: readonly (readonly [keys: string, action: string])[] = [
   ['Mouse or drag', 'look'],
   ['E', 'interact'],
   ['M', 'map'],
-  ['Esc', 'leave'],
+  ['Esc', 'text view'],
 ];
 
 /**
  * "Enter the office" gate (initial bundle, no WebGL imports). Pointer lock and audio need a user
- * gesture, so first person starts from this click or Enter key.
+ * gesture, so first person starts from this click or Enter key. `onText` skips to the text view.
  */
-export function PlaySplash({ onEnter, onOverview }: { onEnter: () => void; onOverview: () => void }) {
+export function PlaySplash({ onEnter, onText }: { onEnter: () => void; onText: () => void }) {
   const titleId = useId();
   const enter = useRef<HTMLButtonElement>(null);
   useEffect(() => { enter.current?.focus({ preventScroll: true }); }, []);
@@ -34,7 +34,7 @@ export function PlaySplash({ onEnter, onOverview }: { onEnter: () => void; onOve
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onEnter]);
   return <div className='play-splash' role='dialog' aria-modal='true' aria-labelledby={titleId} data-testid='play-splash'
-    onKeyDown={event => { if (isCloseKey(event.key)) { event.preventDefault(); onOverview(); } }}>
+    onKeyDown={event => { if (isCloseKey(event.key)) { event.preventDefault(); onText(); } }}>
     <div className='play-splash-card'>
       <p className='play-splash-kicker'>Enter the office</p>
       <h2 id={titleId}>Backroom</h2>
@@ -43,7 +43,7 @@ export function PlaySplash({ onEnter, onOverview }: { onEnter: () => void; onOve
       <ul className='play-splash-controls' aria-label='Controls'>
         {CONTROLS.map(([keys, action]) => <li key={keys}><kbd>{keys}</kbd><span>{action}</span></li>)}
       </ul>
-      <button type='button' className='play-splash-overview' onClick={onOverview}>Overview (map view)</button>
+      <button type='button' className='play-splash-overview' onClick={onText}>Text view (no 3D)</button>
     </div>
   </div>;
 }

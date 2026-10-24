@@ -8,10 +8,11 @@ import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { interpolateIntroPose, playIntroProgress, type IntroPose } from '../../lib/office/play-intro';
 import type { MotionRegistry } from '../../lib/office/motion';
 import {
-  EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, headBob, interactCandidates, moveIntent, movePlayer, officeColliders,
-  pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
+  EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, guidePose, headBob, interactCandidates, lerpPose, moveIntent, movePlayer, officeColliders,
+  pickTarget, targetKey, turnIntent, type PlayBridge, type PlayGuide, type PlayPose, type PlayTarget,
 } from '../../lib/office/play';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
+import { tourProgress } from '../../lib/office/tour';
 
 const PLAY_EYE: IntroPose = {
   position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]],
@@ -19,10 +20,14 @@ const PLAY_EYE: IntroPose = {
 };
 
 /**
- * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
- * orthographic default camera. Frames continue only during the intro or while input is active.
+ * First-person camera for Play, the office's only camera. The intro flies in from the Canvas's orthographic
+ * default camera. Frames continue only during the intro, a guided walk or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null }: PlayBridge & {
+  motions: MotionRegistry; snapshot: OfficeSnapshot;
+  /** A guided walk (room button, tour or story stop): glide to the room's aisle pose. A new `seq` restarts it; any move or look input cancels it. */
+  guide?: PlayGuide | null;
+}) {
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);
@@ -55,6 +60,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
     return () => query.removeEventListener('change', update);
   }, [invalidate]);
   useEffect(() => () => { latest.current.onTarget(null); }, []);
+  const glide = useRef<{ to: PlayPose; from: PlayPose | null; startedAt: number | null } | null>(null);
+  useEffect(() => {
+    glide.current = guide ? { to: guidePose(guide.room), from: null, startedAt: null } : null;
+    invalidate();
+  }, [guide?.room, guide?.seq, invalidate]);
   // The canvas only resizes the active camera; refit the restored orthographic one in case it resized during Play.
   useEffect(() => () => {
     if (!(previous instanceof OrthographicCamera)) return;
@@ -85,13 +95,32 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
     // The first frame after idle has a stale clock delta; treat it as one display frame.
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;
     wasActive.current = active;
-    const [lookYaw, lookPitch] = input.consumeLook();
-    const look = applyLook(yaw.current, pitch.current, lookYaw + turnIntent(input, dt), lookPitch);
-    const turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
-    yaw.current = look.yaw;
-    pitch.current = look.pitch;
-    const step = moveIntent(input, yaw.current, dt);
-    const next = movePlayer(position.current, step, latest.current.colliders, PLAYER_RADIUS);
+    if (active) glide.current = null;
+    const guided = glide.current;
+    let next: [number, number];
+    let turned: boolean;
+    if (guided) {
+      // Scripted path through the open aisle: no collision sweep, and it ends in a free spot (guidePose).
+      const now = performance.now();
+      guided.startedAt ??= now;
+      guided.from ??= { position: [position.current[0], position.current[1]], yaw: yaw.current, pitch: pitch.current };
+      const progress = tourProgress(now - guided.startedAt, reduced.current);
+      const pose = lerpPose(guided.from, guided.to, progress);
+      next = [pose.position[0], pose.position[1]];
+      turned = pose.yaw !== yaw.current || pose.pitch !== pitch.current;
+      yaw.current = pose.yaw;
+      pitch.current = pose.pitch;
+      if (progress >= 1) glide.current = null;
+      else state.invalidate();
+    } else {
+      const [lookYaw, lookPitch] = input.consumeLook();
+      const look = applyLook(yaw.current, pitch.current, lookYaw + turnIntent(input, dt), lookPitch);
+      turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
+      yaw.current = look.yaw;
+      pitch.current = look.pitch;
+      const step = moveIntent(input, yaw.current, dt);
+      next = movePlayer(position.current, step, latest.current.colliders, PLAYER_RADIUS);
+    }
     const travelled = Math.hypot(next[0] - position.current[0], next[1] - position.current[1]);
     const moved = travelled > 0;
     walked.current += travelled;
