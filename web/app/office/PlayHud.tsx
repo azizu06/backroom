@@ -6,6 +6,7 @@ import { requestSceneFrame } from '../../lib/office/frame';
 import { serverRoomReadout, type Gx10Status } from '../../lib/gx10/server-room';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { useGamepad } from './useGamepad';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -219,6 +220,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     if (knob.current) knob.current.style.transform = '';
     requestSceneFrame();
   }
+
+  useGamepad({ input, enabled: true, move: !panel, onInteract: panel ? undefined : interact, onExit: panel ? closePanel : onExit });
 
   const prompt = target && !panel ? targetLabel(snapshot, target) : '';
   return <div className='play-hud'>
