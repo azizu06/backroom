@@ -1,15 +1,17 @@
-import { Timestamp } from 'spacetimedb';
+import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { schema, table, t, SenderError } from 'spacetimedb/server';
 import { ReducerEngine, AuditLog, evaluateStep, type ApprovalGrant } from '@backroom/orchestrator/reducer';
 import { evaluate, DEFAULT_POLICY, type Badge, type Context, type Policy } from '@backroom/policy';
 import type { Agent, AuditEntry, Escalation, Invoice, Lease, Task, Step } from '@backroom/orchestrator/reducer';
 import * as agents from '@backroom/orchestrator/agent-handoff';
+import { normalizeOfficePresence, validateViewerId, OFFICE_PRESENCE_LIMIT, OFFICE_PRESENCE_RATE, OFFICE_PRESENCE_TTL, OFFICE_PRESENCE_SWEEP } from './office-presence';
 
 // JSON columns preserve the exported StateStore/fixture shapes. Indexed state and
 // visual fields stay typed; private payloads never enter anonymous subscriptions.
 const entity = () => table({}, { id: t.string().primaryKey(), json: t.string() });
 const invoice = () => table({}, { id: t.string().primaryKey(), state: t.string(), json: t.string() });
 const receipt = table({}, { id: t.string().primaryKey(), result: t.string() });
+const presenceSweep = table({}, { scheduledId: t.u64().primaryKey().autoInc(), scheduledAt: t.scheduleAt() });
 const spacetimedb = schema({
   policy: table({ public: true }, { version: t.u32().primaryKey(), json: t.string() }),
   seat: table({ public: true }, { seatId: t.string().primaryKey(), policyVersion: t.u32(), json: t.string() }),
@@ -43,6 +45,9 @@ const spacetimedb = schema({
     reason: t.string(), summary: t.string(), line: t.string(), createdAt: t.f64(), acceptedAt: t.f64().optional(), completedAt: t.f64().optional(),
     decisionRef: t.string().optional(), errorCode: t.string().optional(),
   }),
+  office_presence: table({ public: true }, { viewerId: t.string().primaryKey(), name: t.string(), x: t.f32(), z: t.f32(), yaw: t.f32(), mode: t.string(), at: t.u64() }),
+  office_presence_owner: table({}, { viewerId: t.string().primaryKey(), owner: t.identity() }),
+  office_presence_schedule: presenceSweep,
 });
 export default spacetimedb;
 type Ctx = Parameters<Parameters<typeof spacetimedb.reducer>[1]>[0];
@@ -554,3 +559,37 @@ export const agent_stop_case = agentInvoke('stopCase');
 export const agent_resume_case = agentInvoke('resumeCase');
 export const agent_get_case = agentInvoke('getCase');
 export const agent_list_public = agentInvoke('listPublic');
+// Deliberately anonymous, visual-only ingress. Never touches business tables.
+export const office_presence_upsert = spacetimedb.reducer({ viewerId: t.string(), name: t.string(), x: t.f32(), z: t.f32(), yaw: t.f32(), mode: t.string() }, (ctx, input) => {
+  let row;
+  try { row = normalizeOfficePresence(input); }
+  catch (error) { throw new SenderError((error as Error).message); }
+  const owner = ctx.db.office_presence_owner.viewerId.find(row.viewerId);
+  if (owner && !owner.owner.isEqual(ctx.sender)) throw new SenderError('PRESENCE_NOT_OWNER');
+  const prior = ctx.db.office_presence.viewerId.find(row.viewerId);
+  const at = ctx.timestamp.microsSinceUnixEpoch / 1000n;
+  if (prior && at - prior.at < OFFICE_PRESENCE_RATE) return;
+  if (!prior && ctx.db.office_presence.count() >= OFFICE_PRESENCE_LIMIT) throw new SenderError('PRESENCE_FULL');
+  if (!owner) ctx.db.office_presence_owner.insert({ viewerId: row.viewerId, owner: ctx.sender });
+  if (prior) ctx.db.office_presence.viewerId.update({ ...row, at });
+  else ctx.db.office_presence.insert({ ...row, at });
+  // Lazy initialization also covers an additive publish onto an existing DB.
+  if (!ctx.db.office_presence_schedule.count()) ctx.db.office_presence_schedule.insert({ scheduledId: 0n, scheduledAt: ScheduleAt.interval(OFFICE_PRESENCE_SWEEP) });
+});
+export const office_presence_leave = spacetimedb.reducer({ viewerId: t.string() }, (ctx, { viewerId }) => {
+  try { validateViewerId(viewerId); }
+  catch (error) { throw new SenderError((error as Error).message); }
+  const owner = ctx.db.office_presence_owner.viewerId.find(viewerId);
+  if (!owner) return;
+  if (!owner.owner.isEqual(ctx.sender)) throw new SenderError('PRESENCE_NOT_OWNER');
+  ctx.db.office_presence.viewerId.delete(viewerId);
+  ctx.db.office_presence_owner.viewerId.delete(viewerId);
+});
+export const office_presence_sweep = spacetimedb.reducer({ onSchedule: presenceSweep }, { schedule: presenceSweep.rowType }, ctx => {
+  if (!ctx.sender.isEqual(ctx.identity)) throw new SenderError('SCHEDULE_ONLY');
+  const cutoff = ctx.timestamp.microsSinceUnixEpoch / 1000n - OFFICE_PRESENCE_TTL;
+  for (const row of ctx.db.office_presence.iter()) if (row.at < cutoff) {
+    ctx.db.office_presence.viewerId.delete(row.viewerId);
+    ctx.db.office_presence_owner.viewerId.delete(row.viewerId);
+  }
+});
