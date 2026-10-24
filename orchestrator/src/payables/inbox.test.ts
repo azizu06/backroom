@@ -49,3 +49,14 @@ it('escalates a judge input with no valid sender domain without making model cal
   expect(modelRoute).not.toHaveBeenCalled();
   expect((await state.listAudit()).at(-1)?.inputs?.scenario_source).toBe('judge');
 });
+it('keeps raw judge input on the code escalation path while models are paused', async () => {
+  const state = new MemoryStateStore();
+  await state.setLlmEnabled(false);
+  const http = vi.fn();
+  const { options, payables } = setup(createRouter({ stateStore: state, fetch: http }).route);
+  options.state = state;
+  expect((await processInbox(meta, options)).decision.kind).toBe('ESCALATE');
+  expect(http).not.toHaveBeenCalled();
+  expect(payables.process).not.toHaveBeenCalled();
+  expect((await state.listAudit()).at(-1)?.inputs).toMatchObject({ modelStatus: 'LLM_OFF', scenario_source: 'judge' });
+});

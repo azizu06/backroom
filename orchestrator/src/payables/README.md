@@ -14,11 +14,14 @@ processInbox(email/invoice)
 
 ## Server adapter contract
 
-- `processInbox(item, { state, controller, payables, vendor })` returns `SeatResult`.
+- `processInbox(item: FinanceInboxItem, { state, controller, payables, vendor })` returns `SeatResult`.
   Set `source: 'judge'` on the server for tray submissions. `senderDomain` is
   envelope metadata, never an extracted authority field. Unsupported/invalid
   documents, missing sender domains, router failures, and unknown classifications
-  produce `ESCALATE`; audit inputs include `scenario_source: judge`.
+  produce `ESCALATE`; audit inputs include `scenario_source: judge`. A paused
+  router (`LLM_OFF`) also escalates without making network calls; typed seat
+  policy checks continue to work. Preserve the existing `routeInboxItem` API for
+  queue selection; `processInbox` handles full AP/vendor extraction and execution.
 - `PayablesSeat({ repository, state, controller, nessie? }).process(fields, source)`
   validates again, checks PO vendor/amount/line items, and invokes policy with
   trusted master/history. Payment destination always comes from the approved
