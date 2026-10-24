@@ -19,6 +19,9 @@ import type { StoryChapter } from '../../lib/office/story';
 import { SoundToggle } from './SoundToggle';
 import { PresenceChip } from './PresenceChip';
 import { usePresence } from './usePresence';
+import { useProximityChat } from './useProximityChat';
+import { coworkerSpots } from '../../lib/office/targets/coworker';
+import type { CoworkerSpot } from '../../lib/office/play';
 import { FloorPlan } from './FloorPlan';
 import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
@@ -63,8 +66,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const [inspecting, setInspecting] = useState<AnchorId | null>(null);
   const [motions] = useState(() => new MotionRegistry());
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
-  const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
+  const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null }; coworkers: { current: readonly CoworkerSpot[] } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null }, coworkers: { current: [] } }));
   const presence = usePresence({ mode: touring ? 'tour' : 'play', hud: play.hud, source, connectionMode: snapshot.connection });
+  play.coworkers.current = coworkerSpots(presence.peers);
+  const { setEnabled: setPresence } = presence;
+  const showCoworkers = useCallback(() => setPresence(true), [setPresence]);
+  const chat = useProximityChat({ active: presence.enabled, hud: play.hud, selfId: presence.selfId, presence: presence.enabled, showCoworkers });
   const textView = useRef<HTMLElement>(null);
   /** The exit from first person: every seat, receipt and the inbox as plain text below the office. */
   function showTextView() {
@@ -162,7 +169,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           {/* Keyed by attempt: retrying after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} paused={!layers.scene.visible} focus={focus} guide={guide} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={play} presence={presence.peers} />
+            <OfficeScene snapshot={snapshot} motions={motions} paused={!layers.scene.visible} focus={focus} guide={guide} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={play} presence={presence.peers} chatBubbles={chat.bubbles} />
           </div>
           {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
@@ -179,7 +186,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           })}
         </>
       </ViewBoundary>
-      {layers.scene.visible && !splash && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={showTextView} lookOnStart={hudStart.look} focusOnStart={hudStart.focus} />}
+      {layers.scene.visible && !splash && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={showTextView} lookOnStart={hudStart.look} focusOnStart={hudStart.focus} chat={chat} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : touch ? PLAY_TOUCH_HINT : PLAY_HINT}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>

@@ -39,5 +39,5 @@ export function usePresence({ mode, hud, source, connectionMode }: { mode: 'play
     update();
     return () => { window.clearInterval(timer); unsubscribe(); transport.close(); setPeers([]); };
   }, [enabled, mode, hud, source, connectionMode]);
-  return { enabled, setEnabled, peers, selfName: viewerName(id.current) };
+  return { enabled, setEnabled, peers, selfId: id.current, selfName: viewerName(id.current) };
 }

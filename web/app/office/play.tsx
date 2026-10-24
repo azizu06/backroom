@@ -11,19 +11,19 @@ import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, guidePose, headBob, interactCandidates, lerpPose, moveIntent, movePlayer, officeColliders,
   pickTarget, targetKey, turnIntent, type PlayBridge, type PlayGuide, type PlayPose, type PlayTarget,
 } from '../../lib/office/play';
+import { playSpawn } from '../../lib/office/play-spawn';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 import { tourProgress } from '../../lib/office/tour';
 
-const PLAY_EYE: IntroPose = {
-  position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]],
-  quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)],
-};
+function playEye([x, z]: readonly [number, number]): IntroPose {
+  return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)] };
+}
 
 /**
  * First-person camera for Play, the office's only camera. The intro flies in from the Canvas's orthographic
  * default camera. Frames continue only during the intro, a guided walk or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null }: PlayBridge & {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null, coworkers }: PlayBridge & {
   motions: MotionRegistry; snapshot: OfficeSnapshot;
   /** A guided walk (room button, tour or story stop): glide to the room's aisle pose. A new `seq` restarts it; any move or look input cancels it. */
   guide?: PlayGuide | null;
@@ -38,7 +38,6 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null 
     from: { position: previous.position.toArray(), quaternion: previous.quaternion.toArray() } satisfies IntroPose,
     startedAt: null as number | null, done: false,
   }));
-  const position = useRef<[number, number]>([SPAWN.position[0], SPAWN.position[1]]);
   const yaw = useRef<number>(SPAWN.yaw);
   const pitch = useRef(0);
   const walked = useRef(0);
@@ -49,6 +48,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null 
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
   const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
+  const [spawn] = useState(() => playSpawn(location.search, colliders));
+  const [eye] = useState(() => playEye(spawn));
+  const position = useRef<[number, number]>(spawn);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
 
@@ -80,7 +82,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null 
       const now = performance.now();
       intro.startedAt ??= now;
       const progress = playIntroProgress(now - intro.startedAt, reduced.current);
-      const pose = interpolateIntroPose(intro.from, PLAY_EYE, progress);
+      const pose = interpolateIntroPose(intro.from, eye, progress);
       camera.current.position.fromArray(pose.position);
       camera.current.quaternion.fromArray(pose.quaternion);
       camera.current.updateMatrixWorld();
@@ -132,7 +134,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null 
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
-    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current)));
+    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
     if (hud.current && (moved || turned || !written.current)) {
