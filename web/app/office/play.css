@@ -28,5 +28,18 @@
 @media (max-width: 760px) {
   .play-panel { top: 8px; left: 8px; width: min(300px, calc(100% - 16px)); }
 }
+.office-shell .play-settings-toggle { position: absolute; top: 52px; right: 18px; padding: 5px 10px; background: #30382df2; border: 1px solid #839175; font-size: 13px; }
+.play-panel.play-settings { left: auto; right: 18px; top: 92px; width: 280px; }
+.play-setting { display: grid; gap: 4px; margin: 12px 0; font-size: 13px; color: #d0d6c6; }
+.play-setting span { display: flex; justify-content: space-between; }
+.play-setting output { font: 12px 'SFMono-Regular', Consolas, monospace; color: #f3dfb9; }
+.play-setting input[type='range'] { width: 100%; accent-color: #c3b68e; }
+.play-setting-check { display: flex; align-items: center; gap: 8px; }
+.play-settings-note { margin: 4px 0 10px; }
+.play-settings input:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 2px; }
+@media (max-width: 760px) {
+  .play-panel.play-settings { top: 88px; right: 8px; width: min(280px, calc(100% - 16px)); }
+}
+
 /* PaymentLinkPanel QR inside the narrow Play dialog. */
 .play-panel img { display: block; max-width: 100%; height: auto; }

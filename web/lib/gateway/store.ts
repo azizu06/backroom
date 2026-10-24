@@ -168,6 +168,10 @@ export class MemoryGatewayStore implements GatewayStore {
           throw new GatewayError(409, "WEBHOOK_ID_REUSED");
         }
       }
+      // KNOWN GAP (fix after the demo, see Anthony's approved 9a0d89e): this scans `this.calls`, which still
+      // holds the pre-transaction copy of `callId`. A `work` that renames a link id while keeping its short
+      // code collides with its own stale row and gets a false PAYMENT_CODE_COLLISION. Conversely, two links
+      // that reuse both the same id and the same short code are not caught. Don't rename link ids in `work`.
       for (const link of copy.links) {
         if (link.shortCode && [...this.calls.values()].some(other => other.links.some(row => row.id !== link.id && row.shortCode === link.shortCode)))
           throw new GatewayError(409, 'PAYMENT_CODE_COLLISION');
