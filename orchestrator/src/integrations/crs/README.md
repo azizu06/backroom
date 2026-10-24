@@ -43,7 +43,7 @@ business credit and OFAC stay unconfigured and fail before login.
 For wiring: `createCrsClientFromEnv()` returns a live sandbox client when `CRS_USERNAME` and
 `CRS_PASSWORD` are set, otherwise `undefined`. `createCrsFixtureClient()` runs the same client offline
 over `crsSandboxFixtureFetch`, which answers only exact persona bodies with CRS's published outcome
-(`CRS_SANDBOX_EXPECTED`; label it FAKE wherever shown). The counts cannot tell an open bankruptcy (P07)
+(`CRS_SANDBOX_EXPECTED`). Its evidence is `source: crs_fixture` with a `FAKE: CRS fixture` label, set in code. The counts cannot tell an open bankruptcy (P07)
 from a discharged one (P06).
 
 Live probe with only credentials (no module): `CRS_LIVE=1 CRS_USERNAME=… CRS_PASSWORD=…
