@@ -17,7 +17,12 @@ export interface AuditWallView {
   rows: readonly AuditWallRow[];
   total: number;
   connection: OfficeSnapshot['connection'];
+  /** Set when the feed is not the audit log, so no rows are painted (and nothing is presented as verified). */
+  notice?: string;
 }
+/** Preview and replay snapshots are fixtures or derived copies, not `/api/audit/entries`; only the live feed carries real receipt ids. */
+export const AUDIT_WALL_UNVERIFIED_FEEDS: readonly OfficeSnapshot['connection'][] = ['preview', 'replay'];
+export const AUDIT_WALL_NOTICE = 'Preview feed: no audit entries. Live receipts appear here; see /audit.';
 
 /** Keeps both ends of a long id so neighbouring receipts stay distinguishable. */
 export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
@@ -26,8 +31,11 @@ export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
   return `${id.slice(0, head)}…${id.slice(id.length - tail)}`;
 }
 
-/** Newest first, from the same snapshot rows the lobby audit panel list reads. */
+/** Newest first, from the live snapshot's audit rows (the same ids as `/api/audit/entries`); nothing for preview or replay feeds. */
 export function auditWallView(snapshot: OfficeSnapshot, max = AUDIT_WALL_MAX_ROWS): AuditWallView {
+  if (AUDIT_WALL_UNVERIFIED_FEEDS.includes(snapshot.connection)) {
+    return { total: 0, connection: snapshot.connection, rows: [], notice: AUDIT_WALL_NOTICE };
+  }
   return {
     total: snapshot.audit.length,
     connection: snapshot.connection,

@@ -34,14 +34,14 @@ describe('inbox tray Play target', () => {
     expect(pickTarget([0, INBOX_TRAY[1] + 0.4], 0, candidates)?.kind).toBe('desk');
     expect(pickTarget([INBOX_TRAY[0], INBOX_TRAY[1] + 2.5], 0, candidates)).toBeNull();
   });
-  it('labels with the unread count and lists inbox receipts newest first', () => {
+  it('labels with the count of items in the inbox and lists inbox receipts newest first', () => {
     const snapshot = { ...INITIAL_OFFICE, inboxCount: 2, inboxReceipts: [
       { id: 'i1', agentId: 'a', seatId: 'payables', action: 'submit_inbox_item', decision: 'RECORDED' as const, ruleIds: [], summary: 'first' },
       { id: 'i2', agentId: 'a', seatId: 'payables', action: 'route_inbox_item', decision: 'ALLOW' as const, ruleIds: ['R1'], summary: 'second' },
     ] };
-    expect(inboxTarget.label(snapshot, { kind: 'inbox' })).toBe('Open inbox tray · 2 unread');
+    expect(inboxTarget.label(snapshot, { kind: 'inbox' })).toBe('Open inbox tray · 2 in inbox');
     const panel = inboxTarget.panel(snapshot, { kind: 'inbox' });
-    expect(panel?.state).toBe('2 unread');
+    expect(panel?.state).toBe('2 in inbox');
     expect(panel?.entries.map(entry => entry.id)).toEqual(['i2', 'i1']);
     expect(inboxTarget.panel(INITIAL_OFFICE, { kind: 'inbox' })?.entries).toEqual([]);
     expect(inboxTarget.panel(INITIAL_OFFICE, { kind: 'inbox' })?.task).toBeUndefined();
