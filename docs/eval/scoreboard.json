@@ -17,7 +17,7 @@
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
-      "orchestrator/src/agents/eval/approval-expiry.ts": "2b73e349797e6716b10d3d062ac1c2385ebaf10e274dd45f2e9731e23841999e",
+      "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
       "orchestrator/src/agents/eval/scoreboard.ts": "48a7fc27d0dea653c442a98beb5d72aa03dbda93311bc175c260b27c08aa4bf0"
@@ -67,7 +67,7 @@
     "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
-    "approvalExpiry": "Production ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore on a synthetic call. A live escalation stays pending at 60s and becomes expired with may_reask at approvalWindowMs(); the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expires another propose_plan is ESCALATION_RETRY_USED. A still-valid passkey decide after expiry is rejected with no decide_escalation audit; voice cannot approve. A worker row with no callId stays pending through 59.999s and closes at 60s as pending_owner when ControllerApprovals reads it. Software passkey and fixture call only; Cartesia, email, phone, and a human tap are not executed.",
+    "approvalExpiry": "Production ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore on a synthetic call. APPROVAL_WINDOW_MS is pinned to the five-minute default for this run and restored afterward. A live escalation stays pending at 60s and becomes expired with may_reask at that window; the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expires another propose_plan is ESCALATION_RETRY_USED. A passkey challenge taken while the row is pending is rejected by decide after the window, before any status poll, with no decide_escalation audit; voice cannot approve. A worker row with no callId stays pending through 59.999s and closes at 60s as pending_owner when ControllerApprovals reads it. Software passkey and fixture call only; Cartesia, email, phone, and a human tap are not executed.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
     "unscored": "The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy."
   },
@@ -170,8 +170,8 @@
       "percent": 100
     },
     "approvalExpiry": {
-      "numerator": 13,
-      "denominator": 13,
+      "numerator": 14,
+      "denominator": 14,
       "percent": 100
     },
     "bankChangeApprovalGuards": {
@@ -14554,6 +14554,7 @@
     "match": true,
     "checks": {
       "pendingAtSixtySeconds": true,
+      "pinnedWindow": true,
       "pendingUntilWindow": true,
       "expiredAtWindow": true,
       "oneFreshEscalation": true,
@@ -14567,7 +14568,7 @@
       "pendingBeforeSixtySeconds": true,
       "pendingOwnerAtSixtySeconds": true
     },
-    "scope": "Production ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore on a synthetic call. A live escalation stays pending at 60s and becomes expired with may_reask at approvalWindowMs(); the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expires another propose_plan is ESCALATION_RETRY_USED. A still-valid passkey decide after expiry is rejected with no decide_escalation audit; voice cannot approve. A worker row with no callId stays pending through 59.999s and closes at 60s as pending_owner when ControllerApprovals reads it. Software passkey and fixture call only; Cartesia, email, phone, and a human tap are not executed.",
+    "scope": "Production ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore on a synthetic call. APPROVAL_WINDOW_MS is pinned to the five-minute default for this run and restored afterward. A live escalation stays pending at 60s and becomes expired with may_reask at that window; the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expires another propose_plan is ESCALATION_RETRY_USED. A passkey challenge taken while the row is pending is rejected by decide after the window, before any status poll, with no decide_escalation audit; voice cannot approve. A worker row with no callId stays pending through 59.999s and closes at 60s as pending_owner when ControllerApprovals reads it. Software passkey and fixture call only; Cartesia, email, phone, and a human tap are not executed.",
     "windowMs": 300000,
     "storedCallId": "approval-demo",
     "storedWindow": 300000,
