@@ -1,7 +1,8 @@
+import { MemoryFinanceRepository } from './payables/repository';
 import { FakeEffects, getStateStore, SeatWorker, type NewTask, type Seat } from './index';
 
 const store = getStateStore();
-const effects = new FakeEffects();
+const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:demo', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
 const seats: Seat[] = ['collections', 'payables', 'vendor_onboarding'];
 const tasks: NewTask[] = [
   { id: 'demo:collections', seatId: 'collections', refs: ['ar:demo'], steps: [

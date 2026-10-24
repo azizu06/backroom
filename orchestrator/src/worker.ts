@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Effects } from './effects';
 import { evaluateStep, type PolicyEvaluator } from './policy-gate';
 import type { Lease, Seat, StateStore, Step } from './store';
+import { PaymentBoundaryError } from './payment-boundary';
 
 export interface WorkerOptions {
   id: string; seat: Seat; store: StateStore; effects: Effects; now?: () => number;
@@ -114,6 +115,14 @@ export class SeatWorker {
         input: step.input, idempotencyKey: step.kind === 'nessie' ? task.idempotencyKey : undefined, signal: effectSignal });
       } catch (error) {
         if (modelDependent && modelSignal.aborted) { await pause(); return; }
+        if (error instanceof PaymentBoundaryError) {
+          await store.assertLease(lease, this.now());
+          await store.appendAudit({ ts: this.now(), actor: 'code', seat, action: 'payment_boundary_rejected',
+            ruleIds: ['PAYEE_NOT_IN_MASTER'], policyVersion: decision.policyVersion, refs: task.refs,
+            route: 'code', decision: 'DENY', latencyMs: 0, costUsd: 0,
+            inputs: { taskId: task.id, workerId: id, leaseToken: lease.leaseToken, cursor: task.cursor } });
+          await store.completeTask(lease, 'denied', this.now()); this.lease = undefined; return;
+        }
         throw error;
       }
       if (modelDependent && modelSignal.aborted) { await pause(); return; }

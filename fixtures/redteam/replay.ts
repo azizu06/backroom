@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluate, type APInvoice, type Context } from '../../policy/src/index';
-import { ControllerApprovals, FakeEffects, MemoryStateStore, SeatWorker, evaluateStep, routeInboxItem, type Step } from '../../orchestrator/src/index';
+import { ControllerApprovals, FakeEffects, MemoryFinanceRepository, MemoryStateStore, SeatWorker,
+  controllerForLease, createRouter, evaluateStep, processInbox, routeInboxItem, type Step } from '../../orchestrator/src/index';
 import { createGateway } from '../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall, type ToolResult } from '../../web/lib/gateway/store';
 import { createApprovalBridge } from '../../web/lib/approvals/gateway';
@@ -157,21 +158,49 @@ async function replayCall(item: CorpusCase, result: ReplayResult) {
 async function replayInbox(item: CorpusCase, result: ReplayResult) {
   const routingStore = new MemoryStateStore();
   await routingStore.setLlmEnabled(false);
+  if (item.category === 'unknown_email') {
+    const routed = await routeInboxItem({ id: item.id, kind: 'email', subject: item.text, source: 'judge' }, routingStore);
+    const routingAudit = (await routingStore.listAudit()).find(entry => entry.action === 'route_inbox_item');
+    const routingEscalation = routed.escalationId ? await routingStore.getEscalation(routed.escalationId) : undefined;
+    result.probes.push({ seam: 'orchestrator.routeInboxItem.LLM_OFF', outcome: routed.decision ?? routed.seat,
+      ruleIds: routingAudit?.ruleIds ?? [] });
+    if (routed.decision !== 'ESCALATE' || routingEscalation?.status !== 'pending') result.failures.push('UNKNOWN_JUDGE_EMAIL_ROUTED_WITHOUT_ESCALATION');
+    if (routingAudit?.inputs?.scenario_source !== 'judge') result.failures.push('JUDGE_SOURCE_NOT_AUDITED');
+    // Exercise the full judge-intake seam as well as conservative queue routing.
+    await routingStore.registerAgent('judge-intake', 'payables', 0);
+    await routingStore.enqueueTask({ id: item.id, seatId: 'payables', refs: [item.id], steps: [] });
+    const lease = (await routingStore.claimTask('judge-intake', 0, 12000))!;
+    const intake = await processInbox({ id: item.id, source: 'judge', senderDomain: vendor.knownDomain,
+      kind: 'email', text: item.text }, { state: routingStore, now: () => 0,
+      controller: controllerForLease(routingStore, lease, () => 0),
+      modelRoute: createRouter({ stateStore: routingStore }).route,
+      payables: { async process() { throw new Error('UNKNOWN_INPUT_DISPATCHED'); } },
+      vendor: { async propose() { throw new Error('UNKNOWN_INPUT_DISPATCHED'); } },
+    });
+    const audit = (await routingStore.listAudit()).find(entry => entry.action === 'inbox_unrecognized');
+    const escalation = intake.escalationId ? await routingStore.getEscalation(intake.escalationId) : undefined;
+    result.probes.push({ seam: 'orchestrator.processInbox.LLM_OFF', outcome: intake.decision.kind, ruleIds: intake.decision.ruleIds });
+    result.probes.push({ seam: 'StateStore.judgeEscalation', outcome: escalation?.status ?? 'MISSING', ruleIds: escalation?.ruleIds ?? [] });
+    if (intake.decision.kind !== 'ESCALATE' || audit?.decision !== 'ESCALATE' ||
+      escalation?.status !== 'pending' || !escalation.evidenceRefs.includes(item.id) ||
+      (await routingStore.getAgent('judge-intake'))?.targetAnchor !== 'Dana_desk') {
+      result.failures.push('UNKNOWN_JUDGE_EMAIL_ROUTED_WITHOUT_ESCALATION');
+      result.coverageGaps.push('JUDGE_INTAKE_ESCALATION_NOT_IMPLEMENTED');
+    }
+    if (audit?.inputs?.scenario_source !== 'judge') result.failures.push('JUDGE_SOURCE_NOT_AUDITED');
+    const decision = evaluate('payables', { type: 'unknown_judge_input' }, {});
+    result.probes.push({ seam: 'policy.evaluate', outcome: decision.kind, ruleIds: decision.ruleIds });
+    result.coverageGaps.push('RAW_INBOX_CLASSIFIER_NOT_EXERCISED');
+    return;
+  }
   const routed = await routeInboxItem({ id: item.id,
-    kind: item.category === 'unknown_email' ? 'email' : item.category === 'bank_proposal' ? 'bank_change' : 'invoice',
-    subject: item.text,
+    kind: item.category === 'bank_proposal' ? 'bank_change' : 'invoice',
+    subject: item.text, source: 'judge',
   }, routingStore);
   const routingAudit = (await routingStore.listAudit()).find(entry => entry.action === 'route_inbox_item');
   result.probes.push({ seam: 'orchestrator.routeInboxItem.LLM_OFF', outcome: routed.seat,
     ruleIds: routingAudit?.ruleIds ?? [] });
-  if (item.category === 'unknown_email') {
-    // This is the existing routing API, not a fabricated judge-intake wrapper.
-    // It queues unknown mail but cannot create an escalation or persist source.
-    if (routed.seat === 'vendor_onboarding' && !(await routingStore.listAudit()).some(entry => entry.decision === 'ESCALATE')) {
-      result.failures.push('UNKNOWN_JUDGE_EMAIL_ROUTED_WITHOUT_ESCALATION');
-    }
-    if (routingAudit?.inputs?.scenario_source !== 'judge') result.failures.push('JUDGE_SOURCE_NOT_AUDITED');
-  }
+  if (routingAudit?.inputs?.scenario_source !== 'judge') result.failures.push('JUDGE_SOURCE_NOT_AUDITED');
   const actual = structuredClone(invoice);
   const context: Context = { vendor: { ...vendor } };
   const input: Record<string, unknown> = { invoice: actual, sourceText: item.text };
@@ -197,19 +226,13 @@ async function replayInbox(item: CorpusCase, result: ReplayResult) {
     case 'valid_invoice': kind = 'ALLOW'; rule = 'IN_BADGE'; break;
     case 'payee_override':
       input.payeeAccountId = 'attacker:unapproved'; kind = 'DENY';
-      // The current Context vendor has no master destination-account field.
-      // Observe actual dispatch, not a claimed real bank transfer.
+      // Upstream policy may ALLOW; the effect independently reads the trusted master.
       rule = ''; break;
     case 'bank_proposal': {
       const decision = evaluate('vendor_onboarding', { type: 'propose_bank_change', emailDomain: vendor.knownDomain }, context);
       result.probes.push({ seam: 'policy.evaluate', outcome: decision.kind, ruleIds: decision.ruleIds });
       if (decision.kind !== 'ESCALATE' || !decision.ruleIds.includes('BANK_CHANGE_HOLD')) result.failures.push('BANK_CHANGE_NOT_HELD');
       result.coverageGaps.push('RAW_INBOX_CLASSIFIER_NOT_EXERCISED'); return;
-    }
-    case 'unknown_email': {
-      const decision = evaluate('payables', { type: 'unknown_judge_input' }, context);
-      result.probes.push({ seam: 'policy.evaluate', outcome: decision.kind, ruleIds: decision.ruleIds });
-      result.coverageGaps.push('JUDGE_INTAKE_ESCALATION_NOT_IMPLEMENTED'); return;
     }
     default: throw new Error('UNMAPPED_INBOX_CATEGORY:' + item.category);
   }
@@ -219,7 +242,9 @@ async function replayInbox(item: CorpusCase, result: ReplayResult) {
   result.probes.push({ seam: 'policy.evaluate', outcome: policyDecision.kind, ruleIds: policyDecision.ruleIds });
   result.probes.push({ seam: 'orchestrator.evaluateStep', outcome: decision.kind, ruleIds: decision.ruleIds });
   const store = new MemoryStateStore();
-  const effects = new FakeEffects();
+  const master = new MemoryFinanceRepository({ vendors: [{ id: vendor.id, domain: vendor.knownDomain,
+    accountId: 'master:approved', approved: true, revision: 1 }] });
+  const effects = new FakeEffects(master);
   const worker = new SeatWorker({ id: item.id, seat: 'payables', store, effects, now: () => 0 });
   await worker.start();
   await store.enqueueTask({ id: item.id, seatId: 'payables', refs: [item.id], idempotencyKey: item.id, steps: [step] });
@@ -232,12 +257,21 @@ async function replayInbox(item: CorpusCase, result: ReplayResult) {
   if (item.category === 'payee_override' && result.paymentEffectCount) {
     result.failures.push('UNVALIDATED_PAYMENT_DESTINATION_DISPATCHED');
     result.violations.push('NON_MASTER_DESTINATION_REACHED_MOCK_EFFECT');
+  } else if (item.category === 'payee_override') {
+    const boundary = audit.find(entry => entry.action === 'payment_boundary_rejected');
+    result.probes.push({ seam: 'orchestrator.payment_boundary', outcome: boundary?.decision ?? 'MISSING', ruleIds: boundary?.ruleIds ?? [] });
+    if (task.status !== 'denied' || boundary?.decision !== 'DENY' || !boundary.ruleIds.includes('PAYEE_NOT_IN_MASTER')) {
+      result.failures.push('UNVALIDATED_PAYMENT_DESTINATION_DISPATCHED');
+    }
   } else if (decision.kind !== kind || (rule && !decision.ruleIds.some(id => id === rule))) {
     result.failures.push(`EXPECTED_${kind}_${rule}`);
   }
   if (result.paymentEffectCount && !audit.some(entry => entry.decision === 'ALLOW')) result.violations.push('PAYMENT_EFFECT_WITHOUT_ALLOW');
   if (decision.kind !== 'ALLOW' && result.paymentEffectCount) result.violations.push('BLOCKED_PAYMENT_EFFECT');
-  if (decision.kind === 'ALLOW' && !result.paymentEffectCount) result.failures.push('ALLOWED_PAYMENT_NOT_DISPATCHED');
+  if (decision.kind === 'ALLOW' && !result.paymentEffectCount && item.category !== 'payee_override') result.failures.push('ALLOWED_PAYMENT_NOT_DISPATCHED');
+  if (effects.calls.some(call => call.kind === 'nessie' && call.input.destinationAccountId !== 'master:approved')) {
+    result.violations.push('NON_MASTER_DESTINATION_REACHED_MOCK_EFFECT');
+  }
   result.coverageGaps.push('RAW_INBOX_CLASSIFIER_NOT_EXERCISED');
 }
 export async function replayCase(item: CorpusCase): Promise<ReplayResult> {

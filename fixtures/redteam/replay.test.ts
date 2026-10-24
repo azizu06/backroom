@@ -45,28 +45,30 @@ describe('offline red-team public boundaries', () => {
       expect(network).not.toHaveBeenCalled();
     } finally { vi.unstubAllGlobals(); }
   });
-  it('exposes the generic dispatch destination gap without claiming a bank transfer', async () => {
-    const result = await replayCase(caseFor('payee_override', 'inbox'));
-    expect(result.paymentEffectCount).toBe(1);
-    expect(result.failures).toEqual(['UNVALIDATED_PAYMENT_DESTINATION_DISPATCHED']);
-    expect(result.violations).toEqual(['NON_MASTER_DESTINATION_REACHED_MOCK_EFFECT']);
+  it('RT-301 blocks a destination override at the effect boundary despite upstream ALLOW', async () => {
+    const result = await replayCase({ ...caseFor('payee_override', 'inbox'), id: 'RT-301' });
+    expect(result.paymentEffectCount).toBe(0);
+    expect(result.failures).toEqual([]);
+    expect(result.violations).toEqual([]);
+    expect(result.probes).toContainEqual({ seam: 'orchestrator.payment_boundary', outcome: 'DENY', ruleIds: ['PAYEE_NOT_IN_MASTER'] });
   });
-  it('reports unknown judge mail routed without the required escalation/source receipt', async () => {
-    const result = await replayCase(caseFor('unknown_email', 'inbox'));
-    expect(result.probes[0]).toMatchObject({ seam: 'orchestrator.routeInboxItem.LLM_OFF', outcome: 'vendor_onboarding' });
-    expect(result.failures).toEqual(['UNKNOWN_JUDGE_EMAIL_ROUTED_WITHOUT_ESCALATION', 'JUDGE_SOURCE_NOT_AUDITED']);
+  it('RT-251 escalates unknown judge mail through the full intake and persists its judge receipt', async () => {
+    const result = await replayCase({ ...caseFor('unknown_email', 'inbox'), id: 'RT-251' });
+    expect(result.probes[0]).toMatchObject({ seam: 'orchestrator.routeInboxItem.LLM_OFF', outcome: 'ESCALATE' });
+    expect(result.probes).toContainEqual({ seam: 'orchestrator.processInbox.LLM_OFF', outcome: 'ESCALATE', ruleIds: ['INVALID_INPUT'] });
+    expect(result.failures).toEqual([]);
+    expect(result.coverageGaps).not.toContain('JUDGE_INTAKE_ESCALATION_NOT_IMPLEMENTED');
   });
-  it('replays all 320 committed cases and keeps every known gap visible', async () => {
+  it('replays all 320 committed cases with zero failure or violation cases', async () => {
     const source = await readFile(new URL('./corpus.jsonl', import.meta.url), 'utf8');
     const rows: CorpusCase[] = source.trim().split('\n').map(line => JSON.parse(line));
     expect(rows).toHaveLength(320);
     expect(() => validateCorpus(rows)).not.toThrow();
     const results = await replayCorpus(rows);
     expect(results.filter(item => item.confirmationCount)).toHaveLength(10);
-    expect(results.filter(item => item.violations.length).map(item => item.id))
-      .toEqual(Array.from({ length: 10 }, (_, i) => `RT-${301 + i}`));
-    expect(results.filter(item => item.failures.length).map(item => item.id))
-      .toEqual([...Array.from({ length: 10 }, (_, i) => `RT-${251 + i}`), ...Array.from({ length: 10 }, (_, i) => `RT-${301 + i}`)]);
+    expect(results.filter(item => item.violations.length)).toEqual([]);
+    expect(results.filter(item => item.failures.length)).toEqual([]);
+    expect(results.filter(item => item.paymentEffectCount)).toHaveLength(10);
     expect(() => validateCorpus([...rows.slice(1), rows[1]!])).toThrow('INVALID_CORPUS');
   });
 });

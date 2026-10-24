@@ -49,7 +49,10 @@ integration check, not something a local fetch abort can prove.
 `routeInboxItem` always sends typed invoices/bank changes to Payables. For generic
 emails, the router may suggest one of the three seats. On OFF or model failure,
 code routes client messages to Collections and unclassified/vendor messages to
-Vendor onboarding for triage. Routing grants no payment authority. AP decisions,
+Vendor onboarding for triage. Server adapters set `source: 'judge'` for tray submissions. Raw judge email
+creates a pending controller escalation and an audited `scenario_source: judge`
+receipt even while OFF; use `processInbox` for recognized schema-validated
+classification/extraction. Routing grants no payment authority. AP decisions,
 call permits, and gateway tools keep running. OFF worker completion/recovery,
 routing and switch audits are `actor=code`; gateway decision audits always are.
 Human approval records retain their actual attribution and passkey requirement.
