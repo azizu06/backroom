@@ -1,5 +1,6 @@
 import { ROLES, type HandoffRecord, type HandoffRequest, type Role } from './contracts';
 import type { HandoffRole } from '../voice/voices';
+import type { AuditInput } from '../store';
 
 /** Pure, deterministic case/handoff state machine. MemoryHandoffStore and the
  * SpacetimeDB `agent_*` reducers both run it, so ownership rules exist once.
@@ -233,4 +234,13 @@ export function toPublicHandoff(state: Pick<CaseState, 'displayId'>, record: Han
     ...(record.completedAt !== undefined ? { completedAt: record.completedAt } : {}),
     ...(record.toActivationId ? { decisionRef: record.toActivationId } : {}),
     ...(record.errorCode ? { errorCode: record.errorCode } : {}) };
+}
+
+/** Public audit rows for every handoff whose status changed; inputs carry only the projection. */
+export function handoffAudits(state: CaseState, before: readonly HandoffRow[], now: number): AuditInput[] {
+  const prior = new Map(before.map(r => [r.handoffId, r.status]));
+  return state.handoffs.filter(r => prior.get(r.handoffId) !== r.status).map(r => ({
+    ts: now, actor: 'code', seat: 'controller', action: `agent_handoff_${r.status}`, ruleIds: r.errorCode ? [r.errorCode] : [],
+    policyVersion: 0, refs: [state.caseId, r.handoffId], route: 'agent', inputs: { ...toPublicHandoff(state, r) },
+    latencyMs: 0, costUsd: 0 }));
 }

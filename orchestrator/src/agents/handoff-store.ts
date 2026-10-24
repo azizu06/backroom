@@ -1,5 +1,5 @@
 import type { StateTransport } from '../spacetime-store';
-import type { AuditInput, StateStore } from '../store';
+import type { StateStore } from '../store';
 import type { Activation, HandoffRecord, HandoffRequest, HandoffStore, Role, ToolContext } from './contracts';
 import * as engine from './handoff-engine';
 import type { ActivationRow, AgentHandoffPublic, CaseState, FinishOutcome, HandoffRow } from './handoff-engine';
@@ -26,15 +26,6 @@ export interface AgentCaseStore extends HandoffStore {
 }
 const claim = (a: Activation) => ({ activationId: a.activationId, leaseOwner: a.leaseOwner, leaseToken: a.leaseToken });
 
-/** Handoff lifecycle audits are public; inputs carry only the sanitized projection. */
-export function handoffAudits(state: CaseState, before: readonly HandoffRow[], now: number): AuditInput[] {
-  const prior = new Map(before.map(r => [r.handoffId, r.status]));
-  return state.handoffs.filter(r => prior.get(r.handoffId) !== r.status).map(r => ({
-    ts: now, actor: 'code', seat: 'controller', action: `agent_handoff_${r.status}`, ruleIds: r.errorCode ? [r.errorCode] : [],
-    policyVersion: 0, refs: [state.caseId, r.handoffId], route: 'agent', inputs: { ...engine.toPublicHandoff(state, r) },
-    latencyMs: 0, costUsd: 0 }));
-}
-
 /** Process-local reference store. Ops are synchronous on one object, so each is atomic. */
 export class MemoryHandoffStore implements AgentCaseStore {
   private readonly cases = new Map<string, CaseState>();
@@ -49,7 +40,7 @@ export class MemoryHandoffStore implements AgentCaseStore {
     if (!current) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
     const draft = structuredClone(current);
     const result = op(draft);
-    const audits = handoffAudits(draft, current.handoffs, this.now());
+    const audits = engine.handoffAudits(draft, current.handoffs, this.now());
     this.cases.set(caseId, draft);
     if (audits.length) await this.options.audit?.appendAudits(audits);
     const changed = new Map(current.handoffs.map(r => [r.handoffId, r.status]));
