@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
+import { serverRoomReadout, type Gx10Status } from '../../lib/gx10/server-room';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import './play.css';
@@ -43,6 +44,38 @@ function focusAskWhy() {
   field?.focus({ preventScroll: true });
 }
 
+/** Read-only GX10 readout: polls GET /api/gx10 only while open, like ServerRoom. */
+function ServerPanel() {
+  const [status, setStatus] = useState<Gx10Status | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const response = await fetch('/api/gx10', { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(4000)]) });
+        if (!response.ok) throw new Error('Telemetry unavailable');
+        const next = await response.json() as Gx10Status;
+        if (!controller.signal.aborted) setStatus(next);
+      } catch { if (!controller.signal.aborted) setStatus(null); }
+      if (!controller.signal.aborted) timer = setTimeout(() => { void poll(); }, 2500);
+    }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, []);
+  const view = serverRoomReadout(status);
+  return <>
+    <p className='play-panel-state'>{view.connection}</p>
+    <p>Read-only · live telemetry, no controls.</p>
+    <dl aria-label='GX10 telemetry'>
+      <div><dt>Loaded models</dt><dd>{view.models}</dd></div>
+      <div><dt>Output tokens/s</dt><dd data-testid='play-gx10-speed'>{view.speed}</dd></div>
+      <div><dt>Request latency</dt><dd>{view.latency}</dd></div>
+      <div><dt>Local share</dt><dd>{view.share}</dd></div>
+    </dl>
+    <p>{view.calls}</p>
+  </>;
+}
+
 function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void }) {
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -67,11 +100,12 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
     {panel.kind === 'treasury' && panel.denial && <p className='denial-text' role='status' data-denial-audit={panel.denial.id}>
       <strong>{panel.denial.decision}</strong> Entry denied · rule {panel.denial.ruleIds.join(', ')} · audit <code>{panel.denial.id}</code>
     </p>}
-    {panel.kind !== 'treasury' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
+    {panel.kind === 'server' && <ServerPanel />}
+    {panel.kind !== 'treasury' && panel.kind !== 'server' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
       <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
       <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
-    <button className='play-panel-ask' onClick={askWhy}>Ask why</button>
+    {panel.kind !== 'server' && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
   </section>;
 }
 
