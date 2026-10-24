@@ -122,6 +122,13 @@ describe('vendor verifier tools', () => {
     expect(await t.run('conclude_verification', { outcome: 'human_review', note: 'site corroborates' })).toMatchObject({ decision: 'ALLOW', next: 'human' });
   });
 
+  it('a human-review verdict reports the rule it sealed, so the handoff can cite it', async () => {
+    const t = setup({ c: { kind: 'bank_change', claimedAccountId: 'ACCT-NEW' } });
+    await t.gather();
+    await t.run('apify_contact_page');
+    expect(await t.run('conclude_verification', { outcome: 'human_review', note: 'needs Dana' })).toMatchObject({ decision: 'ALLOW', ruleIds: ['BANK_CHANGE_HOLD'] });
+  });
+
   it('an invoice whose account differs from the master is treated as a bank change', async () => {
     const t = setup({ c: { claimedAccountId: 'ACCT-OTHER' } });
     await t.gather();
