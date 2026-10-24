@@ -1,5 +1,8 @@
 'use client';
 
+import { needsHandoffHuman } from '../../lib/office/handoffs';
+import { useHandoffPresentation } from './handoffs/HandoffPresentation';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
@@ -25,6 +28,7 @@ function playEye([x, z]: readonly [number, number]): IntroPose {
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
 export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+  const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);
@@ -126,7 +130,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
-    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current));
+    const handoff = handoffs?.sample(Date.now(), reduced.current);
+    // Only agents with a handoff to show are targets (Dana only while she is at her desk).
+    const handoffAgents = handoff ? handoff.actors.filter(actor => (actor.id !== 'human' || handoff.human)
+      && handoffs!.current.some(row => row.fromRole === actor.id || row.toRole === actor.id || (actor.id === 'human' && needsHandoffHuman(row)))) : [];
+    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current, handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
     if (hud.current && (moved || turned || !written.current)) {

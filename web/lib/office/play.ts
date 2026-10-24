@@ -11,7 +11,7 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
-import type { CoworkerSpot, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+import type { CoworkerSpot, HandoffResolver, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
 export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
@@ -192,8 +192,8 @@ export function targetKey(target: PlayTarget | null): string {
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
  * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
  */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = []): PlayCandidate[] {
-  const context = { agents, visible: new Set(rooms), coworkers };
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = [], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), handoffAgents, coworkers };
   return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 
@@ -228,8 +228,8 @@ export function headBob(distance: number, moving: boolean, reduced: boolean): nu
 export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;
 
 /** Display data for the interaction panel (from the target's registry module); null when the target is no longer in the snapshot. */
-export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPanel | null {
-  return playTargetModule(target.kind).panel(snapshot, target);
+export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget, handoffFor?: HandoffResolver): PlayPanel | null {
+  return playTargetModule(target.kind).panel(snapshot, target, handoffFor);
 }
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {
