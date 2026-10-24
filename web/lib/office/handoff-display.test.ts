@@ -6,6 +6,7 @@ import { HandoffEntries } from '../../app/office/handoffs/HandoffLog';
 import { HandoffDetails } from '../../app/office/handoffs/HandoffDetails';
 import { HandoffLog, HandoffPresentation, useOfficeHandoffs } from '../../app/office/handoffs/HandoffPresentation';
 import { PLAY_PANEL_VIEWS } from '../../app/office/panels';
+import { agentTalk } from './agent-talk';
 import { handoffText } from './handoff-text';
 import { handoffFromRow, handoffLine } from './handoffs';
 import { planHandoffs, sampleHandoffs } from './handoff-plan';
@@ -22,6 +23,17 @@ const row = handoffFromRow({ handoffId: 'raw-case-secret:handoff:1', decisionRef
   privateCaseId: 'PRIVATE-CASE', privatePayload: 'PRIVATE-PAYLOAD' })!;
 
 describe('public handoff display', () => {
+  it('renders the real receipt id beside the greeting', () => {
+    const agent = { id: 'collections-clerk', name: 'Alex', seatId: 'collections' as const, targetAnchor: 'collections' as const, pos: [0, 0] as const, state: '' };
+    const talk = agentTalk({ ...INITIAL_OFFICE, agents: [agent], audit: [{ id: 'real-audit-entry-212', agentId: agent.id, seatId: agent.seatId,
+      action: 'pay', decision: 'DENY', ruleIds: [], summary: 'Payment blocked' }] }, agent.id)!;
+    const html = renderToStaticMarkup(createElement(PLAY_PANEL_VIEWS.handoff!.Body!, { panel: { kind: 'handoff', title: 'Alex', entries: [], talk } }));
+    const greeting = html.match(/<p class="agent-talk-line"[^>]*>(.*?)<\/p>/)?.[1];
+    expect(greeting).toContain('My last receipt: Payment blocked.');
+    expect(greeting).toContain('Receipt <code>real-audit-entry-212</code>');
+    expect(greeting).not.toContain('audit-0');
+  });
+
   it('mounts an empty live log before a stage exists and fills it when the first handoff arrives', () => {
     function Log({ populated }: { populated: boolean }) {
       const { presentation } = useOfficeHandoffs({ ...INITIAL_OFFICE, handoffs: populated ? [row] : [] });

@@ -4,6 +4,7 @@
  */
 import type { AnchorId, OfficeSnapshot } from "../state";
 import type { Handoff } from "../handoffs";
+import type { AgentTalk } from "../agent-talk";
 
 export type HandoffResolver = (actor: string) => Handoff | undefined;
 
@@ -19,6 +20,8 @@ export interface PlayPanelOf<K extends string = string> {
   readonly locked?: string;
   readonly denial?: PlayPanelEntry;
   readonly handoff?: { readonly from: string; readonly to: string; readonly caseDisplayId: string; readonly reason: string; readonly summary: string; readonly status: string; readonly correction: boolean; readonly errorCode?: string };
+  /** Conversation for agents you can talk to (agent-talk.ts). */
+  readonly talk?: AgentTalk;
   /** Prefilled chat text (coworker "Say hi"). */
   readonly greeting?: string;
   readonly entries: readonly PlayPanelEntry[];
