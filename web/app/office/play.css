@@ -51,23 +51,23 @@
   border: 2px solid #8b987b; color: #1d231c; font-weight: 700; font-size: 18px;
 }
 .play-panel .agent-talk-role { font-size: 12px; color: #aab39d; }
-.play-panel .agent-talk-line { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid #f3dfb9; background: #1f261d; }
+.play-panel .agent-talk-line { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--office-lavender); background: var(--office-peach); }
 .play-panel .agent-talk-recent { margin: 0 0 10px; padding-left: 18px; }
 .play-panel .agent-talk-recent li { margin-bottom: 4px; }
 .play-panel .agent-talk-recent li[data-tone='fail'], .play-panel .agent-talk-reply[data-tone='fail'] { color: #ff9c8f; }
 .play-panel .agent-talk-recent li[data-tone='correction'] { color: #f3bf65; }
 .play-panel .agent-talk-receipt { font-size: 11px; color: #c9d1bd; }
 .play-panel .agent-talk-receipt code { font-family: ui-monospace, monospace; }
-.play-panel .agent-talk-rules { font-family: ui-monospace, monospace; font-size: 11px; color: #f3dfb9; }
+.play-panel .agent-talk-rules { font-family: ui-monospace, monospace; font-size: 11px; color: var(--office-navy); }
 .play-panel .agent-talk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .play-panel .agent-talk-chips button {
-  padding: 4px 9px; font-size: 12px; color: #d0d6c6; background: #30382d; border: 1px solid #8b987b; border-radius: 12px; cursor: pointer;
+  padding: 4px 9px; font-size: 12px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 12px; cursor: pointer;
 }
-.play-panel .agent-talk-chips button[aria-pressed='true'] { color: #1d231c; background: #f3dfb9; border-color: #f3dfb9; }
+.play-panel .agent-talk-chips button[aria-pressed='true'] { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
 .play-panel .agent-talk-chips kbd { font: inherit; font-weight: 700; opacity: .75; }
 .play-panel .agent-talk-reply { min-height: 1.4em; margin: 0 0 8px; }
 .play-panel .agent-talk-asked { font-size: 11px; color: #aab39d; }
-.play-panel .agent-talk-record summary { cursor: pointer; font-size: 12px; color: #d0d6c6; }
+.play-panel .agent-talk-record summary { cursor: pointer; font-size: 12px; color: var(--office-navy); }
 /* The bubble sits above the projected name tag without changing the tag's size (no reprojection needed). */
 .office-shell .handoff-bubble.agent-talk-bubble {
   position: absolute; left: 50%; bottom: calc(100% + 8px); margin: 0; width: max-content; transform: translateX(-50%);
