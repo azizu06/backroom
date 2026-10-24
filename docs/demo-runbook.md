@@ -172,3 +172,128 @@ phone by Sun 3 AM. This document does not claim those rehearsals happened.
 4. **CRS / Apify / Nessie down:** try live first only in the owning opt-in smoke;
    cached evidence needs an actual `cached at hh:mm` timestamp. This host's mock
    bank is labeled mock and never counts as a Nessie T4 pass or cached live result.
+
+## Optional judge moment: GX10 month burst (#29)
+
+Keep this separate from `demo:up` and the three-minute core take. The single
+command generates **925 synthetic AP inbox items** (37 per company × 25 companies),
+then runs the real `processInbox` → schema validation → Payables/Vendor seats →
+code policy/leased controller escalations path with bounded concurrent company
+workers. No cloud call, Nessie HTTP write, external vendor check, or dial is
+available. Approved payments have explicitly **simulated** receipts. State is
+isolated in memory per company; it is not the office's shared database.
+
+```sh
+pnpm demo:burst -- --companies 25 --month 2026-09
+```
+
+The command runs `gx10 gpu` before inference and prints the shared GPU state;
+it fails closed if that preflight fails. Default concurrency is **2**, capped at
+8. Coordinate an idle window with teammates before a full burst; never unload
+someone else's model. Use `--model qwen3:8b` for a smaller model or opt in to
+`--model gpt-oss:120b` for quality over speed. The fixed transport allowlist accepts
+only the GX10's exact Ollama completion endpoint and rejects redirects and cloud
+fallback before network I/O, even when cloud keys are present in the shell.
+The normal router's interactive 5-second circuit breaker is isolated per task
+for this batch; each request has a 120-second timeout. This does not change the
+application router or its global OFF switch. This standalone process owns an
+isolated ON store; stop this command with Ctrl-C to stop its work.
+
+Rehearse a small sample first:
+
+```sh
+pnpm demo:burst -- --companies 1 --month 2026-09 --items-per-company 1 --concurrency 1
+pnpm demo:burst -- --companies 25 --month 2026-09 --plan
+```
+
+The second command only generates the workload and plan receipt. Generation is
+reproducible code, with Northfield September invoice patterns, historical paid
+invoices as duplicate evidence, unchanged approved Acme master for the duplicate
+cohort, pending legitimate Cedar bank changes, and four frozen inbox red-team
+traps per company. Company/date envelopes are generated for the requested month;
+underlying line-item descriptions and IDs retain their fixture provenance. This
+is a cloned synthetic stress workload, not 25 independently sampled businesses,
+and does not claim PDF OCR or transcript processing.
+
+Live JSON progress prints every second and after each completed item: cumulative
+items/s, returned token counts and tokens/s, holds by rule, generic traps held,
+expected-rule trap matches, false holds, model failures, simulated payments and
+successful-task local share. A failed model call followed by a code safety hold
+is counted as **both failure and hold**. Missing provider usage makes token rate
+and cost comparison `null`; it never becomes zero. Model retries count toward
+usage. Local share describes completed model tasks; failed task counts remain
+visible. With no completed model tasks it is `null`.
+
+Receipts are written under `.demo/burst/<run-id>/`: `manifest.json` includes the
+source SHA and exact generated input, `events.jsonl` includes the manifest hash,
+GPU preflight, item results, router failure categories, real seat audit entries
+and progress, and `summary.json` contains the final aggregate. Existing audit
+wall/metrics adapters can consume these files; **this command does not mount a
+new UI or publish these rows to SpacetimeDB**. Exit status is nonzero for model
+failures, missed holds, or missing expected trap rules. A killed take retains its
+partial JSONL but has no complete summary; never label it complete.
+
+Cloud-equivalent dollars are an **operator-priced estimate**, never a measured
+cloud bill or benchmark. Supply both `--input-usd-per-million N` and
+`--output-usd-per-million N` for your chosen comparison; without both, the value
+is `null`. The receipt records the supplied rates. Actual cloud spend is zero
+because cloud transport is forbidden.
+
+Measured judge rehearsal (2026-10-24, `gpt-oss:20b`, concurrency **2**):
+
+```sh
+pnpm demo:burst -- --companies 10 --month 2026-09 --concurrency 2
+```
+
+The GX10 was already at **93% utilization** at the initial preflight, so this
+budgeted take used **10 companies / 370 items**, rather than the 25-company
+925-item default. See the [measured receipt](evidence/burst/ten-company/summary.json)
+and [all 370 item/audit records](evidence/burst/ten-company/items.jsonl).
+
+| Measured result | Value |
+| --- | --- |
+| Processing wall time | **18m 42.73s** (1,122.733676 s; excludes generation/GPU preflight) |
+| Throughput | **0.329553 items/s** |
+| Returned input + output tokens | **410,970 + 59,183** |
+| Input + output token throughput | **418.757369 tokens/s** |
+| Generated output throughput | **52.713303 tokens/s** |
+| Planted traps held | **120 / 120** |
+| Expected policy-rule matches | **79 / 80** |
+| Failed model tasks / affected items | **5 / 5** |
+| Completed local model tasks | **692 / 692 (100%)**; 697 tasks total, 698 local HTTP attempts |
+| Raw `falseHolds` label counter | **30 / 250** non-trap-labeled items; caveat below |
+| Simulated payments | **220**; no Nessie HTTP writes |
+| Usage omissions / pending HTTP attempts | **0 / 0** |
+| Cloud-equivalent dollars | **null** (comparison prices not supplied) |
+| Command exit status | **1**, correctly reporting failures and one expected-rule miss |
+
+Holds by rule (an item can cite multiple rules): `BANK_CHANGE_HOLD=30`,
+`OFAC_STOP=20`, `INVALID_INPUT=44`, `PAYEE_NOT_IN_MASTER=17`,
+`DUPLICATE_INVOICE=9`, `LOOKALIKE_DOMAIN=10`, `NO_PO=10`, `OVER_LIMIT=20`.
+
+This is a completed measured take, **not a clean model-quality pass**. Four
+model tasks failed confidence checks; one extraction failed schema validation.
+The attempted cloud fallback was rejected by the transport guard **before HTTP**.
+The duplicate trap `synthetic-0007:2026-09:4419` remained safely held under
+`INVALID_INPUT`, but missed its expected `DUPLICATE_INVOICE` citation. This is why
+120/120 safety holds must not be presented as 80/80 correct rule detection.
+
+The raw false-hold label counter is conservative and **not a calibrated error
+rate**: it counts the 30 ordinary-labeled invoices for Cedar's already-pending
+bank change (`5002` × 10), the sanctioned vendor (`5023` × 10), and the unverified
+vendor (`5024` × 10). These are code-required holds from trusted seed state;
+three unverified-vendor items used `INVALID_INPUT` instead of the master rule.
+All 220 other ordinary-labeled items reached a simulated payment. The committed
+receipt retains the original labels/counts and every result, rather than
+relabeling the take after seeing it.
+
+Use this **18m 42.73s measured take** as the wall-time reference for the documented
+10-company command; shared load varies. The 25-company default and a laptop
+comparison remain unmeasured. Show the labeled receipt and a small live sample
+during judging; do not claim a measured laptop speedup.
+
+The [one-item live smoke receipt](evidence/burst/smoke.json) measured 3.24 seconds,
+2 completed local tasks, 1,199 prompt + 164 output tokens, zero model failures,
+and one simulated payment on `gpt-oss:20b`. It is a connectivity/path smoke, not
+a 925-item throughput result. The runner's `tokensPerSecond` includes input plus
+output; `outputTokensPerSecond` isolates generated output.
