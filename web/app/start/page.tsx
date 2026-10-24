@@ -13,8 +13,9 @@ const steps = [
     instruction: 'Select “Preview Treasury denial”.', outcome: 'See the door refusal and its simulated audit receipt.' },
   { title: 'Ask why on the audit wall', href: '/audit', time: '40 sec',
     instruction: 'Open the wall with an operator code, then ask about a decision.', outcome: 'Read an explanation tied to recorded evidence.' },
-  { title: 'Escalation to a human', href: '/office', time: '30 sec',
-    instruction: 'Choose “Preview escalation” below the office: the agent walks the case to Dana’s desk and stops there. The preview creates no approval; in a live run only a human with a passkey can approve.', outcome: 'See that an exception waits for a person, never a model or a voice.' },
+  { title: 'Visual escalation preview', href: '/office', time: '30 sec',
+    instruction: <>Choose “Preview escalation” below the office. The agent walks the case to Dana’s desk and stops. The preview is a visual fixture. A real passkey approval link comes from a seeded approval, or from an approval you create in the <Link href='/inbox'>inbox</Link>.</>,
+    outcome: 'See that an exception waits for a person, never a model or a voice.' },
   { title: 'Real vs simulated status', href: '/real-vs-sim', time: '15 sec',
     instruction: 'Read the integration and sandbox disclosures.', outcome: 'Know which parts are real, simulated, or unverified.' },
 ] as const;

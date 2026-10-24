@@ -1,5 +1,7 @@
 .office-shell { color-scheme: dark; height: 100dvh; min-height: 760px; display: flex; flex-direction: column; background: #202620; color: #e4e5dc; font: 14px/1.45 'Avenir Next', Avenir, sans-serif; }
 .office-shell * { box-sizing: border-box; }
+.office-header { flex: none; display: flex; flex-direction: column; }
+.office-header > .site-nav { flex: none; }
 .office-toolbar { min-height: 72px; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid #41493d; }
 .office-toolbar strong { font-size: 21px; font-weight: 600; letter-spacing: -0.5px; }
 .toolbar-divider { margin: 0 16px; color: #87917f; }

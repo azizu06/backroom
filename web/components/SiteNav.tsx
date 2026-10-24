@@ -3,17 +3,19 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { isActive, navLinks } from '../lib/site-nav';
+import { isActive, navLinks, siteNavHidden, type SiteNavPlacement } from '../lib/site-nav';
 import './SiteNav.css';
 
-export function SiteNav() {
-  return <Suspense fallback={null}><SiteNavContent /></Suspense>;
+export function SiteNav({ placement = 'layout' }: { placement?: SiteNavPlacement }) {
+  return <Suspense fallback={null}><SiteNavContent placement={placement} /></Suspense>;
 }
 
-function SiteNavContent() {
-  const pathname = usePathname();
-  const embedded = useSearchParams().get('embed') === '1';
-  if (embedded || pathname.startsWith('/pay/')) return null;
+function SiteNavContent({ placement }: { placement: SiteNavPlacement }) {
+  const pathname = usePathname() ?? '';
+  // Static renders of the office (and a missing router) have no search-param context.
+  const params = useSearchParams();
+  const embed = params?.get('embed') ?? null;
+  if (siteNavHidden(pathname, embed, placement)) return null;
   return <nav className='site-nav' aria-label='Site'>
     <Link className='site-nav-brand' href='/start' aria-current={isActive(pathname, '/start') ? 'page' : undefined}>Backroom</Link>
     <ul>

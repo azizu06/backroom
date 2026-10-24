@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { isActive, navLinks } from '../lib/site-nav';
+import { isActive, navLinks, siteNavHidden } from '../lib/site-nav';
 
 describe('site navigation', () => {
-  it('lists the internal destinations in order, without operator tools', () => {
+  it('lists the seven app destinations in order', () => {
     expect(navLinks).toEqual([
       { label: 'Office', href: '/office' },
       { label: 'Inbox', href: '/inbox' },
-      { label: 'Audit', href: '/audit' },
-      { label: 'Policy', href: '/policy' },
-      { label: 'Real vs Sim', href: '/real-vs-sim' },
+      { label: 'Audit wall', href: '/audit' },
+      { label: 'Attack demo', href: '/attack' },
+      { label: 'Real vs simulated', href: '/real-vs-sim' },
+      { label: 'Operator', href: '/operator' },
+      { label: 'Controller', href: '/controller' },
     ]);
   });
 
@@ -23,10 +25,31 @@ describe('site navigation', () => {
     expect(isActive(`${href}-other`, href)).toBe(false);
   });
 
-  it('leaves the office links inactive on the start page and unknown routes', () => {
-    for (const pathname of ['/start', '/controller', '/t8', '/unknown']) {
+  it('leaves unrelated routes inactive', () => {
+    for (const pathname of ['/start', '/policy', '/t8', '/unknown', '/pay/missing-link']) {
       expect(navLinks.some(link => isActive(pathname, link.href))).toBe(false);
     }
     expect(isActive('/start', '/start')).toBe(true);
+    expect(isActive('/controller', '/controller')).toBe(true);
+  });
+
+  it('hides embeds and customer payment routes, and keeps a single bar on the office', () => {
+    for (const pathname of ['/start', '/office', '/', '/pay/missing-link']) {
+      expect(siteNavHidden(pathname, '1', 'layout')).toBe(true);
+      expect(siteNavHidden(pathname, '1', 'office')).toBe(true);
+    }
+    expect(siteNavHidden('/pay/missing-link', null, 'layout')).toBe(true);
+    expect(siteNavHidden('/pay', null, 'office')).toBe(true);
+    expect(siteNavHidden('/payment-link', null, 'layout')).toBe(false);
+    expect(siteNavHidden('/approve/abc', null, 'layout')).toBe(false);
+    expect(siteNavHidden('/office', null, 'layout')).toBe(true);
+    expect(siteNavHidden('/office/replay', null, 'layout')).toBe(true);
+    expect(siteNavHidden('/', null, 'layout')).toBe(true);
+    expect(siteNavHidden('/office-other', null, 'layout')).toBe(false);
+    expect(siteNavHidden('/office', null, 'office')).toBe(false);
+    expect(siteNavHidden('/', null, 'office')).toBe(false);
+    expect(siteNavHidden('/start', null, 'layout')).toBe(false);
+    expect(siteNavHidden('/audit', null, 'layout')).toBe(false);
+    expect(siteNavHidden('/controller', null, 'layout')).toBe(false);
   });
 });
