@@ -114,7 +114,7 @@ async function main() {
       `head=${run.status.headHash}`])), '',
     '## Reproduction and interpretation', '',
     '- Saved runs: `pnpm metrics --audit path.json --audit other.json`. Each file is a full genesis chain array, or `{ "kind": "live" | "simulated", "entries": [...] }`. Bare arrays have unknown provenance and do not establish live model share. Caller-supplied provenance is an assertion, not cryptographic proof. Each file is a separate run; do not supply overlapping snapshots of the same run.',
-    '- Every invocation overwrites `docs/metrics.md` and prints this same Markdown. Saved-run mode skips fresh demo/eval/replay; historical receipt rows retain their original dates. Malformed inputs fail; invalid chains remain visible and are excluded.',
+    '- By default, every invocation overwrites `docs/metrics.md` and prints this same Markdown. `BACKROOM_REPORT_DIR` redirects the report to that directory. Saved-run mode skips fresh demo/eval/replay; historical receipt rows retain their original dates. Malformed inputs fail; invalid chains remain visible and are excluded.',
     '- The frozen red-team corpus was generated on GX10, but its generation calls are not office decisions and do not contribute to C2. Replay records multiple seams per case, so counts must not be added to eval or demo as unique scenarios.',
     '- Bad historical results remain in [red-team evidence](redteam.md): before the fixes, 20 failure cases and 10 mock violation cases. Current results do not erase those findings.',
     '- Live rehearsal scope, operator routing override, sandbox idempotency and reproduction: [receipt notes](evidence/live-run/README.md). An operator-forced local sample does not establish production C2 attainment.',
