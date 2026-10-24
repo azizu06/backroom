@@ -39,6 +39,17 @@ describe('public handoff choreography', () => {
     expect(sampleHandoffs(plan, 300).actors.filter(a => a.moving).map(a => a.id).sort()).toEqual(['collections', 'intake']);
     expect(planHandoffs([...plan.trips.map(t => t.handoff)].reverse())).toEqual(plan);
   });
+  it('keeps an unfinished walk when more than 40 newer rows arrive', () => {
+    const first = row('first', 'intake', 'extractor', 0, { status: 'offered' });
+    const stage = new HandoffStage(); stage.update([first], 0);
+    const before = stage.sample(100).actors;
+    const rows = [first, ...Array.from({ length: 41 }, (_, i) => row(`later-${i}`, 'collections', 'auditor', i + 1))];
+    stage.update(rows.slice().reverse(), 100);
+    expect(stage.plan.trips[0]!.handoff.handoffId).toBe('first');
+    expect(stage.sample(100).actors.find(actor => actor.id === 'intake')).toEqual(before.find(actor => actor.id === 'intake'));
+    expect(stage.plan.folders[0]!.segments.at(-1)!.end).toBe(Infinity);
+    expect(planHandoffs(rows).trips).toHaveLength(42);
+  });
   it('returns a rejected folder with the sender, who keeps the case', () => {
     const plan = planHandoffs([row('r', 'extractor', 'vendor', 0, { status: 'rejected', errorCode: 'MISMATCH' })]);
     const back = plan.legs.find(leg => leg.returning)!;
@@ -87,6 +98,27 @@ describe('public handoff choreography', () => {
 });
 
 describe('HandoffStage status continuity', () => {
+  it('reschedules a later trip after an in-place rejection return for the same actor', () => {
+    const first = row('first', 'intake', 'extractor', 0, { status: 'accepted', acceptedAt: 0 });
+    const later = row('later', 'extractor', 'vendor', 8000);
+    const stage = new HandoffStage(); stage.update([first, later], 0);
+    expect(stage.plan.trips[1]!.start).toBe(8000);
+    const rejected = { ...first, status: 'rejected' as const, errorCode: 'CASE_STOPPED' };
+    stage.update([rejected, later], 9500);
+    const back = stage.plan.legs.find(leg => leg.phase === 'return')!;
+    const reset = stage.plan.legs.find(leg => leg.phase === 'reset')!;
+    expect(back.start).toBe(9500);
+    expect(stage.plan.trips[1]!.start).toBeGreaterThanOrEqual(reset.end);
+    expect(actorAt(stage.plan, 'extractor', 9550).returning).toBe(true);
+    for (const now of [9550, reset.end + 100]) {
+      stage.update([{ ...rejected, completedAt: now }, { ...later }], now);
+      for (const actor of ['intake', 'extractor', 'vendor'] as const) {
+        const legs = stage.plan.legs.filter(leg => leg.actor === actor).sort((a, b) => a.start - b.start);
+        for (let i = 1; i < legs.length; i++) expect(legs[i]!.start).toBeGreaterThanOrEqual(legs[i - 1]!.end);
+      }
+      expect(stage.plan.trips[1]!.start).toBeGreaterThanOrEqual(reset.end);
+    }
+  });
   it.each(['accepted', 'completed'] as const)('keeps start time and position when offered becomes %s mid-walk', status => {
     const stage = new HandoffStage(), initial = row('a', 'intake', 'payables', 1000, { status: 'offered' });
     stage.update([initial], 1000);

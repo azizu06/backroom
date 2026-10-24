@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { HandoffEntries } from '../../app/office/handoffs/HandoffLog';
 import { HandoffDetails } from '../../app/office/handoffs/HandoffDetails';
+import { HandoffLog, HandoffPresentation, useOfficeHandoffs } from '../../app/office/handoffs/HandoffPresentation';
 import { PLAY_PANEL_VIEWS } from '../../app/office/panels';
 import { handoffText } from './handoff-text';
 import { handoffFromRow, handoffLine } from './handoffs';
@@ -21,6 +22,20 @@ const row = handoffFromRow({ handoffId: 'raw-case-secret:handoff:1', decisionRef
   privateCaseId: 'PRIVATE-CASE', privatePayload: 'PRIVATE-PAYLOAD' })!;
 
 describe('public handoff display', () => {
+  it('mounts an empty live log before a stage exists and fills it when the first handoff arrives', () => {
+    function Log({ populated }: { populated: boolean }) {
+      const { presentation } = useOfficeHandoffs({ ...INITIAL_OFFICE, handoffs: populated ? [row] : [] });
+      expect(!!presentation.stage).toBe(populated);
+      return createElement(HandoffPresentation.Provider, { value: presentation }, createElement(HandoffLog));
+    }
+    const empty = renderToStaticMarkup(createElement(Log, { populated: false }));
+    expect(empty).toContain('<ol role="log" aria-live="polite" aria-relevant="additions text"></ol>');
+    expect(empty).toContain('No handoffs yet.');
+    const populated = renderToStaticMarkup(createElement(Log, { populated: true }));
+    expect(populated).toContain('<ol role="log" aria-live="polite" aria-relevant="additions text">');
+    expect(populated).toContain(row.caseDisplayId);
+    expect(populated).not.toContain('No handoffs yet.');
+  });
   it('never includes handoffId, decisionRef or private fields in rendered HTML or panel/bubble models', () => {
     const panel = playPanel({ ...INITIAL_OFFICE, handoffs: [row] }, { kind: 'handoff', actor: 'extractor' })!;
     const bubbles = sampleHandoffs(planHandoffs([row]), 100).bubbles;
