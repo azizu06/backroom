@@ -35,7 +35,7 @@ export type CaseStatus = 'open' | 'done' | 'held' | 'paused' | 'failed' | 'cance
 export type ActivationStatus = 'queued' | 'active' | 'handed_off' | 'done' | 'held' | 'paused' | 'failed' | 'cancelled';
 export interface ActivationRow {
   activationId: string; role: Role; status: ActivationStatus; artifactRefs: string[];
-  leaseOwner?: string; leaseToken?: number; inboundHandoffId?: string;
+  leaseOwner?: string; leaseToken?: number; leaseExpiresAt?: number; inboundHandoffId?: string;
   createdAt: number; startedAt?: number; endedAt?: number; reason?: string;
 }
 export interface HandoffRow extends HandoffRecord {
@@ -79,25 +79,46 @@ export function openCase(prior: CaseState | undefined, input: { caseId: string; 
     corrections: 0, handoffs: [], createdAt: input.now };
 }
 
-export function startActivation(state: CaseState, input: { leaseOwner: string; now: number }) {
+export function startActivation(state: CaseState, input: { leaseOwner: string; now: number; leaseMs?: number }) {
   if (state.status !== 'open') fail('AGENT_CASE_NOT_OPEN');
   if (state.activeActivationId) fail('AGENT_ACTIVATION_ACTIVE');
   const activation = state.activations.find(row => row.activationId === state.queuedActivationId) ?? fail('AGENT_NO_QUEUED_ACTIVATION');
   if (!input.leaseOwner || input.leaseOwner.length > 120) fail('INVALID_LEASE_OWNER');
+  if (input.leaseMs !== undefined && (!Number.isSafeInteger(input.leaseMs) || input.leaseMs <= 0 ||
+    !Number.isSafeInteger(input.now + input.leaseMs))) fail('INVALID_ACTIVATION_LEASE');
   state.leaseToken += 1;
   Object.assign(activation, { status: 'active', leaseOwner: input.leaseOwner, leaseToken: state.leaseToken, startedAt: input.now });
+  if (input.leaseMs !== undefined) activation.leaseExpiresAt = input.now + input.leaseMs;
   state.activeActivationId = activation.activationId; state.queuedActivationId = undefined;
   const inbound = state.handoffs.find(row => row.handoffId === activation.inboundHandoffId);
   if (inbound) Object.assign(inbound, { status: 'accepted', acceptedAt: input.now });
   return { activation: { ...activation }, inbound: inbound && { ...inbound } };
 }
 
-export function assertActive(state: CaseState, claim: LeaseClaim): ActivationRow {
+export function assertActive(state: CaseState, claim: LeaseClaim, now?: number): ActivationRow {
   if (state.status !== 'open') fail('AGENT_CASE_NOT_OPEN');
   if (state.activeActivationId !== claim.activationId) fail('AGENT_ACTIVATION_NOT_ACTIVE');
   const row = state.activations.find(r => r.activationId === claim.activationId)!;
   if (row.leaseOwner !== claim.leaseOwner || row.leaseToken !== claim.leaseToken || state.leaseToken !== claim.leaseToken) fail('AGENT_LEASE_STALE');
+  if (now !== undefined && row.leaseExpiresAt !== undefined && now >= row.leaseExpiresAt) fail('AGENT_LEASE_EXPIRED');
   return row;
+}
+
+/** Explicit code-owned takeover; never steals a live activation. No external effects are replayed here. */
+export function recoverExpiredActivation(state: CaseState, now: number) {
+  const expired = state.activations.find(row => row.activationId === state.activeActivationId);
+  if (state.status !== 'open' || !expired || expired.leaseExpiresAt === undefined || now < expired.leaseExpiresAt) return undefined;
+  const replacement: ActivationRow = { activationId: `${state.caseId}:a${state.activations.length + 1}`, role: expired.role,
+    status: 'queued', artifactRefs: [...expired.artifactRefs], inboundHandoffId: expired.inboundHandoffId, createdAt: now };
+  Object.assign(expired, { status: 'failed', reason: 'LEASE_EXPIRED', endedAt: now });
+  state.leaseToken += 1; // immediately fences the abandoned runner, before replacement starts
+  state.activeActivationId = undefined;
+  state.queuedActivationId = replacement.activationId;
+  state.activations.push(replacement);
+  const inbound = state.handoffs.find(row => row.handoffId === expired.inboundHandoffId);
+  if (inbound) inbound.toActivationId = replacement.activationId;
+  return { expiredActivationId: expired.activationId, replacementActivationId: replacement.activationId,
+    expiredToken: expired.leaseToken, fencedToken: state.leaseToken };
 }
 
 /** Refs come from code-owned tool outputs, never from model arguments. */
@@ -123,7 +144,7 @@ export function commitHandoff(state: CaseState, claim: LeaseClaim & { request: H
     if (prior.leaseToken !== claim.leaseToken || !sameRequest(prior, request)) fail('HANDOFF_CONFLICT');
     return { ok: true, record: { ...prior }, replayed: true };
   }
-  const source = assertActive(state, claim);
+  const source = assertActive(state, claim, claim.now);
   const rejected = (errorCode: string): CommitResult => {
     const record = row(state, source, request, claim, 'rejected', errorCode);
     state.handoffs.push(record);
@@ -156,7 +177,7 @@ export function commitHandoff(state: CaseState, claim: LeaseClaim & { request: H
 
 /** A code-owned role guard refused the staged offer before commit: record it for the office, keep ownership. */
 export function rejectHandoff(state: CaseState, claim: LeaseClaim & { request: HandoffRequest; errorCode: string; now: number; sequence: number }): HandoffRow {
-  const source = assertActive(state, claim);
+  const source = assertActive(state, claim, claim.now);
   const record = row(state, source, claim.request, claim, 'rejected', safeText(claim.errorCode, 80));
   state.handoffs.push(record);
   return { ...record };
@@ -178,7 +199,7 @@ function completeInbound(state: CaseState, activation: ActivationRow, now: numbe
 
 export type FinishOutcome = 'done' | 'held' | 'paused' | 'failed';
 export function finishActivation(state: CaseState, claim: LeaseClaim & { outcome: FinishOutcome; reason?: string; now: number }) {
-  const activation = assertActive(state, claim);
+  const activation = assertActive(state, claim, claim.now);
   if (claim.outcome === 'done' && !TERMINAL_ROLES.includes(activation.role)) fail('AGENT_DONE_NOT_TERMINAL');
   const reason = claim.reason ? safeText(claim.reason, 80) : undefined;
   Object.assign(activation, { status: claim.outcome, endedAt: claim.now, reason });
