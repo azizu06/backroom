@@ -1,0 +1,697 @@
+{
+  "schemaVersion": 1,
+  "mode": "recorded-live-gx10",
+  "recordedAt": "2026-10-24T18:51:17.743Z",
+  "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/pdf-extraction.ts",
+  "baseCommit": "9a191ffd234c01281112e5d11ddc8b71abb5b547",
+  "scope": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured.",
+  "model": "gpt-oss:20b",
+  "items": 83,
+  "fieldsCorrect": 579,
+  "fieldsTotal": 581,
+  "percent": 99.66,
+  "exactItems": 81,
+  "errors": 0,
+  "p50LatencyMs": 2850,
+  "overProductionTimeout8s": 0,
+  "overDemotionMedian5s": 0,
+  "byField": {
+    "vendorName": 83,
+    "invoiceId": 83,
+    "poId": 83,
+    "amountCents": 83,
+    "currency": 83,
+    "lineItems": 81,
+    "adjustmentCents": 83
+  },
+  "results": [
+    {
+      "id": "4402",
+      "route": "local",
+      "latencyMs": 3352,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3001",
+      "route": "local",
+      "latencyMs": 2757,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3002",
+      "route": "local",
+      "latencyMs": 2699,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3003",
+      "route": "local",
+      "latencyMs": 3410,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3004",
+      "route": "local",
+      "latencyMs": 2759,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3005",
+      "route": "local",
+      "latencyMs": 2786,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3006",
+      "route": "local",
+      "latencyMs": 3001,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3007",
+      "route": "local",
+      "latencyMs": 3441,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3008",
+      "route": "local",
+      "latencyMs": 2744,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3009",
+      "route": "local",
+      "latencyMs": 3091,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3010",
+      "route": "local",
+      "latencyMs": 2956,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3011",
+      "route": "local",
+      "latencyMs": 3094,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3012",
+      "route": "local",
+      "latencyMs": 3107,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3013",
+      "route": "local",
+      "latencyMs": 3006,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3014",
+      "route": "local",
+      "latencyMs": 2758,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3015",
+      "route": "local",
+      "latencyMs": 2816,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3016",
+      "route": "local",
+      "latencyMs": 3023,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3017",
+      "route": "local",
+      "latencyMs": 2815,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3018",
+      "route": "local",
+      "latencyMs": 3251,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3019",
+      "route": "local",
+      "latencyMs": 3437,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3020",
+      "route": "local",
+      "latencyMs": 3461,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3021",
+      "route": "local",
+      "latencyMs": 3119,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3022",
+      "route": "local",
+      "latencyMs": 2672,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3023",
+      "route": "local",
+      "latencyMs": 2978,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "3024",
+      "route": "local",
+      "latencyMs": 3265,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4000",
+      "route": "local",
+      "latencyMs": 3367,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4001",
+      "route": "local",
+      "latencyMs": 2797,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4002",
+      "route": "local",
+      "latencyMs": 2714,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4003",
+      "route": "local",
+      "latencyMs": 3448,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4004",
+      "route": "local",
+      "latencyMs": 2756,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4005",
+      "route": "local",
+      "latencyMs": 2827,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4006",
+      "route": "local",
+      "latencyMs": 2755,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4007",
+      "route": "local",
+      "latencyMs": 2782,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4008",
+      "route": "local",
+      "latencyMs": 3098,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4009",
+      "route": "local",
+      "latencyMs": 3070,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4010",
+      "route": "local",
+      "latencyMs": 2778,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4011",
+      "route": "local",
+      "latencyMs": 2936,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4012",
+      "route": "local",
+      "latencyMs": 2736,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4013",
+      "route": "local",
+      "latencyMs": 3356,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4014",
+      "route": "local",
+      "latencyMs": 2733,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4015",
+      "route": "local",
+      "latencyMs": 2794,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4016",
+      "route": "local",
+      "latencyMs": 2749,
+      "correct": 6,
+      "total": 7,
+      "mismatches": [
+        "lineItems"
+      ]
+    },
+    {
+      "id": "4017",
+      "route": "local",
+      "latencyMs": 3154,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4018",
+      "route": "local",
+      "latencyMs": 3104,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4019",
+      "route": "local",
+      "latencyMs": 2757,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4020",
+      "route": "local",
+      "latencyMs": 2841,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4021",
+      "route": "local",
+      "latencyMs": 3521,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4022",
+      "route": "local",
+      "latencyMs": 2732,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4023",
+      "route": "local",
+      "latencyMs": 3044,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4024",
+      "route": "local",
+      "latencyMs": 3234,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5000",
+      "route": "local",
+      "latencyMs": 3275,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4401",
+      "route": "local",
+      "latencyMs": 3342,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5002",
+      "route": "local",
+      "latencyMs": 3061,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5003",
+      "route": "local",
+      "latencyMs": 2850,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5004",
+      "route": "local",
+      "latencyMs": 2595,
+      "correct": 6,
+      "total": 7,
+      "mismatches": [
+        "lineItems"
+      ]
+    },
+    {
+      "id": "5005",
+      "route": "local",
+      "latencyMs": 2805,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5006",
+      "route": "local",
+      "latencyMs": 2855,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5007",
+      "route": "local",
+      "latencyMs": 2739,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5008",
+      "route": "local",
+      "latencyMs": 3088,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5009",
+      "route": "local",
+      "latencyMs": 3088,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5010",
+      "route": "local",
+      "latencyMs": 2946,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5011",
+      "route": "local",
+      "latencyMs": 3157,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5012",
+      "route": "local",
+      "latencyMs": 2818,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5013",
+      "route": "local",
+      "latencyMs": 2751,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5014",
+      "route": "local",
+      "latencyMs": 3027,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5015",
+      "route": "local",
+      "latencyMs": 2831,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5016",
+      "route": "local",
+      "latencyMs": 2777,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5017",
+      "route": "local",
+      "latencyMs": 2810,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5018",
+      "route": "local",
+      "latencyMs": 2812,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5019",
+      "route": "local",
+      "latencyMs": 2787,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5020",
+      "route": "local",
+      "latencyMs": 2868,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5021",
+      "route": "local",
+      "latencyMs": 2676,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5022",
+      "route": "local",
+      "latencyMs": 2728,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5023",
+      "route": "local",
+      "latencyMs": 3290,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "5024",
+      "route": "local",
+      "latencyMs": 3275,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4419",
+      "route": "local",
+      "latencyMs": 3869,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4471",
+      "route": "local",
+      "latencyMs": 2558,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4480",
+      "route": "local",
+      "latencyMs": 2630,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4481",
+      "route": "local",
+      "latencyMs": 2549,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4482",
+      "route": "local",
+      "latencyMs": 2780,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4483",
+      "route": "local",
+      "latencyMs": 2632,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4484",
+      "route": "local",
+      "latencyMs": 2874,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    },
+    {
+      "id": "4485",
+      "route": "local",
+      "latencyMs": 2527,
+      "correct": 7,
+      "total": 7,
+      "mismatches": []
+    }
+  ]
+}
