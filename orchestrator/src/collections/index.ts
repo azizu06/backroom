@@ -86,5 +86,5 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   await audit('plan_validated', { decision: plan ? 'ALLOW' : 'DENY', inputs: { valid: !!plan, ...(plan ? { plan } : {}) } });
   if (!plan) return { status: 'blocked', reason: 'Invalid call plan or terms outside the envelope' };
   return { status: 'ready', envelope, plan, summary: `${!health ? 'health check pending. ' : ''}${renderCallPlan(plan)}`, healthCheckPending: !health,
-    route: draft.route, model: draft.model, evidenceRefs: refs };
+    route: draft.route, model: draft.model, evidenceRefs: refs, signals: context.signals ?? {} };
 }

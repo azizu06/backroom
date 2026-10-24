@@ -58,7 +58,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
     })();
   }
   const status = () => ({ live, bank: live ? 'nessie_sandbox' as const : 'mock' as const,
-    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
+    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}),
+      ...(preCall.status === 'ready' ? { signals: preCall.signals } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
       nessie: { mode: live ? 'sandbox' : 'mock' }, apify: { ...apify },
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
   return { bank, accountId, status,
