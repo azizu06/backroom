@@ -13,6 +13,8 @@ import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
 import { RoomEntryLabel } from './RoomEntryLabel';
+import { ProximityChat } from './ProximityChat';
+import type { PlayChat } from './useProximityChat';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
@@ -108,8 +110,8 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit, lookOnStart = false }: {
-  snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void;
+export function PlayHud({ snapshot, input, target, hud, onExit, chat, lookOnStart = false }: {
+  snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; chat?: PlayChat;
   /** Entered from an explicit Enter click: ask for pointer lock right away (that click is the user gesture). */
   lookOnStart?: boolean;
 }) {
@@ -119,6 +121,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, lookOnStart = fa
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const [chatOpen, setChatOpen] = useState(false);
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const knob = useRef<HTMLSpanElement>(null);
   const targetRef = useRef(target);
@@ -168,6 +171,14 @@ export function PlayHud({ snapshot, input, target, hud, onExit, lookOnStart = fa
     setSettings(next);
     savePlaySettings(viewerStorage(), next);
   }
+  function openChat() {
+    releaseStick();
+    input.clear();
+    releasePointer();
+    requestSceneFrame();
+    setPanel(null);
+    setChatOpen(true);
+  }
   function closePanel() {
     setPanel(null);
     hud.current?.focus();
@@ -189,6 +200,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, lookOnStart = fa
     if (event.key === 'e' || event.key === 'E' || event.key === 'Enter') {
       event.preventDefault();
       if (!event.repeat) interact();
+      return;
+    }
+    if (chat && (event.key === 't' || event.key === 'T')) {
+      event.preventDefault();
+      if (!event.repeat) openChat();
       return;
     }
     const held = control(event);
@@ -270,6 +286,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, lookOnStart = fa
       {prompt && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
     {settingsOpen && <PlaySettingsDialog settings={settings} change={changeSettings} close={closeSettings} />}
+    {chat && <ProximityChat chat={chat} open={chatOpen} onOpen={openChat} onClose={() => setChatOpen(false)} hud={hud} />}
     {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} />}
   </div>;
 }

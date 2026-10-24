@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deskPieces, deskScreenPiece, PLANT_SPOTS } from './furniture';
+import { MONITOR_FACE } from './props/monitors';
 import { OFFICE_ANCHORS } from './state';
 import { DESKS, DESK_SIZE } from './targets/desk';
 
@@ -14,25 +15,25 @@ describe('static office furniture', () => {
     expect(deskPieces(room)).toEqual(pieces);
   });
 
-  it('rotates Dana’s chair, paper and screen together around the anchor', () => {
+  it('rotates Dana’s chair and paper around the anchor and turns her screen back to the room', () => {
     const pieces = deskPieces('dana');
     expect(pieces[5]!.at).toEqual([-0.65, 0.95, 3.3]);
     expect(pieces[5]!.rotation![1]).toBeCloseTo(Math.PI - 0.12);
     expect(pieces[7]!.at[2]).toBeCloseTo(4.54);
     const screen = deskScreenPiece('dana');
-    expect(screen.at[0]).toBe(0.35);
-    expect(screen.at[2]).toBeCloseTo(3.58);
-    expect(screen.rotation).toEqual([0, Math.PI, 0]);
+    expect(screen.at[0]).toBeCloseTo(OFFICE_ANCHORS.dana.center[0] - MONITOR_FACE.x);
+    expect(screen.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] - MONITOR_FACE.z + 0.05);
+    expect(screen.rotation).toEqual([0, 0, 0]);
   });
 
   it.each(DESKS)('keeps %s monitor face in front of its casing', room => {
     const casing = deskPieces(room)[3]!;
     const screen = deskScreenPiece(room);
-    const flip = room === 'dana' ? -1 : 1;
     expect(screen.at[0]).toBe(casing.at[0]);
     expect(screen.at[1]).toBe(casing.at[1]);
-    expect((screen.at[2] - casing.at[2]) * flip).toBeCloseTo(0.05);
-    expect(screen.size).toEqual([0.67, 0.37, 0.015]);
+    expect(screen.at[2] - casing.at[2]).toBeCloseTo(0.05);
+    expect(casing.size).toEqual([MONITOR_FACE.width + 0.1, MONITOR_FACE.height + 0.1, 0.08]);
+    expect(screen.size).toEqual([MONITOR_FACE.width + 0.01, MONITOR_FACE.height + 0.01, 0.015]);
     expect(screen.color).toBe(OFFICE_ANCHORS[room].color);
   });
 
