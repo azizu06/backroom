@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Group, Vector3 } from 'three';
 import { serverRoomReadout, type Gx10Status } from '../../../lib/gx10/server-room';
-import { PALETTE, ROLES } from '../../../lib/office/palette';
+import { ROLES } from '../../../lib/office/palette';
 
 /** Own the DOM root outside the Canvas reconciler; defer root work past its commit. */
 function Readout({ children }: { children: ReactNode }) {
@@ -62,12 +62,12 @@ export function ServerRoom({ position = [7.1, 0, -0.8], replay = false }: { posi
     <mesh position={[0, 0.12, 0]} castShadow receiveShadow><boxGeometry args={[1.2, 0.24, 1.05]} /><meshStandardMaterial color={ROLES.desk} /></mesh>
     <mesh position={[0, 0.62, 0]} castShadow><boxGeometry args={[0.85, 0.8, 0.85]} /><meshStandardMaterial color={ROLES.frame} metalness={0.5} roughness={0.45} /></mesh>
     {Array.from({ length: 5 }, (_, i) => <mesh key={i} position={[0, 0.4 + i * 0.1, 0.43]}><boxGeometry args={[0.6, 0.025, 0.015]} /><meshStandardMaterial color={ROLES.shadow} /></mesh>)}
-    <mesh position={[0.29, 0.9, 0.44]}><sphereGeometry args={[0.035, 8, 8]} /><meshBasicMaterial color={view.connected ? PALETTE.mint : PALETTE.butter} /></mesh>
+    <mesh position={[0.29, 0.9, 0.44]}><sphereGeometry args={[0.035, 8, 8]} /><meshBasicMaterial color={view.connected ? ROLES.statusOk : ROLES.statusWarn} /></mesh>
     {!replay && <Readout>
       <section aria-label='Live GX10 server readout' data-testid='gx10-readout' onPointerDown={event => event.stopPropagation()}
-        style={{ width: 228, maxHeight: '65vh', overflowY: 'auto', padding: 12, background: '#202620', color: '#e7ddc5', border: '1px solid #747e6a', borderRadius: 4, font: '12px/1.5 monospace', pointerEvents: 'auto' }}>
+        style={{ width: 228, maxHeight: '65vh', overflowY: 'auto', padding: 12, background: ROLES.frame, color: ROLES.wall, border: `1px solid ${ROLES.shadow}`, borderRadius: 4, font: '12px/1.5 monospace', pointerEvents: 'auto' }}>
         <strong style={{ fontSize: 15 }}>GX10 · {view.connection}</strong>
-        <div style={{ overflowWrap: 'anywhere', color: '#c3b68e', marginBottom: 8 }}>{view.models}</div>
+        <div style={{ overflowWrap: 'anywhere', color: ROLES.lampLight, marginBottom: 8 }}>{view.models}</div>
         <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 8px', margin: 0 }}>
           <dt>Local share</dt><dd style={{ margin: 0 }}>{view.share}</dd>
           <dt>Output / wall time</dt><dd style={{ margin: 0 }}>{view.speed}</dd>
