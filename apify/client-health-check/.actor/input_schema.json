@@ -4,19 +4,44 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "companyName": { "title": "Company name", "type": "string", "description": "Public business name. It is not sent to a model." },
-        "website": { "title": "Website", "type": "string", "description": "Public http(s) website to probe." },
-        "phone": { "title": "Consented phone", "type": "string", "description": "Phone on the consent record, compared with the public listing." },
-        "listedPhone": { "title": "Listed phone", "type": "string", "description": "Phone from the public listing." },
+        "companyName": {
+            "title": "Company name",
+            "type": "string",
+            "description": "Public business name. It is not sent to a model.",
+            "editor": "textfield",
+            "prefill": "Northfield Studio"
+        },
+        "website": {
+            "title": "Website",
+            "type": "string",
+            "description": "Public http(s) website to probe.",
+            "editor": "textfield",
+            "prefill": ""
+        },
+        "phone": {
+            "title": "Consented phone",
+            "type": "string",
+            "description": "Phone on the consent record, compared with the public listing.",
+            "editor": "textfield",
+            "prefill": ""
+        },
+        "listedPhone": {
+            "title": "Listed phone",
+            "type": "string",
+            "description": "Phone from the public listing.",
+            "editor": "textfield",
+            "prefill": ""
+        },
         "maps": {
             "title": "Maps observation",
             "type": "object",
             "description": "Already collected public Maps fields. This Actor does not start a paid Maps run by itself.",
-            "properties": {
-                "permanentlyClosed": { "type": "boolean" },
-                "temporarilyClosed": { "type": "boolean" },
-                "sourceUrl": { "type": "string" },
-                "observedAt": { "type": "string" }
+            "editor": "json",
+            "prefill": {
+                "permanentlyClosed": false,
+                "temporarilyClosed": false,
+                "sourceUrl": "",
+                "observedAt": ""
             }
         }
     },
