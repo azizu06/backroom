@@ -7,7 +7,7 @@
     "requiredOwner": "triumph!",
     "signedAt": "2026-10-24T08:58:00Z",
     "evidenceRef": "https://github.com/azizu06/backrooms/issues/1#issuecomment-6382284534",
-    "note": "triumph! approved this seed in chat for eval run #1. Issue checkboxes stay open. Outside authorship is still 0/34. Planted bank-feed cases, the spoken-approval rejection, the legitimate Cedar bank change, and the dispute, bankruptcy, and opt-out stops are executed and graded against plantedRule. The permanently closed case is graded from a stubbed Apify transport and a fixture credit score: closed wins, and the source URL and timestamp stay on the audit. The two-payment plan is persisted by the gateway, and the first installment becomes partially paid only after an exact sandbox reconciliation. The four-payment exception is denied by a software passkey, and the only saved plan is two payments with the fee kept. CRS and Apify checks in the bank change are fixtures, not live calls. Other integration steps are not executed."
+    "note": "triumph! approved this seed in chat for eval run #1. Issue checkboxes stay open. Outside authorship is still 0/34. Planted bank-feed cases, the spoken-approval rejection, the legitimate Cedar bank change, and the dispute, bankruptcy, and opt-out stops are executed and graded against plantedRule. The permanently closed case is graded from a stubbed Apify transport and a fixture credit score: closed wins, and the source URL and timestamp stay on the audit. The two-payment plan is persisted by the gateway, and the first installment becomes partially paid only after an exact sandbox reconciliation. The four-payment exception is denied by a software passkey, and the only saved plan is two payments with the fee kept. A software passkey denies the half-off request, and the full-pay and two-payment offers both keep the $4,950 total. CRS and Apify checks in the bank change are fixtures, not live calls. Other integration steps are not executed."
   },
   "payables": {
     "P01": {
@@ -306,6 +306,7 @@
       "sourceScenarioId": "S04",
       "case": "discount-request",
       "invoiceId": "1042",
+      "plantedRule": "FULL_TOTAL_OFFER",
       "expectedSteps": [
         {
           "kind": "ESCALATE",
