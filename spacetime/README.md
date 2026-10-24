@@ -30,7 +30,8 @@ sh .t8-tools/install.sh --root-dir "$PWD/.t8-tools/spacetime" --yes
 Publish records the publisher identity in the private `controller` table. Use
 that identity's **private token on trusted servers only**, never in browser props,
 `NEXT_PUBLIC_*`, tool arguments, or model input. Anonymous clients can subscribe
-but cannot invoke a writer. Maincloud browser authentication is still deferred;
+but cannot invoke business writers; visual presence is the deliberate exception
+documented below. Maincloud browser authentication is still deferred;
 no hosted publish is claimed.
 
 Put server settings in the repo root `.env.local`, loaded by the orchestrator
@@ -73,7 +74,37 @@ Typed public projections for the office:
 | `escalation` | `id`, `taskId`, `fromAgent`, `toHuman`, `status`, `ruleIds`, `evidenceRefs`, `createdAt`, `expiresAt`, `json` (full StateStore row) |
 | `audit_entry` | `seq` (u64), unique `id`, `ts` (integer ms), actor/seat/action, ruleIds/policyVersion/refs/route, latencyMs/costUsd, optional decision, canonical `inputs` JSON, prevHash/hash |
 | `runtime_control` | `id=global`, `llmEnabled`, monotonic `generation` (u64), `heartbeatAt` |
+| `office_presence` | `viewer_id` (random client id, primary key), `name`, `x/z/yaw` (f32), `mode`, `at` (u64 server milliseconds); generated accessor `db.officePresence`, field `viewerId` |
 | `policy`, `seat`, `badge` | immutable policy snapshots and current code-enforced badges/limits |
+
+`office_presence_upsert(viewer_id, name, x, z, yaw, mode)` and
+`office_presence_leave(viewer_id)` are the **only deliberate anonymous-write
+exception**, for optional viewer display. They never touch business state,
+permissions or audits. The public row has no SpacetimeDB identity, token or auth
+data; private `office_presence_owner` binds each random id to `ctx.sender` so
+another identity cannot update or remove it. Only a display name is shared.
+Ids must match `[A-Za-z0-9-]{8,64}`. Names lose control characters, are trimmed
+and capped at 24 characters, defaulting to `Viewer`. Positions must be finite:
+x clamps to [-8,8], z to [-5.5,5.5], yaw wraps into [-pi,pi]. Mode must be
+`overview`, `play` or `tour`. Updates within 200ms are ignored without renewing
+the timestamp; at most 32 viewers can exist, including when one caller uses
+multiple ids. The server alone sets `at`.
+
+A private scheduled table, `office_presence_schedule`, starts one 5s interval
+on the first successful upsert, including after updating an existing database.
+Its `office_presence_sweep` reducer accepts only the module identity and deletes
+public and owner rows older than 15s (removal within 20s of the last heartbeat).
+No disconnect hook is installed; TTL handles socket loss. Leave deletes both
+rows immediately when delivered. A new anonymous identity reusing a prior
+session's viewer id must wait for that row's TTL or successful leave.
+
+The office reuses its existing anonymous connection and subscribes to this table
+only when **Show viewers** is enabled (`/office?presence=1` also opts in).
+Live mode uses SpacetimeDB when the bindings expose presence; preview and missing
+bindings use BroadcastChannel. Presence stays off by default. No additional
+connection, browser key, or paid API is needed. Pagehide/close sends leave;
+restoring a cached page resumes heartbeats. The web display also prunes stale
+peers with the existing 10s TTL and shows at most 12 peers.
 
 `agent.state` includes `paused`; an escalation target is `Dana_desk`. Map that
 anchor to the existing office desk. Treasury entry is evaluated against the
@@ -98,6 +129,10 @@ Generated bindings live in `orchestrator/src/spacetime-client`, exported as
 .t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime generate \
   --lang typescript --module-path spacetime --out-dir orchestrator/src/spacetime-client --yes
 ```
+
+The presence binding additions were written in the existing 2.13 generated style
+because the CLI was unavailable in the presence worktree; regenerate with the
+same command when the pinned CLI is available.
 
 Browser example (no token):
 
