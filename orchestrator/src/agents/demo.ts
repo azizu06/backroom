@@ -20,7 +20,7 @@ const live = process.argv.includes('--live');
 async function main() {
   const { control, roles, payments, store } = await createDemoTeam();
   (store as MemoryHandoffStore).subscribe(row => console.log(`  [office] #${row.sequence} ${row.fromAgentId} -> ${row.toAgentId} ${row.status}`
-    + `${row.correction ? ' (correction)' : ''}${row.errorCode ? ` ${row.errorCode}` : ''} | voice=${row.toVoiceRole} "${row.line}"`));
+    + `${row.correction ? ' (correction)' : ''}${row.errorCode ? ` ${row.errorCode}` : ''} | voice=${row.fromVoiceRole} "${row.line}"`));
   const calls: ScriptedCall[] = [];
   const runtime = new ClaudeAgentRuntime({
     credential: live ? () => execFileSync('security', ['find-generic-password', '-s', 'backroom-anthropic-key', '-w'], { encoding: 'utf8' }).trim() : () => 'mock-no-network',
