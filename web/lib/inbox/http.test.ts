@@ -11,6 +11,19 @@ function submission(values: Record<string, string> = {}, file?: File) {
 }
 
 describe('judge inbox HTTP boundary', () => {
+  it('a narration failure cannot replace the recorded inbox response', async () => {
+    const state = new MemoryStateStore();
+    const agents = vi.fn().mockRejectedValue(new Error('SDK unavailable'));
+    const modelRoute = vi.fn().mockResolvedValue({ output: { kind: 'unknown' }, route: 'local', model: 'mock', costUsd: 0, latencyMs: 1 });
+    const response = await createInboxHTTP({ store: () => state, modelRoute, agents })(submission());
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.decision.kind).toBe('ESCALATE');
+    expect(await state.getAudit(body.auditId)).toBeDefined();
+    expect(agents).toHaveBeenCalledOnce();
+    expect(agents.mock.calls[0]![0].item.source).toBe('judge');
+  });
+
   it('unknown judge input escalates, records its source, and links the exact audited decision', async () => {
     const state = new MemoryStateStore();
     const modelRoute = vi.fn().mockResolvedValue({ output: { kind: 'unknown' }, route: 'local', model: 'mock', costUsd: 0, latencyMs: 1 });

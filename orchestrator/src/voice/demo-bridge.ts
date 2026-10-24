@@ -14,6 +14,7 @@ export function createDemoVoiceBridge(options: { port: number; controlSecret: st
   };
   return {
     register: (sessionId: string) => admin('voice-call', { sessionId }),
+    endCall: (sessionId: string) => admin('voice-call-ended', { sessionId }),
     clientStopped: async () => (await admin('voice-client-stopped')).stopped as boolean,
     gateway: async (tool: string, request: Request) => {
       const response = await send(`${base}/api/tools/${encodeURIComponent(tool)}`, {
