@@ -203,7 +203,7 @@ test('office ambience renders a still scene under reduced motion', async ({ page
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
   const viewport = page.getByTestId('office-viewport');
   const canvas = viewport.locator('canvas');
