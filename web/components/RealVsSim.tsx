@@ -1,28 +1,33 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { disclosureItems, getDisclosureStatus, type DemoStatus } from '../lib/real-vs-sim';
 import './RealVsSim.css';
 
-export function RealVsSim({ detailed = false }: { detailed?: boolean }) {
+export function RealVsSim(props: { detailed?: boolean }) {
+  return <Suspense fallback={null}><RealVsSimContent {...props} /></Suspense>;
+}
+function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
   const pathname = usePathname();
+  const replayRequested = useSearchParams().has('replay');
+  const replay = replayRequested && (pathname === '/office' || pathname === '/audit');
   const [status, setStatus] = useState<DemoStatus | null>(null);
   const panel = useRef<HTMLElement>(null);
   const [panelHeight, setPanelHeight] = useState(280);
   const hidden = !detailed && pathname === '/real-vs-sim';
 
   useEffect(() => {
-    if (hidden || detailed || !panel.current) return;
+    if (hidden || replay || detailed || !panel.current) return;
     const observer = new ResizeObserver(([entry]) => {
       if (entry) setPanelHeight(entry.target.getBoundingClientRect().height + 24);
     });
     observer.observe(panel.current);
     return () => observer.disconnect();
-  }, [hidden, detailed]);
+  }, [hidden, detailed, replay]);
 
   useEffect(() => {
-    if (hidden) return;
+    if (hidden || replay) return;
     const controller = new AbortController();
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -42,8 +47,13 @@ export function RealVsSim({ detailed = false }: { detailed?: boolean }) {
     }
     void refresh();
     return () => { active = false; controller.abort(); clearTimeout(timer); };
-  }, [hidden]);
+  }, [hidden, replay]);
 
+  if (replay) return <aside aria-label="Replay disclosure" style={{ position: 'fixed', bottom: 12, right: 12, zIndex: 110,
+    maxWidth: 'calc(100vw - 48px)', padding: '10px 14px', background: '#302e24', color: '#f0d6a7',
+    border: '2px solid #d9af65', font: '13px/1.4 Avenir, sans-serif' }}>
+    <strong>REPLAY</strong> · saved synthetic run · no live call or money movement
+  </aside>;
   if (hidden) return null;
   return (
     <>

@@ -14,3 +14,6 @@ export * from './vendor';
 export * from './why';
 export * from './payments';
 export * from './spacetime-store';
+
+export type { ReplayRecording, ReplayFrame, ReplayHeader, ReplayState } from './replay/types';
+export { createReplayRecorder, parseReplay } from './replay/record';
