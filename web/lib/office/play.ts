@@ -33,6 +33,8 @@ export const TREASURY_DOOR: FloorPosition = [5, 1.15];
 /** Lobby counter (see the lobby footprint in officeColliders); hosts the read-only payment link. */
 export const PAYLINK_KIOSK: FloorPosition = [-4.4, 3.1];
 export const PAYLINK_RADIUS = 0.7;
+/** GX10 server room footprint: scene.tsx mounts ServerRoom here and Play makes it solid and interactable. */
+export const SERVER_ROOM = { position: [7.1, -0.8] as const, size: { width: 1.2, depth: 1.05 } } as const;
 
 export type Vec2 = readonly [x: number, z: number];
 export interface Box { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
@@ -44,6 +46,7 @@ export function rightOf(yaw: number): [number, number] { return [Math.cos(yaw), 
 function box(x: number, z: number, width: number, depth: number): Box {
   return { minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 };
 }
+export const SERVER_ROOM_BOX: Box = box(SERVER_ROOM.position[0], SERVER_ROOM.position[1], SERVER_ROOM.size.width, SERVER_ROOM.size.depth);
 const DESKS = ["collections", "payables", "vendor_onboarding", "dana"] as const satisfies readonly AnchorId[];
 const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfies readonly AnchorId[];
 
@@ -156,13 +159,14 @@ export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: numb
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" } | { kind: "paylink" };
+export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" } | { kind: "paylink" } | { kind: "server" };
 export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
 export function targetKey(target: PlayTarget | null): string {
-  return !target ? "" : target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : target.kind;
+  if (!target) return "";
+  return target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : target.kind;
 }
 
-/** Agents at their drawn (motion) positions, each visible desk at its room centre, the Treasury door and the lobby payment kiosk. */
+/** Agents at their drawn (motion) positions, each visible desk at its room centre, the Treasury door, the lobby payment kiosk and the GX10 server. */
 export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[]): PlayCandidate[] {
   const visible = new Set(rooms);
   return [
@@ -170,6 +174,7 @@ export function interactCandidates(agents: readonly { id: string; position: Vec2
     ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: DESK_RADIUS })),
     ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: DOOR_RADIUS }] : []),
     ...(visible.has("lobby") ? [{ target: { kind: "paylink" } as const, position: PAYLINK_KIOSK, radius: PAYLINK_RADIUS }] : []),
+    { target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 },
   ];
 }
 
@@ -242,25 +247,24 @@ export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPan
       entries: entries(snapshot, row => row.seatId === target.room),
     };
   }
-  if (target.kind === "treasury") {
-    const denial = matchingDenial(snapshot, "treasury");
-    const row = denial && snapshot.audit.find(entry => entry.id === denial.auditId);
-    return {
-      kind: "treasury", title: OFFICE_ANCHORS.treasury.name, locked: "Locked · Dana only",
-      denial: row ? { id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds } : undefined,
-      entries: [],
-    };
-  }
-  target.kind satisfies "paylink";
-  return { kind: "paylink", title: "Payment link kiosk", entries: [] };
+  // Live GX10 numbers are not in the snapshot; the dialog reads them from GET /api/gx10.
+  if (target.kind === "server") return { kind: "server", title: "GX10 server", entries: [] };
+  if (target.kind === "paylink") return { kind: "paylink", title: "Payment link kiosk", entries: [] };
+  const denial = matchingDenial(snapshot, "treasury");
+  const row = denial && snapshot.audit.find(entry => entry.id === denial.auditId);
+  return {
+    kind: "treasury", title: OFFICE_ANCHORS.treasury.name, locked: "Locked · Dana only",
+    denial: row ? { id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds } : undefined,
+    entries: [],
+  };
 }
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {
   if (target.kind === "agent") return `Talk to ${snapshot.agents.find(row => row.id === target.id)?.name ?? target.id}`;
   if (target.kind === "desk") return target.room === "dana" ? `Inspect ${OFFICE_ANCHORS.dana.name}` : `Inspect ${OFFICE_ANCHORS[target.room].name} desk`;
-  if (target.kind === "treasury") return "Treasury door";
-  target.kind satisfies "paylink";
-  return "Scan to pay · payment link kiosk";
+  if (target.kind === "server") return "Check GX10 server";
+  if (target.kind === "paylink") return "Scan to pay · payment link kiosk";
+  return "Treasury door";
 }
 
 /** What the lazy scene needs from Office to run Play; `hud` receives data-player-* attributes. */
