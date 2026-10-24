@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-type Delivery = { code: string; url: string; amountCents: number; expiresAt: number; qr: string; localOnly?: boolean };
+type Delivery = { code: string; url: string; amountCents: number; expiresAt: number; qr: string; localOnly?: boolean; bankLine?: string };
 /** Read-only projection. Mount in office/lobby; no server secrets or payment authority. */
 export default function PaymentLinkPanel() {
   const [delivery, setDelivery] = useState<Delivery | null>(null);
@@ -30,7 +30,7 @@ export default function PaymentLinkPanel() {
       <p>Code: <strong>{active.code}</strong></p>
       <a href={active.url} rel="noreferrer" style={{ color: "#9dc2ff", overflowWrap: "anywhere" }}>{active.url}</a>
       <p>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(active.amountCents / 100)} · Expires {new Date(active.expiresAt).toLocaleTimeString()}</p>
-      <p>Nessie sandbox · simulated card</p>
+      {active.bankLine ? <p>{active.bankLine}</p> : null}
     </> : <p role="status">Waiting for an authorized payment plan…</p>}
   </section>;
 }
