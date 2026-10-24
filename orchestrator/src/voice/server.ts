@@ -47,7 +47,9 @@ const response = (body: unknown, status = 200) => Response.json(body, { status, 
 const safeStops = ['record_opt_out', 'request_human', 'mark_dispute', 'report_already_paid'];
 
 export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret: string; toolSecret: string; gatewaySecret: string;
-  gateway: (tool: string, request: Request) => Promise<Response>; agentId?: string }) {
+  gateway: (tool: string, request: Request) => Promise<Response>; agentId?: string;
+  /** Gateway call id (voice session id), not the provider call id. Closes that call's open approvals. */
+  onCallEnded?: (gatewayCallId: string) => Promise<void> }) {
   if (![options.eventSecret, options.toolSecret, options.gatewaySecret].every(s => s.length > 0)) throw new Error('VOICE_SECRETS_REQUIRED');
   const forward = async (tool: string, body: Record<string, unknown>) => {
     const r = await options.gateway(tool, new Request(`https://gateway.internal/api/tools/${tool}`, {
@@ -103,7 +105,10 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
               }
             }
           }
-          if (body.type === 'call_completed' || body.type === 'call_failed') session.stopped = true;
+          if (body.type === 'call_completed' || body.type === 'call_failed') {
+            session.stopped = true;
+            await options.onCallEnded?.(session.id);
+          }
           data.events.push({ id: body.webhook_request_id as string, type: String(body.type), callId: body.call_id as string, at: new Date().toISOString() });
           return response({ ok: true });
         }

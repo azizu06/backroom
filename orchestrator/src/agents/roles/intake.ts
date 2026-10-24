@@ -15,6 +15,8 @@ export interface IntakePorts {
   /** Request-only ControllerPort, normally controllerForLease(); never approval authority. */
   controller: ControllerPort;
   classify?: (ctx: ToolContext, item: FinanceInboxItem) => Promise<Classification>;
+  /** Trusted server narration only; retains judge attribution and grants no effect authority. */
+  judgeNarration?: boolean;
   now?: () => number;
 }
 
@@ -63,8 +65,8 @@ export async function createIntakeSpecialist(ctx: ToolContext, ports: IntakePort
   await ctx.assertCurrent();
   const item = loaded?.id === itemRef ? loaded : undefined;
   // Metadata belongs to the storage adapter, never to the model or classifier.
-  const reason = item?.source === 'judge' ? 'judge_input' :
-    !item || item.source !== 'seed' || !['email', 'invoice'].includes(item.kind) ||
+  const reason = item?.source === 'judge' && !ports.judgeNarration ? 'judge_input' :
+    !item || (item.source !== 'seed' && !(ports.judgeNarration && item.source === 'judge')) || !['email', 'invoice'].includes(item.kind) ||
     !validDomain(item.senderDomain) || typeof item.text !== 'string' || item.text.length > 32000 ? 'unrecognized_input' :
     !item.text.trim() && !item.attachment ? 'missing_document' : undefined;
   const classify = ports.classify ?? createIntakeClassifier();
