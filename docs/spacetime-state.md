@@ -1,6 +1,6 @@
 # Full SpacetimeDB state: local evidence
 
-Verified 2026-10-24 around 01:43 PDT, after integrating main through `2974dd6`.
+Verified 2026-10-24 around 01:45 PDT, after integrating main through `952b2c7`.
 This extends the original T8 spike; it does not replace its historical evidence.
 Setup, table visibility, reducer signatures and UI subscription mapping are in
 [`spacetime/README.md`](../spacetime/README.md).
@@ -12,14 +12,14 @@ API, bank or paid service is contacted by this lane.
 
 | Check | Observed result |
 | --- | --- |
-| `pnpm -r test` | 422 passing at the integrated candidate; the subsequent FIFO regression adds one module test (423 total) |
+| `pnpm -r test` | 439 passing at the integrated candidate |
 | `pnpm --filter @backroom/spacetime test:contract` | 79 existing state/audit/real-policy/recovery/LLM-OFF/approval/gateway/core-demo tests pass through actual WASM reducers and the durable adapter |
 | `pnpm --filter @backroom/spacetime test` | 14 module tests pass, including database-time fencing, cross-badge writes, AP approval/receipt requirements, stale vendor context, fixture seed replay and FIFO claims |
 | `pnpm -r build`, `pnpm -r typecheck` | Pass, including `/office`, `/audit`, `/t8` and generated client reexports |
 | `tsc --project spacetime/tsconfig.tests.json --noEmit` | Scripts and test-harness types pass |
 | `SPACETIME_LIVE=1 pnpm state:live` | Pass on actual standalone server and generated WebSocket client |
-| Anonymous office subscription | Saw Dana target and all 29 collection audit entries; maximum local row-to-client callback latency **5 ms**; server result view remained empty |
-| Collection audit parity | All **29** audit bodies equal memory replay; only timestamps and their derived hashes differ; both original hash chains verify |
+| Anonymous office subscription | Saw Dana target and all 31 collection audit entries; maximum local row-to-client callback latency **4 ms**; server result view remained empty |
+| Collection audit parity | All **31** audit bodies equal memory replay; only timestamps and their derived hashes differ; both original hash chains verify |
 | Cross-client model switch | OFF aborts the peer's old signal, ON creates a fresh signal, old generation remains fenced |
 | New client after close | Reads completed task and verifies the persisted chain |
 | Anonymous writer | Rejected with `CONTROLLER_REQUIRED` |
@@ -41,7 +41,7 @@ errors are translated to `SenderError` instead of becoming opaque runtime faults
 
 Maincloud remains deferred: T8's local-only token produced 401 `InvalidSignature`,
 and browser login is still needed. No new hosted attempt or hosted latency is
-claimed. The 5 ms result measures local client callbacks, not DOM commit or a
+claimed. The 4 ms result measures local client callbacks, not DOM commit or a
 networked venue deployment. The office can consume the public tables through the
 new shared bindings; its `OfficeState` producer still needs that integration.
 
