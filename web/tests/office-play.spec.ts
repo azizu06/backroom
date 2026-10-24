@@ -212,6 +212,53 @@ test('play mode walks to the GX10 server room and reads live telemetry read-only
   expect(errors).toEqual([]);
 });
 
+test('play mode walks with a gamepad left stick and A does nothing when facing nothing', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  // Resource 401s from unauthenticated app endpoints are unrelated to the pad; script errors count.
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) consoleErrors.push(message.text()); });
+  await page.addInitScript(() => {
+    const pad = {
+      id: 'Fake standard pad', index: 0, connected: true, mapping: 'standard', timestamp: 0,
+      axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    };
+    const fake = window as unknown as { __pad: typeof pad; __padConnected: boolean };
+    fake.__pad = pad;
+    fake.__padConnected = false;
+    Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value: () => (fake.__padConnected ? [fake.__pad] : []) });
+  });
+  const errors = await startPlay(page);
+  const start = await player(page);
+  await page.evaluate(() => {
+    (window as unknown as { __padConnected: boolean }).__padConnected = true;
+    window.dispatchEvent(new Event('gamepadconnected'));
+  });
+
+  await page.evaluate(() => { (window as unknown as { __pad: { axes: number[] } }).__pad.axes[1] = -1; });
+  await page.waitForFunction(z => Number(document.querySelector<HTMLElement>('[data-player-z]')?.dataset.playerZ) < z - 0.1, start.z, { polling: 'raf' });
+  await page.evaluate(() => { (window as unknown as { __pad: { axes: number[] } }).__pad.axes[1] = 0; });
+  const moved = await player(page);
+  expect(moved.z).toBeLessThan(start.z - 0.1);
+  expect(Math.abs(moved.x - start.x)).toBeLessThan(0.05);
+  // Stick released: the player stops.
+  await page.waitForTimeout(300);
+  const stopped = await player(page);
+  await page.waitForTimeout(300);
+  expect((await player(page)).z).toBe(stopped.z);
+
+  const prompt = page.getByTestId('office-viewport').locator('.play-prompt');
+  await expect(prompt).toHaveText('');
+  const setA = (pressed: boolean) => page.evaluate(value => {
+    (window as unknown as { __pad: { buttons: { pressed: boolean }[] } }).__pad.buttons[0]!.pressed = value;
+  }, pressed);
+  await setA(true);
+  await page.waitForTimeout(300);
+  await setA(false);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(surface(page)).toBeVisible();
+  expect(errors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
 test.describe('play mode on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
