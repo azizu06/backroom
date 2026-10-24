@@ -1,5 +1,6 @@
 // Single local process: Next route chunks, seats, gateway and controller share globals.
 import next from 'next';
+import { demoBindHost } from '../tools/demo/host';
 import { createServer, request as proxyRequest } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -91,7 +92,7 @@ async function main() {
     res.once('finish', settled); res.once('close', settled);
     try { await handle(req, res); } catch { if (!res.headersSent) res.writeHead(500); res.end('Demo request failed'); }
   });
-  server.listen(port, '127.0.0.1');
+  server.listen(port, demoBindHost(process.env), () => console.log(`Demo bound: ${demoBindHost(process.env)}:${port}`));
   let closing = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
     if (closing) return; closing = true;

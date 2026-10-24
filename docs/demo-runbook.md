@@ -322,3 +322,95 @@ The [one-item live smoke receipt](evidence/burst/smoke.json) measured 3.24 secon
 and one simulated payment on `gpt-oss:20b`. It is a connectivity/path smoke, not
 a 925-item throughput result. The runner's `tokensPerSecond` includes input plus
 output; `outputTokensPerSecond` isolates generated output.
+
+## GX10 production host and warm Mac fallback (Refs #29 #32)
+
+`pnpm demo:up:gx10` bootstraps private Linux ARM64 tools, clones/fetches clean
+`main` into `~/work/backroom-judge-host/app`, installs the lockfile, runs
+`pnpm -r build`, then starts the existing detached demo supervisor. SSH logout
+leaves it running. No sudo, system services, shared jobs or Ollama changes.
+`GX10_HOST` selects the SSH alias; `GX10_DEPLOY_DIR=work/<name>` selects a different
+owned directory. `GX10_REF` is for explicitly testing a candidate branch; the
+judging default is `main`. A running host is reused without updating its checkout;
+stop it before deploying a new release. Dirty tracked files fail closed.
+
+```sh
+pnpm demo:up:gx10
+pnpm demo:health:gx10 --live
+pnpm demo:down:gx10
+```
+
+The wrapper reads Mac Keychain item `backroom-anthropic-key` and transfers it over
+SSH stdin to private `~/work/backroom-judge-host/anthropic.env` (0600). The key is
+never printed, passed in command arguments, added to the shared team env, or
+copied into the app's `.env.local`. Sponsor settings come from the GX10 team env.
+Keep `host.env` and `state.env` under that same private host directory, mode 0600;
+they are dotenv data, never sourced shell scripts. Inspect private host logs on
+the GX10 (`build.log`, `install.log`, `app/.demo/*.log`); do not paste raw logs.
+
+`host.env` selects the real sandbox adapter path and receiver (no dial):
+
+```dotenv
+DEMO_LIVE=1
+DEMO_VOICE=1
+```
+
+Voice setup creates/updates this checkout's private Cartesia agent/tools, then
+starts the receiver. It never invokes `dial`. Receiver and control listeners
+remain loopback-only. Its file-backed gateway is still separate from the web
+StateStore; hosting does not prove phone → passkey → payment integration.
+
+Web binds **100.117.44.20:3340**, local fallback DB **100.117.44.20:3341**,
+voice **127.0.0.1:3342**. Startup prints `ss -ltn`; the runner checks each selected
+port before launch. The quick tunnel forwards HTTPS pages and `/_cartesia/*` to
+web. From the Mac, use the printed Tailscale `/office` URL when the DB is local:
+a public HTTPS office cannot subscribe to an insecure private `ws://` DB. Phone
+approval/pay pages use the HTTPS tunnel and server APIs. Maincloud uses WSS and
+makes the public office subscription accessible too.
+
+If the Maincloud worker has published a **fresh database for this host**, place
+its private settings in `~/work/backroom-judge-host/state.env`:
+
+```dotenv
+DEMO_STATE_REMOTE=1
+STATE_STORE=spacetime
+SPACETIMEDB_URI=wss://maincloud.spacetimedb.com
+SPACETIMEDB_DATABASE=<fresh host database>
+SPACETIMEDB_TOKEN=<private publisher token>
+```
+
+The host never publishes/deletes/resets external databases. `demo:reset` returns
+409 in this mode. Seed is idempotent, so restarting against an already advanced
+scripted database is not a clean rehearsal; obtain a fresh one from the state
+operator. Without `state.env`, the host owns its own GX10 SpacetimeDB server and
+fresh `backroom-demo-*` database. Never point two hosts at the same demo database.
+
+### Switch in under one minute
+
+Prepare the Mac **before** judging: install dependencies and SpacetimeDB 2.13.0,
+copy sponsor env privately as in AGENTS.md, build once with `pnpm -r build`, then
+keep a separate warm standby running:
+
+```sh
+DEMO_PREBUILT=1 DEMO_PORT=3350 DEMO_STATE_PORT=3351 VOICE_PORT=3352 pnpm demo:up
+```
+
+This standby uses a separate local database, mock bank, LLM OFF, and its own
+quick tunnel. Save both hosts' printed public URLs and enroll Dana's passkey on
+each origin in advance. The standby's preview is deliberately labeled; a switch
+must disclose the mock-bank/OFF mode. For live sandbox parity, explicitly prepare
+`DEMO_LIVE=1` on that standby too and check its actual receipts before the take;
+that may start its one capped Apify request. Never let two receiver writers use
+the same `.env.voice` directory.
+
+1. If GX10 degrades, open the already-warm Mac `/office` and the saved Mac public
+   approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
+   credential copy or passkey registration belongs in this minute.
+2. For fresh seeded links, run `pnpm demo:reset` on the **local** standby, then
+   reopen its printed links (the approval expires after 60 seconds).
+3. When GX10 health recovers, switch back to its saved URLs after a read-only
+   health check. Do not stop/restart either origin during a live take.
+
+This is a URL/origin switch, not transparent failover. Process-local finance and
+voice state do not migrate. Complete an in-flight approval/payment on its original
+host; never replay a possibly completed bank operation on the fallback.
