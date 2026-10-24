@@ -1,0 +1,87 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { createNorthfieldRepository, getStateStore, PayablesSeat, processInbox, VendorSeat,
+  type InboxOptions, type InvoiceFields, type StateStore, type VendorFields } from '@backroom/orchestrator';
+
+import { matchPreset, presetFields } from './presets';
+
+const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+
+const LIMIT = 4 * 1024 * 1024;
+
+/** Public synthetic judge intake: no payment adapter, approval writes, or live vendor checks. */
+export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute'] } = {}) {
+  return async (request: Request) => {
+    if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'Origin rejected.' }, 403);
+    if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) return json({ error: 'Use the inbox form.' }, 415);
+    if (Number(request.headers.get('content-length')) > LIMIT + 64000) return json({ error: 'Attachment must be 4 MB or smaller.' }, 413);
+    let form: FormData;
+    try {
+      // Bound the entire body even for chunked uploads without Content-Length.
+      const reader = request.body?.getReader();
+      if (!reader) return json({ error: 'Empty submission.' }, 400);
+      const chunks: Uint8Array[] = []; let size = 0;
+      while (true) {
+        const chunk = await reader.read(); if (chunk.done) break;
+        size += chunk.value.byteLength;
+        if (size > LIMIT + 64000) { await reader.cancel(); return json({ error: 'Submission too large.' }, 413); }
+        chunks.push(chunk.value);
+      }
+      form = await new Response(Buffer.concat(chunks), { headers: { 'Content-Type': request.headers.get('content-type')! } }).formData();
+    } catch { return json({ error: 'Could not read the submission.' }, 400); }
+    const text = form.get('text'), kind = form.get('kind'), sender = form.get('senderDomain');
+    if (typeof text !== 'string' || text.length > 32000 || !['email', 'invoice'].includes(String(kind)) ||
+        typeof sender !== 'string' || sender.length > 253) return json({ error: 'Check the document type, sender domain, and text (32,000 characters maximum).' }, 400);
+    const upload = form.get('attachment');
+    if (upload && !(upload instanceof File)) return json({ error: 'Invalid attachment.' }, 400);
+    const file = upload instanceof File && upload.size ? upload : undefined;
+    if (file && (file.size > LIMIT || !['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(file.type))) return json({ error: 'Choose a PDF, PNG, JPEG, or WebP up to 4 MB.' }, 400);
+    if (!text.trim() && !file) return json({ error: 'Type a scenario or choose an attachment.' }, 400);
+    try {
+      const state = (options.store ?? getStateStore)();
+      const id = `judge:${randomUUID()}`;
+      let seat: 'payables' | 'vendor_onboarding' = 'payables';
+      let fields: InvoiceFields | VendorFields | null = null;
+      const controller: InboxOptions['controller'] = { async request(decision, refs) {
+        const escalation = await state.createCallEscalation({ id: `review:${id}`, taskId: id,
+          fromAgent: `intake:${id}`, seat, toHuman: decision.toHuman, ruleIds: decision.ruleIds,
+          evidenceRefs: refs, policyVersion: decision.policyVersion, quote: decision.quote }, Date.now());
+        return escalation.id;
+      } };
+      const repository = await createNorthfieldRepository();
+      const shared = { state, controller, repository };
+      const payables = new PayablesSeat(shared);
+      const vendor = new VendorSeat({ ...shared, checks: {
+        business: async () => ({ verified: false, evidenceRef: 'unconfigured:crs' }),
+        ofac: async () => ({ status: 'unknown', evidenceRef: 'unconfigured:ofac' }),
+        footprint: async () => ({ websiteReachable: false, listingOperating: false, domain: 'unknown.invalid', evidenceRef: 'unconfigured:apify' }),
+      } });
+      const preset = !file && matchPreset(form.get('presetId'), String(kind), sender, text);
+      if (preset && preset.id === '4419') {
+        // P02's frozen precondition isolates the duplicate from Acme's independent bank-change trap.
+        const vendor = await repository.getVendor('acme');
+        if (vendor) await repository.saveVendor({ ...vendor, pendingBankChange: false });
+      }
+      const source = { id, source: 'judge' as const, senderDomain: sender.trim().toLowerCase() };
+      const seeded = preset ? presetFields(preset) : undefined;
+      if (seeded) { fields = seeded; seat = seeded.kind === 'invoice' ? 'payables' : 'vendor_onboarding'; }
+      const result = seeded ? seeded.kind === 'invoice' ? await payables.process(seeded, source) : await vendor.propose(seeded, source) : await processInbox({ id, source: 'judge', kind: kind as 'email' | 'invoice',
+        senderDomain: sender.trim().toLowerCase(), text: file ? '' : text }, {
+        state, controller, modelRoute: options.modelRoute,
+        payables: { process: async (value, source) => { fields = value; seat = 'payables'; return payables.process(value, source); } },
+        vendor: { propose: async (value, source) => { fields = value; seat = 'vendor_onboarding'; return vendor.propose(value, source); } },
+      });
+      const attachment = file ? { name: file.name.slice(0, 200), type: file.type, size: file.size,
+        sha256: createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex') } : null;
+      const entry = await state.appendAudit({ ts: Date.now(), actor: 'code', seat, action: 'judge_inbox_decision',
+        decision: result.decision.kind, ruleIds: result.decision.ruleIds, policyVersion: result.decision.policyVersion,
+        refs: [id, ...result.evidenceRefs, ...(result.escalationId ? [result.escalationId] : [])], route: 'code', latencyMs: 0, costUsd: 0,
+        inputs: { scenario_source: 'judge', extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized', decision: result.decision, fields, attachment,
+          text, senderDomain: sender, kind, attachmentParsed: false } });
+      return json({ id, scenario_source: 'judge', seat, fields, ...result, attachment,
+        extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
+        notice: file ? 'Attachment fingerprint recorded. File contents are not parsed or retained; held for human review. Paste the relevant text to test extraction.'
+          : 'Synthetic Northfield company. No bank debit or live vendor verification is configured. Approvals require the controller’s passkey.',
+        auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay` });
+    } catch { return json({ error: 'Intake could not record a decision. Try again; no payment was submitted.' }, 503); }
+  };
+}
