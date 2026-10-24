@@ -19,11 +19,33 @@ async function main() {
   let resetting = false;
   const server = createServer(async (req, res) => {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
-    if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end('demo mock bank; ' + process.env.STATE_STORE + ' state'); return; }
+    if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end(`demo ${runtime.status().bank}; ${process.env.STATE_STORE} state`); return; }
     if (path.startsWith('/__demo/')) {
       const actual = Buffer.from(req.headers.authorization || ''), expected = Buffer.from(`Bearer ${process.env.DEMO_CONTROL_SECRET}`);
       if (!process.env.DEMO_CONTROL_SECRET || actual.length !== expected.length || !timingSafeEqual(actual, expected)) { res.writeHead(401).end(); return; }
       res.setHeader('Cache-Control', 'no-store'); res.setHeader('Content-Type', 'application/json');
+      if (path === '/__demo/health' && req.method === 'GET') {
+        res.end(JSON.stringify(await runtime.health())); return;
+      }
+      if (path === '/__demo/voice-call' || path === '/__demo/voice-client-stopped') {
+        // Tunnel requests also arrive on loopback: require the private Host as well.
+        if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '')
+          || req.headers.host !== `127.0.0.1:${port}`) { res.writeHead(403).end('{}'); return; }
+        try {
+          if (path.endsWith('voice-client-stopped') && req.method === 'GET') {
+            res.end(JSON.stringify({ stopped: await runtime.clientStopped() })); return;
+          }
+          if (path.endsWith('voice-call') && req.method === 'POST') {
+            let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 1024) throw new Error('TOO_LARGE'); }
+            const body = JSON.parse(raw);
+            if (!body || Object.keys(body).length !== 1 || typeof body.sessionId !== 'string') throw new Error('INVALID_SESSION');
+            await runtime.registerVoiceCall(body.sessionId);
+            res.end('{"ok":true}'); return;
+          }
+          res.writeHead(405).end('{}');
+        } catch { res.writeHead(409).end('{"error":"VOICE_REGISTRATION_FAILED"}'); }
+        return;
+      }
       if (path === '/__demo/status' && req.method === 'GET') {
         try { await runtime.check();
           let voice = false;
@@ -75,7 +97,7 @@ async function main() {
     if (closing) return; closing = true;
     server.close(); void runtime.stop().then(() => app.close()).finally(() => process.exit(0));
   });
-  console.log('Demo ready: shared state, mock bank, no phone call placed.');
+  console.log(`Demo ready: shared state, ${runtime.status().bank}, no phone call placed.`);
 
 }
 main().catch(() => { console.error('DEMO_WEB_START_FAILED'); process.exit(1); });

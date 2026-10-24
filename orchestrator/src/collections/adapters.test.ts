@@ -38,3 +38,10 @@ describe('pre-call integration adapters', () => {
     expect(result.signals[0]).not.toHaveProperty('rawHtml');
   });
 });
+
+it.each(['crs_fixture', 'crs_sandbox'] as const)('rejects %s FAKE evidence at the legacy credit boundary', source => {
+  const fakeEvidence = (product: 'businessCredit' | 'ofac') => ({ ...evidence(product), source, label: 'FAKE: CRS fixture, test identity #7' });
+  // Structural client accepts the fixture source so the boundary can explicitly reject it.
+  const client = { getBusinessCreditReport: async () => fakeEvidence('businessCredit'), checkOfac: async () => fakeEvidence('ofac') };
+  return expect(createCrsCreditCheck(client).check(7)).resolves.toMatchObject({ ofacStatus: 'unknown', evidence: [] });
+});
