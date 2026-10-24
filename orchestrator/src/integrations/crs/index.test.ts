@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CrsClient } from './index.js';
+import { CrsClient } from './index';
 
 describe('CRS authentication (public OpenAPI UserLoginRespDTO)', () => {
   it('shares a login across concurrent callers and never returns credentials', async () => {

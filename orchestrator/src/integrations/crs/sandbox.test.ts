@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CrsClient } from './index.js';
-import { CRS_CALHACKS_PERSONAS, CRS_CALHACKS_SANDBOX, CRS_SANDBOX_EXPECTED, CRS_SANDBOX_IDENTITIES, createCrsClientFromEnv, createCrsFixtureClient, crsSandboxFixtureFetch } from './sandbox.js';
+import { CrsClient } from './index';
+import { CRS_CALHACKS_PERSONAS, CRS_CALHACKS_SANDBOX, CRS_SANDBOX_EXPECTED, CRS_SANDBOX_IDENTITIES, createCrsClientFromEnv, createCrsFixtureClient, crsSandboxFixtureFetch } from './sandbox';
 
 // Product responses are shaped from the CRS guides (PitchPoint XML-named counts, AtData risk.score);
 // they are NOT recorded vendor responses. A live probe (pnpm crs:live) is still required for T3.

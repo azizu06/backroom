@@ -7,8 +7,8 @@
  *   - fraudRisk: Fraud Finder (AtData) email risk (vendor bank-change verification)
  * Routes and bodies come from @crscreditapi/crs-calhacks-mcp-server@1.1.2 (guides + test data).
  */
-import { CrsClient, type CrsOptions, type CrsProductAdapter, type CrsSandboxIdentity, type CrsSummary } from './index.js';
-import { CRS_CALHACKS_PERSONAS } from './personas.js';
+import { CrsClient, type CrsOptions, type CrsProductAdapter, type CrsSandboxIdentity, type CrsSummary } from './index';
+import { CRS_CALHACKS_PERSONAS } from './personas';
 
 export { CRS_CALHACKS_PERSONAS };
 export const CRS_SANDBOX_SOURCE = '@crscreditapi/crs-calhacks-mcp-server@1.1.2 test-data/personas.json';
