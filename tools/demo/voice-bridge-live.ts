@@ -1,4 +1,4 @@
-/** Opt-in, no-dial/read-only smoke for an already-running owned demo. No provider request. */
+/** Opt-in, no-dial synthetic context-read smoke. Records one gateway delivery; no provider request. */
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -22,22 +22,22 @@ async function main() {
   const bridge = createDemoVoiceBridge({ port, controlSecret: owner.token, publicOrigin: status.publicUrl });
   const stopped = await bridge.clientStopped();
   if (typeof stopped !== 'boolean') throw new Error('VOICE_ADMIN_RESPONSE_INVALID');
-  const invocation = { call_id: `health-unknown-${randomUUID()}`, webhook_request_id: randomUUID() };
+  const invocation = { call_id: 'demo-collections-1042', webhook_request_id: randomUUID() };
   const toolResponse = await bridge.gateway('get_invoice_context', new Request('https://probe.invalid/api/tools/get_invoice_context', {
     method: 'POST', headers: { authorization: `Bearer ${process.env.TOOL_GATEWAY_SECRET}`, 'content-type': 'application/json' }, body: JSON.stringify(invocation),
   }));
   const tool = await toolResponse.json();
-  if (toolResponse.status !== 404 || tool.error !== 'CALL_NOT_FOUND') throw new Error('VOICE_BRIDGE_GATEWAY_FAILED');
+  if (toolResponse.status !== 200 || tool.kind !== 'CONTEXT' || tool.invoice_id !== '1042') throw new Error('VOICE_BRIDGE_GATEWAY_FAILED');
   const callback = await fetch(`${status.publicUrl}/api/voice/tools/get_invoice_context`, {
     method: 'POST', headers: { authorization: `Bearer ${process.env.VOICE_TOOL_SECRET}`, 'content-type': 'application/json' },
-    body: JSON.stringify(invocation), signal: AbortSignal.timeout(10000),
+    body: JSON.stringify({ ...invocation, call_id: `health-unknown-${randomUUID()}` }), signal: AbortSignal.timeout(10000),
   });
   const callbackBody = await callback.json();
   if (callback.status !== 404 || callbackBody.error !== 'SESSION_NOT_FOUND') throw new Error('VOICE_CALLBACK_SESSION_GATE_FAILED');
   const proof = { measuredAt: new Date().toISOString(), bindHost: new URL(status.localUrl).hostname,
-    privateVoiceClientStopped: 'authenticated boolean response over loopback', externalPrivateAdmin: '403 on non-loopback socket', bridgeGateway: '404 CALL_NOT_FOUND (authorized; unknown synthetic call)',
+    privateVoiceClientStopped: 'authenticated boolean response over loopback', externalPrivateAdmin: new URL(status.localUrl).hostname === '127.0.0.1' ? 'not applicable (loopback-only bind)' : '403 on non-loopback socket', bridgeGateway: '200 CONTEXT (authorized; seeded synthetic invoice 1042 read)',
     publicVoiceToolCallback: '404 SESSION_NOT_FOUND (authorized; unknown synthetic session)',
-    scope: 'No registration, dial, provider request, payment or existing call mutation. Both handler/auth gates exercised; this is not a live call receipt.' };
+    scope: 'Records one synthetic gateway delivery receipt. No registration, dial, provider request, approval/payment or live-call mutation. Both handler/auth gates exercised; this is not a live call receipt.' };
   writeFileSync('.demo/voice-bridge-live.json', JSON.stringify(proof, null, 2) + '\n', { mode: 0o600 });
   console.log(JSON.stringify(proof, null, 2));
 }

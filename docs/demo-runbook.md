@@ -467,8 +467,9 @@ After a host/listener change, exercise the authenticated bridge as well as healt
 ssh gx10 'cd ~/work/backroom-judge-host/app; PATH="$HOME/work/backroom-judge-host/.runtime/bin:$PATH" node --import ./orchestrator/node_modules/tsx/dist/loader.mjs tools/demo/voice-bridge-live.ts --confirm-owned-demo'
 ```
 
-This calls the private loopback client-stop read and an authenticated gateway tool
-for a deliberately unknown synthetic call (404 `CALL_NOT_FOUND`), plus the signed
+This calls the private loopback client-stop read and an authenticated
+`get_invoice_context` for seeded synthetic invoice 1042 (200 `CONTEXT`), plus the signed
 public voice-tool callback for an unknown session (404 `SESSION_NOT_FOUND`). It
-never registers a call, dials, pays, or contacts a provider. A relay `/health` or
+records one synthetic gateway delivery receipt but never registers a call, dials,
+approves, pays, mutates a live call, or contacts a provider. A relay `/health` or
 unsigned 401 alone does not prove bridge → web connectivity.
