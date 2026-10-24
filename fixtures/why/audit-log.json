@@ -1,0 +1,7 @@
+[
+  {"id":"212","actor":"code","seat":"payables","action":"detect_duplicate","outcome":"held","policyVersion":1,"ruleIds":["DUPLICATE_INVOICE"],"evidenceRefs":["invoice:4419","invoice:4402","vendor:acme","line-items:acme-4402"],"inputs":{"invoiceId":"4419","relatedInvoiceId":"4402","vendorId":"acme","amountDelta":37}},
+  {"id":"213","actor":"code","seat":"payables","action":"hold_invoice","outcome":"escalated","policyVersion":1,"ruleIds":["DUPLICATE_INVOICE"],"evidenceRefs":["invoice:4419","invoice:4402","controller:dana"],"inputs":{"invoiceId":"4419","relatedInvoiceId":"4402","vendorId":"acme"}},
+  {"id":"214","actor":"code","seat":"payables","action":"hold_bank_change","outcome":"held","policyVersion":1,"ruleIds":["BANK_CHANGE_HOLD","LOOKALIKE_DOMAIN"],"evidenceRefs":["invoice:4471","vendor:acme","vendor-master:acme-bank"],"inputs":{"invoiceId":"4471","vendorId":"acme","senderDomain":"acme-supp1y.com","vendorDomain":"acme-supply.com","bankChanged":true}},
+  {"id":"215","actor":"code","seat":"collections","action":"propose_plan","outcome":"denied","policyVersion":1,"ruleIds":["FEES_NON_WAIVABLE"],"evidenceRefs":["invoice:1042","call:1042-plan"],"inputs":{"invoiceId":"1042","requestedInstallments":4,"maxInstallments":2}},
+  {"id":"216","actor":"code","seat":"collections","action":"escalate_plan","outcome":"escalated","policyVersion":1,"ruleIds":["MAX_INSTALLMENTS"],"evidenceRefs":["invoice:1042","controller:dana"],"inputs":{"invoiceId":"1042","requestedInstallments":4,"maxInstallments":2}}
+]

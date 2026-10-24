@@ -1,0 +1,5 @@
+[
+  {"question":"Why didn't you pay invoice #4419?","correctIds":["212","213"],"expectedFacts":["duplicate of #4402","amount changed by 37","held or escalated"],"modelAnswer":"Invoice #4419 was held as a duplicate of #4402 with a 37 amount difference [entry:212]. It was escalated to the controller [entry:213]."},
+  {"question":"Why was the bank change for invoice #4471 held?","correctIds":["214"],"expectedFacts":["bank differs from vendor master","lookalike sender acme-supp1y.com"],"modelAnswer":"The changed bank details and lookalike sender triggered BANK_CHANGE_HOLD and LOOKALIKE_DOMAIN [entry:214]."},
+  {"question":"Why was the collections plan for invoice #1042 escalated?","correctIds":["215","216"],"expectedFacts":["four requested installments exceed limit of two","late fee cannot be waived","controller escalation"],"modelAnswer":"The late-fee waiver was denied [entry:215]. Four installments exceeded the limit of two, so the plan was escalated to the controller [entry:216]."}
+]
