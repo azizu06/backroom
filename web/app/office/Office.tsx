@@ -9,7 +9,7 @@ import { OfficeScene, ROOM_IDS, type RoomLabels } from './scene';
 import '../office.css';
 
 type ViewMode = 'walk' | 'tween' | 'plan';
-function PlanAgent({ agent }: { agent: OfficeAgent }) {
+function PlanAgent({ agent, recorded }: { agent: OfficeAgent; recorded: boolean }) {
   const marker = useRef<HTMLDivElement>(null);
   const motion = useRef(new WalkMotion(agent.pos));
   useEffect(() => { motion.current.moveTo(agent.targetAnchor); }, [agent.targetAnchor]);
@@ -17,7 +17,7 @@ function PlanAgent({ agent }: { agent: OfficeAgent }) {
     let frame = 0;
     let previous = performance.now();
     function draw(now: number) {
-      motion.current.advance((now - previous) / 1000); previous = now;
+      if (!recorded) motion.current.advance((now - previous) / 1000); previous = now;
       if (marker.current) {
         marker.current.style.left = `${50 + motion.current.position[0] / 16 * 100}%`;
         marker.current.style.top = `${50 + motion.current.position[1] / 11 * 100}%`;
@@ -26,7 +26,8 @@ function PlanAgent({ agent }: { agent: OfficeAgent }) {
     }
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [recorded]);
+  useEffect(() => { if (recorded) motion.current.position.splice(0, 2, ...agent.pos); }, [recorded, agent.pos]);
   return <div ref={marker} className='plan-agent' data-escalating={!!agent.escalationId}>
     {agent.escalationId && <span aria-label='Escalation folder'>▱ </span>}{agent.name}
   </div>;
@@ -39,7 +40,7 @@ function FloorPlan({ snapshot, select }: { snapshot: OfficeSnapshot; select: (ro
       {OFFICE_ANCHORS[room].name}{room === 'treasury' && ' · Locked'}
       {matchingDenial(snapshot, room) && <span className='denial-text'>Entry denied</span>}
     </button>)}
-    {snapshot.agents.map(agent => <PlanAgent key={agent.id} agent={agent} />)}
+    {snapshot.agents.map(agent => <PlanAgent key={agent.id} agent={agent} recorded={snapshot.connection === 'replay'} />)}
   </div>;
 }
 class SceneBoundary extends Component<{ children: ReactNode; fallback: ReactNode; onFailure: () => void }, { failed: boolean }> {
@@ -93,7 +94,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
-        <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
+        <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
@@ -129,7 +130,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {OFFICE_ANCHORS[agent.targetAnchor].name}</span>}
       </div>)}</div>
       <section id='office-audit-wall' className='office-audit' aria-label='Office audit receipts' data-office-mount='audit-wall'>
-        {auditWall ?? <><h2>Lobby audit wall <span>{snapshot.connection === 'preview' ? 'Preview receipts' : 'Subscribed receipts'}</span></h2>
+        {auditWall ?? <><h2>Lobby audit wall <span>{snapshot.connection === 'preview' ? 'Preview receipts' : snapshot.connection === 'replay' ? 'REPLAY receipts' : 'Subscribed receipts'}</span></h2>
           {!snapshot.audit.length ? <p>No decisions received.</p> : <ol>{snapshot.audit.slice(-2).reverse().map(entry => <li key={entry.id}>
             <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br /><code>{entry.id} · {entry.ruleIds.join(', ')}</code>
           </li>)}</ol>}</>}
