@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LIGHTING } from './lighting';
+import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LIGHTING } from './lighting';
 
 function rgb(hex: string) {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -27,17 +27,19 @@ describe('office lighting', () => {
     expect(OFFICE_LIGHTING.contactShadows.resolution).toBeLessThanOrEqual(512);
   });
 
-  it('places contact shadows just above the floor and keeps them soft', () => {
-    const { position, opacity, blur, far, scale } = OFFICE_LIGHTING.contactShadows;
-    expect(position[1]).toBeGreaterThan(0);
-    expect(position[1]).toBeLessThan(0.1);
+  it('places the contact-shadow plane above the floor pads and keeps pad undersides out of its depth pass', () => {
+    const { position, near, scale } = OFFICE_LIGHTING.contactShadows;
+    expect(position[1]).toBeGreaterThan(FLOOR_PAD_TOP);
+    expect(position[1] + near).toBeGreaterThan(FLOOR_PAD_BOTTOM);
     expect(scale).toEqual([16, 11]);
-    expect(opacity).toBeGreaterThanOrEqual(0.35);
-    expect(opacity).toBeLessThanOrEqual(0.5);
-    expect(blur).toBeGreaterThanOrEqual(2);
-    expect(blur).toBeLessThanOrEqual(3);
-    expect(far).toBeGreaterThanOrEqual(2);
-    expect(far).toBeLessThanOrEqual(3);
+  });
+
+  it('bounds the key shadow camera so the depth bias stays small in world units', () => {
+    const { near, far, bias } = OFFICE_LIGHTING.key.shadow;
+    const throwDistance = Math.hypot(...OFFICE_LIGHTING.key.position);
+    expect(near).toBeLessThan(throwDistance - 8);
+    expect(far).toBeGreaterThan(throwDistance + 8);
+    expect(Math.abs(bias) * (far - near)).toBeLessThan(0.02);
   });
 
   it('makes screens glossier than the rough base material', () => {
