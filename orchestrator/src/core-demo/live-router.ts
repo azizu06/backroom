@@ -16,7 +16,7 @@ export function createGx10RehearsalRouter(state: StateStore, http: typeof fetch 
     return http(url, { ...init, body: JSON.stringify(body) });
   };
   const router = (model: string) => createRouter({ stateStore: state, localEnabled: false,
-    cloudBaseUrl: base, cloudApiKey: 'ollama', cloudModel: model,
+    cloudBaseUrl: base, cloudProvider: 'openrouter', cloudApiKey: 'ollama', cloudModel: model,
     cloudInputUsdPerMillion: 0, cloudOutputUsdPerMillion: 0, timeoutMs: 120000, fetch: guarded });
   const routine = router('gpt-oss:20b'), quality = router('gpt-oss:120b');
   return async (task, input, schema) => {

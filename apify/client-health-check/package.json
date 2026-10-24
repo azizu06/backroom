@@ -2,7 +2,7 @@
   "name": "backroom-client-health-check",
   "version": "0.0.1",
   "type": "module",
-  "description": "Unpublished T5 TypeScript Actor scaffold for Backroom",
+  "description": "Public business website checks and typed Maps and phone signals for Backroom",
   "engines": {
     "node": ">=22"
   },
@@ -32,7 +32,7 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run test/main.test.ts && node --experimental-strip-types --test src/signals.test.ts"
   },
   "author": "Backroom team",
   "license": "ISC"

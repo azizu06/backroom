@@ -50,7 +50,7 @@ Humans over agents. Only Aziz reassigns work between streams or people. If asked
 
 ## 6. LLM calls
 
-- OpenRouter by default (`OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`), **server-side only**, never in client code. Use a sponsor's own API only when its track requires it.
+- Anthropic is the primary cloud route, **server-side only**. For provider selection, personal key setup, pricing and the opt-in smoke, read `orchestrator/README.md` §Model router.
 - **$50 total budget.** Prototype on cheap models (e.g. `google/gemini-2.5-flash`, `openai/gpt-5-mini`); use a stronger model only for the demo run.
 - Shared GX10 Ollama over Tailscale: `http://100.117.44.20:11434/v1` (any non-empty key). Models: `qwen3:8b`, `gpt-oss:20b`, `qwen3-coder:30b`, `qwen2.5vl:7b`, `nomic-embed-text`. For cheap bulk work only; **not in the demo's critical path**. Four people share it.
 

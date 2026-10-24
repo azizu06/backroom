@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync, openSync, closeSync } from 'nod
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, expect, type Browser, type Page } from '@playwright/test';
 import { DbConnection } from '../../orchestrator/src/spacetime-client';
@@ -38,6 +39,8 @@ async function main() {
   const prefix = [`--root-dir=${cliRoot}`, `--config-path=${resolve(scratch, 'cli.toml')}`];
   const dbPort = await port(), webPort = await port();
   const uri = `ws://127.0.0.1:${dbPort}`, http = `http://127.0.0.1:${dbPort}`, base = `http://localhost:${webPort}`;
+  // The lobby audit wall is operator-gated (#82). Parity unlocks it the way a real operator does.
+  const operatorCode = randomBytes(24).toString('hex');
   const dbLog = openSync(resolve(scratch, 'server.log'), 'w');
   const server = spawn(cli, [...prefix, 'start', '--listen-addr', `127.0.0.1:${dbPort}`,
     '--data-dir', resolve(scratch, 'db'), '--in-memory', '--non-interactive'], { cwd: root, stdio: ['ignore', dbLog, dbLog] });
@@ -58,6 +61,7 @@ async function main() {
       web = spawn(process.execPath, [resolve(root, 'web/node_modules/next/dist/bin/next'), 'start', '--port', String(webPort)], {
         cwd: resolve(root, 'web'), stdio: ['ignore', log, log], env: { ...process.env,
           STATE_STORE: 'spacetime', SPACETIMEDB_URI: uri, SPACETIMEDB_DATABASE: database, SPACETIMEDB_TOKEN: token,
+          CONTROLLER_ENROLLMENT_SECRET: operatorCode, WEBAUTHN_ORIGIN: base, WEBAUTHN_RP_ID: 'localhost',
           GX10_ENABLED: 'false', OPENROUTER_API_KEY: '', BACKROOM_APPROVAL_DEMO: '', BACKROOM_PAYMENT_DEMO: '', BACKROOM_DEMO: '' },
       });
       closeSync(log);
@@ -66,10 +70,16 @@ async function main() {
     const open = async () => {
       const page = await browser!.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
       page.on('pageerror', error => errors.push(error.message));
-      page.on('request', request => { if (request.method() !== 'GET' && !request.url().includes('__next')) writes.push(`${request.method()} ${new URL(request.url()).pathname}`); });
+      page.on('request', request => { const path = new URL(request.url()).pathname;
+        // The read-only audit session cookie is the operator unlock, not a state write.
+        if (request.method() !== 'GET' && !request.url().includes('__next') && path !== '/api/audit/session') writes.push(`${request.method()} ${path}`); });
       await page.goto(`${base}/office`);
       await expect(page.locator('[data-connection="live"]')).toBeVisible();
       await expect(page.locator('canvas')).toBeVisible();
+      const lobby = page.locator('#office-audit-wall');
+      await lobby.getByLabel('Operator code').fill(operatorCode);
+      await lobby.getByRole('button', { name: 'Open audit wall' }).click();
+      await expect(lobby.getByText(/^Chain verified · \d+ entries$/)).toBeVisible();
       return page;
     };
     const caughtUp = async (page: Page, entries: AuditEntry[]) => {

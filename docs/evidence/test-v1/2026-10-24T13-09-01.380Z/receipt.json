@@ -1,0 +1,91 @@
+{
+  "measuredAt": "2026-10-24T13:09:20.972Z",
+  "steps": [
+    {
+      "name": "01-controller",
+      "detail": "Real verifier, Chromium software authenticator; no human biometrics"
+    },
+    {
+      "name": "02-four-payments",
+      "detail": "Four-payment escalation with immutable policy evidence"
+    },
+    {
+      "name": "03-denied",
+      "detail": "Passkey denial recorded while LLM OFF"
+    },
+    {
+      "name": "04-pay",
+      "detail": "Exact reconciliation; this web host uses mock Nessie HTTP transport"
+    },
+    {
+      "name": "05-inbox-4419",
+      "detail": "Frozen typed trap held by code with LLM OFF"
+    },
+    {
+      "name": "05-inbox-4471",
+      "detail": "Frozen typed trap held by code with LLM OFF"
+    },
+    {
+      "name": "06-audit-link",
+      "detail": "Inbox link opens its exact audit entry; full chain verifies"
+    },
+    {
+      "name": "07-ask-why-off",
+      "detail": "Cited deterministic answer; no model call"
+    },
+    {
+      "name": "08-real-vs-sim",
+      "detail": "Process observations, not a claim that separate live probes ran here"
+    },
+    {
+      "name": "09-policy-v2",
+      "detail": "Saved max 3; subsequent three-payment gateway request ALLOW"
+    },
+    {
+      "name": "10-office-orbit",
+      "detail": "Local loopback Spacetime subscription connected"
+    },
+    {
+      "name": "11-office-fixed",
+      "detail": "Fixed camera fallback"
+    },
+    {
+      "name": "11-room-lobby",
+      "detail": "Manual camera preset: Lobby"
+    },
+    {
+      "name": "11-room-collections",
+      "detail": "Manual camera preset: Collections"
+    },
+    {
+      "name": "11-room-payables",
+      "detail": "Manual camera preset: Payables"
+    },
+    {
+      "name": "11-room-vendor",
+      "detail": "Manual camera preset: Vendor Desk"
+    },
+    {
+      "name": "11-room-danas",
+      "detail": "Manual camera preset: Dana’s desk"
+    },
+    {
+      "name": "11-room-treasury",
+      "detail": "Manual camera preset: Treasury · Locked"
+    },
+    {
+      "name": "12-office-plan",
+      "detail": "Same subscribed state in 2D"
+    },
+    {
+      "name": "office-tour",
+      "detail": "Available modes: Orbit camera, Fixed camera, Floor plan"
+    }
+  ],
+  "errors": [],
+  "state": "spacetime",
+  "bank": "mock",
+  "llm": "OFF",
+  "passkey": "software test authenticator",
+  "phone": "not dialed"
+}
