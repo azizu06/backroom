@@ -56,7 +56,7 @@ Humans over agents. Only Aziz reassigns work between streams or people. If asked
 
 ## 7. Secrets
 
-Only in `.env` (gitignored; names in `.env.example`). Never in commits, Discord, logs, or board posts. Never print a key into a terminal or agent transcript.
+Team sponsor keys live in `/srv/team/backroom.env` on the GX10. From the repo root, copy them with `scp <your-gx10-user>@gx10:/srv/team/backroom.env .env.local` (or `ssh gx10 cat /srv/team/backroom.env > .env.local`). `.env.local` is gitignored. Never print, commit, or post the values; ask Aziz on the board (`@azizu06`) for a new key, and never paste one there. Next.js and the orchestrator should load these variables from `.env.local`.
 
 ## 8. Product rules
 
