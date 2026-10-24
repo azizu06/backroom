@@ -268,10 +268,10 @@ const lines = [
   '## Keyed AP items', '', '| Item | Invoice | Expected | Actual | Exact rule match |', '| --- | --- | --- | --- | --- |',
   ...gradedAP.map(row => `| ${row.id} | ${row.invoiceId} | ${row.expected} | ${row.actual} | ${row.exactRuleMatch ?? 'workflow gate'} |`), '',
 ];
-const out = join(root, 'docs/eval');
+const out = process.env.BACKROOM_REPORT_DIR || join(root, 'docs/eval');
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\n');
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
-console.log(JSON.stringify({ rates, gaps: gaps.length, output: 'docs/eval/scoreboard.{md,json}' }, null, 2));
+console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
 if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match)) process.exitCode = 1;
