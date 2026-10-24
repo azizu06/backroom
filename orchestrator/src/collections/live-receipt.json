@@ -1,0 +1,270 @@
+{
+  "measuredAt": "2026-10-24T08:02:23.377Z",
+  "services": {
+    "model": "live",
+    "crs": "fake",
+    "apify": "fake",
+    "dial": "none"
+  },
+  "latencyMs": 12695.892709,
+  "result": {
+    "status": "ready",
+    "envelope": {
+      "maxInstallments": 2,
+      "minFirstPct": 50,
+      "maxPlanDays": 30,
+      "feesWaivable": false,
+      "maxDiscountPct": 0,
+      "payInFull": true
+    },
+    "plan": {
+      "tone": "neutral",
+      "offerOrder": [
+        "pay_in_full",
+        "installments"
+      ],
+      "plan": {
+        "installments": 2,
+        "firstPaymentPct": 50,
+        "totalDays": 30,
+        "waiveFees": false,
+        "discountPct": 0
+      }
+    },
+    "summary": "Use a neutral tone. Give the fixed AI/business/recording disclosure; confirm identity before any invoice details. Offer payment in full; then 2 payments, 50% first, over 30 days, 0% discount, fees retained. Escalate exceptions to the controller; give the callback number and honor opt-out. No voice approvals.",
+    "healthCheckPending": false,
+    "route": "gx10_fallback",
+    "model": "gpt-oss:120b",
+    "evidenceRefs": [
+      "synthetic-client",
+      "synthetic-invoice",
+      "audit:1",
+      "audit:2",
+      "audit:3",
+      "audit:4",
+      "audit:5",
+      "audit:6",
+      "audit:7"
+    ]
+  },
+  "audit": [
+    {
+      "ts": 1792828930682,
+      "actor": "code",
+      "seat": "collections",
+      "action": "can_call",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "policyVersion": 1
+        }
+      },
+      "seq": 1,
+      "id": "audit:1",
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "b9618b5e4b99fe7542279db5a15bd4d0a2aef168252d351203e32b5c1259e908"
+    },
+    {
+      "ts": 1792828930682,
+      "actor": "code",
+      "seat": "collections",
+      "action": "credit_check",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "label": "SANDBOX: test identity #7",
+        "ofacStatus": "clear",
+        "evidence": []
+      },
+      "seq": 2,
+      "id": "audit:2",
+      "prevHash": "b9618b5e4b99fe7542279db5a15bd4d0a2aef168252d351203e32b5c1259e908",
+      "hash": "1ed578cec9860a5ab392bb56f252f2400c2f01331b70450f9f7b047a71c68122"
+    },
+    {
+      "ts": 1792828930682,
+      "actor": "code",
+      "seat": "collections",
+      "action": "health_check",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "status": "complete",
+        "signals": []
+      },
+      "seq": 3,
+      "id": "audit:3",
+      "prevHash": "1ed578cec9860a5ab392bb56f252f2400c2f01331b70450f9f7b047a71c68122",
+      "hash": "210bc8c97f0528f3a2f299ca72b77176f808b9bcccf26b45e17163547e3028c0"
+    },
+    {
+      "ts": 1792828930682,
+      "actor": "code",
+      "seat": "collections",
+      "action": "pre_call_permit",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "policyVersion": 1
+        }
+      },
+      "seq": 4,
+      "id": "audit:4",
+      "prevHash": "210bc8c97f0528f3a2f299ca72b77176f808b9bcccf26b45e17163547e3028c0",
+      "hash": "41202a93a0254bf9f2616a4686e19b4d4a3bfdc739569403d10ba29bc25ad240"
+    },
+    {
+      "ts": 1792828930682,
+      "actor": "code",
+      "seat": "collections",
+      "action": "envelope",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3",
+        "audit:4"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "envelope": {
+          "maxInstallments": 2,
+          "minFirstPct": 50,
+          "maxPlanDays": 30,
+          "feesWaivable": false,
+          "maxDiscountPct": 0,
+          "payInFull": true
+        }
+      },
+      "seq": 5,
+      "id": "audit:5",
+      "prevHash": "41202a93a0254bf9f2616a4686e19b4d4a3bfdc739569403d10ba29bc25ad240",
+      "hash": "91e7eb6d2e785ea20610f13499ecb5e92479ac9a49d2bc06d7e40a602564f639"
+    },
+    {
+      "ts": 1792828943376,
+      "actor": "local_model",
+      "seat": "collections",
+      "action": "call_plan",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3",
+        "audit:4",
+        "audit:5"
+      ],
+      "route": "gx10_fallback",
+      "latencyMs": 12694.128417,
+      "costUsd": 0,
+      "inputs": {
+        "model": "gpt-oss:120b"
+      },
+      "seq": 6,
+      "id": "audit:6",
+      "prevHash": "91e7eb6d2e785ea20610f13499ecb5e92479ac9a49d2bc06d7e40a602564f639",
+      "hash": "303074102758cb2f441c63b5314eee71f95a8dc2b1ea2553122002378be5c42b"
+    },
+    {
+      "ts": 1792828943377,
+      "actor": "code",
+      "seat": "collections",
+      "action": "plan_validated",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3",
+        "audit:4",
+        "audit:5",
+        "audit:6"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "valid": true,
+        "plan": {
+          "tone": "neutral",
+          "offerOrder": [
+            "pay_in_full",
+            "installments"
+          ],
+          "plan": {
+            "installments": 2,
+            "firstPaymentPct": 50,
+            "totalDays": 30,
+            "waiveFees": false,
+            "discountPct": 0
+          }
+        }
+      },
+      "seq": 7,
+      "id": "audit:7",
+      "prevHash": "303074102758cb2f441c63b5314eee71f95a8dc2b1ea2553122002378be5c42b",
+      "hash": "3e072f6243e22887b5dea3df4292fbe80502b468acb03359c7fe1099dc9f94b3"
+    }
+  ]
+}
