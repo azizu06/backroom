@@ -131,15 +131,21 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const roomsRef = useRef(rooms);
   roomsRef.current = rooms;
   const stopTour = useCallback(() => dispatch({ type: 'endTour' }), []);
+  const viewSelect = useRef<HTMLSelectElement>(null);
+  // Any input ends the tour, except the view select's own navigation keys: its onChange picks the next view.
+  const interruptTour = useCallback((event: Event) => {
+    if (event instanceof KeyboardEvent && event.target === viewSelect.current && /^(Arrow|Home$|End$|Page)/.test(event.key)) return;
+    stopTour();
+  }, [stopTour]);
   // The tour only moves the camera: each stop is a focus change, and finishing returns to the full floor.
   useEffect(() => {
     if (!touring) return;
     const stops = tourStops(roomsRef.current);
-    const started = Date.now();
+    const started = performance.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     setInspecting(null);
     function step() {
-      const index = tourIndexAt(Date.now() - started, stops.length);
+      const index = tourIndexAt(performance.now() - started, stops.length);
       if (index === null) {
         setFocus(null);
         dispatch({ type: 'endTour' });
@@ -147,7 +153,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       }
       setTour({ stops, index });
       setFocus(stops[index]!);
-      timer = setTimeout(step, Math.max(0, started + (index + 1) * TOUR_STEP_MS - Date.now()));
+      timer = setTimeout(step, Math.max(0, started + (index + 1) * TOUR_STEP_MS - performance.now()));
     }
     step();
     return () => { clearTimeout(timer); setTour(null); };
@@ -155,9 +161,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   // Added after the switch to the tour commits, so the select interaction that started it does not cancel it.
   useEffect(() => {
     if (!touring) return;
-    for (const type of TOUR_INTERRUPT_EVENTS) window.addEventListener(type, stopTour, { capture: true, passive: true });
-    return () => { for (const type of TOUR_INTERRUPT_EVENTS) window.removeEventListener(type, stopTour, { capture: true }); };
-  }, [touring, stopTour]);
+    for (const type of TOUR_INTERRUPT_EVENTS) window.addEventListener(type, interruptTour, { capture: true, passive: true });
+    return () => { for (const type of TOUR_INTERRUPT_EVENTS) window.removeEventListener(type, interruptTour, { capture: true }); };
+  }, [touring, interruptTour]);
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
@@ -181,7 +187,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
-        <label htmlFor='office-view'>View <select id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
+        <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
           <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option><option value='tour'>Tour</option>
         </select></label>
       </div>

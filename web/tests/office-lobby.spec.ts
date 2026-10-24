@@ -65,8 +65,9 @@ test('office judge tour visits the rooms with agent tags and stops on any key', 
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office');
   await expect(page.locator('canvas')).toBeVisible();
-  const seats = await page.locator('.seat-statuses > div').count();
-  if (seats) await expect(page.locator('[data-agent-tag]')).toHaveCount(seats);
+  // The preview fixture seats three agents; each gets one tag.
+  await expect(page.locator('.seat-statuses > div')).toHaveCount(3);
+  await expect(page.locator('[data-agent-tag]')).toHaveCount(3);
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
   await view.selectOption('tour');
@@ -96,4 +97,25 @@ test('office judge tour advances under reduced motion and stops on a click', asy
   await expect(view).toHaveValue('tween');
   await expect(caption).not.toContainText('Tour');
   expect(errors).toEqual([]);
+});
+
+test('office judge tour started from the keyboard is not cancelled by the select keys', async ({ page }) => {
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('plan');
+  await view.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(view).toHaveValue('tour');
+  await page.waitForTimeout(500);
+  await expect(caption).toContainText('Tour · 1 of');
+  await page.keyboard.press('ArrowUp');
+  await expect(view).toHaveValue('plan');
+  await expect(page.getByLabel('2D office floor plan')).toBeVisible();
+  await view.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(view).toHaveValue('tour');
+  await page.keyboard.press('Tab');
+  await expect(view).toHaveValue('tween');
 });
