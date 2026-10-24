@@ -71,9 +71,26 @@ describe('judge inbox HTTP boundary', () => {
     expect(result.decision.kind).toBe('ESCALATE');
     expect(result.attachment).toMatchObject({ name: 'judge.pdf', size: 9, type: 'application/pdf' });
     expect(result.attachment.sha256).toHaveLength(64);
-    expect(result.notice).toContain('not parsed or retained');
+    expect(result.notice).toContain('held for human review');
     expect(modelRoute).not.toHaveBeenCalled();
     expect(JSON.stringify(await state.listAudit())).not.toContain('%PDF-test');
+  });
+
+  it('extracts uploaded image bytes then returns the code hold and a linked audit without retaining bytes', async () => {
+    const { northfieldInvoice } = await import('@backroom/orchestrator');
+    const state = new MemoryStateStore();
+    const modelRoute = vi.fn().mockResolvedValue({ output: northfieldInvoice('4471'), route: 'local', model: 'qwen2.5vl:7b', costUsd: 0, latencyMs: 42 });
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1sAAAAASUVORK5CYII=', 'base64');
+    const result = await (await createInboxHTTP({ store: () => state, modelRoute })(submission({ text: '', senderDomain: 'acme-supp1y.com' }, new File([png], 'trap.png', { type: 'image/png' })))).json();
+    expect(result.fields?.invoiceId).toBe('4471');
+    expect(result.decision.ruleIds).toEqual(expect.arrayContaining(['LOOKALIKE_DOMAIN', 'BANK_CHANGE_HOLD']));
+    expect(result.attachmentParsed).toBe(true);
+    expect(modelRoute.mock.calls[0]?.[0]).toBe('document_extraction');
+    const entries = await state.listAudit();
+    expect(entries.find(entry => entry.action === 'document_extracted')).toMatchObject({ route: 'local', latencyMs: 42 });
+    expect(JSON.stringify(entries)).not.toContain(png.toString('base64'));
+    expect((await state.getAudit(result.auditId))?.inputs?.attachmentParsed).toBe(true);
+    expect(result.receiptId).toBeUndefined();
   });
 
   it('rejects cross-origin, oversized, unsupported and empty submissions without writing audit records', async () => {

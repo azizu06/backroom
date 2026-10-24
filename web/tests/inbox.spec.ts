@@ -56,7 +56,7 @@ test('judge submits traps, original scenarios and uploads on laptop and phone', 
   await page.getByLabel('Attach a PDF or image').setInputFiles({ name: 'judge.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF judge scenario') });
   await submit.click();
   await expect(receipt.getByText('ESCALATE', { exact: true })).toBeVisible();
-  await expect(receipt.getByText(/File contents are not parsed or retained/)).toBeVisible();
+  await expect(receipt.getByText(/held for human review/)).toBeVisible();
   await page.screenshot({ path: '../docs/evidence/inbox/mobile-upload.png', fullPage: true });
   expect(errors).toEqual([]);
 });
