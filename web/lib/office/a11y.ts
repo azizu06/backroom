@@ -1,9 +1,9 @@
-import { OFFICE_ANCHORS, matchingDenial, type AnchorId, type OfficeAgent, type OfficeSnapshot } from './state';
+import { OFFICE_ANCHORS, anchorLabel, matchingDenial, type AnchorId, type OfficeAgent, type OfficeSnapshot } from './state';
 
 export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 export function seatLabel(agent: OfficeAgent): string {
-  return `${agent.name} · ${agent.id}, ${agent.state}${agent.escalationId ? `, escalation folder to ${OFFICE_ANCHORS[agent.targetAnchor].name}` : ''}`;
+  return `${agent.name} · ${agent.id}, ${agent.state}${agent.escalationId ? `, escalation folder to ${anchorLabel(agent.targetAnchor)}` : ''}`;
 }
 
 export function roomLabel(room: AnchorId, snapshot: OfficeSnapshot): string {

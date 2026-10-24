@@ -6,6 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { evaluate, type ActionRequest, type Badge, type Context } from '@backroom/policy';
 import { FakeEffects, MemoryStateStore, SeatWorker, type AuditInput } from '../index';
 import { MemoryFinanceRepository } from '../payables/repository';
+import { inspectPaymentEvidence, reconcileAlreadyPaid, type BankEvidence } from '../payments';
+import { ControllerApprovals } from '../approvals';
+import { TestAuthenticator } from '../approvals/testing/authenticator';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
 
@@ -61,7 +65,14 @@ interface PolicyStep { verificationLayer: string; badge?: Badge; action?: string
   invoiceId?: string; vendorId?: string; emailDomain?: string; vendorOverrides?: Record<string, unknown>;
   priorInvoiceIds?: string[]; signals?: Context['signals']; contextOverrides?: Record<string, any>; expected?: { kind: string; ruleIds: string[] }; operation?: string }
 interface Scenario { id: string; description?: string; utterance?: string; invoiceId?: string; steps: PolicyStep[] }
-interface KeyEntry { expectedSteps: ({ kind: string; ruleIds: string[] } | { integrationOutcome: string })[] }
+interface KeyEntry { expectedSteps: ({ kind: string; ruleIds: string[] } | { integrationOutcome: string })[]; plantedRule?: string }
+
+export function gradePlanted(actual: string | undefined, expected: string | undefined): string | undefined {
+  if (!expected) return undefined;
+  if (!actual) return 'planted case not executed';
+  if (actual !== expected) return `expected ${expected} got ${actual}`;
+  return undefined;
+}
 
 const fixedNow = 1_700_000_000_000;
 
@@ -178,6 +189,78 @@ async function directPolicy(scenario: Scenario, step: PolicyStep, seed: any): Pr
   return { kind: decision.kind, ruleIds: decision.ruleIds, seams: ['state:audit', 'policy:evaluate'] };
 }
 
+function bankFeed(seed: any): BankEvidence[] {
+  return seed.bankTransactions.filter((row: any) => row.direction === 'credit' && row.matchedRef == null).map((row: any) => ({
+    _id: row.id, amount: row.amountCents / 100, description: row.memo, paymentLinkRef: row.paymentLinkRef,
+    status: 'completed', medium: 'balance', transaction_date: String(row.postedAt).slice(0, 10) }));
+}
+
+function trustedMemo(seed: any, invoiceId: string, clientId: string): string {
+  const recorded = seed.bankTransactions.find((row: any) => row.direction === 'credit' && row.matchedRef == null && String(row.memo).includes(`invoice ${invoiceId}`));
+  if (recorded) return recorded.memo;
+  const client = seed.clients.find((row: any) => row.id === clientId);
+  return `${client?.name ?? 'unknown client'} payment invoice ${invoiceId}`;
+}
+
+async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any): Promise<{ kind: string; seams: string[] } | undefined> {
+  const operation = step.operation;
+  const feed = bankFeed(seed);
+  const now = Date.parse('2026-10-24T09:00:00Z');
+  if (operation === 'match_seed-credit-1043_to_ar_invoice_1043_before_clearing' || operation === 'record_claim_keep_open_escalate_unmatched_99000c_credit_no_blind_clear') {
+    const invoiceId = scenario.invoiceId ?? '';
+    const invoice = seed.arInvoices.find((row: any) => row.id === invoiceId);
+    const store = new MemoryStateStore();
+    await store.registerAgent('eval-recon', 'collections', now);
+    await store.insertInvoice({ id: invoiceId, kind: 'ar', state: 'overdue' });
+    await store.enqueueTask({ id: `eval-${invoiceId}`, seatId: 'collections', refs: [invoiceId], steps: [], idempotencyKey: `ar:${invoiceId}:1` });
+    const lease = await store.claimTask('eval-recon', now, 12000);
+    if (!lease || !invoice) return { kind: 'SETUP_FAILED', seams: ['reconciliation:fixture-feed'] };
+    const expectedMemo = trustedMemo(seed, invoiceId, invoice.clientId);
+    if (operation === 'record_claim_keep_open_escalate_unmatched_99000c_credit_no_blind_clear') {
+      const stray = feed.find(row => row._id === 'seed-credit-unmatched');
+      if (!stray || Math.round(stray.amount * 100) !== 99000 || stray.description === expectedMemo) {
+        return { kind: 'UNMATCHED_CREDIT_NOT_TESTED', seams: ['reconciliation:fixture-feed'] };
+      }
+    }
+    const result = await reconcileAlreadyPaid({ invoiceId, totalCents: invoice.principalCents + invoice.lateFeeCents,
+      expectedMemo, policyVersion: seed.policyVersion }, feed, store, lease, 'overdue', now);
+    const kind = result.status === 'paid' ? 'EXACT_PAYMENT_MATCH' : result.ruleId;
+    return { kind, seams: ['reconciliation:fixture-feed', 'state:audit'] };
+  }
+  if (operation === 'voice_claim_never_counts_as_passkey_approval') {
+    const store = new MemoryStateStore();
+    await store.registerAgent('eval-voice', 'collections', now);
+    await store.enqueueTask({ id: 'eval-voice', seatId: 'collections', refs: ['1042'], steps: [] });
+    const lease = await store.claimTask('eval-voice', now, 12000);
+    if (!lease) return { kind: 'SETUP_FAILED', seams: ['passkey:voice-rejected'] };
+    const escalation = await store.createCallEscalation({ id: 'eval-voice-escalation', taskId: lease.id, fromAgent: lease.leaseOwner,
+      seat: 'collections', toHuman: 'Dana', invoiceId: '1042', ruleIds: ['MAX_INSTALLMENTS'], evidenceRefs: ['1042'],
+      policyVersion: seed.policyVersion, quote: { sentenceId: 'NF-012', text: 'A spoken approval is not a passkey.' } }, now);
+    const approvals = new ControllerApprovals(store, { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'eval-test-only' }, () => now);
+    const authenticator = new TestAuthenticator();
+    const enrollment = await approvals.registrationOptions('eval-test-only');
+    await approvals.register('eval-test-only', enrollment.challengeId, authenticator.registration(enrollment.options.challenge));
+    const challenge = await approvals.decisionOptions(escalation.id, { kind: 'Approve' });
+    let rejected = false;
+    try {
+      await approvals.decide(escalation.id, challenge.challengeId, { id: 'spoken-approval' } as AuthenticationResponseJSON);
+    } catch (error) {
+      rejected = error instanceof Error && error.message === 'PASSKEY_INVALID';
+    }
+    const stored = await store.getEscalation(escalation.id);
+    if (!rejected || stored?.status === 'approved') return { kind: 'VOICE_APPROVED', seams: ['passkey:voice-rejected'] };
+    return { kind: 'PASSKEY_INVALID', seams: ['passkey:voice-rejected'] };
+  }
+  const linkId = operation === 'match_seed-short-1044_to_50000c_link_flag_RECON_SHORT_keep_invoice_unadvanced_followup_email' ? 'link-short-1044'
+    : operation === 'two_distinct_bank_deposits_same_link_flag_second_RECON_DUPLICATE_create_Dana_refund_or_credit_task' ? 'link-duplicate-1045' : undefined;
+  if (!linkId) return undefined;
+  const link = seed.paymentLinks.find((row: any) => row.id === linkId);
+  if (!link) return { kind: 'SETUP_FAILED', seams: ['reconciliation:fixture-feed'] };
+  const evidence = inspectPaymentEvidence({ linkId, amountCents: link.amountCents,
+    memo: `backroom:invoice=${link.invoiceId}:installment=1` }, feed);
+  return { kind: evidence.ruleId ?? 'EXACT_PAYMENT_MATCH', seams: ['reconciliation:fixture-feed'] };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -202,7 +285,15 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        seams.add('integration:not_executed');
+        const planted = await plantedBankCase(scenario, step, seed);
+        const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
+        if (!planted) seams.add('integration:not_executed');
+        else {
+          planted.seams.forEach(seam => seams.add(seam));
+          outcomes.push(planted.kind);
+          if (planted.kind === 'SETUP_FAILED' || planted.kind === 'VOICE_APPROVED') violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+        }
+        if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
       }
       const actual = step.action === 'pay_invoice'

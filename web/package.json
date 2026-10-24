@@ -8,6 +8,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --globals",
     "test:approvals:browser": "playwright test --config playwright.approvals.config.ts",
+    "test:office:browser": "playwright test --config playwright.office.config.ts",
     "test:audit:browser": "playwright test --config playwright.audit.config.ts",
     "test:inbox:browser": "playwright test --config playwright.inbox.config.ts"
   },

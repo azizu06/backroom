@@ -11,5 +11,5 @@ if (graded && result.signoff !== 'approved') {
 }
 for (const report of result.reports) console.log(formatReport(report));
 console.log(formatSummary(graded ? { ...result, gradedEval: 'run-1' } : result));
-console.log('Policy decisions only. Integration steps were not executed. Issue checkboxes stay open.');
+console.log('Policy decisions, planted bank-feed checks, and a spoken approval rejected by the passkey verifier. Other integration steps were not executed. Issue checkboxes stay open.');
 if (result.reports.some(report => !report.answerKeyMatch)) process.exitCode = 1;
