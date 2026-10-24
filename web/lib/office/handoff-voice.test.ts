@@ -57,22 +57,30 @@ describe('handoff voice proxy', () => {
 });
 
 describe('handoff voice lines', () => {
-  it('maps agents to voice roles and gives Dana no voice', () => {
-    expect(handoffVoiceLine('intake', 'New invoice')).toEqual({ role: 'intake_sorter', text: 'New invoice' });
-    expect(handoffVoiceLine('collections', 'x')?.role).toBe('collections_caller');
+  it('uses the row voice role and line verbatim; short role ids are not voice aliases', () => {
+    expect(handoffVoiceLine('intake_sorter', 'New invoice')).toEqual({ role: 'intake_sorter', text: 'New invoice' });
+    expect(handoffVoiceLine('vendor_verifier', 'Verify remit-to')).toEqual({ role: 'vendor_verifier', text: 'Verify remit-to' });
+    expect(handoffVoiceLine('intake', 'x')).toBeNull();
+    expect(handoffVoiceLine('vendor', 'x')).toBeNull();
     expect(handoffVoiceLine('human', 'Passkey needed')).toBeNull();
-    expect(handoffVoiceLine('mystery', 'x')).toBeNull();
   });
-  it('cleans text to the server rules', () => {
-    expect(handoffVoiceLine('auditor', '✕ Remit <b>mismatch</b>\n')?.text).toBe('Remit bmismatch/b');
-    expect(Array.from(handoffVoiceLine('auditor', 'y'.repeat(400))!.text)).toHaveLength(240);
-    expect(handoffVoiceLine('auditor', ' \n ')).toBeNull();
+  it('drops unsafe or overlong text instead of inventing a spoken fallback', () => {
+    expect(handoffVoiceLine('auditor', '<b>mismatch</b>')).toBeNull();
+    expect(handoffVoiceLine('auditor', 'y'.repeat(241))).toBeNull();
+    expect(handoffVoiceLine('auditor', ' ')).toBeNull();
   });
-  it('cues the delivery and the failed-check reason at their bubble times', () => {
-    const plan = planHandoffs([{ id: 'f', from: 'extractor', to: 'vendor_verifier', item: 'INV-1', summary: 'Account mismatch', status: 'failed', at: 0 }]);
-    const cues = voiceCues(plan);
-    expect(cues.map(cue => [cue.line.role, cue.line.text])).toEqual([['extractor', 'INV-1 → Vendor verifier'], ['vendor_verifier', 'Account mismatch']]);
-    expect(cues[0]!.at).toBeLessThan(cues[1]!.at);
+  it('cues the author on offered with its masked line unchanged, and never voices a terminal row', () => {
+    const row = { handoffId: 'f', sequence: 0n, caseDisplayId: 'INV-1', fromAgentId: 'extractor-agent', toAgentId: 'vendor-agent',
+      fromRole: 'extractor' as const, toRole: 'vendor' as const, fromVoiceRole: 'extractor', toVoiceRole: 'vendor_verifier',
+      status: 'offered' as const, correction: false, reason: 'Human approval escalation', summary: 'Public display summary', line: 'Verify GB29 NWBK ••6819 for [email] (••6819).', createdAt: 1000 };
+    const cues = voiceCues(planHandoffs([row]));
+    expect(cues).toEqual([{ key: 'f', at: 1000, line: { role: 'extractor', text: row.line } }]);
+    for (const status of ['accepted', 'completed', 'rejected'] as const) {
+      expect(voiceCues(planHandoffs([{ ...row, status, acceptedAt: 2000, completedAt: 3000 }]))).toEqual([]);
+    }
+    expect(voiceCues(planHandoffs([{ ...row, line: '' }]))).toEqual([]);
+    const queued = { ...row, handoffId: 'queued', sequence: 1n };
+    expect(voiceCues(planHandoffs([row, queued])).map(cue => cue.key)).toEqual(['f']);
   });
 });
 

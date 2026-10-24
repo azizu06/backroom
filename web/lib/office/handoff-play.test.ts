@@ -4,10 +4,8 @@ import { HandoffStage } from './handoff-plan';
 import { interactCandidates, pickTarget, playPanel, targetKey, targetLabel } from './play';
 import { INITIAL_OFFICE } from './state';
 
-const rows: Handoff[] = [
-  { id: 'h1', from: 'intake', to: 'extractor', item: 'INV-1', summary: 'first', status: 'accepted', at: 0 },
-  { id: 'h2', from: 'extractor', to: 'vendor_verifier', item: 'INV-1', summary: 'bad account', status: 'failed', at: 10 },
-];
+const make = (id:string, from:'intake'|'extractor', to:'extractor'|'vendor', status:'accepted'|'rejected', at:number, summary:string):Handoff => ({handoffId:id,sequence:BigInt(at),caseDisplayId:'INV-1',fromAgentId:`${from}-agent`,toAgentId:`${to}-agent`,fromRole:from,toRole:to,fromVoiceRole:from,toVoiceRole:to,status,correction:false,reason:summary,summary,line:summary,createdAt:at});
+const rows: Handoff[] = [make('h1','intake','extractor','accepted',0,'first'),make('h2','extractor','vendor','rejected',10,'bad account')];
 const snapshot = { ...INITIAL_OFFICE, handoffs: rows };
 
 describe('Play handoff targets', () => {
@@ -24,10 +22,19 @@ describe('Play handoff targets', () => {
   });
   it('shows the in-flight handoff, falling back to the latest row for the agent', () => {
     const latest = playPanel(snapshot, { kind: 'handoff', actor: 'extractor' })!;
-    expect(latest).toMatchObject({ kind: 'handoff', title: 'Extractor · handoff', state: 'failed', handoff: { id: 'h2', from: 'Extractor', to: 'Vendor verifier', summary: 'bad account' } });
-    expect(latest.entries.map(entry => entry.decision)).toEqual(['FAILED', 'ACCEPTED']);
+    expect(latest).toMatchObject({ kind: 'handoff', title: 'Extractor · handoff', state: 'rejected', handoff: { from: 'Extractor', to: 'Vendor verifier', summary: 'bad account' } });
+    expect(latest.entries.map(entry => entry.decision)).toEqual(['REJECTED', 'ACCEPTED']);
     const inFlight = playPanel(snapshot, { kind: 'handoff', actor: 'extractor' }, () => rows[0])!;
-    expect(inFlight.handoff?.id).toBe('h1');
+    expect(inFlight.handoff?.summary).toBe('first');
     expect(playPanel(snapshot, { kind: 'handoff', actor: 'auditor' })).toBeNull();
+  });
+  it('orders by bigint sequence and limits the panel history to the current case', () => {
+    const old = { ...rows[1]!, sequence: 9_007_199_254_740_992n, createdAt: 9999, caseDisplayId: 'OTHER' };
+    const current = { ...rows[0]!, sequence: 9_007_199_254_740_993n, createdAt: 0, decisionRef: 'decision:42', correction: true };
+    const panel = playPanel({ ...snapshot, handoffs: [current, old] }, { kind: 'handoff', actor: 'extractor' })!;
+    expect(panel.handoff).toMatchObject({ correction: true, caseDisplayId: 'INV-1' });
+    expect(panel.entries).toHaveLength(1);
+    expect(panel.entries[0]!.summary).toContain(current.summary);
+    expect(JSON.stringify(panel)).not.toContain(current.decisionRef);
   });
 });

@@ -7,7 +7,7 @@ import { LlmToggle } from '../../components/LlmToggle';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, useTouch } from './PlayHud';
 import { REDUCED_MOTION_QUERY, isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
-import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, handoffLine, type Handoff, type HandoffAgentId } from '../../lib/office/handoffs';
+import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, type Handoff, type HandoffAgentId } from '../../lib/office/handoffs';
 import { HandoffStage } from '../../lib/office/handoff-plan';
 import { createMockHandoffFeed, type HandoffFeed } from '../../lib/office/handoff-mock';
 import { HandoffVoice, createAudioPlayer, voiceCues } from '../../lib/office/handoff-voice';
@@ -20,6 +20,7 @@ import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStop
 import { OfficeLobby } from './OfficeLobby';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import type { HandoffTagLookup } from './handoffs/HandoffLayer';
+import { HandoffEntries } from './handoffs/HandoffLog';
 import '../office.css';
 import './a11y.css';
 import './tags.css';
@@ -100,9 +101,10 @@ function useHandoffs(snapshot: OfficeSnapshot) {
   }, []);
   const mockRows = useSyncExternalStore(mock?.feed.subscribe ?? noSubscription, mock?.feed.getRows ?? (() => NO_HANDOFFS), () => NO_HANDOFFS);
   const rows = snapshot.handoffs ?? (mock ? mockRows : NO_HANDOFFS);
-  const stage = snapshot.handoffs ? live : mock?.stage ?? null;
-  useEffect(() => { if (stage?.update(rows)) requestSceneFrame(); }, [stage, rows]);
-  return { stage: rows.length || mock ? stage : null, rows };
+  const openEscalation = snapshot.agents.some(agent => !!agent.escalationId);
+  const stage = snapshot.handoffs ? live : mock?.stage ?? (openEscalation ? live : null);
+  useEffect(() => { if (stage?.update(rows, Date.now(), openEscalation)) requestSceneFrame(); }, [stage, rows, openEscalation]);
+  return { stage: rows.length || mock || openEscalation ? stage : null, rows };
 }
 /**
  * Optional voices for the handoff bubbles (#133). Off until the viewer turns them on in this visit;
@@ -137,7 +139,7 @@ function HandoffLog({ rows, reduced, sound }: { rows: readonly Handoff[]; reduce
     {/* The log stays mounted while empty so the first handoff is announced. */}
     {!rows.length && <p>No handoffs yet.</p>}
     <ol role='log' aria-live='polite' aria-relevant='additions text'>
-      {rows.slice(-8).map(row => <li key={row.id} data-handoff-id={row.id} data-status={row.status}>{handoffLine(row)}</li>)}
+      <HandoffEntries rows={rows} />
     </ol>
   </section>;
 }

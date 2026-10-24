@@ -1,5 +1,7 @@
 'use client';
 
+import { needsHandoffHuman } from '../../lib/office/handoffs';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
@@ -79,7 +81,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, handoffs }: P
     const handoff = handoffs?.sample(Date.now(), reduced.current);
     // Only agents with a handoff to show are targets (Dana only while she is at her desk).
     const handoffAgents = handoff ? handoff.actors.filter(actor => (actor.id !== 'human' || handoff.human)
-      && handoffs!.current.some(row => row.from === actor.id || row.to === actor.id)) : [];
+      && handoffs!.current.some(row => row.fromRole === actor.id || row.toRole === actor.id || (actor.id === 'human' && needsHandoffHuman(row)))) : [];
     const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }

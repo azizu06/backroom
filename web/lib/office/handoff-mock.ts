@@ -1,85 +1,51 @@
-/**
- * Fixture handoff stream for `/office?handoffs=mock`, so the choreography is demoable before the
- * backend table exists. Never used as a live source: it only emits rows in the adapter's shape.
- */
-import type { Handoff, HandoffStatus } from './handoffs';
-
-interface ScriptRow { readonly offset: number; readonly from: string; readonly to: string; readonly item: string; readonly summary: string; readonly status: HandoffStatus; readonly resolve?: { readonly offset: number; readonly status: HandoffStatus } }
-/**
- * One cycle of the invoice pipeline (offsets in ms at speed 1). Shows a queue (two intake rows for the
- * extractor), an overlap (collections → auditor alongside intake), a failed check that walks back and
- * is retried, and Dana appearing only for the passkey step.
- */
-export const MOCK_HANDOFF_SCRIPT: readonly ScriptRow[] = [
-  { offset: 0, from: 'intake', to: 'extractor', item: 'INV-1042', summary: 'Northwind invoice email · PDF attached', status: 'accepted' },
-  { offset: 0, from: 'collections', to: 'auditor', item: 'INV-0977', summary: 'Second reminder sent to Ridgeway · log it', status: 'accepted' },
-  { offset: 400, from: 'intake', to: 'extractor', item: 'INV-1043', summary: 'Bay Supply invoice · scanned PDF', status: 'accepted' },
-  { offset: 5000, from: 'extractor', to: 'vendor_verifier', item: 'INV-1042', summary: 'Remit-to ••4821 does not match vendor master ••7710', status: 'failed' },
-  { offset: 5100, from: 'extractor', to: 'vendor_verifier', item: 'INV-1042', summary: 'Re-read page 2 · remit-to ••7710 matches master', status: 'accepted' },
-  { offset: 5200, from: 'vendor_verifier', to: 'payables', item: 'INV-1042', summary: 'Vendor verified · W-9 and bank letter on file', status: 'accepted' },
-  { offset: 5300, from: 'payables', to: 'human', item: 'INV-1042', summary: 'Pay $4,200 to Northwind · needs Dana’s passkey', status: 'awaiting_passkey', resolve: { offset: 52_000, status: 'accepted' } },
-  { offset: 5400, from: 'payables', to: 'reconciler', item: 'PAY-88', summary: 'Payment released · match it to the bank feed', status: 'accepted' },
-  { offset: 5500, from: 'reconciler', to: 'auditor', item: 'PAY-88', summary: 'Matched PAY-88 to bank feed line 3 of 112', status: 'accepted' },
+import type { Handoff, HandoffRole } from './handoffs';
+export interface HandoffFeed { subscribe(listener: () => void): () => void; getRows(): readonly Handoff[]; start(): void; stop(): void }
+interface Step {
+  from: HandoffRole; to: HandoffRole; at: number; accept?: number; complete?: number; reject?: number;
+  caseDisplayId: string; reason: string; summary: string; correction?: boolean; errorCode?: string; decisionRef?: string;
+}
+export const MOCK_HANDOFF_SCRIPT: readonly Step[] = [
+  { from: 'intake', to: 'extractor', at: 0, accept: 2500, complete: 5000, caseDisplayId: 'INV-1042', reason: 'Invoice received', summary: 'Extract the invoice fields' },
+  { from: 'collections', to: 'auditor', at: 0, accept: 6500, complete: 9000, caseDisplayId: 'INV-0977', reason: 'Review call record', summary: 'Consent record attached' },
+  { from: 'intake', to: 'extractor', at: 1500, accept: 6500, complete: 9000, caseDisplayId: 'INV-1043', reason: 'Invoice received', summary: 'Check supporting documents' },
+  { from: 'extractor', to: 'vendor', at: 11000, caseDisplayId: 'INV-1043', reason: 'Remit-to ••4821 does not match', summary: 'Extractor keeps the case', errorCode: 'VENDOR_MISMATCH' },
+  { from: 'vendor', to: 'payables', at: 16000, accept: 21000, complete: 26000, caseDisplayId: 'INV-1044', reason: 'Vendor documents checked', summary: 'Review payment evidence' },
+  { from: 'payables', to: 'vendor', at: 29000, accept: 35000, complete: 39000, caseDisplayId: 'INV-1044', reason: 'Missing tax form', summary: 'Return to vendor for correction', correction: true },
+  { from: 'payables', to: 'reconciler', at: 42000, accept: 45000, complete: 52000, caseDisplayId: 'INV-1045', reason: 'Human approval escalation · waiting for Dana’s passkey', summary: 'Approval evidence requires a human', decisionRef: 'PASSKEY-42' },
+  { from: 'payables', to: 'reconciler', at: 54000, reject: 56000, caseDisplayId: 'INV-1046', reason: 'Case cancelled before acceptance', summary: 'GB29 NWBK ••6819 / [email]', errorCode: 'CASE_STOPPED' },
+  { from: 'intake', to: 'extractor', at: 54000, accept: 55000, reject: 58000, caseDisplayId: 'INV-1047', reason: 'Case stopped after acceptance', summary: 'Return documents for ••6819', errorCode: 'CASE_STOPPED' },
 ];
+// Fixture voice keys from #133; production rows provide these directly.
+const voice = (role: HandoffRole) => role === 'intake' ? 'intake_sorter' : role === 'vendor' ? 'vendor_verifier' : role === 'collections' ? 'collections_caller' : role;
 export const MOCK_CYCLE_MS = 64_000;
-const KEEP = 40;
-
-export interface HandoffFeed {
-  subscribe(listener: () => void): () => void;
-  getRows(): readonly Handoff[];
-  start(): void;
-  stop(): void;
-}
-
-/** Rows of one cycle as they should look at `now` (pure; used by the feed and tests). */
 export function mockCycleRows(cycle: number, cycleStart: number, now: number, speed = 1): Handoff[] {
-  const rows: Handoff[] = [];
-  MOCK_HANDOFF_SCRIPT.forEach((row, i) => {
-    const at = cycleStart + row.offset / speed;
-    if (at > now) return;
-    const resolvedAt = row.resolve && cycleStart + row.resolve.offset / speed;
-    const resolved = resolvedAt !== undefined && resolvedAt <= now;
-    rows.push({
-      id: `mock-${cycle}-${i + 1}`, from: row.from, to: row.to, item: row.item, summary: row.summary, at,
-      status: resolved ? row.resolve!.status : row.status, ...(resolved ? { updatedAt: resolvedAt } : {}),
-    });
+  const time = (offset: number) => cycleStart + offset / speed;
+  return MOCK_HANDOFF_SCRIPT.flatMap((step, i) => {
+    if (time(step.at) > now) return [];
+    const acceptedAt = step.accept !== undefined && time(step.accept) <= now ? time(step.accept) : undefined;
+    const completedAt = step.complete !== undefined && time(step.complete) <= now ? time(step.complete) : undefined;
+    const rejected = !!step.errorCode && (step.reject === undefined || time(step.reject) <= now);
+    return [{ handoffId: `mock-${cycle}-${i + 1}`, sequence: BigInt(cycle * MOCK_HANDOFF_SCRIPT.length + i + 1),
+      caseDisplayId: step.caseDisplayId, fromAgentId: `${step.from}-agent`, toAgentId: `${step.to}-agent`,
+      fromRole: step.from, toRole: step.to, fromVoiceRole: voice(step.from), toVoiceRole: voice(step.to),
+      status: rejected ? 'rejected' as const : completedAt !== undefined ? 'completed' as const : acceptedAt !== undefined ? 'accepted' as const : 'offered' as const,
+      correction: step.correction ?? false, reason: step.reason, summary: step.summary, line: step.summary,
+      createdAt: time(step.at), acceptedAt, completedAt, errorCode: rejected ? step.errorCode : undefined, decisionRef: step.decisionRef }];
   });
-  return rows;
 }
-
-/** Emits the script on a loop; each cycle's rows get fresh ids. `now` and timers are injectable for tests. */
 export function createMockHandoffFeed({ speed = 1, now = () => Date.now(), lead = 600 }: { speed?: number; now?: () => number; lead?: number } = {}): HandoffFeed {
   const listeners = new Set<() => void>();
-  let rows: readonly Handoff[] = [];
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let origin = 0;
-  const cycleMs = MOCK_CYCLE_MS / speed;
-  const times = MOCK_HANDOFF_SCRIPT.flatMap(row => [row.offset, ...(row.resolve ? [row.resolve.offset] : [])]).map(offset => offset / speed).sort((a, b) => a - b);
-
-  function rebuild(at: number) {
-    const cycle = Math.floor((at - origin) / cycleMs);
-    const next: Handoff[] = [];
-    for (let c = Math.max(0, cycle - 1); c <= cycle; c++) next.push(...mockCycleRows(c, origin + c * cycleMs, at, speed));
-    const trimmed = next.slice(-KEEP);
-    const changed = trimmed.length !== rows.length || trimmed.some((row, i) => row.id !== rows[i]!.id || row.status !== rows[i]!.status);
-    if (changed) { rows = trimmed; listeners.forEach(listener => listener()); }
-  }
-  function schedule() {
-    const at = now();
-    const inCycle = (at - origin) % cycleMs;
-    const upcoming = times.find(time => time > inCycle);
-    const wait = (upcoming ?? cycleMs) - inCycle;
-    timer = setTimeout(() => { rebuild(now()); schedule(); }, Math.max(16, wait + 1));
-  }
+  let rows: readonly Handoff[] = [], timer: ReturnType<typeof setInterval> | undefined, origin = 0, signature = '';
+  const rebuild = () => {
+    const current = now(), cycle = Math.max(0, Math.floor((current - origin) / (MOCK_CYCLE_MS / speed)));
+    const next = [cycle - 1, cycle].filter(n => n >= 0).flatMap(n => mockCycleRows(n, origin + n * MOCK_CYCLE_MS / speed, current, speed));
+    const key = next.map(row => `${row.handoffId}:${row.status}`).join('|');
+    if (key === signature) return;
+    signature = key; rows = next; listeners.forEach(fn => fn());
+  };
   return {
-    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    getRows: () => rows,
-    start() {
-      if (timer !== undefined) return;
-      origin = now() + lead;
-      rebuild(now());
-      schedule();
-    },
-    stop() { clearTimeout(timer); timer = undefined; },
+    subscribe(fn) { listeners.add(fn); return () => { listeners.delete(fn); }; }, getRows: () => rows,
+    start() { if (timer !== undefined) return; origin = now() + lead; rebuild(); timer = setInterval(rebuild, 100 / speed); },
+    stop() { clearInterval(timer); timer = undefined; },
   };
 }

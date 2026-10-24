@@ -21,9 +21,14 @@
 .office-shell .handoff-bubble[data-tone='fail'] { color: #fff; background: #b8382d; border-color: #ffb3a8; font-weight: 600; }
 .office-shell .handoff-bubble[data-tone='passkey'] { background: #f3dfb9; border-color: #8a6d2f; font-weight: 600; }
 .office-shell .handoff-log ol { margin: 0; padding-left: 18px; }
-.office-shell .handoff-log li[data-status='failed'] { color: #ff9c8f; }
-.office-shell .handoff-log li[data-status='awaiting_passkey'] { color: #f3dfb9; }
+.office-shell .handoff-log li[data-status='rejected'] { color: #ff9c8f; }
+.office-shell .handoff-tag[data-correction='true'] > strong { border-color: #f3bf65; color: #f3dfb9; }
+.office-shell .handoff-bubble[data-tone='correction'] { background: #f3bf65; border-color: #8a6d2f; }
+.office-shell .handoff-log li[data-correction='true'] { color: #f3bf65; }
+.office-shell .handoff-log li { overflow-wrap: anywhere; }
+.office-shell .handoff-log code, .office-shell .handoff-bubble code { color: inherit; }
 .play-panel .play-panel-handoff dd { text-align: right; overflow-wrap: anywhere; }
+.office-shell .handoff-token { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
 @media (max-width: 760px) {
   .office-shell .handoff-bubble { max-width: 18ch; font-size: 10px; }
 }

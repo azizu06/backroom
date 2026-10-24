@@ -7,6 +7,8 @@ import { serverRoomReadout, type Gx10Status } from '../../lib/gx10/server-room';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import type { Handoff } from '../../lib/office/handoffs';
+import { HandoffDetails } from './handoffs/HandoffDetails';
+import { HandoffText } from './handoffs/HandoffText';
 import PaymentLinkPanel from '../../components/PaymentLinkPanel';
 import './play.css';
 
@@ -101,19 +103,15 @@ function PlayPanelDialog({ snapshot, target, close, askWhy, handoffFor }: { snap
     {panel.seated && (panel.seated.length ? <ul aria-label='Seated agents'>{panel.seated.map(agent => <li key={agent.id}><strong>{agent.name}</strong> · {agent.state}</li>)}</ul>
       : <p>No agents seated here.</p>)}
     {panel.locked && <p>{panel.locked}</p>}
-    {panel.handoff && <dl className='play-panel-handoff' data-handoff-id={panel.handoff.id}>
-      <div><dt>From</dt><dd>{panel.handoff.from}</dd></div><div><dt>To</dt><dd>{panel.handoff.to}</dd></div>
-      {panel.handoff.item && <div><dt>Item</dt><dd>{panel.handoff.item}</dd></div>}
-      <div><dt>Status</dt><dd>{panel.handoff.status}</dd></div><div><dt>Summary</dt><dd>{panel.handoff.summary}</dd></div>
-    </dl>}
+    {panel.handoff && <HandoffDetails handoff={panel.handoff} />}
     {panel.kind === 'treasury' && panel.denial && <p className='denial-text' role='status' data-denial-audit={panel.denial.id}>
       <strong>{panel.denial.decision}</strong> Entry denied · rule {panel.denial.ruleIds.join(', ')} · audit <code>{panel.denial.id}</code>
     </p>}
     {panel.kind === 'paylink' && <PaymentLinkPanel />}
     {panel.kind === 'server' && <ServerPanel />}
-    {panel.kind !== 'treasury' && panel.kind !== 'paylink' && panel.kind !== 'server' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
-      <strong className={entry.decision === 'DENY' || entry.decision === 'FAILED' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
-      {panel.kind !== 'handoff' && <><span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · </>}<code>{entry.id}</code>
+    {panel.kind !== 'treasury' && panel.kind !== 'paylink' && panel.kind !== 'server' && (panel.entries.length ? <ol className='play-panel-audit' aria-label={panel.kind === 'handoff' ? 'Case handoffs' : 'Audit entries'}>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
+      <strong className={entry.decision === 'DENY' || (panel.kind === 'handoff' && entry.decision === 'REJECTED') ? 'denial-text' : ''}>{entry.decision}</strong> <HandoffText text={entry.summary} /><br />
+      {panel.kind !== 'handoff' && <><span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code></>}
     </li>)}</ol> : <p>No audit entries yet.</p>)}
     {panel.kind !== 'paylink' && panel.kind !== 'server' && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
   </section>;
