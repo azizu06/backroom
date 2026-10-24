@@ -38,7 +38,19 @@ describe('agent talk', () => {
     expect(talkReply(talk, 'working').text).toBe('Right now: Reviewing invoice 1042 (Collections).');
     expect(talkReply(talk, 'stopped').text).toBe(NO_STOP);
     expect(talkReply(talk, 'next').text).toBe(NOBODY_NEXT);
-    expect(talk.lines).toEqual([{ id: 'audit-0', text: 'I was cleared: Called Northwind.', ruleIds: ['CALL_HOURS'], tone: 'info' }]);
+    expect(talk.lines).toEqual([{ id: 'audit-0', text: 'I was cleared: Called Northwind.', ruleIds: ['CALL_HOURS'], tone: 'info', receiptIds: ['a1'] }]);
+  });
+
+  it('cites the real audit entry ids and never a handoff id', () => {
+    const rows = [receipt('real-audit-entry-212', 'DENY', 'Payment blocked', ['PAY_LIMIT'])];
+    const row = handoff({ fromAgentId: alex.id });
+    const talk = agentTalk(desk({}, rows, [row]), alex.id)!;
+    const cited = [...talk.lines, ...TALK_CHIPS.map(chip => talkReply(talk, chip.id))].flatMap(l => l.receiptIds);
+    expect(talk.lines.find(l => l.text.startsWith('I was refused'))!.receiptIds).toEqual(['real-audit-entry-212']);
+    expect(talkReply(talk, 'stopped').receiptIds).toEqual(['real-audit-entry-212']);
+    expect(cited.length).toBeGreaterThan(0);
+    expect(cited.every(id => id === 'real-audit-entry-212')).toBe(true);
+    expect(JSON.stringify(talk)).not.toContain(row.handoffId);
   });
 
   it('explains an escalation with its rule id and who is next', () => {
@@ -47,7 +59,8 @@ describe('agent talk', () => {
     const talk = agentTalk(mock.source.getSnapshot(), alex.id)!;
     expect(talk.greeting.text).toBe("I'm Alex, collections. Right now: Four installments requested · awaiting Dana (Dana’s desk).");
     expect(talk.greeting.tone).toBe('passkey');
-    expect(talkReply(talk, 'stopped')).toEqual({ id: 'stopped', tone: 'passkey', ruleIds: ['MAX_INSTALLMENTS'],
+    expect(talkReply(talk, 'stopped').receiptIds).toHaveLength(1);
+    expect(talkReply(talk, 'stopped')).toMatchObject({ id: 'stopped', tone: 'passkey', ruleIds: ['MAX_INSTALLMENTS'],
       text: "I stopped to escalate: Invoice 1042 · four installments → Dana. It's waiting at Dana’s desk (preview-escalation-1042)." });
     expect(talkReply(talk, 'next').text).toBe("Dana’s desk is next: my folder is waiting there (preview-escalation-1042).");
     expect(talk.lines[0]).toMatchObject({ text: 'I escalated: Invoice 1042 · four installments → Dana.', ruleIds: ['MAX_INSTALLMENTS'], tone: 'passkey' });
@@ -57,7 +70,7 @@ describe('agent talk', () => {
     const mock = createMockOfficeState();
     for (let i = 0; i < 4; i++) mock.denyTreasury();
     const talk = agentTalk(mock.source.getSnapshot(), alex.id)!;
-    expect(talkReply(talk, 'stopped')).toEqual({ id: 'stopped', tone: 'fail', ruleIds: ['NOT_IN_BADGE'], text: 'I was refused: Treasury entry refused · controller only.' });
+    expect(talkReply(talk, 'stopped')).toMatchObject({ id: 'stopped', tone: 'fail', ruleIds: ['NOT_IN_BADGE'], text: 'I was refused: Treasury entry refused · controller only.' });
     expect(talk.lines).toHaveLength(3);
     expect(talk.lines.every(line => line.ruleIds.includes('NOT_IN_BADGE') && line.tone === 'fail')).toBe(true);
     expect(talk.askWhy).toBe('Why did Alex (collections-clerk) get DENY on “Treasury entry refused · controller only”?');
@@ -80,7 +93,7 @@ describe('agent talk', () => {
     const talk = handoffTalk({ ...INITIAL_OFFICE, handoffs: rows }, 'extractor')!;
     expect(talk.speaker).toMatchObject({ name: 'Extractor', role: 'handoff team · Lobby', tag: { kind: 'handoff', actor: 'extractor' } });
     expect(talk.greeting.text).toBe("I'm Extractor, handoff team · lobby. I'm on INV-1043: the handoff to Vendor verifier was rejected (VENDOR_MISMATCH).");
-    expect(talkReply(talk, 'stopped')).toEqual({ id: 'stopped', tone: 'fail', ruleIds: ['VENDOR_MISMATCH'],
+    expect(talkReply(talk, 'stopped')).toMatchObject({ id: 'stopped', tone: 'fail', ruleIds: ['VENDOR_MISMATCH'], receiptIds: [],
       text: 'My handoff of INV-1043 to Vendor verifier was rejected: Remit-to ••4821 does not match.' });
     expect(talkReply(talk, 'next').text).toBe('No one is next on INV-1043: the handoff to Vendor verifier was rejected.');
     expect(talk.lines.map(line => line.text)).toEqual([
