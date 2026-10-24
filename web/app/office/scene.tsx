@@ -6,6 +6,8 @@ import { ContactShadows, Instance, Instances, OrbitControls } from '@react-three
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
+import type { PlayBridge } from '../../lib/office/play';
+import { PlayRig } from './play';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
@@ -40,7 +42,7 @@ function ScreenLabel({ at, element }: { at: [number, number, number]; element: L
   useFrame(({ camera, size }) => {
     point.current.set(...at).project(camera);
     if (!element.current) return;
-    element.current.style.visibility = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 ? 'hidden' : 'visible';
+    element.current.style.visibility = point.current.z > 1 || Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 ? 'hidden' : 'visible';
     element.current.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -50%)`;
   });
   return null;
@@ -215,9 +217,9 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored }: {
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
-  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void;
+  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge;
 }) {
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
@@ -276,6 +278,6 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     </Fragment>)}
     </Instances>
     <ServerRoom position={[7.1, 0, -0.8]} />
-    <CameraRig focus={focus} fixed={fixed} tour={tour} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
+    {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
