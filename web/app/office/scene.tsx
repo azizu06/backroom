@@ -1,17 +1,20 @@
 'use client';
 
 import { useEffect, useRef, type ComponentRef, type RefObject } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { doorFlash } from '../../lib/office/view';
+import { registerSceneFrameRequester } from '../../lib/office/frame';
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const deskIds = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
+// Office (in the initial bundle) requests on-demand frames through this bridge.
+registerSceneFrameRequester(invalidate);
 
 function Block({ at, size, color, rotation = 0 }: { at: [number, number, number]; size: [number, number, number]; color: string; rotation?: number }) {
   return <Instance position={at} rotation={[0, rotation, 0]} scale={size} color={color} />;
