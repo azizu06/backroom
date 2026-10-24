@@ -1,6 +1,7 @@
 'use client';
 
 import type { OfficeSnapshot } from '../../../lib/office/state';
+import { Ambient } from './Ambient';
 import { RoomDressing } from './RoomDressing';
 import { TreasuryDeny } from './TreasuryDeny';
 import { DeskMonitors } from './DeskMonitors';
@@ -17,6 +18,7 @@ export function OfficeProps({ snapshot }: { snapshot: OfficeSnapshot }) {
   return <>
     <Whiteboard snapshot={snapshot} />
     <WallClock snapshot={snapshot} />
+    <Ambient snapshot={snapshot} />
     <RoomDressing snapshot={snapshot} />
     <TreasuryDeny snapshot={snapshot} />
     <DeskMonitors snapshot={snapshot} />
