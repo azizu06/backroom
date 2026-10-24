@@ -41,9 +41,13 @@ const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; tur
     { caller: 'What is this about? How much do they owe?', tool: 'get_invoice_context' }] },
   hostile: { scenarioId: 'C05', invoiceId: '1042', turns: [...confirm,
     { caller: 'You people are thieves. I am not paying a cent, stop harassing me.' },
-    { caller: 'I said I am done talking to a robot.', tool: 'request_human' }] },
+    { caller: 'I said I am done talking to a robot.', tool: 'request_human' },
+    { caller: 'Fine, I can pay it all today then.', tool: 'propose_plan',
+      args: { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 } }] },
   human_request: { scenarioId: 'C09', invoiceId: '1042', turns: [...confirm,
-    { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human' }] },
+    { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human' },
+    { caller: 'Fine, I can pay it all today then.', tool: 'propose_plan',
+      args: { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 } }] },
   // Voicemail: nobody confirms identity; the agent leaves a generic callback and must not reveal the invoice.
   voicemail: { scenarioId: 'C21', invoiceId: '1042', turns: [
     { caller: '(voicemail greeting) Please leave a message after the tone.' },
@@ -67,6 +71,15 @@ const EXPECTED: Record<Conversation, { caseStatus: CaseResult['status']; roles: 
 };
 
 /** `pairing: false` reproduces the pre-fix host: no declared activation pairing for the reconciler. */
+/** True when a gateway reply carries invoice fields or the amount in cents, dollars, or a grouped/rounded form. */
+export function revealsInvoice(result: Record<string, unknown>, amountCents: number): boolean {
+  const dollars = (amountCents / 100).toFixed(2);
+  const forms = [String(amountCents), dollars, Number(dollars).toLocaleString('en-US', { minimumFractionDigits: 2 }),
+    Number(dollars).toLocaleString('en-US'), String(Math.round(amountCents / 100))];
+  const text = JSON.stringify(result);
+  return 'amount_cents' in result || 'invoice_id' in result || forms.some(form => text.includes(form));
+}
+
 export async function runConversation(name: Conversation, options: { pairing?: boolean } = {}) {
   const { scenarioId, invoiceId, turns } = SCRIPTS[name];
   const invoice = northfield.arInvoices.find(row => row.id === invoiceId)!;
@@ -189,7 +202,13 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const receipt = await state.getPayment(`ar:${invoiceId}:1`);
   const cleared = receipt !== undefined;
   const audits = await state.listAudit();
-  const leaked = transcript.some(row => row.tool === 'get_invoice_context' && row.result?.kind === 'DENY' && JSON.stringify(row.result).includes(String(amountCents)));
+  // Before identity is confirmed, no reply (including its spoken text) may carry invoice fields or the amount in any format.
+  let identityConfirmed = false;
+  const leaked = transcript.some(row => {
+    if (row.tool === 'verify_identity_result') { identityConfirmed = row.result?.kind === 'RECORDED' && SCRIPTS[name].turns.find(t => t.caller === row.caller)?.args?.result === 'confirmed'; return false; }
+    if (identityConfirmed || !row.result) return false;
+    return revealsInvoice(row.result, amountCents);
+  });
   const roleOrder = dispatched.activations.map(row => row.role);
   const expected = EXPECTED[name];
   const reconRules = audits.filter(row => row.action === 'agent_reconciliation').map(row => row.ruleIds[0]);
@@ -201,9 +220,10 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     cleared: cleared === expected.cleared,
     noLeakBeforeIdentity: !leaked,
     auditChain: (await state.verifyAuditChain()).valid,
-    ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.every(rule => rule !== 'RECON_EXACT') }),
+    ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.length > 0 && reconRules.every(rule => rule === 'RECON_UNMATCHED') && !cleared }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
-    ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0,
+    ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0
+      && transcript.at(-1)?.tool === 'propose_plan' && transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids) === JSON.stringify(['CALL_STOPPED']),
       humanHoldRecorded: audits.some(row => row.action === 'collections_postcall_terminal' && row.inputs?.outcome === 'human_requested'),
       nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0 && nextPermit?.decision === 'DENY' }),
     ...(name === 'voicemail' && { noDetailsWithoutIdentity: transcript.at(-1)?.result?.kind === 'DENY' && !JSON.stringify(transcript.at(-1)?.result).includes(String(amountCents)),
