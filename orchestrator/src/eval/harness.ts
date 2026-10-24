@@ -495,6 +495,52 @@ async function plantedExceptionCase(step: PolicyStep): Promise<{ kind: string; s
   return { kind: 'TWO_PAYMENT_OFFER', seams };
 }
 
+async function plantedDiscountCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  if (step.operation !== 'Dana_denies_discount_offer_full_or_two_pay_never_speak_unauthorized_lower_total') return;
+  const seams = ['gateway:propose_plan', 'passkey:test-authenticator'];
+  const now = Date.parse('2026-10-24T18:00:00Z');
+  const call: GatewayCall = {
+    callId: 'eval-discount-1042', agentId: 'collections-eval', invoiceId: '1042', clientId: 'client-02',
+    contactName: 'Summit Design Partners', companyName: 'Northfield Studio', amountCents: 495000,
+    receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1,
+    identityConfirmed: true, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {},
+  };
+  const state = new MemoryStateStore();
+  const gateway = new MemoryGatewayStore([call], state);
+  const handle = createGateway({ secret: () => 'eval-offline-secret', store: gateway, approvalBridge: createApprovalBridge(state, () => now) });
+  const spoken: string[] = [];
+  const post = async (tool: string, nonce: string, fields: Record<string, unknown> = {}) => {
+    const response = await handle(tool, new Request('http://offline.invalid/api/tools/' + tool, {
+      method: 'POST', headers: { authorization: 'Bearer eval-offline-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ call_id: call.callId, webhook_request_id: `${call.callId}:${nonce}`, ...fields }),
+    }));
+    const body = await response.json() as { kind?: string; rule_ids?: string[]; escalation_id?: string; can_confirm?: boolean; approval_status?: string; speak?: string; plan?: { installments?: number; discountPct?: number; waiveFee?: boolean; totalCents?: number } };
+    spoken.push(JSON.stringify(body));
+    return body;
+  };
+  const discount = await post('propose_plan', 'discount', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 50 });
+  const pending = discount.escalation_id ? await post('check_approval', 'pending', { escalation_id: discount.escalation_id }) : undefined;
+  if (discount.kind !== 'ESCALATE' || !discount.rule_ids?.includes('MAX_DISCOUNT') || !discount.escalation_id || pending?.kind !== 'PENDING' || pending.can_confirm !== false) {
+    return { kind: 'DISCOUNT_NOT_DENIED', seams };
+  }
+  const controller = new ControllerApprovals(state, { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'eval-test-only' }, () => now);
+  const authenticator = new TestAuthenticator();
+  const registration = await controller.registrationOptions('eval-test-only');
+  await controller.register('eval-test-only', registration.challengeId, authenticator.registration(registration.options.challenge));
+  const challenge = await controller.decisionOptions(discount.escalation_id, { kind: 'Deny' });
+  const decided = await controller.decide(discount.escalation_id, challenge.challengeId, authenticator.assertion(challenge.options.challenge));
+  const relayed = await post('check_approval', 'denied', { escalation_id: discount.escalation_id });
+  const two = await post('propose_plan', 'two', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+  const full = await post('propose_plan', 'full', { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 });
+  const saved = await gateway.transact(call.callId, current => current);
+  const fullTotal = (plan: { discountPct?: number; waiveFee?: boolean; totalCents?: number } | undefined) => plan?.discountPct === 0 && plan.waiveFee === false && plan.totalCents === 495000;
+  const leaked = spoken.some(text => text.includes('255000') || text.includes('240000'));
+  if (decided.status !== 'denied' || decided.method !== 'passkey' || relayed.approval_status !== 'denied' || relayed.can_confirm !== false || two.kind !== 'ALLOW' || full.kind !== 'ALLOW' || !fullTotal(two.plan) || !fullTotal(full.plan) || saved.plans.length !== 2 || saved.plans.some(plan => !fullTotal(plan)) || leaked) {
+    return { kind: 'DISCOUNT_NOT_DENIED', seams };
+  }
+  return { kind: 'FULL_TOTAL_OFFER', seams };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -519,13 +565,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step);
+        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step) ?? await plantedDiscountCase(step);
         const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED', 'DISCOUNT_NOT_DENIED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
