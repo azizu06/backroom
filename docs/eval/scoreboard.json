@@ -4,11 +4,11 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "349e46f577ec4f9daea102a2311a30c17eeb8814",
+    "baseCommit": "961baea9dd7925460e680446acbc8326dcb78a7f",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "accf5a5567a238bcfb337a3ec2564cd4e914178e7943efed5d1184f77312cbae",
+      "orchestrator/src/agents/eval/conversation.ts": "c4cd8e828a12e5dc782ad6ffc7162ef9661d19fd98c0591132236c1b88ca7b60",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -13976,7 +13976,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
-        "identityDenied": true
+        "identityDenied": true,
+        "numberFlagged": true
       },
       "callStatus": "human_requested",
       "caseStatus": "held",
@@ -13994,7 +13995,9 @@
         "collections.planner.get_invoice_context",
         "collections.planner.can_call",
         "collections.planner.run_precall",
-        "collections.planner.start_call"
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     },
