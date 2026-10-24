@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { ReplayRecording } from '@backroom/orchestrator';
+import type { ReplayRecording } from '@backroom/orchestrator/replay';
 import { createReplayPlayer } from '../lib/replay/player';
 import { Office } from '../app/office/Office';
 import { AuditWall, type AuditSnapshot } from './AuditWall';

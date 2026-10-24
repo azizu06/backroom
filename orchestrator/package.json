@@ -35,6 +35,7 @@
     ".": "./src/index.ts",
     "./reducer": "./src/reducer-engine.ts",
     "./spacetime-client": "./src/spacetime-client/index.ts",
-    "./spacetime-client/types": "./src/spacetime-client/types.ts"
+    "./spacetime-client/types": "./src/spacetime-client/types.ts",
+    "./replay": "./src/replay/index.ts"
   }
 }

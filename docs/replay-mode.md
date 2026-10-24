@@ -19,21 +19,30 @@ would be a new model/read request rather than part of the recording.
 From the repo root:
 
 ```sh
-pnpm demo:core --record my-backup
+STATE_STORE=spacetime pnpm demo:core --record my-backup
 # Then restart/rebuild the web app if it is a production build:
 pnpm --filter @backroom/web build
 # /office?replay=my-backup or /audit?replay=my-backup
 ```
+
+The configured SpacetimeDB writer and four fresh per-run databases (base,
+`-on`, `-off`, `-ap`) are required for the durable demo path; follow
+`spacetime/README.md`. The recorder decorates the configured store and preserves
+its normal connection cleanup. Unit tests and the bundled synthetic offline
+fixture use explicit `STATE_STORE=memory` without a database.
 
 Names use letters, digits, `_` or `-` (64 characters max). Files are created
 exclusively at `fixtures/replays/<name>.jsonl`; existing recordings are never
 overwritten. `--live` and `--record` cannot be combined. Only review and commit
 synthetic recordings: bundled files are public through their replay pages.
 Do not place real client data, credentials or recordings from a real call there.
-The recorder does not read `.env.local` or make network/model calls.
+The recorder never serializes environment variables or credentials. The CLI
+uses normal runtime bootstrap; durable recording performs StateStore reads and
+writes, while playback performs none. No new model or sponsor-service call is
+introduced by recording.
 
-`core-offline.jsonl` was captured by `pnpm demo:core --record core-offline`:
-140 ordered frames, 25,375 ms, four separate demo phases (Collections #1042,
+`core-offline.jsonl` was captured by `STATE_STORE=memory pnpm demo:core --record core-offline`:
+140 ordered frames, 25,397 ms, four separate demo phases (Collections #1042,
 inbox LLM on, inbox LLM off, Northfield AP). Original synthetic sponsor responses,
 scripted voice turns and software test passkey remain explicitly synthetic. This
 is a state/audit backup; it does not contain call audio. Pair it with an honestly
@@ -47,8 +56,8 @@ clock. Replay position and audit event time are distinct.
 
 ## Contract
 
-`@backroom/orchestrator` exports `createReplayRecorder`, `parseReplay` and the
-`ReplayRecording` types. The recorder attaches to a fresh `StateStore` before
+`@backroom/orchestrator/replay` exports `createReplayRecorder`, `parseReplay` and the
+`ReplayRecording` types without importing live runtime bootstrap. The recorder attaches to a fresh `StateStore` before
 registration and serializes its successful mutations. It then reads agents,
 tasks, escalations, policy/runtime state and incremental audit entries through
 public read APIs; it never inspects a store's private maps or copies reducer

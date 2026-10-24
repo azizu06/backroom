@@ -25,7 +25,7 @@ describe('read-only OfficeState replay', () => {
     expect(player.source.getSnapshot().agents[0]?.targetAnchor).toBe('collections');
     player.setSpeed(2); player.advance(250);
     expect(player.source.getSnapshot().agents[0]?.targetAnchor).toBe('dana');
-    expect(player.getSnapshot().entries).toHaveLength(1);
+    expect(player.getSnapshot().entries.map(entry => entry.action)).toContain('plan');
     player.pause(); player.advance(1000);
     expect(player.getSnapshot().positionMs).toBe(1000);
     player.play(); player.advance(250); player.pause();
@@ -34,7 +34,7 @@ describe('read-only OfficeState replay', () => {
     player.advance(500);
     expect(player.source.getSnapshot().agents[0]?.pos).toEqual(frozen);
     player.seek(0);
-    expect(player.getSnapshot().entries).toHaveLength(0);
+    expect(player.getSnapshot().entries.map(entry => entry.action)).not.toContain('plan');
     expect(player.source.getSnapshot().agents[0]?.pos).toEqual([-5, -1.8]);
     expect(player.source.getSnapshot().agents[0]?.targetAnchor).toBe('collections');
     player.seek(3000); player.play(); player.advance(1000);

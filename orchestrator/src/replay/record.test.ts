@@ -19,7 +19,7 @@ describe('run recording', () => {
     const recording = parseReplay(recorder.toJsonl());
     expect(recording.frames.find(frame => frame.atMs === 100)?.state.agents[0]?.targetAnchor).toBe('dana_desk');
     expect(recording.frames.at(-1)?.state.agents[0]?.targetAnchor).toBe('collections_desk');
-    expect(recording.frames.flatMap(frame => frame.audit).map(entry => entry.seq)).toEqual([1]);
+    expect(recording.frames.flatMap(frame => frame.audit)).toEqual(await store.listAudit());
     expect(recording.durationMs).toBe(200);
   });
 });
@@ -53,4 +53,27 @@ it('records independent genesis chains without renumbering phase-local audit ids
   const recording = parseReplay(recorder.toJsonl());
   expect(recording.frames.flatMap(frame => frame.audit).map(row => row.id)).toEqual(['audit:1', 'audit:1']);
   expect(recording.frames.map(frame => frame.phase)).toEqual(['call', 'inbox']);
+});
+
+it('records through the SpacetimeStateStore public adapter with mocked transport', async () => {
+  const { SpacetimeStateStore } = await import('../spacetime-store');
+  const engine = new MemoryStateStore();
+  const durable = new SpacetimeStateStore({ transport: {
+    ready: Promise.resolve(), close() {},
+    onControl(listener) { listener({ connected: true, enabled: true, generation: 0n }); return () => {}; },
+    async invoke(method, values) {
+      const fn = engine[method as keyof MemoryStateStore];
+      if (typeof fn !== 'function') throw new Error('UNEXPECTED_TRANSPORT_METHOD');
+      return Reflect.apply(fn, engine, values);
+    },
+  } });
+  try {
+    const recorder = createReplayRecorder({ name: 'durable-test' });
+    const store = recorder.attach(durable, 'call');
+    await store.registerAgent('alex', 'collections', 1000);
+    const recording = parseReplay(recorder.toJsonl());
+    expect(recording.frames[0]?.state.agents[0]?.id).toBe('alex');
+    expect(recording.frames[0]?.audit).toEqual(await durable.listAudit());
+    expect(recording.frames[0]?.state.llmEnabled).toBe(true);
+  } finally { await durable.close(); }
 });

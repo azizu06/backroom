@@ -1,5 +1,5 @@
 import type { AuditEntry } from '@backroom/orchestrator';
-import type { ReplayRecording, ReplayFrame } from '../../../orchestrator/src/replay/types';
+import type { ReplayRecording, ReplayFrame } from '@backroom/orchestrator/replay';
 import { WalkMotion } from '../office/motion';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot, type OfficeState, type SeatId } from '../office/state';
 
