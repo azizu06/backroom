@@ -12,7 +12,7 @@ describe('coworker play targets', () => {
     expect(coworkerSpots([peer(), peer({ viewerId: 'v2', mode: 'overview' })])).toEqual([{ id: 'v1', name: 'Viewer 00V1', position: [-5, -0.2] }]);
   });
   it('walking up to a coworker offers Say hi with a prefilled greeting', () => {
-    const candidates = interactCandidates([], [], [], coworkerSpots([peer()]));
+    const candidates = interactCandidates([], [], coworkerSpots([peer()]));
     const target = pickTarget([-5, 0.9], 0, candidates);
     expect(target).toEqual({ kind: 'coworker', id: 'v1', name: 'Viewer 00V1' });
     expect(targetKey(target)).toBe('coworker:v1');
@@ -21,7 +21,7 @@ describe('coworker play targets', () => {
     expect(pickTarget([-5, 4], 0, candidates)).toBeNull();
   });
   it('agents win exact ties with coworkers', () => {
-    const candidates = interactCandidates([{ id: 'alex', position: [-5, -0.2] }], [], [], coworkerSpots([peer()]));
+    const candidates = interactCandidates([{ id: 'alex', position: [-5, -0.2] }], [], coworkerSpots([peer()]));
     expect(pickTarget([-5, 0.9], 0, candidates)).toMatchObject({ kind: 'agent' });
   });
 });

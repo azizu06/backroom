@@ -29,7 +29,7 @@ async function main() {
       if (path === '/__demo/health' && req.method === 'GET') {
         res.end(JSON.stringify(await runtime.health())); return;
       }
-      if (path === '/__demo/voice-call' || path === '/__demo/voice-client-stopped') {
+      if (path === '/__demo/voice-call' || path === '/__demo/voice-call-ended' || path === '/__demo/voice-client-stopped') {
         // Tunnel requests also arrive on loopback: require the private Host as well.
         if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '')
           || req.headers.host !== `127.0.0.1:${port}`) { res.writeHead(403).end('{}'); return; }
@@ -37,11 +37,12 @@ async function main() {
           if (path.endsWith('voice-client-stopped') && req.method === 'GET') {
             res.end(JSON.stringify({ stopped: await runtime.clientStopped() })); return;
           }
-          if (path.endsWith('voice-call') && req.method === 'POST') {
+          if ((path === '/__demo/voice-call' || path === '/__demo/voice-call-ended') && req.method === 'POST') {
             let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 1024) throw new Error('TOO_LARGE'); }
             const body = JSON.parse(raw);
             if (!body || Object.keys(body).length !== 1 || typeof body.sessionId !== 'string') throw new Error('INVALID_SESSION');
-            await runtime.registerVoiceCall(body.sessionId);
+            if (path === '/__demo/voice-call-ended') await runtime.endVoiceCall(body.sessionId);
+            else await runtime.registerVoiceCall(body.sessionId);
             res.end('{"ok":true}'); return;
           }
           res.writeHead(405).end('{}');

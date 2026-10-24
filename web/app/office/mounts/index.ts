@@ -3,6 +3,9 @@
  * folder (a component taking SceneMountProps) and one entry below. Order is draw order.
  */
 import { OfficeProps } from '../props/OfficeProps';
+import { LobbyInbox } from '../props/LobbyInbox';
+import { ReceiptPrinter } from '../props/ReceiptPrinter';
+import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
 import { AuditWallMount } from './AuditWallMount';
 import { Desks } from './Desks';
 import { Doors } from './Doors';
@@ -26,6 +29,9 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'audit-wall', instanced: false, Component: AuditWallMount },
   { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },
   { id: 'props', instanced: false, Component: OfficeProps },
+  { id: 'lobby-inbox', instanced: false, Component: LobbyInbox },
+  { id: 'receipt-printer', instanced: false, Component: ReceiptPrinter },
+  { id: 'lobby-deny-stamp', instanced: false, Component: LobbyDenyStamp },
   { id: 'handoffs', instanced: false, Component: HandoffMount },
   { id: 'performance', instanced: false, Component: Performance },
 ];

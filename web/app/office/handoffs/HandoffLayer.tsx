@@ -7,6 +7,7 @@ import { REDUCED_MOTION_QUERY, legSwing } from '../../../lib/office/a11y';
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, type HandoffAgentId } from '../../../lib/office/handoffs';
 import { nextChange, type HandoffFrame, type HandoffStage } from '../../../lib/office/handoff-plan';
 import { setHandoffText } from '../../../lib/office/handoff-text';
+import { Bear, createBearRig, poseBear, type BearRig } from '../avatars/Bear';
 
 /** Looks up the HTML tag (name + speech bubble) Office renders for a handoff agent. */
 export type HandoffTagLookup = (actor: HandoffAgentId) => HTMLDivElement | undefined;
@@ -22,6 +23,7 @@ function useReducedMotion() {
   return useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia(REDUCED_MOTION_QUERY).matches, () => false);
 }
 
+/** Dana stays a person; every agent is a Bear. */
 function Figure({ color, coat = '#414b43', registerLegs }: { color: string; coat?: string; registerLegs?: (legs: Group | null) => void }) {
   return <>
     <mesh position={[0, 0.83, 0]} castShadow><boxGeometry args={[0.43, 0.6, 0.28]} /><meshStandardMaterial color={color} /></mesh>
@@ -35,7 +37,7 @@ function Figure({ color, coat = '#414b43', registerLegs }: { color: string; coat
 }
 
 /**
- * Agent-to-agent handoffs: one figure per backend agent at its station, folders passed between them,
+ * Agent-to-agent handoffs: one bear per backend agent at its station, folders passed between them,
  * and Dana only at the passkey step. Positions come from the pure plan (handoff-plan.ts); this layer only
  * draws them. Renders on demand: frames are requested while someone walks or a folder is mid-pass, and a
  * timer wakes the scene for the next bubble or leg start.
@@ -44,7 +46,8 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
   const reduced = useReducedMotion();
   const invalidate = useThree(state => state.invalidate);
   const bodies = useRef(new Map<HandoffAgentId, Group>());
-  const legs = useRef(new Map<HandoffAgentId, Group>());
+  const humanLegs = useRef<Group | null>(null);
+  const rigs = useRef(new Map<HandoffAgentId, BearRig>(FLOOR_AGENTS.map(id => [id, createBearRig()])));
   const rings = useRef(new Map<HandoffAgentId, Mesh>());
   const human = useRef<Group>(null);
   const folders = useRef<(Group | null)[]>([]);
@@ -57,6 +60,7 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
   useFrame((state, delta) => {
     const now = Date.now();
     const frame: HandoffFrame = stage.sample(now, reduced);
+    const carriers = new Set(frame.folders.map(folder => folder.carrier));
     for (const actor of frame.actors) {
       const body = actor.id === HUMAN ? human.current : bodies.current.get(actor.id);
       if (!body) continue;
@@ -67,8 +71,11 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
         const turn = MathUtils.euclideanModulo(actor.heading - body.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
         body.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
       }
-      const legGroup = legs.current.get(actor.id);
-      if (legGroup) legGroup.children.forEach((leg, i) => { leg.rotation.x = legSwing(actor.stride, i, actor.moving, reduced); });
+      const rig = rigs.current.get(actor.id);
+      if (rig) {
+        rig.carry = carriers.has(actor.id) ? 'front' : 'none';
+        poseBear(rig, actor.stride, actor.moving, reduced);
+      } else humanLegs.current?.children.forEach((leg, i) => { leg.rotation.x = legSwing(actor.stride, i, actor.moving, reduced); });
       const ring = rings.current.get(actor.id);
       if (ring) {
         ring.visible = actor.returning;
@@ -126,7 +133,7 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
       const { station, color } = HANDOFF_AGENTS[id];
       return <group key={id} name={`handoff-agent:${id}`} position={[station[0], 0, station[1]]}
         ref={group => { if (group) bodies.current.set(id, group); else bodies.current.delete(id); }}>
-        <Figure color={color} registerLegs={group => { if (group) legs.current.set(id, group); else legs.current.delete(id); }} />
+        <Bear color={color} seed={id} rig={rigs.current.get(id)} />
         {/* Return-trip cue: a red ring under an agent walking a failed folder back. */}
         <mesh ref={mesh => { if (mesh) rings.current.set(id, mesh); else rings.current.delete(id); }} visible={false} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
           <ringGeometry args={[0.38, 0.5, 24]} /><meshBasicMaterial color={RETURNED} transparent opacity={0.9} />
@@ -134,7 +141,7 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
       </group>;
     })}
     <group ref={human} name='handoff-human' visible={false} position={[HANDOFF_AGENTS.human.station[0], 0, HANDOFF_AGENTS.human.station[1]]}>
-      <Figure color={HANDOFF_AGENTS.human.color} coat='#2f3a45' registerLegs={group => { if (group) legs.current.set(HUMAN, group); else legs.current.delete(HUMAN); }} />
+      <Figure color={HANDOFF_AGENTS.human.color} coat='#2f3a45' registerLegs={group => { humanLegs.current = group; }} />
       {/* Passkey card in Dana's hand. */}
       <mesh position={[0.32, 1.02, 0.22]}><boxGeometry args={[0.16, 0.1, 0.02]} /><meshStandardMaterial color='#f3dfb9' emissive='#c3b68e' emissiveIntensity={0.4} /></mesh>
     </group>

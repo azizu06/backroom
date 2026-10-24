@@ -6,15 +6,15 @@ import type { Invocation } from '../gateway/parser';
 export function createApprovalBridge(store: StateStore, now = Date.now) {
   return async (call: GatewayCall, input: Invocation, result?: ToolResult) => {
     await store.expireEscalations(now());
-    if (input.tool === 'check_approval') {
-      const local = call.escalations.find(e => e.id === input.escalationId);
-      if (!local) return;
+    // Refresh before the tool runs so an expired row is not still "pending" on a re-ask.
+    for (const local of call.escalations) {
       const row = await store.getEscalation(local.id);
-      if (!row || row.callId !== call.callId) return;
+      if (!row || row.callId !== call.callId) continue;
       local.status = row.status;
       local.method = row.method;
       local.decision = row.decision;
       local.decidedAt = row.decidedAt;
+      local.createdAt = row.createdAt;
       local.expiresAt = row.expiresAt;
     }
     if (result?.kind !== 'ESCALATE' || typeof result.escalation_id !== 'string') return;

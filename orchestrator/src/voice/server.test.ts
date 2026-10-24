@@ -24,6 +24,21 @@ async function fixture() {
   return { handle, gateway, event, tool };
 }
 describe('voice HTTP boundary with the actual tool gateway', () => {
+  it('closes the gateway call when the provider call ends, and retries if that close fails', async () => {
+    const journal = new VoiceJournal();
+    const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, userReply: '', stopped: false, deliveries: {} };
+    await journal.register(session);
+    const event = (handle: ReturnType<typeof createVoiceHandler>, id: string) => handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
+      body: JSON.stringify({ type: 'call_completed', call_id: 'ac-1', webhook_request_id: id }) }));
+    const failing = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway: async () => Response.json({}),
+      onCallEnded: async () => { throw new Error('close failed'); } });
+    expect((await event(failing, 'done')).status).toBe(500);
+    const ended: string[] = [];
+    const handle = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway: async () => Response.json({}),
+      onCallEnded: async id => { ended.push(id); } });
+    expect((await event(handle, 'done')).status).toBe(200);
+    expect(ended).toEqual(['session-1']);
+  });
   it('keeps invoice data unavailable through interrupted disclosure and unconfirmed identity', async () => {
     const f = await fixture();
     await f.event('turn-1', { role: 'assistant', text: welcome, was_interrupted: true });
