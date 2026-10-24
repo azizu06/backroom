@@ -10,20 +10,18 @@ async function main() {
   let bank: DemoBank | undefined;
   let accountId: string | undefined;
   if (args.includes('--live')) {
-    const env = new URL('../../../.env.local', import.meta.url);
+    const env = new URL('../../../../.env.local', import.meta.url);
     if (existsSync(env)) process.loadEnvFile(fileURLToPath(env));
     if (!process.env.NESSIE_API_KEY) throw new Error('LIVE_NESSIE_KEY_REQUIRED: --live needs NESSIE_API_KEY');
-    // Optional integration from #21/#42. Do not duplicate its HTTP SDK or silently claim a fake is live.
-    const source = new URL('../../../integrations/nessie/src/index.ts', import.meta.url);
-    if (!existsSync(source)) throw new Error('LIVE_NESSIE_CLIENT_NOT_MERGED: merge https://github.com/azizu06/backrooms/pull/42 first; use pnpm demo:core for the labeled fake');
-    const module = await import(source.href);
-    const claims = new module.FileClaims(fileURLToPath(new URL('../../../.board/core-demo-nessie-claims', import.meta.url)));
-    bank = new module.NessieClient({ apiKey: process.env.NESSIE_API_KEY, claims });
+    const module = await import('@backroom/nessie');
+    const claims = new module.FileClaims(process.env.NESSIE_CLAIMS_DIR ?? fileURLToPath(new URL('../../../../.nessie-state/claims', import.meta.url)));
+    const client = new module.NessieClient({ apiKey: process.env.NESSIE_API_KEY, claims });
+    bank = client;
     accountId = process.env.NESSIE_ACCOUNT_ID;
-    if (!accountId) accountId = (await module.seedNorthfield(bank, claims)).account._id;
+    if (!accountId) accountId = (await module.seedNorthfield(client, claims)).account._id;
     console.log('LIVE Nessie sandbox ONLY. Card, call, controller authenticator and external pre-call checks remain simulated.');
   }
-  console.log('MOMENT 1 | 3D closed | policy + gateway + StateStore real; all external services fake by default');
+  console.log('MOMENT 1 | 3D closed | policy + gateway + payment service + reconciliation + StateStore real; external transports fake by default');
   const run = await runCoreDemo({ bank, accountId, ...(bank && { bankLabel: 'live_nessie_sandbox' }) });
   for (const line of run.transcript) console.log(line);
   console.log(`AUDIT chain valid=${run.chainValid}; gateway IDs retained in refs; why IDs audit_N alias audit:N`);

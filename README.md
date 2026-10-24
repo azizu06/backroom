@@ -58,7 +58,7 @@ checkpoint or live sponsor gates.
  -> propose_plan(4, retain fee): ESCALATE / MAX_INSTALLMENTS
  -> escalation row + Dana_desk -> real WebAuthn verifier + software test authenticator denies
  -> check_approval -> propose_plan(2, 50/50): ALLOW
- -> stored $2,475 link -> fake Nessie feed + balance readback
+ -> stored $2,475 link -> real payment service + Nessie SDK (fake HTTP) -> exact reconciliation
  -> exact reconciliation -> partially_paid -> hash-chain audit + two cited why answers
 4471 inbox -> Payables -> LOOKALIKE_DOMAIN -> held/escalated; zero bank effects
  -> corrected-domain defense check still BANK_CHANGE_HOLD
@@ -77,8 +77,8 @@ sender domain; it never releases the actual lookalike payment.
 | Voice (#18) | Real authenticated `web/lib/gateway` HTTP handlers, parser, policy, dedupe and transactional gateway store | Scripted turns; no Cartesia dial, speech, transcript compliance, or delivery provider |
 | State (#16) | Real `MemoryStateStore`, leases, invoice transitions, target anchors, hash-chain audit | In process; no SpacetimeDB or restart durability. Demo copies gateway audits into the state chain, preserving source IDs in `refs` |
 | Controller (#20) | Real approval bridge, StateStore escalation/desk target, `ControllerApprovals` registration and signed assertion verification, then gateway `check_approval` | Exported software `TestAuthenticator` supplies P-256 signatures; no human phone/Face ID tap. The recorded human actor describes the verifier contract, not evidence of an actual Dana tap |
-| Pay page + bank (#21) | Link amount comes only from the committed allowed plan: ($4,800 + $150) × 50% = $2,475 | Pay-page click/email delivery simulated. `FakeDemoBank` implements the Nessie client's deposit/readBalance/listDeposits subset |
-| Reconciliation (#21) | Code checks unique deposit ID, exact memo, completed status, amount and bank balance delta | Demo bookkeeper adapter until the exported reconciler lands; short/duplicate feed tests fail closed |
+| Pay page + bank (#21) | Link amount comes only from the committed ALLOW plan; real `PaymentService` and Nessie SDK | CLI click/email delivery and bank HTTP are simulated. Mobile page: see [M7 setup](docs/m7-payments.md) |
+| Reconciliation (#21) | Exported job checks unique deposit ID, exact memo, completed status, amount; reducer transitions + receipt | Balance display uses the SDK's exact API-derived label, never settlement evidence. Seed short/duplicate/already-paid tests fail closed |
 | Inbox/payables (#22) | Real `routeInboxItem`, `SeatWorker`, `evaluateStep`, escalation and Dana target | Typed #4471 fixture replaces email/PDF extraction and the not-yet-merged payables pipeline; no vendor master mutation |
 | Ask why (#23) | Real retrieval and cited deterministic templates; `audit_N` maps to StateStore `audit:N` in evidence refs | Explicit offline option; no Claude call or TTS |
 | LLM OFF (#47) | Real store switch, router `LLM_OFF`, inbox routing and policy enforcement | No model needed for either typed bank-change run; OFF never simulates a new voice call |
@@ -89,7 +89,7 @@ can vary across executions; assertions compare outcomes and validate each chain,
 not byte-identical logs. The command prints policy quotes, original gateway IDs,
 StateStore IDs, `prevHash`/`hash`, fake labels, and two grounded answers.
 
-Opt-in Nessie sandbox run: **after the #21 client is merged**, put
+Opt-in Nessie sandbox run: put
 `NESSIE_API_KEY` in root `.env.local` and run `pnpm demo:core --live`. Optionally
 set `NESSIE_ACCOUNT_ID`; otherwise the exported client seeds Northfield. It uses
 that client's durable claims in gitignored `.board/core-demo-nessie-claims`, and

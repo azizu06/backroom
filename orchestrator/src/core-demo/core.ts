@@ -10,7 +10,9 @@ import { TestAuthenticator } from '../approvals/testing/authenticator';
 import { createApprovalBridge } from '../../../web/lib/approvals/gateway';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall, type ToolResult } from '../../../web/lib/gateway/store';
-import { FakeDemoBank, reconcile, type DemoBank } from './bank';
+import { FakeDemoBank, type DemoBank } from './bank';
+import { PaymentService } from '../payments';
+import { authorizedPaymentLink } from '../../../web/lib/payments/authorization';
 
 const NOW = Date.parse('2026-10-24T18:00:00Z');
 const callId = 'demo-core-1042';
@@ -37,13 +39,12 @@ export function verifyChain(entries: AuditEntry[]): boolean {
 
 export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string } = {}) {
   const store = new MemoryStateStore();
-  const gatewayStore = new MemoryGatewayStore([baseCall()]);
+  const gatewayStore = new MemoryGatewayStore([baseCall()], store);
   const gateway = createGateway({ secret: () => secret, store: gatewayStore,
     approvalBridge: createApprovalBridge(store, () => NOW) });
   const bank = options.bank ?? new FakeDemoBank();
   const transcript: string[] = ['3D CLOSED; synthetic company/client; scripted call turns (no phone call).'];
   let requestId = 0;
-  let copiedAudits = 0;
   const tool = async (name: string, args: Record<string, unknown> = {}): Promise<ToolResult> => {
     const response = await gateway(name, new Request(`http://demo.invalid/api/tools/${name}`, {
       method: 'POST', headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
@@ -51,15 +52,6 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
     }));
     requireThat(response.ok, `gateway ${name} failed (${response.status})`);
     const result = await response.json() as ToolResult;
-    // Explicit demo adapter: preserve original gateway audit IDs in the StateStore chain.
-    const call = await gatewayStore.transact(callId, call => call);
-    for (const audit of call.audits.slice(copiedAudits)) {
-      await store.appendAudit({ ts: NOW, actor: 'code', seat: 'collections', action: audit.action,
-        ruleIds: audit.ruleIds, policyVersion: audit.policyVersion, refs: ['1042', audit.id], route: 'code',
-        ...(audit.kind !== 'RECORDED' && { decision: audit.kind }),
-        inputs: { gatewayAuditId: audit.id, plan: audit.plan, decision: audit.decision }, latencyMs: 0, costUsd: 0 });
-    }
-    copiedAudits = call.audits.length;
     transcript.push(`${name}: ${JSON.stringify(result)}`);
     return result;
   };
@@ -69,7 +61,7 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
       latencyMs: 0, costUsd: 0 });
 
   await store.registerAgent('collections-demo', 'collections', NOW);
-  await store.enqueueTask({ id: 'collect-1042', seatId: 'collections', refs: ['1042'], steps: [] });
+  await store.enqueueTask({ id: 'collect-1042', seatId: 'collections', refs: ['1042'], idempotencyKey: 'ar:1042:1', steps: [] });
   const lease = await store.claimTask('collections-demo', NOW, 12000);
   requireThat(lease, 'collection lease missing');
   await store.insertInvoice({ id: '1042', kind: 'ar', state: 'overdue' });
@@ -142,21 +134,22 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
   const linkResult = await tool('send_payment_link', { plan_id: allowed.plan_id });
   const link = await gatewayStore.transact(callId, call => call.links.find(link => link.planId === allowed.plan_id));
   requireThat(link && link.amountCents === 247500 && linkResult.amount_cents === link.amountCents, 'link amount differs from allowed plan');
-  transcript.push('Pay page/delivery SIMULATED: consuming stored link, never a client-supplied amount.');
-  const payment = { accountId: options.accountId ?? 'receivables', invoiceId: '1042', installment: 1, amountCents: link.amountCents };
-  const balanceBeforeCents = Math.round(await bank.readBalance(payment.accountId) * 100);
-  const deposit = await bank.deposit(payment);
-  const feed = await bank.listDeposits(payment.accountId);
-  const invoiceState = reconcile(payment, deposit._id, feed);
-  const balanceAfterCents = Math.round(await bank.readBalance(payment.accountId) * 100);
-  requireThat(invoiceState === 'partially_paid', 'bank feed did not match amount + memo + unique deposit');
-  requireThat(balanceAfterCents - balanceBeforeCents === payment.amountCents, 'bank balance readback mismatch');
-  await store.transitionInvoice(lease, '1042', 'promised', invoiceState, NOW);
-  await store.appendAudit({ ts: NOW, actor: 'code', seat: 'collections', action: 'reconcile', ruleIds: ['EXACT_PAYMENT_MATCH'],
-    policyVersion: 1, refs: ['1042', link.id, deposit._id], route: options.bankLabel ?? 'fake_nessie',
-    inputs: { payment, deposit, invoiceState, balanceBeforeCents, balanceAfterCents }, latencyMs: 0, costUsd: 0 });
+  transcript.push('Pay delivery SIMULATED; real payment service consumes the stored ALLOW link.');
+  const payments = new PaymentService({ bank, accountId: options.accountId ?? 'receivables', now: () => NOW,
+    lookup: async id => {
+      const call = await gatewayStore.findPaymentCall(id);
+      return call ? authorizedPaymentLink(call, id) : undefined;
+    } });
+  const before = await payments.view(link.id);
+  const payment = await payments.pay(link.id);
+  const reconciled = await payments.reconcile(link.id, store, lease, 'promised');
+  requireThat(reconciled.status === 'partially_paid', 'bank feed did not match amount + memo + unique deposit');
+  const after = await payments.view(link.id);
+  const invoiceState = reconciled.status;
+  const balanceBeforeCents = Math.round(before.balance.displayTotal * 100);
+  const balanceAfterCents = Math.round(after.balance.displayTotal * 100);
   await store.completeTask(lease, 'done', NOW);
-  transcript.push(`${options.bankLabel ?? 'FAKE Nessie'}: ${deposit._id}; ${invoiceState}; balance readback ${balanceBeforeCents} -> ${balanceAfterCents} cents`);
+  transcript.push(`${options.bankLabel ?? 'FAKE Nessie transport'}: ${payment.depositId}; ${invoiceState}; ${after.balance.label}: ${balanceBeforeCents} -> ${balanceAfterCents} cents. Account balance=${after.balance.accountBalance}; not settlement.`);
   const entries = await store.listAudit();
   const whyEntries: WhyAuditEntry[] = entries.filter(e => ['DENY', 'ESCALATE'].includes(e.decision ?? '')).map(e => ({
     id: `audit_${e.seq}`, actor: e.actor, seat: e.seat, action: e.action,

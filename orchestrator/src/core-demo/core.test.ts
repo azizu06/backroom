@@ -42,8 +42,8 @@ it.each([false, true])('holds the #4471 bank change with LLM OFF=%s and never di
 it.each(['short', 'duplicate'] as const)('refuses to mark a %s bank-feed match reconciled', async corruption => {
   const { FakeDemoBank } = await import('./bank');
   class CorruptFeed extends FakeDemoBank {
-    override async listDeposits() {
-      const rows = await super.listDeposits();
+    override async listDeposits(accountId: string) {
+      const rows = await super.listDeposits(accountId);
       return corruption === 'short' ? rows.map(row => ({ ...row, amount: row.amount - 1 })) : [...rows, ...rows];
     }
   }

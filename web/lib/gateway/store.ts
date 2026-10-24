@@ -91,6 +91,8 @@ export interface ToolResult {
  * No mutation is committed if work throws. Never expose this interface to voice.
  */
 export interface GatewayStore {
+  /** Trusted server-only lookup by opaque payment capability; no call IDs supplied by clients. */
+  findPaymentCall?(linkId: string): Promise<GatewayCall | undefined>;
   transact<T>(
     callId: string,
     work: (call: GatewayCall) => T | Promise<T>,
@@ -114,6 +116,10 @@ export class MemoryGatewayStore implements GatewayStore {
   ) {
     for (const call of calls)
       this.calls.set(call.callId, structuredClone(call));
+  }
+  async findPaymentCall(linkId: string): Promise<GatewayCall | undefined> {
+    await this.tail;
+    return structuredClone([...this.calls.values()].find(call => call.links.some(link => link.id === linkId)));
   }
   async transact<T>(
     callId: string,
