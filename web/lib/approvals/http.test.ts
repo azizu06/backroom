@@ -6,6 +6,7 @@ import { createGateway } from '../gateway/http';
 import { MemoryGatewayStore } from '../gateway/store';
 import { createApprovalBridge } from './gateway';
 import { approvalDemoCall } from './testing/call';
+import { inboxIds } from './inbox';
 
 const origin = 'http://localhost:3020';
 function request(path: string, body: unknown, requestOrigin = origin) {
@@ -15,7 +16,7 @@ function setup() {
   const state = new MemoryStateStore();
   let now = 1000;
   const service = new ControllerApprovals(state, { origin, rpID: 'localhost', enrollmentSecret: 'test-enrollment' }, () => now);
-  const handler = createApprovalHTTP(() => service, () => origin);
+  const handler = createApprovalHTTP(() => service, () => origin, inboxIds);
   const gatewayStore = new MemoryGatewayStore([approvalDemoCall()]);
   const gateway = createGateway({ secret: () => 'test-tool', store: gatewayStore, approvalBridge: createApprovalBridge(state, () => now) });
   let seq = 0;
@@ -105,5 +106,36 @@ describe('M6 HTTP and gateway boundary', () => {
     expect(after.escalations).toEqual(before);
     expect(after.status).not.toBe('active');
     expect((await tool('check_approval', { escalation_id: 'fake', method: 'passkey', approved: true })).status).toBe(400);
+  });
+
+  it('lists gateway escalations only to a passkey-signed-in controller session', async () => {
+    const { service, handler, tool } = setup();
+    const auth = new TestAuthenticator();
+    const enrolled = await service.registrationOptions('test-enrollment');
+    await service.register('test-enrollment', enrolled.challengeId, auth.registration(enrolled.options.challenge));
+    const escalation = await (await tool('propose_plan', { installments: 4, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 })).json();
+    const inbox = (cookie?: string) => handler('controller', '', 'inbox', new Request(`${origin}/api/controller/inbox`, cookie ? { headers: { cookie } } : {}));
+    expect((await inbox()).status).toBe(401);
+    expect((await inbox('backroom_controller=guess')).status).toBe(401);
+    expect((await handler('controller', '', 'session-options', request('/x', {}, 'https://evil.example'))).status).toBe(403);
+    const { options, challengeId } = await (await handler('controller', '', 'session-options', request('/x', {}))).json();
+    const forged = await handler('controller', '', 'session', request('/x', { challengeId, response: { verified: true, method: 'passkey' } }));
+    expect(forged.status).toBe(403);
+    expect(forged.headers.get('set-cookie')).toBeNull();
+    const again = await (await handler('controller', '', 'session-options', request('/x', {}))).json();
+    const signedIn = await handler('controller', '', 'session', request('/x', { challengeId: again.challengeId, response: auth.assertion(again.options.challenge) }));
+    expect(signedIn.status).toBe(200);
+    const cookie = signedIn.headers.get('set-cookie')!;
+    expect(cookie).toMatch(/^backroom_controller=[\w-]{43}; Path=\/api\/controller; Max-Age=43200; HttpOnly; SameSite=Strict$/);
+    const session = cookie.split(';')[0]!;
+    const listed = await (await inbox(session)).json();
+    expect(listed.escalations.map((e: { id: string }) => e.id)).toContain(escalation.escalation_id);
+    expect(await (await handler('controller', '', 'view', new Request(`${origin}/view`, { headers: { cookie: session } }))).json())
+      .toEqual({ registered: true, signedIn: true });
+    // The session cannot decide: a decision still needs its own bound passkey assertion.
+    const decide = await handler('approval', escalation.escalation_id, 'decide', new Request(`${origin}/decide`, { method: 'POST',
+      headers: { origin, cookie: session, 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId: again.challengeId, response: {} }) }));
+    expect(decide.status).toBe(403);
+    expect((await service.get(escalation.escalation_id)).status).toBe('pending');
   });
 });

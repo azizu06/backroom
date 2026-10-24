@@ -221,7 +221,10 @@ network activity; preflight itself is read-only and makes no model calls.
   Confirm the office connection indicator before judging.
 - Dana: open public `/controller` on the passkey phone. Use the private
   `CONTROLLER_ENROLLMENT_SECRET` from `.env.local` or generated `.demo/private.env`;
-  never display it. Complete registration before resetting for the pitch.
+  never display it. Complete registration before resetting for the pitch, then tap
+  **Sign in with passkey** and leave the page open (screen on, volume up): each new
+  escalation chimes and opens on that screen by itself, so nobody shares a link
+  during the call. See `docs/m6-approvals.md` "Live controller inbox".
 - Audit operator: unlock `/audit` with the private `CONTROLLER_ENROLLMENT_SECRET` from the
   same source. Policy operator: use the separate `POLICY_DEMO_PIN`.
 - Network operator: hotspot/wired internet, charged backup phone, audible volume,
@@ -258,7 +261,7 @@ phone holds the passkey. Run `demo:reset` immediately before the opening.
 
 | Time | Speaker / operator | Action and claim |
 | --- | --- | --- |
-| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” Open the new approval URL on Dana's enrolled phone. |
+| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” The seeded request rings on Dana's signed-in `/controller` page; no link is opened. |
 | 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion while the request is open. It stays open for the call, up to five minutes, and closes when the call ends. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
 | 0:45–1:15 | Demo operator; presenter | Open the printed pay URL, press Pay with simulated card, then show `partially_paid` and the exact-match reconciliation audit. “The real policy, SDK and reducer path ran over an in-memory mock HTTP transport.” No card data and no real money. |
 | 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Open the printed `/attack` URL for the hostile-document proof (mock by default; assessment only, no payment). Use the frozen #4419 or #4471 preset for the inbox trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
