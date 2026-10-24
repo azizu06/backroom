@@ -98,7 +98,8 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
     clonesRef.current.clear();
   }, []);
 
-  // After the blocky avatar's useFrame writes its pose. Idle frames are not requested here.
+  // Priority 0 keeps Fiber's automatic render (a positive priority would take it over); this mount
+  // subscribes after the avatars, so it still runs after their pose writes. Idle frames are not requested here.
   useFrame(() => {
     if (clonesRef.current.size === 0) return;
     for (const [id, clone] of clonesRef.current) {
@@ -107,7 +108,7 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
       placeCharacter(clone, body);
       clone.visible = true;
     }
-  }, 1);
+  });
 
   return <>{models.map(model => <primitive key={model.id} object={model.object} dispose={null} />)}</>;
 }
