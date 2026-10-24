@@ -39,7 +39,7 @@ test('plays and scrubs the original state/audit into 3D, floor plan and audit wa
   await expect(page.getByLabel('2D office floor plan')).toBeVisible();
   await page.screenshot({ path: `${out}/floor-plan-paused.png`, fullPage: true });
   await seek(page, 0);
-  await expect(page.getByText('0 total', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^No decisions in this run yet/)).toBeVisible();
   await page.getByRole('combobox', { name: 'Speed', exact: true }).selectOption('2');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.waitForTimeout(300);
