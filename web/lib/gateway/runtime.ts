@@ -15,3 +15,5 @@ export const handleTool = createGateway({
   secret: () => process.env.TOOL_GATEWAY_SECRET,
   store: { transact: (callId, work) => root.backroomGatewayStore!.transact(callId, work) },
 });
+
+export const getGatewayStore = (): GatewayStore => root.backroomGatewayStore!;

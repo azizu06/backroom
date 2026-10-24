@@ -187,6 +187,9 @@ importers:
 
   orchestrator:
     dependencies:
+      '@backroom/nessie':
+        specifier: workspace:*
+        version: link:../integrations/nessie
       '@backroom/policy':
         specifier: workspace:*
         version: link:../policy
@@ -234,6 +237,9 @@ importers:
 
   web:
     dependencies:
+      '@backroom/nessie':
+        specifier: workspace:*
+        version: link:../integrations/nessie
       '@backroom/orchestrator':
         specifier: workspace:*
         version: link:../orchestrator
