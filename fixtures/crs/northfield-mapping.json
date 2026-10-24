@@ -1,0 +1,8 @@
+{
+  "status": "pending-sponsor-confirmation",
+  "note": "Slots are local placeholders, not approved CRS identities. Do not send these references to CRS. Fill testIdentityId only after CRS provides exact business test bodies and approves mapping.",
+  "mappings": [
+    { "northfieldRef": "invoice:1042", "role": "client", "identitySlot": 1, "testIdentityId": null },
+    { "northfieldRef": "vendor:acme", "role": "vendor", "identitySlot": 2, "testIdentityId": null }
+  ]
+}
