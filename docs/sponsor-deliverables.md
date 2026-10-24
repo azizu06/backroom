@@ -26,7 +26,7 @@ tap, a live CRS/OFAC probe, or a Nessie settlement.
 | Scoreboard row | Result | What it does not prove |
 | --- | --- | --- |
 | Recorded PDF extraction, GX10 gpt-oss:20b | 579/581 fields; 81/83 invoices exact | Not re-run for this note. Provenance hashes `docs/eval/pdf-extraction.json` as `762e09694c6605dcb77c36fb5c84364ffc6248e04c05d8a17e54e709d7ff4e90` |
-| AR scripted calls, including C05 hostile, C08 wrong number, C09 human request, C21 voicemail | 9/9 | Caller lines and tool choices are scripted. No Cartesia speech, live phone, or de-escalation grade |
+| AR scripted calls, including C05 hostile, C08 wrong number, C09 human request, C17 phone mismatch, C21 voicemail | 10/10 | Caller lines and tool choices are scripted. No Cartesia speech, live phone, or de-escalation grade |
 | Pre-call stops C11, C13–C16, C22 | 6/6 | Planner and dial path over an injected stub. Not a live CRS/Apify/OFAC product call |
 | In-app call button and pre-call gate | 6/6 | No provider dial leaves the stub. A second click stays on cooldown |
 | Demo inbox agent team | 1/1 | Scripted QueryFn. `VENDOR_CRS` is pinned fake for the run. Not the Cedar passkey write |
