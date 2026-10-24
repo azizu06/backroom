@@ -151,7 +151,11 @@ async function supervise() {
     const existing = { ...process.env }; process.loadEnvFile(privateEnv);
     for (const name of ['TOOL_GATEWAY_SECRET', 'CONTROLLER_ENROLLMENT_SECRET', 'POLICY_DEMO_PIN']) env[name] = existing[name] || process.env[name];
     // Same private bearer as the web proxy. Live analysis remains explicitly opt-in.
+    // Mock imports must not open a second writer on a database that reset rotates.
+    const attackStateMode = env.STATE_STORE;
+    if (env.ATTACK_DEMO_LIVE !== '1') env.STATE_STORE = 'memory';
     children.start(process.execPath, ['--import', loader, 'orchestrator/src/attack-demo/server.ts'], join(dir, 'attack.log'));
+    env.STATE_STORE = attackStateMode;
     await waitFor(async () => (await probeAttackDemo(env)).ok, 20000);
     if (env.DEMO_VOICE === '1') {
       const voicePrivate = join(dir, 'voice-private.env');

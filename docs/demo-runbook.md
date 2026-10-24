@@ -79,7 +79,10 @@ for the web proxy. It shares the private `TOOL_GATEWAY_SECRET` server-side only.
 `demo:health` performs an authenticated GET and prints **Attack demo: reachable
 (mock)** without a response body. No model call is made. `ATTACK_DEMO_LIVE` is
 unset by default; live analysis requires explicit opt-in. `demo:down` stops this
-child with the other owned process groups. If its port is busy, choose a free
+child with the other owned process groups. The default mock child uses isolated
+memory state, so it never opens a writer on the web host's rotating database.
+Explicit live opt-in retains the configured StateStore for the LLM OFF gate.
+If its port is busy, choose a free
 `ATTACK_DEMO_PORT`; never stop another worker's listener. Its private log is
 `.demo/attack.log`.
 
