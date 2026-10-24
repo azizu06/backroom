@@ -1,12 +1,14 @@
 'use client';
 
 import { useLayoutEffect, useRef } from 'react';
-import { useThree } from '@react-three/fiber';
-import { Object3D, type InstancedMesh } from 'three';
+import { Billboard } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Object3D, OrthographicCamera, type Group, type InstancedMesh } from 'three';
 import { visibleRooms } from '../../../lib/office/state';
-import { INBOX_SHEET_LIMIT, inboxSheets } from '../../../lib/office/props/inboxStack';
+import { INBOX_LABEL_ASPECT, INBOX_LABEL_GLYPH, INBOX_SHEET_LIMIT, inboxLabelHeight, inboxSheets } from '../../../lib/office/props/inboxStack';
 import type { SceneMountProps } from '../mounts/types';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
+import { useSceneTextNode } from './useSceneTextNode';
 
 function Papers({ count }: { count: number }) {
   const mesh = useRef<InstancedMesh>(null);
@@ -30,23 +32,40 @@ function Papers({ count }: { count: number }) {
   </instancedMesh>;
 }
 
+const LABEL_W = 256;
+const LABEL_H = LABEL_W / INBOX_LABEL_ASPECT;
+/** Bottom edge of the label, just above a full paper stack. */
+const LABEL_BASE = 0.22;
+
+/** Camera-facing label resized each frame to a fixed pixel height, so it reads at every orthographic zoom. */
 function Label({ count }: { count: number }) {
   const text = `Inbox · ${count}`;
-  const texture = useCanvasTexture(256, 64, ctx => {
+  useSceneTextNode('lobby-inbox-label', text);
+  const texture = useCanvasTexture(LABEL_W, LABEL_H, ctx => {
     ctx.fillStyle = '#272f25';
-    ctx.fillRect(0, 0, 256, 64);
+    ctx.fillRect(0, 0, LABEL_W, LABEL_H);
     ctx.strokeStyle = '#8b987b';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, 252, 60);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, LABEL_W - 3, LABEL_H - 3);
     ctx.fillStyle = '#d0d6c6';
-    ctx.font = `700 34px ${PROP_FONT}`;
+    ctx.font = `700 ${Math.round(LABEL_H * INBOX_LABEL_GLYPH)}px ${PROP_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 128, 34, 236);
+    ctx.fillText(text, LABEL_W / 2, LABEL_H / 2 + 2, LABEL_W - 16);
   }, [text]);
-  return <mesh position={[0, 0.035, 0.31]} rotation={[-Math.PI / 2, 0, 0]}>
-    <planeGeometry args={[0.3, 0.075]} /><meshBasicMaterial map={texture} toneMapped={false} />
-  </mesh>;
+  const group = useRef<Group>(null);
+  useFrame(({ camera }) => {
+    if (!group.current) return;
+    const height = inboxLabelHeight(camera.zoom, camera instanceof OrthographicCamera);
+    group.current.scale.setScalar(height);
+    group.current.position.y = LABEL_BASE + height / 2;
+  });
+  return <Billboard ref={group} position={[0, LABEL_BASE, 0]}>
+    <mesh renderOrder={10}>
+      <planeGeometry args={[INBOX_LABEL_ASPECT, 1]} />
+      <meshBasicMaterial map={texture} transparent depthTest={false} depthWrite={false} toneMapped={false} />
+    </mesh>
+  </Billboard>;
 }
 
 /** Sits entirely on the existing lobby counter, inside its Play collider. */
