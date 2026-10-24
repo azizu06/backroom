@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-24T13:49:27.660Z",
+  "bank": "nessie_sandbox",
+  "phoneDialed": false,
+  "qrDecoded": true,
+  "amountCents": 247500,
+  "status": "partially_paid",
+  "privateRegistration": true,
+  "steps": [
+    {
+      "name": "paylink-01-qr",
+      "detail": "Decoded the rendered QR pixels into the public HTTPS short URL"
+    },
+    {
+      "name": "paylink-02-reconciled",
+      "detail": "Real Nessie sandbox deposit and exact reducer reconciliation; receipt survives reload"
+    }
+  ]
+}

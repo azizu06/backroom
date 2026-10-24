@@ -4,6 +4,8 @@ import { Component, useCallback, useEffect, useId, useReducer, useRef, useState,
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
+import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
+import { PLAY_HINT, PlayHud } from './PlayHud';
 import { isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
@@ -122,6 +124,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const [focus, setFocus] = useState<AnchorId | null>(null);
   const [inspecting, setInspecting] = useState<AnchorId | null>(null);
   const [motions] = useState(() => new MotionRegistry());
+  // Play is first person over the same scene; exiting returns to the view chosen before it.
+  const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
+  const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
+  const prePlay = useRef<ViewMode>('walk');
+  useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
+  function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
   useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
@@ -196,6 +204,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         </fieldset>
         <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
           <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option><option value='tour'>Tour</option>
+          <option value='play'>Play (first person)</option>
         </select></label>
       </div>
     </header>
@@ -210,7 +219,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} />
           </div>
           {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
@@ -227,8 +236,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           })}
         </>}
       </ViewBoundary>
+      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}

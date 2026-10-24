@@ -1,0 +1,13 @@
+import QRCode from 'qrcode';
+import { getGatewayStore } from '../../../../lib/gateway/runtime';
+import { activePaymentDelivery, paymentPublicOrigin } from '../../../../lib/payments/delivery';
+export const runtime = 'nodejs';
+export async function GET() {
+  const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
+  try {
+    const link = await activePaymentDelivery(getGatewayStore());
+    if (!link) return Response.json({ active: null }, { headers });
+    const url = `${paymentPublicOrigin()}/p/${link.code}`;
+    return Response.json({ active: { ...link, url, qr: await QRCode.toDataURL(url, { width: 256, margin: 4, errorCorrectionLevel: 'M' }) } }, { headers });
+  } catch { return Response.json({ error: 'PAYMENT_DELIVERY_UNAVAILABLE' }, { status: 503, headers }); }
+}

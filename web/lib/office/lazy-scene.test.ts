@@ -3,22 +3,27 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(new URL('../../app/office/Office.tsx', import.meta.url), 'utf8');
-const office = ts.createSourceFile('Office.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+function parse(file: string) {
+  const text = readFileSync(new URL(`../../app/office/${file}`, import.meta.url), 'utf8');
+  return ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+const office = parse('Office.tsx');
+/** Modules in the initial office bundle; only the lazy scene (and its ./play rig) may load WebGL. */
+const initialBundle = [office, parse('PlayHud.tsx')];
 
 describe('lazy office scene', () => {
-  it('keeps scene and WebGL runtime imports out of the initial module', () => {
-    const runtimeImports = office.statements.filter(ts.isImportDeclaration).filter(statement => {
+  it.each(initialBundle.map(file => [file.fileName, file] as const))('keeps scene and WebGL runtime imports out of %s', (_, file) => {
+    const runtimeImports = file.statements.filter(ts.isImportDeclaration).filter(statement => {
       if (!ts.isStringLiteral(statement.moduleSpecifier)) return false;
       const name = statement.moduleSpecifier.text;
-      if (name !== './scene' && name !== 'three' && !name.startsWith('three/') && !name.startsWith('@react-three/')) return false;
+      if (name !== './scene' && name !== './play' && name !== 'three' && !name.startsWith('three/') && !name.startsWith('@react-three/')) return false;
       const clause = statement.importClause;
       if (!clause) return true;
       if (clause.isTypeOnly) return false;
       if (clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) return true;
       return clause.namedBindings.elements.some(binding => !binding.isTypeOnly);
     });
-    expect(runtimeImports.map(statement => statement.getText(office))).toEqual([]);
+    expect(runtimeImports.map(statement => statement.getText(file))).toEqual([]);
   });
 
   it('loads the scene dynamically with server rendering disabled and a loading state', () => {
