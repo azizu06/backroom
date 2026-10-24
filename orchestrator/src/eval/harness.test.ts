@@ -32,6 +32,7 @@ describe('eval run', () => {
     expect(result.reports.find(report => report.id === 'C19')).toMatchObject({ outcome: 'RECON_SHORT' });
     expect(result.reports.find(report => report.id === 'C20')).toMatchObject({ outcome: 'RECON_DUPLICATE' });
     expect(result.reports.find(report => report.id === 'C18')).toMatchObject({ outcome: 'ESCALATE,PASSKEY_INVALID', seams: expect.arrayContaining(['passkey:voice-rejected']) });
+    expect(result.reports.find(report => report.id === 'P04')).toMatchObject({ outcome: 'ESCALATE,BANK_CHANGE_APPLIED', answerKeyMatch: true, seams: expect.arrayContaining(['crs:fixture', 'apify:fixture', 'passkey:test-authenticator', 'payment:approved-master']) });
     expect(duplicate?.seams).not.toContain('simulated:nessie');
     expect(result.reports.filter(report => report.answerKeyMatch)).toHaveLength(result.reports.length);
   });
