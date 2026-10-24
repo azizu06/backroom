@@ -1,0 +1,11 @@
+{
+  "revision": "e55c01aa1bfdd3dd32e75a329d59120f18c4d530",
+  "database": "backrooms-gx10-loopback-1792853699",
+  "uri": "wss://maincloud.spacetimedb.com",
+  "trackedCheckoutClean": true,
+  "webListeners": [
+    "100.117.44.20:3340",
+    "127.0.0.1:3340"
+  ],
+  "privateFilesMode": "0600"
+}
