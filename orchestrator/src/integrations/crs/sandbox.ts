@@ -7,7 +7,7 @@
  *   - fraudRisk: Fraud Finder (AtData) email risk (vendor bank-change verification)
  * Routes and bodies come from @crscreditapi/crs-calhacks-mcp-server@1.1.2 (guides + test data).
  */
-import type { CrsOptions, CrsProductAdapter, CrsSandboxIdentity } from './index.js';
+import { CrsClient, type CrsOptions, type CrsProductAdapter, type CrsSandboxIdentity, type CrsSummary } from './index.js';
 import { CRS_CALHACKS_PERSONAS } from './personas.js';
 
 export { CRS_CALHACKS_PERSONAS };
@@ -60,3 +60,48 @@ export const CRS_CALHACKS_SANDBOX: Pick<CrsOptions, 'identities' | 'products'> =
   identities: CRS_SANDBOX_IDENTITIES,
   products: CRS_SANDBOX_PRODUCTS,
 };
+
+/**
+ * CRS's published outcome per persona (personas.json `expected`), as the client's summary fields.
+ * PitchPoint counts do not say whether a bankruptcy is open (P07, Ch.13) or discharged (P06, Ch.7).
+ */
+export const CRS_SANDBOX_EXPECTED: Readonly<Record<number, Required<Pick<CrsSummary, 'bankruptcies' | 'judgments' | 'liens' | 'fraudRiskScore'>>>> = Object.fromEntries(
+  ([[11], [9], [14], [18], [52], [12, 1], [12, 1], [10, 0, 1, 1], [11], [10], [11, 0, 1], [85], [88], [80], [10], [50], [11], [12], [9], [8]] as const)
+    .map(([fraudRiskScore, bankruptcies = 0, judgments = 0, liens = 0], index) => [index + 1, { bankruptcies, judgments, liens, fraudRiskScore }]),
+);
+
+const fixtureJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+const sameBody = (sent: unknown, persona: unknown) => JSON.stringify(sent) === JSON.stringify(persona);
+
+/**
+ * Offline stand-in for the CRS sandbox: guide-shaped PitchPoint and AtData bodies carrying each persona's
+ * published counts and score. Like the real sandbox, only an exact persona body gets an answer.
+ * Use in tests and FAKE-labelled demo runs; it is not evidence of a live call.
+ */
+export const crsSandboxFixtureFetch: typeof fetch = async (input, init) => {
+  const path = new URL(String(input)).pathname.replace(/^\/api/, '');
+  let body: unknown;
+  try { body = JSON.parse(String(init?.body ?? 'null')); } catch { return fixtureJson({ codes: ['CRS200'] }, 400); }
+  if (path === '/users/login') return fixtureJson({ token: 'fixture-token', refreshToken: 'fixture-refresh' });
+  for (const persona of CRS_CALHACKS_PERSONAS) {
+    const expected = CRS_SANDBOX_EXPECTED[persona.testIdentityId]!;
+    if (path === CRS_SANDBOX_PRODUCTS.publicRecords.path && sameBody(body, persona.publicRecords)) {
+      return fixtureJson({ Report: { Summary: { BankruptciesFound: String(expected.bankruptcies), JudgmentsFound: String(expected.judgments), LiensFound: String(expected.liens) } } });
+    }
+    if (path === CRS_SANDBOX_PRODUCTS.fraudRisk.path && sameBody(body, persona.fraudRisk)) {
+      return fixtureJson({ risk: { score: expected.fraudRiskScore, tumbling_risk: 0 } });
+    }
+  }
+  return fixtureJson({ codes: ['CRS200'], messages: ['Not a sandbox persona request'] }, 400);
+};
+
+/** Live sandbox client when CRS_USERNAME and CRS_PASSWORD are set; otherwise undefined, so callers fall back to fixtures. */
+export function createCrsClientFromEnv(env: Record<string, string | undefined> = process.env, fetchImpl?: typeof fetch): CrsClient | undefined {
+  if (!env.CRS_USERNAME?.trim() || !env.CRS_PASSWORD) return undefined;
+  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: env.CRS_USERNAME, password: env.CRS_PASSWORD, fetch: fetchImpl });
+}
+
+/** Offline client over crsSandboxFixtureFetch; label results FAKE wherever they are shown. */
+export function createCrsFixtureClient(): CrsClient {
+  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: 'fixture', password: 'fixture', fetch: crsSandboxFixtureFetch });
+}
