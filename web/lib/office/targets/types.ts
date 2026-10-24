@@ -26,7 +26,13 @@ export interface PlayPanelOf<K extends string = string> {
   readonly greeting?: string;
   readonly entries: readonly PlayPanelEntry[];
 }
-export interface PlayCandidateOf<T> { readonly target: T; readonly position: Vec2; readonly radius: number }
+export interface PlayCandidateOf<T> {
+  readonly target: T;
+  readonly position: Vec2;
+  readonly radius: number;
+  /** A closed leaf takes priority over targets farther behind it. */
+  readonly blocksInteraction?: boolean;
+}
 /** Another viewer walking in Play (from presence). */
 export interface CoworkerSpot { readonly id: string; readonly name: string; readonly position: Vec2 }
 /** What every target's `candidates` sees: agents at their drawn (motion) positions, the visible rooms and coworkers. */
@@ -44,6 +50,8 @@ export interface PlayTargetModule<T extends { kind: string }> {
   key?(target: T): string;
   /** HUD prompt, e.g. "Talk to Ada". */
   label(snapshot: OfficeSnapshot, target: T): string;
+  /** Optional immediate cosmetic action, instead of opening a read-only panel. */
+  activate?(target: T): void;
   /** Panel data; null when the target is no longer in the snapshot. */
   panel(snapshot: OfficeSnapshot, target: T, handoffFor?: HandoffResolver): PlayPanelOf<T["kind"]> | null;
 }
