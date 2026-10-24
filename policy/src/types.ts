@@ -63,7 +63,7 @@ export interface Context {
   demoOverride?: { visible: boolean; logged: boolean };
   identityConfirmed?: boolean;
   signals?: {
-    ofacHit?: boolean; closedBusiness?: boolean; bankruptcy?: boolean; disputed?: boolean;
+    fraudRiskScore?: number; ofacHit?: boolean; closedBusiness?: boolean; bankruptcy?: boolean; disputed?: boolean;
     /** Names in the owner's signalAdjustments table; unknown names have no effect. */
     active?: readonly string[];
   };

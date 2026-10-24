@@ -1,3 +1,4 @@
+import { createBankChangeRiskCheck, assessBankChangeRisk } from '../vendor/crs';
 import { createHash } from 'node:crypto';
 import { evaluate, type APInvoice, type Context, type LineItem } from '@backroom/policy';
 import { audit, domain, hold } from './decisions';
@@ -14,7 +15,8 @@ function items(lines: readonly LineItem[]) {
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
 }
 export class PayablesSeat {
-  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient }) {}
+  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient }) { this.risk = options.bankChangeRisk ?? createBankChangeRiskCheck(); }
+  private readonly risk: ReturnType<typeof createBankChangeRiskCheck>;
   async process(unchecked: InvoiceFields, envelope: InboxSource): Promise<SeatResult> {
     const fields = invoiceSchema.parse(unchecked), source = sourceSchema.parse(envelope);
     const repo = this.options.repository;
@@ -38,6 +40,11 @@ export class PayablesSeat {
       };
       let decision = prior && !canReevaluate ? hold('DUPLICATE_INVOICE') : !vendor ? hold('PAYEE_NOT_IN_MASTER')
         : evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, context);
+      const risk = bankChanged && vendor ? await assessBankChangeRisk(this.risk, vendor.id, vendor.domain) : undefined;
+      if (risk) {
+        if (risk.decision && !decision.ruleIds.includes('OFAC_STOP')) decision = risk.decision;
+        await audit(this.options, 'payables', 'bank_change_fraud_check', source, decision, risk.refs, risk.inputs);
+      }
       // Record both pieces of phishing evidence even though policy returns the first failure.
       if (bankChanged && decision.kind !== 'ALLOW' && !decision.ruleIds.includes('BANK_CHANGE_HOLD')) {
         decision = { ...decision, ruleIds: [...decision.ruleIds, 'BANK_CHANGE_HOLD'] };
@@ -48,7 +55,7 @@ export class PayablesSeat {
       const duplicate = decision.ruleIds.includes('DUPLICATE_INVOICE') ? history.find(row =>
         evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, { ...context, priorInvoices: [row.policyInvoice] }).ruleIds.includes('DUPLICATE_INVOICE')) ?? prior : undefined;
       const refs = [source.id, fields.invoiceId];
-      const evidenceRefs = duplicate ? [...refs, duplicate.fields.invoiceId] : refs;
+      const evidenceRefs = [...refs, ...(duplicate ? [duplicate.fields.invoiceId] : []), ...(risk?.refs ?? [])];
       const result: SeatResult = { status: 'held', decision, evidenceRefs };
       const row: InvoiceRecord = { fields, policyInvoice, fingerprint, result, vendorRevision: vendor?.revision ?? null, paymentAttempted: false };
       await audit(this.options, 'payables', 'pay_invoice', source, decision, evidenceRefs.slice(1), {
