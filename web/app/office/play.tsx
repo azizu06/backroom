@@ -14,7 +14,7 @@ import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, 
 import { playOfficeCue } from '../../lib/office/sound-events';
 import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, interactCandidates, moveIntent, movePlayer, officeColliders,
-  pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
+  frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
@@ -87,6 +87,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
       camera.current.updateMatrixWorld();
       if (progress < 1) {
         input.consumeLook();
+        input.consumeTurnTap();
         state.invalidate();
         return;
       }
@@ -99,7 +100,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;
     wasActive.current = active;
     const [lookYaw, lookPitch] = input.consumeLook();
-    const look = applyLook(yaw.current, pitch.current, lookYaw + turnIntent(input, dt), lookPitch);
+    const look = applyLook(yaw.current, pitch.current, frameLookYaw(lookYaw, turnIntent(input, dt), input.consumeTurnTap()), lookPitch);
     const turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
     yaw.current = look.yaw;
     pitch.current = look.pitch;

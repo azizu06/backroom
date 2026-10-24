@@ -1,12 +1,23 @@
 import { consumeVerifiedApproval, type VerifiedApproval } from './approvals/verified';
 import { ReducerEngine } from './reducer-engine';
 import type { StateStore } from './store';
+import { bankTxnPayload, type BankTxnRow } from './payments/bank-feed';
 export { hashAudit } from './audit';
 
 /** Process-local adapter over the same deterministic engine used by DB reducers. */
 export class MemoryStateStore implements StateStore {
   private readonly engine = new ReducerEngine();
+  private readonly bankTxns = new Map<string, string>();
   private modelController = new AbortController();
+  async recordBankTxn(row: BankTxnRow): Promise<void> {
+    if (!row.nessieId || !Number.isSafeInteger(row.amountCents) || row.amountCents <= 0 || !row.memo) throw new Error('INVALID_BANK_TXN');
+    if (row.nessieId.length > 200) throw new Error('INVALID_EVENT_ID');
+    const payload = bankTxnPayload(row);
+    const prior = this.bankTxns.get(row.nessieId);
+    if (prior !== undefined && prior !== payload) throw new Error('EVENT_ID_CONFLICT');
+    this.bankTxns.set(row.nessieId, payload);
+  }
+  async listBankTxns(): Promise<BankTxnRow[]> { return [...this.bankTxns.values()].map(payload => JSON.parse(payload)); }
   get llmEnabled() { return this.engine.llmEnabled; }
   get llmSignal() { return this.modelController.signal; }
   async setLlmEnabled(enabled: boolean) {

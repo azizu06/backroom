@@ -7,7 +7,7 @@ export class FakeDemoBank extends NessieClient {
   constructor() {
     const deposits: Transaction[] = [];
     const claims = new Set<string>();
-    super({ apiKey: 'fake-demo-no-network', claims: { async claim(key) {
+    super({ apiKey: 'fake-demo-no-network', surface: 'mock', claims: { async claim(key) {
       if (claims.has(key)) return false; claims.add(key); return true;
     } }, fetch: async (url, init) => {
       if (init?.method === 'POST') {

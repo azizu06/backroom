@@ -161,4 +161,32 @@ describe('M6 server-verified controller authority', () => {
     expect(row.expiresAt).toBe(61000);
     expect((await store.getAgent('worker'))?.targetAnchor).toBe('Dana_desk');
   });
+
+  it('signs Dana in to a read-only inbox session that cannot decide a request', async () => {
+    const { service, auth, store, create, advance } = await setup();
+    await expect((await setup(false)).service.sessionOptions()).rejects.toThrow('CONTROLLER_NOT_REGISTERED');
+    const { options, challengeId } = await service.sessionOptions();
+    // A sign-in assertion is bound to the session intent: it cannot be spent on a decision.
+    await expect(service.decide('e1', challengeId, auth.assertion(options.challenge))).rejects.toThrow('CHALLENGE_INVALID');
+    const again = await service.sessionOptions();
+    const { token } = await service.signIn(again.challengeId, auth.assertion(again.options.challenge));
+    expect(service.hasSession(token)).toBe(true);
+    expect(service.hasSession('guess')).toBe(false);
+    await expect(service.signIn(again.challengeId, auth.assertion(again.options.challenge))).rejects.toThrow('CHALLENGE_INVALID');
+    expect((await store.getEscalation('e1'))?.status).toBe('pending');
+    advance(1);
+    await create('e2');
+    expect((await service.pending(['e1', 'e2', 'missing'])).map(e => e.id)).toEqual(['e2', 'e1']);
+    // Live-call rows leave the inbox once the call window expires them.
+    advance(approvalWindowMs());
+    expect(await service.pending(['e1', 'e2'])).toEqual([]);
+    advance(12 * 60 * 60_000);
+    expect(service.hasSession(token)).toBe(false);
+  });
+
+  it('rejects a sign-in assertion without user verification', async () => {
+    const { service, auth } = await setup();
+    const { options, challengeId } = await service.sessionOptions();
+    await expect(service.signIn(challengeId, auth.assertion(options.challenge, { verified: false }))).rejects.toThrow();
+  });
 });

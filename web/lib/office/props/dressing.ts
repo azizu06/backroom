@@ -1,5 +1,6 @@
 import type { Box } from '../play';
 import { OFFICE_ANCHORS, visibleRooms, type AnchorId, type OfficeSnapshot } from '../state';
+import { PALETTE, ROLES } from '../palette';
 
 /** Floor (x, z). */
 export type FloorPoint = readonly [x: number, z: number];
@@ -22,7 +23,7 @@ export const PLANT_RADIUS = 0.5, PLANT_POT = 0.46, PLANT_POT_HEIGHT = 0.44, PLAN
 export const SIGN_WIDTH = 1.34, SIGN_HEIGHT = 0.34, SIGN_DEPTH = 0.05, SIGN_FACE_WIDTH = 1.2, SIGN_FACE_HEIGHT = 0.3;
 export const SIGN_POST_X = 0.72, SIGN_POST_SIZE = 0.1, DOOR_POST_TOP = 1.04;
 export const ROUTE_DASH = 0.3, ROUTE_GAP = 0.22, ROUTE_WIDTH = 0.07, ROUTE_ARROW = 0.26, ROUTE_THICKNESS = 0.01;
-export const ROUTE_COLOR = '#c9c1ad';
+export const ROUTE_COLOR = PALETTE.cream;
 /** Upper bound for the dressing's one instanced mesh. */
 export const DRESSING_INSTANCE_LIMIT = 150;
 
@@ -181,8 +182,8 @@ export interface DressingBox {
   color: string;
 }
 
-const SHELF_COLOR = '#9c8b6e', SHELF_BACK = '#7d8874', POT_COLOR = '#b98667', SIGN_COLOR = '#303d34', POST_COLOR = '#7d8874';
-const BOOK_COLORS = ['#7b5e4a', '#4f6a5c', '#e7ddc5', '#8a5a52'] as const;
+const SHELF_COLOR = ROLES.partition, SHELF_BACK = ROLES.shadow, POT_COLOR = PALETTE.blush, SIGN_COLOR = ROLES.frame, POST_COLOR = ROLES.shadow;
+const BOOK_COLORS = [PALETTE.blush, PALETTE.mint, PALETTE.butter, PALETTE.aqua] as const;
 const BOOK_WIDTHS = [0.07, 0.09, 0.06, 0.08, 0.1] as const;
 const BOOK_HEIGHTS = [0.3, 0.33, 0.26, 0.31, 0.28] as const;
 const BOOKS_PER_ROW = 5;
