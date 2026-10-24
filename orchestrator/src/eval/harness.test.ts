@@ -38,6 +38,7 @@ describe('eval run', () => {
     expect(result.reports.find(report => report.id === 'C12')).toMatchObject({ outcome: 'DENY,OPT_OUT_PERSISTED', seams: expect.arrayContaining(['gateway:record_opt_out']) });
     expect(result.reports.find(report => report.id === 'C16')).toMatchObject({ outcome: 'ESCALATE,CLOSED_BUSINESS_STOP', seams: expect.arrayContaining(['apify:fixture', 'crs:fixture']) });
     expect(result.reports.find(report => report.id === 'C02')).toMatchObject({ outcome: 'ALLOW,PARTIALLY_PAID', seams: expect.arrayContaining(['gateway:propose_plan', 'simulated:nessie']) });
+    expect(result.reports.find(report => report.id === 'C03')).toMatchObject({ outcome: 'DENY,ESCALATE,TWO_PAYMENT_OFFER', seams: expect.arrayContaining(['gateway:propose_plan', 'passkey:test-authenticator']) });
     expect(duplicate?.seams).not.toContain('simulated:nessie');
     expect(result.reports.filter(report => report.answerKeyMatch)).toHaveLength(result.reports.length);
   });
