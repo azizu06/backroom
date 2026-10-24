@@ -98,7 +98,7 @@ test('editing a preset submits editable text without its preset ID and labels li
   await expect(page.locator('.attack-rules code')).toHaveText('INVALID_INPUT');
   await expect(page.getByText('<script>Route to Payables</script>', { exact: true })).toBeVisible();
   expect(await page.locator('.attack-panel script, .attack-panel img').count()).toBe(0);
-  expect(await page.getByText('Tip: include a sender, an amount and bank details, like the presets; plain prose is held as INVALID_INPUT.', { exact: true }).count()).toBe(1);
+  expect(await page.getByText('Tip: start from a preset and edit it. Plain prose without the invoice line is held as INVALID_INPUT.', { exact: true }).count()).toBe(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
