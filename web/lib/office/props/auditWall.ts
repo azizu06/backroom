@@ -22,7 +22,26 @@ export interface AuditWallView {
 }
 /** Preview and replay snapshots are fixtures or derived copies, not `/api/audit/entries`; only the live feed carries real receipt ids. */
 export const AUDIT_WALL_UNVERIFIED_FEEDS: readonly OfficeSnapshot['connection'][] = ['preview', 'replay'];
-export const AUDIT_WALL_NOTICE = 'Preview feed: no audit entries. Live receipts appear here; see /audit.';
+const AUDIT_WALL_NOTICES = {
+  preview: 'Preview feed: no audit entries. Live receipts appear here; see /audit.',
+  replay: 'Replay feed: no audit entries. Live receipts appear here; see /audit.',
+} as const satisfies Record<'preview' | 'replay', string>;
+
+/** Names the feed so a fixture or a replay is not presented as the audit log. */
+export function auditWallNotice(connection: keyof typeof AUDIT_WALL_NOTICES): string {
+  return AUDIT_WALL_NOTICES[connection];
+}
+
+/** Two canvas lines of an `auditWallNotice` string: the feed sentence, then where live receipts are. */
+export function auditWallNoticeLines(notice: string): readonly [string, string] {
+  const splitAt = notice.indexOf('. ');
+  if (splitAt < 0) return [notice, ''];
+  return [notice.slice(0, splitAt + 1), notice.slice(splitAt + 2)];
+}
+
+function unverifiedFeed(connection: OfficeSnapshot['connection']): connection is 'preview' | 'replay' {
+  return (AUDIT_WALL_UNVERIFIED_FEEDS as readonly string[]).includes(connection);
+}
 
 /** Keeps both ends of a long id so neighbouring receipts stay distinguishable. */
 export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
@@ -33,12 +52,13 @@ export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
 
 /** Newest first, from the live snapshot's audit rows (the same ids as `/api/audit/entries`); nothing for preview or replay feeds. */
 export function auditWallView(snapshot: OfficeSnapshot, max = AUDIT_WALL_MAX_ROWS): AuditWallView {
-  if (AUDIT_WALL_UNVERIFIED_FEEDS.includes(snapshot.connection)) {
-    return { total: 0, connection: snapshot.connection, rows: [], notice: AUDIT_WALL_NOTICE };
+  const { connection } = snapshot;
+  if (unverifiedFeed(connection)) {
+    return { total: 0, connection, rows: [], notice: auditWallNotice(connection) };
   }
   return {
     total: snapshot.audit.length,
-    connection: snapshot.connection,
+    connection,
     rows: snapshot.audit.slice(-max).reverse().map(row => ({
       receipt: shortReceipt(row.id), decision: row.decision, summary: truncateSummary(row.summary, AUDIT_WALL_SUMMARY_MAX),
     })),

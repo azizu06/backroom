@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, type OfficeAudit, type OfficeSnapshot } from '../state';
-import { AUDIT_WALL_MAX_ROWS, AUDIT_WALL_NOTICE, RECEIPT_ID_MAX, auditWallText, auditWallView, auditWallVisible, shortReceipt } from './auditWall';
+import { AUDIT_WALL_MAX_ROWS, RECEIPT_ID_MAX, auditWallNotice, auditWallNoticeLines, auditWallText, auditWallView, auditWallVisible, shortReceipt } from './auditWall';
 
 const row = (id: string, over: Partial<OfficeAudit> = {}): OfficeAudit =>
   ({ id, agentId: 'a', seatId: 'payables', action: 'pay', decision: 'ALLOW', ruleIds: [], summary: `row ${id}`, ...over });
@@ -34,11 +34,14 @@ describe('audit wall rows', () => {
     expect(auditWallText(auditWallView(snap([])))).toBe('');
   });
   it('paints no rows for preview or replay feeds, which are not the audit log', () => {
+    expect(auditWallNotice('preview')).toBe('Preview feed: no audit entries. Live receipts appear here; see /audit.');
+    expect(auditWallNotice('replay')).toBe('Replay feed: no audit entries. Live receipts appear here; see /audit.');
     for (const connection of ['preview', 'replay'] as const) {
       const view = auditWallView(snap([row('preview-denial-1', { decision: 'DENY' })], { connection }));
       expect(view.rows).toEqual([]);
       expect(view.total).toBe(0);
-      expect(view.notice).toBe(AUDIT_WALL_NOTICE);
+      expect(view.notice).toBe(auditWallNotice(connection));
+      expect(auditWallNoticeLines(view.notice!).join(' ')).toBe(view.notice);
       expect(auditWallText(view)).toBe('');
     }
     for (const connection of ['live', 'connecting', 'disconnected'] as const) {
