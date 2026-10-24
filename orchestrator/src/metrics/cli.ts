@@ -8,7 +8,7 @@ import { runCoreDemo, runInboxTrap } from '../core-demo/core';
 import { runNorthfieldPayables } from '../core-demo/northfield';
 import { runEval } from '../eval/harness';
 import { replayCorpus, type CorpusCase } from '../../../fixtures/redteam/replay';
-import { renderBenchmark, type BenchmarkReceipt } from './inbox-benchmark';
+import { benchmarkCases, renderBenchmark, type BenchmarkReceipt } from './inbox-benchmark';
 import { existsSync } from 'node:fs';
 import { auditMetrics, missing, renderRoutes, table, type AuditRun } from './report';
 
@@ -78,6 +78,7 @@ async function main() {
     ['Audit escalations per 100 policy decisions', decisions.length ? (100 * decisions.filter(entry => entry.decision === 'ESCALATE').length / decisions.length).toFixed(2) : missing('no policy decisions'), 'Explicit denominator: decision-bearing audit entries; not all agent actions.']);
   const benchmarkPath = 'docs/evidence/inbox-benchmark/receipt.json';
   const benchmark = existsSync(resolve(root, benchmarkPath)) ? json(benchmarkPath) as BenchmarkReceipt : undefined;
+  if (benchmark && benchmark.results.length !== benchmarkCases().length * 2) throw new Error('Incomplete benchmark receipt');
   const benchmarkText = benchmark ? renderBenchmark(benchmark) : 'Raw inbox benchmark not measured: no retained receipt.';
   rows.push(['Policy violations (live end-to-end)', missing('no joined effect/approval receipts or complete speech transcript'), 'DENY/ESCALATE attempts are not violations. A hash-valid audit alone does not prove matching authorization.'],
     ['Human approvals per 100 actions', missing('audit decision rows are not unique actions or completed human approvals'), 'Do not substitute escalation record counts for actual controller work.'],
@@ -113,7 +114,7 @@ async function main() {
     '- The frozen red-team corpus was generated on GX10, but its generation calls are not office decisions and do not contribute to C2. Replay records multiple seams per case, so counts must not be added to eval or demo as unique scenarios.',
     '- Bad historical results remain in [red-team evidence](redteam.md): before the fixes, 20 failure cases and 10 mock violation cases. Current results do not erase those findings.',
     '- Live rehearsal scope, operator routing override, sandbox idempotency and reproduction: [receipt notes](evidence/live-run/README.md). An operator-forced local sample does not establish production C2 attainment.',
-    '- Raw inbox safety benchmark: `INBOX_BENCHMARK_LIVE=1 pnpm --filter @backroom/orchestrator exec tsx src/metrics/inbox-live.ts ../../docs/evidence/inbox-benchmark/receipt.json`; run via `gx10 run` on the GX10. Exact inputs and per-case full audit chains are in [receipt](evidence/inbox-benchmark/receipt.json); scope and limitations in [notes](evidence/inbox-benchmark/README.md). `pnpm metrics` reads this receipt offline in both modes.',
+    '- Raw inbox safety benchmark: `INBOX_BENCHMARK_LIVE=1 pnpm --filter @backroom/orchestrator exec tsx src/metrics/inbox-live.ts ../docs/evidence/inbox-benchmark/receipt.json`; run via `gx10 run` on the GX10. Exact inputs and per-case full audit chains are in [receipt](evidence/inbox-benchmark/receipt.json); scope and limitations in [notes](evidence/inbox-benchmark/README.md). `pnpm metrics` reads this receipt offline in both modes.',
     '- Sources: [answer key](../fixtures/answer-key/expected.json), [T1 voice](t1-cartesia.md), [pre-call receipt](../orchestrator/src/collections/live-receipt.json), [T10 router smoke](../fixtures/t10/router-smoke.json).', '',
     `Answer-key SHA-256: \`${hash('fixtures/answer-key/expected.json')}\``, `Corpus SHA-256: \`${hash('fixtures/redteam/corpus.jsonl')}\``, '',
     '<details><summary>Fresh policy-step eval details (not full final-state grading)</summary>', '', '```text', evalText, '```', '', '</details>', '',

@@ -27,6 +27,8 @@ it('OFF makes zero HTTP requests and reports legitimate fail-closed items as fal
   expect(report).toContain('P01 (OFF; IN_BADGE) | held | INVALID_INPUT; FALSE HOLD');
   expect(report).toContain('redteam LLM ON: trap catch | not measured (n=0)');
   expect(() => renderBenchmark({...receipt,results:[result,result]})).toThrow('INVALID_BENCHMARK_RECEIPT');
+  expect(() => renderBenchmark({...receipt,results:[{...result,held:false}]})).toThrow('INVALID_BENCHMARK_RECEIPT');
+  expect(() => renderBenchmark({...receipt,results:[{...result,trap:true}]})).toThrow('INVALID_BENCHMARK_RECEIPT');
   result.entries[0]!.latencyMs++;
   expect(() => renderBenchmark(receipt)).toThrow('INVALID_BENCHMARK_RECEIPT');
 });

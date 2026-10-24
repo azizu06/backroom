@@ -119,10 +119,18 @@ export async function runBenchmarkCase(c: BenchmarkCase, mode: 'ON' | 'OFF', inj
 
 export function renderBenchmark(receipt: BenchmarkReceipt): string {
   const rows = receipt.results;
+  if (receipt.version !== 1) throw new Error('INVALID_BENCHMARK_RECEIPT');
+  const manifest = new Map(benchmarkCases().map(row => [row.id, row]));
   const keys = new Set<string>();
   for (const row of rows) {
     const key = `${row.mode}:${row.id}`;
-    if (keys.has(key) || !verifyChain(row.entries).valid) throw new Error('INVALID_BENCHMARK_RECEIPT');
+    const expected = manifest.get(row.id);
+    const final = row.entries.filter(entry => entry.decision).at(-1);
+    if (!['ON','OFF'].includes(row.mode) || !expected || row.trap !== expected.trap || row.group !== expected.group ||
+      row.category !== expected.category || JSON.stringify(row.item) !== JSON.stringify(expected.item) ||
+      JSON.stringify(row.expectedRules) !== JSON.stringify(expected.expectedRules) ||
+      keys.has(key) || !verifyChain(row.entries).valid || !final || row.held !== (final.decision !== 'ALLOW') ||
+      JSON.stringify(row.ruleIds) !== JSON.stringify(final.ruleIds)) throw new Error('INVALID_BENCHMARK_RECEIPT');
     keys.add(key);
   }
   const rate = (n: number, d: number) => d ? `${n}/${d} (${(100*n/d).toFixed(2)}%)` : 'not measured (n=0)';

@@ -9,7 +9,7 @@ Run on the GX10 from this repo (Node 24 and the declared pnpm version):
 
 ```sh
 gx10 gpu
-gx10 run backroom-trap-rates 'cd <isolated-repo>; INBOX_BENCHMARK_LIVE=1 pnpm --filter @backroom/orchestrator exec tsx src/metrics/inbox-live.ts ../../docs/evidence/inbox-benchmark/receipt.json'
+gx10 run backroom-trap-rates 'cd <isolated-repo>; INBOX_BENCHMARK_LIVE=1 pnpm --filter @backroom/orchestrator exec tsx src/metrics/inbox-live.ts ../docs/evidence/inbox-benchmark/receipt.json'
 ```
 
 Copy the completed receipt back before `pnpm metrics`. The opt-in runner saves
@@ -62,3 +62,10 @@ Completed-task p50/p95 includes router retries. HTTP attempt timing includes
 failed/time-out attempts and ends at response headers. Cold model loads and
 outliers are not removed. Source hashes establish input/code identity; audit
 hashes establish integrity, not independently attested model provenance.
+
+The measured runner was initially uncommitted (receipt `sourceSha` says
+`working-tree-…`). [Provenance](provenance.json) and the small
+[runner patch](measured-runner.patch), based on its recorded committed SHA,
+reconstruct that exact runner. Later changes validate report labels/results,
+add expected-rule and attempt-latency summaries, and correct the default output
+path; they do not change case construction, router options or seat execution.
