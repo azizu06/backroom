@@ -24,3 +24,23 @@ export function bakedReplacesProps(baked: boolean, room: string): boolean {
 export function bakedReplacesPartition(baked: boolean, overview: boolean, x: number): boolean {
   return baked && !overview && BAKED_REPLACES.shellPartitionX.includes(x);
 }
+
+/**
+ * The freestanding procedural audit board (LobbyCounter frame at x -5.9, z 3.9, 2 m wide; its deny stamp and glow
+ * ride on it). In first person under baked art it stands in front of the baked west wall and blocks the window view,
+ * while the audit wall mount on that wall shows the same receipts, so it hides there; the overview keeps it.
+ */
+export const LOBBY_AUDIT_BOARD = { x: -5.9, z: 3.9, width: 2, depth: 0.15 } as const;
+
+/** True when the baked lobby replaces the procedural audit board (baked art on, first-person walls drawn). */
+export function bakedReplacesAuditBoard(baked: boolean, overview: boolean): boolean {
+  return baked && !overview;
+}
+
+/** Play colliders without the audit board's footprint when baked art hides it (Play is always first person). */
+export function withoutHiddenAuditBoard<T extends { minX: number; maxX: number; minZ: number; maxZ: number }>(boxes: readonly T[], baked: boolean): T[] {
+  if (!bakedReplacesAuditBoard(baked, false)) return [...boxes];
+  const { x, z, width, depth } = LOBBY_AUDIT_BOARD;
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  return boxes.filter(b => !(near(b.minX, x - width / 2) && near(b.maxX, x + width / 2) && near(b.minZ, z - depth / 2) && near(b.maxZ, z + depth / 2)));
+}
