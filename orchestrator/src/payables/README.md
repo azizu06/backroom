@@ -68,9 +68,16 @@ Held invoices with no payment attempt may be reevaluated against fresh state,
 including after a controller-approved master update. Bank adapters must also
 provide durable idempotency for the supplied key and reject changed payloads.
 
-`nessiePayables(effects)` bridges exported `Effects.nessie`; it requires an
+`nessiePayables(effects, repository)` bridges exported `Effects.nessie`. Pass the
+same server-owned repository used by `PayablesSeat`; the bridge runs under that
+seat's vendor lock and freshly validates the explicit destination against the
+approved master before dispatch. Recipient aliases and extra fields reject. It requires an
 explicit completed/pending external receipt and refuses generic simulated
-success. The current Nessie client provides deposits, not an AP debit method.
+success. `FakeEffects(repository)` also validates inside its own boundary under
+the vendor lock, derives clean generic-worker destinations from the master, and
+strips raw source documents. Without a repository it uses an empty master and
+rejects payments. Effect-boundary rejections are audited by `SeatWorker` as
+`payment_boundary_rejected`, `DENY`, `PAYEE_NOT_IN_MASTER`. The current Nessie client provides deposits, not an AP debit method.
 **Leave `nessie` unset until the integration owner supplies a debit-capable
 adapter**; this path escalates and never claims payment. CRS sponsor product
 configuration and the Apify adapter are also injected capabilities: missing or

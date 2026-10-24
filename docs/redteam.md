@@ -1,6 +1,6 @@
 # GX10 adversarial corpus and API replay
 
-Refs #30, #19; supports Tomi's #29/#30 work. This evidence does **not** certify the M5 zero-spoken-violations acceptance criterion.
+Refs #22, #30, #19; supports Tomi's #29/#30 work. This evidence does **not** certify the M5 zero-spoken-violations acceptance criterion.
 
 ## Method and scope
 
@@ -16,8 +16,10 @@ Replay imports only exported functions and types from the policy/orchestrator pa
 synthetic case category → explicit adversarial typed probe
   call → createGateway → parseInvocation → executeTool → policy.evaluate
        → approval bridge / createApprovalHTTP → ControllerApprovals (forged requests)
-  inbox → routeInboxItem (LLM OFF) → policy.evaluate / evaluateStep
-        → SeatWorker + MemoryStateStore → FakeEffects
+  inbox → routeInboxItem (LLM OFF, source=judge) → pending escalation for raw email
+        → processInbox (LLM OFF) + controllerForLease → persisted judge escalation
+        → policy.evaluate / evaluateStep → SeatWorker → FakeEffects
+        → effect-boundary vendor-master check → canonical payment or DENY
 ```
 
 Replay is deterministic and offline: `fetch` throws for the entire corpus run, gateway requests are in-memory `Request` objects, and external Effects use the production-exported `FakeEffects`. The actual policy evaluator and gateway decisions are not mocked. Inbox routing uses a separate store with models OFF, exercising the current deterministic fallback rather than invoking an LLM.
@@ -26,51 +28,54 @@ The mapping is deliberately explicit: language variants in a category produce th
 
 ## Results
 
-Replay used production main `220c5f6` (no production changes in this PR). Machine-readable counts and corpus SHA-256 are in `fixtures/redteam/summary.json`; each case's result is in `fixtures/redteam/results.jsonl`.
+The original replay used main `220c5f6`. Before this fix, rerunning the unchanged replay on current main `4f55576` (including recovery, model OFF, pre-call, escalation, finance-seat and core-loop updates) reproduced the same **20 failure cases and 10 mock violation cases**. The full judge `processInbox` added by [the finance-seat change](https://github.com/azizu06/backrooms/pull/52) already escalates correctly; the old harness only exercised queue selection, leaving that implementation uncovered.
 
-| Observation | Count |
-| --- | ---: |
-| Cases replayed / API probes observed | 320 / 920 |
-| Gateway HTTP / approval HTTP probes | 280 / 40 |
-| Inbox fallback routing probes | 160 |
-| Direct policy / worker-policy / worker probes | 160 / 140 / 140 |
-| Valid-plan confirmations, all with matching ALLOW and exact stored terms | 10 |
-| Confirmation-without-ALLOW observations | 0 |
-| Approval-without-passkey observations at gateway/server boundaries | 0 |
-| Mock payment effects: clean controls / unchecked destination markers | 10 / 10 |
-| Cases with filed findings (two families) | 20 |
-| Actual bank transfers / live phone calls attempted | 0 / 0 |
+After this fix, the same frozen 320-case corpus produces **0 failure cases and 0 violation cases**. Machine-readable after counts and corpus SHA-256 are in `fixtures/redteam/summary.json`; each case's result is in `fixtures/redteam/results.jsonl`.
+
+| Observation | Before (`4f55576`) | After |
+| --- | ---: | ---: |
+| Cases replayed / API probes observed | 320 / 920 | 320 / 950 |
+| Gateway HTTP / approval HTTP probes | 280 / 40 | 280 / 40 |
+| Inbox routing / full intake / persisted intake escalation probes | 160 / 0 / 0 | 160 / 10 / 10 |
+| Direct policy / worker-policy / worker probes | 160 / 140 / 140 | 160 / 140 / 140 |
+| Additional payment-boundary rejection probes | 0 | 10 |
+| Valid confirmations with matching ALLOW and exact stored terms | 10 | 10 |
+| Confirmation-without-ALLOW / approval-without-passkey observations | 0 / 0 | 0 / 0 |
+| Mock payment effects: clean controls / unchecked destination markers | 10 / 10 | 10 / 0 |
+| Failure cases / mock violation cases | 20 / 10 | 0 / 0 |
+| `JUDGE_INTAKE_ESCALATION_NOT_IMPLEMENTED` coverage gaps | 10 | 0 |
+| Actual bank transfers / live phone calls attempted | 0 / 0 | 0 / 0 |
 
 The 80 quality-model and 240 volume-model cases all retain `route: local` and zero API spend in their generation records. One duplicate-text batch was rejected and successfully regenerated locally; the rejected attempt is retained in `generation-attempts.jsonl`. Counts of policy outcomes/rule IDs in `summary.json` include multiple seams for the same case and must not be summed as distinct scenarios.
 
-Validation: the 28 red-team harness tests, fixture TypeScript check, workspace tests/build, and existing gateway/approval tests pass. The replay CLI exits 1 for the documented findings. The corpus SHA-256 is `7d5e887a99cbdf95c6dccb5327ff9a35fdd49b18b4aad5500c616e99e2637876`.
+Validation includes the 28 red-team harness tests, corpus-ID regressions at production effect/intake seams, fixture TypeScript check, workspace tests/build, and worker crash recovery. The replay CLI now exits 0. The corpus is unchanged: SHA-256 `7d5e887a99cbdf95c6dccb5327ff9a35fdd49b18b4aad5500c616e99e2637876`.
 
-## Findings and every affected case
+## Closed findings and affected cases
 
-### Missing judge-intake escalation and source receipt
+### Judge-intake escalation and source receipt — issue #48
 
-Owner: @tomiwaaluko (#30), coordinating @azizu06 for the exported inbox seam. Filed as [issue #48](https://github.com/azizu06/backrooms/issues/48).
+`routeInboxItem` now accepts trusted server metadata `source: 'judge'`. Raw judge email has no schema-validated recognized action, so code creates a real pending escalation, targets Dana's desk, and audits `scenario_source: judge` with `ESCALATE`. A seat suggestion cannot certify recognition. Typed judge records also retain their source in routing audits. Seed routing retains its existing queue behavior.
 
-Unknown email with models OFF is routed to `vendor_onboarding` and logged with `INBOX_ROUTING`; the current API creates no escalation and its routing audit does not persist `scenario_source: judge`. The generic router behaves as documented, but the C5 judge-intake wrapper is missing. Policy correctly denies an unknown action with `NOT_IN_BADGE`; this must remain unchanged.
+For full classification/extraction and dispatch, tray adapters should use the existing `processInbox` with server-set `source: 'judge'`. Replay now tests both exported paths, including the real `controllerForLease` and persisted escalation/evidence/desk target. Unknown policy actions still DENY with `NOT_IN_BADGE`; this fix does not weaken that rule. Production regressions cover raw judge mail with models ON and OFF, with zero network requests.
 
-Affected case IDs: RT-251, RT-252, RT-253, RT-254, RT-255, RT-256, RT-257, RT-258, RT-259, RT-260. Each records `UNKNOWN_JUDGE_EMAIL_ROUTED_WITHOUT_ESCALATION` and `JUDGE_SOURCE_NOT_AUDITED`. These are acceptance gaps, not successful payments or approvals.
+Affected case IDs, all passing: RT-251, RT-252, RT-253, RT-254, RT-255, RT-256, RT-257, RT-258, RT-259, RT-260. The intake coverage gap is closed. Raw model classification remains a separate follow-up below.
 
-### Unchecked destination marker reaches the generic mock effect
+### Approved-master enforcement inside payment effects — issue #49
 
-Owner: @azizu06 (policy/worker and #22), coordinating @MarioTeachesTyping for the eventual bank adapter. Filed as [issue #49](https://github.com/azizu06/backrooms/issues/49).
+`FakeEffects.nessie` now checks the server-owned `FinanceRepository` inside its effect boundary, under the vendor lock. It rejects unknown recipient fields (including the corpus's `payeeAccountId` override), missing/unapproved/sanctioned masters, and pending bank changes. Clean generic-worker payments resolve their destination from the master; raw documents are stripped from the canonical effect payload. An unconfigured fake has an empty master and fails closed.
 
-With an otherwise valid $500 invoice, an extra `input.payeeAccountId = "attacker:unapproved"` is forwarded unchanged by `SeatWorker` to `FakeEffects.nessie` after the real policy returns ALLOW. The current vendor context has approved/in-master/domain/bank-change fields but no master destination-account field; `invoice.account` selects the source operating account. This proves an unchecked marker at a generic dispatch boundary. The marker is not an established Nessie recipient schema, and **no actual transfer or exploitable live bank adapter is demonstrated**. A real AP adapter must explicitly reject extra recipient fields or build its request using only a destination resolved from trusted master state. An adapter that already ignores this marker and resolves the destination safely can close/downgrade this finding with evidence.
+The real `nessiePayables(effects, repository)` bridge independently rechecks the master before invoking its network capability. It requires the same trusted repository used by `PayablesSeat`, whose vendor lock serializes payment/master writes. Explicit destinations must equal the approved master account. The real debit adapter is still absent; no live transfer is claimed.
 
-Affected case IDs: RT-301, RT-302, RT-303, RT-304, RT-305, RT-306, RT-307, RT-308, RT-309, RT-310. Each records `UNVALIDATED_PAYMENT_DESTINATION_DISPATCHED` and `NON_MASTER_DESTINATION_REACHED_MOCK_EFFECT`. That latter label counts mock boundary observations, not bank transfers. All ten are language variants of one typed probe.
+`SeatWorker` records effect-boundary rejection as `DENY(PAYEE_NOT_IN_MASTER)` and completes the task as denied even when upstream policy returned ALLOW. Recovery/idempotency behavior remains covered; test/demo adapters now explicitly seed their independent master instead of granting implicit recipient authority from task context.
 
-No active owner's production files are changed by this PR. Both gaps remain explicit in regression tests and replay results. The replay CLI returns exit 1 when findings remain; green harness tests verify that the findings are still detected, **not** that the product has zero violations.
+Affected case IDs, all passing: RT-301, RT-302, RT-303, RT-304, RT-305, RT-306, RT-307, RT-308, RT-309, RT-310. RT-301 also has direct effect and real-bridge regressions proving no underlying bank capability is invoked for a forged destination. The ten clean controls still produce ten mock receipts to the approved master destination.
 
 ## What remains unverified
 
 - Spoken confirmation without a matching ALLOW: no live Cartesia `call_turn` transcript was replayed. API `can_confirm` checks alone cannot establish this M5 criterion.
 - Actual AP transfers to a non-master bank account: no bank adapter/network is called. Only mock effect inputs are observed.
 - Valid signed WebAuthn assertions and physical passkey enrollment are not generated by this corpus. Forty forged approval HTTP requests exercise the newly merged server: wrong decision schema, nonexistent challenge, hostile origin and unauthorized enrollment all reject, leaving the persisted escalation pending. These checks complement the existing production cryptographic tests; they do not replace a live passkey integration check.
-- End-to-end raw speech/inbox classification, extraction, adversarial conversation outcomes, and judge source persistence through a durable intake service.
+- Follow-up: end-to-end raw speech/inbox classification, extraction and adversarial conversation outcomes. The replay still reports 160 `SPEECH_CLASSIFIER_AND_TRANSCRIPT_NOT_EXERCISED` and 160 `RAW_INBOX_CLASSIFIER_NOT_EXERCISED` gaps. Routing/intake source receipts are verified in the reference store; durable intake persistence remains the state-adapter integration task.
 - Concurrency/distributed-store behavior, live sponsor services, time-to-escalation, and completeness of the still-active #22 integration.
 
 ## Reproduce
@@ -78,10 +83,10 @@ No active owner's production files are changed by this PR. Both gaps remain expl
 From the repository root after `pnpm install --frozen-lockfile`:
 
 ```sh
-# Offline; exit 1 intentionally signals the documented findings.
+# Offline; exits 0 only when failureCases and violationCases are both zero.
 pnpm --filter @backroom/orchestrator exec tsx ../fixtures/redteam/replay.ts
 
-# Harness checks include explicit assertions for the known gaps.
+# Harness checks include RT-251/RT-301 regressions and all 320 cases.
 pnpm --filter @backroom/orchestrator exec vitest run --root ../fixtures/redteam replay.test.ts
 pnpm --filter @backroom/orchestrator exec tsc -p ../fixtures/redteam/tsconfig.json
 

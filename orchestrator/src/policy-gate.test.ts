@@ -1,3 +1,4 @@
+import { MemoryFinanceRepository } from './payables/repository';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_POLICY, evaluate, type APInvoice, type Context } from '@backroom/policy';
 import { evaluateStep } from './policy-gate';
@@ -26,7 +27,7 @@ describe('real policy/effect binding', () => {
   });
   it.each(['ALLOW', 'DENY', 'ESCALATE'] as const)('runs real %s policy through the worker and persists its full decision', async kind => {
     const store = new MemoryStateStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     const input = { invoice: { ...invoice, ...(kind === 'ESCALATE' ? { amountCents: 300000 } : {}) } };
     const taskContext: Context = kind === 'DENY' ? { ...context, signals: { ofacHit: false },
       vendor: undefined } : context;

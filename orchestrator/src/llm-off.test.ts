@@ -1,3 +1,4 @@
+import { MemoryFinanceRepository } from './payables/repository';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MemoryStateStore } from './store';
 import { createRouter, TASK_ROUTES } from './router';
@@ -51,7 +52,7 @@ it.each([
 ] as const)('flip mid-run: inbox routes %s, code holds it, clean payments continue', async (id, trap, ctx, rule) => {
   const store = new MemoryStateStore();
   const network = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => completion());
-  const effects = new FakeEffects();
+  const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'acme', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
   const worker = new SeatWorker({ id: 'ap', seat: 'payables', store, effects, now: () => 0 });
   await worker.start();
   const pay = async (taskId: string, input: APInvoice, taskContext: Context) => {
@@ -73,7 +74,7 @@ it.each([
 });
 it('pauses voice after evaluating its permit, keeps a code stop running, and resumes on ON', async () => {
   const store = new MemoryStateStore();
-  const effects = new FakeEffects();
+  const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'acme', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
   const worker = new SeatWorker({ id: 'ar', seat: 'collections', store, effects, now: () => 0 });
   await worker.start();
   const client = { type: 'business' as const, phoneNumber: '+12025550101', dnc: false, localWeekday: 5, localHour: 10,
@@ -112,7 +113,7 @@ it('falls back for every inbox kind while OFF, including emails normally classif
 });
 it('cancels an active voice effect on OFF without advancing or recording a successful completion', async () => {
   const store = new MemoryStateStore();
-  const effects = new FakeEffects();
+  const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'acme', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
   let started!: () => void;
   const start = new Promise<void>(resolve => { started = resolve; });
   let effectSignal: AbortSignal | undefined;

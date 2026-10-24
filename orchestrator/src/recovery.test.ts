@@ -1,3 +1,4 @@
+import { MemoryFinanceRepository } from './payables/repository';
 import { describe, expect, it } from 'vitest';
 import { FakeEffects, MemoryStateStore, SeatWorker, type NewTask } from './index';
 
@@ -17,7 +18,7 @@ describe('Payables recovery', () => {
   it.each([true, false])('takes over at exact lease expiry with models enabled=%s', async modelsEnabled => {
     let now = 0;
     const store = new MemoryStateStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:recovery', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     await store.setLlmEnabled(modelsEnabled);
     const worker = (id: string) => new SeatWorker({ id, seat: 'payables', store, effects,
       now: () => now, leaseMs: 1000, heartbeatMs: 100 });
@@ -57,7 +58,7 @@ it('survives two successive lease losses on the same payment without paying agai
     }
   }
   const store = new InterruptedStore();
-  const effects = new FakeEffects();
+  const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:recovery', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
   await store.enqueueTask(payment);
   for (let generation = 1; generation <= 3; generation++) {
     const worker = new SeatWorker({ id: `worker:${generation}`, seat: 'payables', store, effects,
