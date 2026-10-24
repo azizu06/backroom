@@ -7,6 +7,9 @@ import { evaluate, type ActionRequest, type Badge, type Context } from '@backroo
 import { FakeEffects, MemoryStateStore, SeatWorker, type AuditInput } from '../index';
 import { MemoryFinanceRepository } from '../payables/repository';
 import { inspectPaymentEvidence, reconcileAlreadyPaid, type BankEvidence } from '../payments';
+import { ControllerApprovals } from '../approvals';
+import { TestAuthenticator } from '../approvals/testing/authenticator';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
 
@@ -202,6 +205,30 @@ async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any):
     const kind = result.status === 'paid' ? 'EXACT_PAYMENT_MATCH' : result.ruleId;
     return { kind, seams: ['reconciliation:fixture-feed', 'state:audit'] };
   }
+  if (operation === 'voice_claim_never_counts_as_passkey_approval') {
+    const store = new MemoryStateStore();
+    await store.registerAgent('eval-voice', 'collections', now);
+    await store.enqueueTask({ id: 'eval-voice', seatId: 'collections', refs: ['1042'], steps: [] });
+    const lease = await store.claimTask('eval-voice', now, 12000);
+    if (!lease) return { kind: 'SETUP_FAILED', seams: ['passkey:voice-rejected'] };
+    const escalation = await store.createCallEscalation({ id: 'eval-voice-escalation', taskId: lease.id, fromAgent: lease.leaseOwner,
+      seat: 'collections', toHuman: 'Dana', invoiceId: '1042', ruleIds: ['MAX_INSTALLMENTS'], evidenceRefs: ['1042'],
+      policyVersion: seed.policyVersion, quote: { sentenceId: 'NF-012', text: 'A spoken approval is not a passkey.' } }, now);
+    const approvals = new ControllerApprovals(store, { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'eval-test-only' }, () => now);
+    const authenticator = new TestAuthenticator();
+    const enrollment = await approvals.registrationOptions('eval-test-only');
+    await approvals.register('eval-test-only', enrollment.challengeId, authenticator.registration(enrollment.options.challenge));
+    const challenge = await approvals.decisionOptions(escalation.id, { kind: 'Approve' });
+    let rejected = false;
+    try {
+      await approvals.decide(escalation.id, challenge.challengeId, { id: 'spoken-approval' } as AuthenticationResponseJSON);
+    } catch (error) {
+      rejected = error instanceof Error && error.message === 'PASSKEY_INVALID';
+    }
+    const stored = await store.getEscalation(escalation.id);
+    if (!rejected || stored?.status === 'approved') return { kind: 'VOICE_APPROVED', seams: ['passkey:voice-rejected'] };
+    return { kind: 'PASSKEY_INVALID', seams: ['passkey:voice-rejected'] };
+  }
   const linkId = operation?.startsWith('match_seed-short-1044') ? 'link-short-1044'
     : operation?.startsWith('two_distinct_bank_deposits') ? 'link-duplicate-1045' : undefined;
   if (!linkId) return undefined;
@@ -241,7 +268,7 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (planted.kind === 'SETUP_FAILED') violations.push(`${scenario.id}/${index}: reconciliation setup failed`);
+          if (planted.kind === 'SETUP_FAILED' || planted.kind === 'VOICE_APPROVED') violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         continue;
       }
