@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "dev:web": "pnpm --filter @backroom/web dev",
-    "demo:core": "pnpm --filter @backroom/orchestrator exec tsx src/core-demo/cli.ts"
+    "demo:core": "pnpm --filter @backroom/orchestrator exec tsx src/core-demo/cli.ts",
+    "eval:run": "pnpm --filter @backroom/orchestrator exec tsx src/eval/cli.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3"
