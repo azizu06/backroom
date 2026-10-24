@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StoryChapter } from '../../lib/office/story';
+import type { OfficeSnapshot } from '../../lib/office/state';
+import { StoryCaption } from './StoryCaption';
 import './story.css';
 
-export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced }: {
+export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced, snapshot }: {
   chapters: readonly StoryChapter[]; onChapter: (index: number) => void; onExit: () => void;
-  onPreview?: (preview: StoryChapter['preview']) => void; reduced: boolean;
+  onPreview?: (preview: StoryChapter['preview']) => void; reduced: boolean; snapshot: OfficeSnapshot;
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -55,8 +57,7 @@ export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced }: {
   const progress = reduced ? (index + 1) / chapters.length : (index + Math.min(1, elapsed / chapter.dwellMs)) / chapters.length;
   return <aside className='story-mode' aria-label='Judge story mode' onPointerDown={event => event.stopPropagation()}>
     <div className='story-progress' role='progressbar' aria-label='Story progress' aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}><span style={{ width: `${progress * 100}%` }} /></div>
-    <p className='story-kicker'>Chapter {index + 1} of {chapters.length} · {chapter.anchor === 'vendor_onboarding' ? 'Vendor desk' : chapter.anchor === 'dana' ? 'Dana’s desk' : chapter.anchor[0]!.toUpperCase() + chapter.anchor.slice(1)}</p>
-    <h2>{chapter.title}</h2><p>{chapter.caption}</p>
+    <StoryCaption chapter={chapter} index={index} total={chapters.length} snapshot={snapshot} />
     {chapter.preview && !onPreview && <p className='story-preview-note'>(preview only in demo mode)</p>}
     <div className='story-actions'>
       {!finished && <button onClick={togglePause}>{paused ? 'Resume' : 'Pause'}</button>}
@@ -65,6 +66,5 @@ export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced }: {
       {!finished && <button onClick={() => select(index + 1)} disabled={index === chapters.length - 1}>Next</button>}
       <button onClick={onExit}>Exit</button>
     </div>
-    <span className='visually-hidden' aria-live='polite' aria-atomic='true'>Chapter {index + 1} of {chapters.length}: {chapter.title}. {chapter.caption}</span>
   </aside>;
 }
