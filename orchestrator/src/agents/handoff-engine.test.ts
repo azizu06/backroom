@@ -86,6 +86,23 @@ describe('handoff engine', () => {
     expect(commit(state, claim, offer('payables'))).toMatchObject({ ok: false, record: { errorCode: 'HANDOFF_TARGET_NOT_IN_CASE' } });
   });
 
+  it.each([
+    ['New account 1234.5678.9012 routing 0210.0002.1', 'New account ••9012 routing ••0021'],
+    ['Click https://acme-supp1y.com/pay?acct=99887766', 'Click [link]'],
+    ['Click www.x.com or acme-supp1y.com/pay', 'Click [link] or [link]'],
+    ...[' ', '-', '_', '/', '.', ' - '].map(separator =>
+      [`Account ${['1234', '5678', '9012'].join(separator)}`, 'Account ••9012']),
+    ['Email ap@evil.example SSN 123-45-6789 card 4111 1111 1111 1111 phone 212-555-1234 account 123456789',
+      'Email [email] SSN ••6789 card ••1111 phone ••1234 account ••6789'],
+    ['Visit HTTPS://example.com/pay and billing.acme-supp1y.com/pay?acct=99887766', 'Visit [link] and [link]'],
+    ['Account 1234_5678/9012', 'Account ••9012'],
+    ['Amounts 4950.00 and $1,234.56', 'Amounts 4950.00 and $1,234.56'],
+  ])('public summary and spoken line sanitize %s', (summary, expected) => {
+    const { state, claim } = started();
+    const { record } = commit(state, claim, { ...offer('vendor'), summary });
+    expect(engine.toPublicHandoff(state, record)).toMatchObject({ summary: expected, line: expected });
+  });
+
   it('public projection is allowlisted, redacted and Cartesia-safe', () => {
     const { state, claim } = started();
     const { record } = commit(state, claim, { ...offer('vendor'), summary: 'Pay <script> ap@evil.example acct 123456789\nnow' });
