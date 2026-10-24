@@ -2,23 +2,32 @@ import { randomUUID } from 'node:crypto';
 import type { StateStore } from '@backroom/orchestrator';
 import { isOperatorAction, type OperatorAction } from './catalog';
 import { operatorOriginAllowed, operatorSessionValid } from './session';
+import { OPERATOR_SIGN_OUT_COOKIE, operatorSignedIn } from './sign-in';
 
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 export function createOperatorHTTP(options: {
   env: () => Record<string, string | undefined>; store: () => StateStore; run: (action: OperatorAction) => Promise<unknown>;
   /** Read-only facts for an unlocked console, e.g. why a rail is unavailable. Never secrets. */
   session?: () => Record<string, unknown>;
+  now?: () => number;
 }) {
+  const now = options.now ?? Date.now;
   let busy = false;
   return async (action: string, request: Request) => {
     const env = options.env();
     if (!env.DEMO_CONTROL_SECRET) return json({ error: 'Operator console requires the owned demo host.' }, 503);
     if (!operatorOriginAllowed(request, env)) return json({ error: 'Origin rejected.' }, 403);
-    if (!operatorSessionValid(request, env)) return json({ error: 'Unlock the console on the host’s local address.' }, 401);
+    // Either the loopback host unlock or the shared operator sign-in, always from an allowed origin.
+    if (!operatorSessionValid(request, env, now()) && !operatorSignedIn(request, env.CONTROLLER_ENROLLMENT_SECRET, now())) {
+      return json({ error: 'Sign in with the operator code.' }, 401);
+    }
     if (action === 'session' && request.method === 'GET') return json({ ...options.session?.(), authorized: true });
-    if (action === 'logout' && request.method === 'POST') return new Response(null, { status: 204, headers: {
-      'Cache-Control': 'no-store', 'Set-Cookie': 'backroom_operator=; Path=/api/operator; HttpOnly; SameSite=Strict; Max-Age=0',
-    } });
+    if (action === 'logout' && request.method === 'POST') {
+      const headers = new Headers({ 'Cache-Control': 'no-store' });
+      headers.append('Set-Cookie', 'backroom_operator=; Path=/api/operator; HttpOnly; SameSite=Strict; Max-Age=0');
+      headers.append('Set-Cookie', OPERATOR_SIGN_OUT_COOKIE);
+      return new Response(null, { status: 204, headers });
+    }
     if (!isOperatorAction(action)) return json({ error: 'Unknown operator action.' }, 404);
     if (request.method !== 'POST') return json({ error: 'POST required.' }, 405);
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return json({ error: 'JSON required.' }, 415);

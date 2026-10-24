@@ -9,6 +9,8 @@ const equal = (actual: string, expected: string) => {
 /** Explicit rehearsal fallback. Separate from voice/tool credentials; no agent tool routes here. */
 export function createPolicyHTTP(config: {
   store: () => StateStore; pin: () => string | undefined; origin: () => string | undefined; now?: () => number;
+  /** The shared operator sign-in; an alternative to the PIN, never an approval. */
+  signedIn?: (request: Request) => boolean;
 }) {
   const now = config.now ?? Date.now;
   let failures = 0, retryAfter = 0;
@@ -19,15 +21,21 @@ export function createPolicyHTTP(config: {
     // All requests use a non-simple header; only same-origin browsers can send it.
     if (request.headers.get('sec-fetch-site') === 'cross-site'
       || (request.method === 'POST' && request.headers.get('origin') !== origin)) return json({ error: 'ORIGIN_REJECTED' }, 403);
-    if (retryAfter && now() >= retryAfter) { failures = 0; retryAfter = 0; }
-    if (failures >= 5) return json({ error: 'PIN_RATE_LIMITED' }, 429);
-    if (!equal(request.headers.get('x-policy-demo-pin') ?? '', pin)) {
-      if (++failures >= 5) retryAfter = now() + 60_000;
-      return json({ error: 'OWNER_PIN_REQUIRED' }, 401);
+    const authMethod = config.signedIn?.(request) ? 'operator_session' : 'demo_pin';
+    if (authMethod === 'demo_pin') {
+      if (retryAfter && now() >= retryAfter) { failures = 0; retryAfter = 0; }
+      if (failures >= 5) return json({ error: 'PIN_RATE_LIMITED' }, 429);
+      const sent = request.headers.get('x-policy-demo-pin');
+      // A signed-out page probes without a PIN; that is not a wrong guess.
+      if (sent === null) return json({ error: 'OWNER_PIN_REQUIRED' }, 401);
+      if (!equal(sent, pin)) {
+        if (++failures >= 5) retryAfter = now() + 60_000;
+        return json({ error: 'OWNER_PIN_REQUIRED' }, 401);
+      }
     }
     try {
       const store = config.store();
-      if (request.method === 'GET') return json({ policy: await store.getPolicy(), authMethod: 'demo_pin' });
+      if (request.method === 'GET') return json({ policy: await store.getPolicy(), authMethod });
       if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ error: 'JSON_REQUIRED' }, 415);
       const raw = await request.text();
       if (raw.length > 4096) return json({ error: 'REQUEST_TOO_LARGE' }, 413);
@@ -35,8 +43,8 @@ export function createPolicyHTTP(config: {
       if (!body || typeof body !== 'object' || Array.isArray(body)
         || Object.keys(body).sort().join(',') !== 'expectedVersion,limits'
         || !Number.isSafeInteger(body.expectedVersion)) return json({ error: 'INVALID_REQUEST' }, 400);
-      const policy = await store.savePolicyLimits(body.expectedVersion, body.limits as PolicyLimits, now());
-      return json({ policy, authMethod: 'demo_pin' });
+      const policy = await store.savePolicyLimits(body.expectedVersion, body.limits as PolicyLimits, now(), authMethod);
+      return json({ policy, authMethod });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (message === 'POLICY_CONFLICT') return json({ error: message }, 409);
