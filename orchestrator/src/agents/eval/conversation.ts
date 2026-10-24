@@ -202,7 +202,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   // 4. Opt-out persists before the next call: the same host composes the next pre-call from gateway state.
   const redials: string[] = [];
   // Stops persist before the next call; a voicemail does not stop future calls.
-  const nextCall = ['opt_out', 'hostile', 'human_request', 'voicemail'].includes(name) ? await plan('next-call', redials) : undefined;
+  const nextCall = ['opt_out', 'hostile', 'human_request', 'voicemail', 'wrong_number'].includes(name) ? await plan('next-call', redials) : undefined;
   const nextPermit = trace.find(row => row.tool === 'next-call.can_call')?.output as Record<string, Json> | undefined;
 
   // The reconciler's code-owned receipt is the only thing that clears an AR invoice.
@@ -241,7 +241,9 @@ export async function runConversation(name: Conversation, options: { pairing?: b
       nextCallAllowed: nextCall?.kind === 'started' && redials.length === 1 }),
     ...(name === 'opt_out' && { noOfferAfterOptOut: call.plans.length === 0, nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0
       && nextPermit?.decision === 'DENY' && JSON.stringify(nextPermit?.ruleIds) === JSON.stringify(['DNC']) }),
-    ...(name === 'wrong_number' && { identityDenied: transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids ?? []).includes('IDENTITY_REQUIRED') }),
+    ...(name === 'wrong_number' && { identityDenied: transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids ?? []).includes('IDENTITY_REQUIRED'),
+      // C08 "flag phone": a wrong-person number must not be dialed again until a human reviews it.
+      numberFlagged: nextCall?.kind === 'not_started' && redials.length === 0 && nextPermit?.decision === 'DENY' }),
     ...(name === 'already_paid_unmatched' && { claimNotCleared: reconRules.includes('RECON_UNMATCHED') }),
   };
   return { id: name, scenarioId, invoiceId, match: Object.values(checks).every(Boolean), checks,
