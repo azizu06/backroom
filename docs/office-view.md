@@ -7,6 +7,9 @@ the publisher token never does. Missing live configuration fails instead of
 falling back to fixtures. Configure the server environment as described in
 [`spacetime/README.md`](../spacetime/README.md).
 
+Explicit `/office?replay=<name>` URLs retain the labeled replay backup and do not
+connect to the live source. See [`replay-mode.md`](replay-mode.md).
+
 Memory mode retains the explicitly labeled **Preview · simulated state** producer
 for tests and offline layout work. Its controls only change fixture state.
 

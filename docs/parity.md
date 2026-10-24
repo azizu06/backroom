@@ -1,6 +1,6 @@
 # §4.9 live office parity: PASS (local SpacetimeDB)
 
-Verified 2026-10-24 at 02:01 PDT with SpacetimeDB 2.13.0 standalone, the actual
+Verified 2026-10-24 at 02:03 PDT with SpacetimeDB 2.13.0 standalone, the actual
 merged #72 StateStore/module, production Next.js, and headless Chromium. The
 renderer is an anonymous subscriber. No shared browser, model, phone, sponsor
 network, or bank effect was used.
@@ -53,14 +53,17 @@ excluded; the browser and server share this Mac's clock.
 
 | Samples | Minimum | Median | p95 | Maximum | ≤1 s |
 | --- | --- | --- | --- | --- | --- |
-| 20 | 12 ms | 112 ms | 194 ms | 200 ms | 20/20 |
+| 20 | 9 ms | 118 ms | 188 ms | 452 ms | 20/20 |
 
 Milliseconds in write order:
 
 ```text
-12, 113, 151, 187, 158, 148, 32, 42, 112, 38,
-200, 194, 85, 152, 30, 151, 27, 22, 21, 111
+452, 122, 143, 118, 154, 44, 122, 129, 9, 102,
+109, 56, 163, 62, 31, 159, 188, 41, 113, 94
 ```
+
+The final rerun also passed after integration with the labeled replay backup;
+473 workspace tests, both replay browser tests, typechecks and build passed.
 
 This measures the view responding to a position command, including frame
 scheduling. It does not time completion of the deliberately animated walk,
