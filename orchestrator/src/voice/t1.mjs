@@ -108,19 +108,23 @@ async function main() {
     const base = required('T1_PUBLIC_URL');
     if (!base.startsWith('https://')) throw new Error('T1_PUBLIC_URL must be HTTPS');
     const secret = required('CARTESIA_WEBHOOK_SECRET');
-    if (!state.webhook_id) {
-      const webhook = await cartesia('/agents/webhooks', { url: `${base}/api/voice/cartesia`, secret, display_name: 'Backroom T1' });
+    const webhookConfig = { url: `${base}/api/voice/cartesia`, secret, display_name: 'Backroom T1' };
+    if (state.webhook_id) await cartesia(`/agents/webhooks/${state.webhook_id}`, webhookConfig, 'PATCH');
+    else {
+      const webhook = await cartesia('/agents/webhooks', webhookConfig);
       state.webhook_id = webhook.id; save(state);
     }
-    if (!state.tool_id) {
-      const tool = await cartesia('/v1/agents/tools', {
-        type: 'webhook', name: 't1_echo', description: 'Run this connectivity check after the caller confirms identity. It returns no invoice data.',
-        pre_tool_speech: 'off', execution_mode: 'immediate', response_timeout_secs: 2,
-        api_schema: { url: `${base}/api/tools/t1_echo`, method: 'POST',
-          request_body_schema: { type: 'object', properties: { probe: { type: 'string', constant_value: 't1' } } },
-          authentication: { mode: 'bearer', token: { type: 'secret', secret_value: secret } },
-        },
-      });
+    const toolConfig = {
+      name: 't1_echo', description: 'Run this connectivity check after the caller confirms identity. It returns no invoice data.',
+      pre_tool_speech: 'off', execution_mode: 'immediate', response_timeout_secs: 2,
+      api_schema: { url: `${base}/api/tools/t1_echo`, method: 'POST',
+        request_body_schema: { type: 'object', properties: { probe: { type: 'string', constant_value: 't1' } } },
+        authentication: { mode: 'bearer', token: { type: 'secret', secret_value: secret } },
+      },
+    };
+    if (state.tool_id) await cartesia(`/v1/agents/tools/${state.tool_id}`, toolConfig, 'PATCH');
+    else {
+      const tool = await cartesia('/v1/agents/tools', { type: 'webhook', ...toolConfig });
       state.tool_id = tool.id; save(state);
     }
     if (!state.agent_id) {

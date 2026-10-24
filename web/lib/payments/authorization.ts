@@ -2,12 +2,13 @@ import type { AuthorizedPaymentLink } from '@backroom/orchestrator';
 import type { GatewayCall } from '../gateway/store';
 
 /** Only stored gateway rows and their original ALLOW audit can authorize a payment. */
-export function authorizedPaymentLink(call: GatewayCall, id: string): AuthorizedPaymentLink | undefined {
+export function authorizedPaymentLink(call: GatewayCall, id: string, now = Date.now()): AuthorizedPaymentLink | undefined {
   const link = call.links.find(row => row.id === id);
   const plan = link && call.plans.find(row => row.id === link.planId && row.auditId === link.auditId);
   const audit = plan && call.audits.find(row => row.id === plan.auditId && row.kind === 'ALLOW'
     && row.action === 'propose_plan' && row.policyVersion === call.policyVersion);
-  if (!link || !plan || !audit?.plan || call.currency !== 'USD') return;
+  if (!link || !plan || !audit?.plan || call.currency !== 'USD' || call.status !== 'active'
+    || (link.expiresAt !== undefined && now >= link.expiresAt)) return;
   for (const field of ['installments', 'firstPaymentPct', 'durationDays', 'waiveFee', 'discountPct'] as const) {
     if (audit.plan[field] !== plan[field]) return;
   }
