@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PAYLINK_KIOSK, PAYLINK_RADIUS, PITCH_LIMIT, PLAYER_RADIUS, SERVER_ROOM, SERVER_ROOM_BOX, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
-  interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
+  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PAYLINK_KIOSK, PAYLINK_RADIUS, PITCH_LIMIT, PLAYER_RADIUS, SERVER_ROOM, SERVER_ROOM_BOX, SPAWN, TREASURY_DOOR, TURN_SPEED, PlayInput, applyLook, headBob, insideAny,
+  applyTurnTap, frameLookYaw, interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
   type PlayCandidate, type Vec2,
 } from "./play";
 import { createMockOfficeState } from "./preview";
@@ -138,6 +138,22 @@ describe("input", () => {
     expect(turnIntent(input, 1)).toBeGreaterThan(0);
   });
 
+  it("a released turn-key tap still yaws one frame", () => {
+    const input = new PlayInput();
+    applyTurnTap(input, "turnLeft");
+    applyTurnTap(input, "forward");
+    input.press("turnLeft");
+    expect(input.active()).toBe(true);
+    input.release("turnLeft");
+    expect(turnIntent(input, 1 / 60)).toBe(0);
+    expect(input.consumeTurnTap()).toBeCloseTo(TURN_SPEED / 60);
+    applyTurnTap(input, "turnRight");
+    expect(input.consumeTurnTap()).toBeCloseTo(-TURN_SPEED / 60);
+    // A keydown both queues a tap and holds the key. The held frame wins so the tap is not applied twice.
+    expect(frameLookYaw(0.1, TURN_SPEED / 60, TURN_SPEED / 60)).toBeCloseTo(0.1 + TURN_SPEED / 60);
+    expect(frameLookYaw(0.1, 0, -TURN_SPEED / 60)).toBeCloseTo(0.1 - TURN_SPEED / 60);
+  });
+
   it("clamps look pitch", () => {
     expect(applyLook(0, 0, 0, 5).pitch).toBe(PITCH_LIMIT);
     expect(applyLook(0, 0, 0, -5).pitch).toBe(-PITCH_LIMIT);
@@ -264,15 +280,15 @@ describe("targets", () => {
 });
 
 describe("panels", () => {
-  it("describes an agent with its task and newest audit entries", () => {
+  it("talks as an agent, grounded in its state and newest audit entries", () => {
     const mock = createMockOfficeState();
     mock.setTargetAnchor("dana");
     const snapshot = mock.source.getSnapshot();
     const panel = playPanel(snapshot, { kind: "agent", id: "collections-clerk" })!;
-    expect(panel.title).toBe("Alex · collections-clerk");
-    expect(panel.state).toContain("awaiting Dana");
-    expect(panel.task).toContain("Dana’s desk");
-    expect(panel.task).toContain("preview-escalation-1042");
+    expect(panel.title).toBe("Talking with Alex");
+    expect(panel.talk!.greeting.text).toContain("awaiting Dana");
+    expect(panel.talk!.replies.stopped.text).toContain("preview-escalation-1042");
+    expect(panel.talk!.replies.stopped.ruleIds).toEqual(["MAX_INSTALLMENTS"]);
     expect(panel.entries[0]).toMatchObject({ decision: "ESCALATE", ruleIds: ["MAX_INSTALLMENTS"] });
     expect(targetLabel(snapshot, { kind: "agent", id: "collections-clerk" })).toBe("Talk to Alex");
     expect(playPanel(snapshot, { kind: "agent", id: "gone" })).toBeNull();

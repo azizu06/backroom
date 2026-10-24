@@ -33,12 +33,12 @@ export const unprobedServices = disclosureItems
 export const NOT_PROBED_LABEL = 'Not probed in this process';
 export const CHECKING_LABEL = 'Checking…';
 
-/** At or below this width the overlay starts collapsed so it does not cover the office. */
+/** At or below this width the overlay starts collapsed outside the office too. */
 export const NARROW_PANEL_QUERY = '(max-width: 760px)';
 
-/** The details page is always expanded; elsewhere the user's toggle wins over the viewport default. */
-export function panelExpanded({ detailed, narrow, userExpanded }: { detailed: boolean; narrow: boolean; userExpanded: boolean | null }) {
-  return detailed || (userExpanded ?? !narrow);
+/** The details page is always expanded; the office overlay starts collapsed. */
+export function panelExpanded({ detailed, narrow, officeView = false, userExpanded }: { detailed: boolean; narrow: boolean; officeView?: boolean; userExpanded: boolean | null }) {
+  return detailed || (userExpanded ?? !(narrow || officeView));
 }
 
 /** The Hide/Show toggle stores the opposite of what is currently shown. */
