@@ -1,4 +1,4 @@
-.route-state { color-scheme: dark; background: #0b141c; color: #edf2f3; min-height: 100svh; font: 16px/1.5 system-ui, sans-serif; padding: 0 24px 200px; box-sizing: border-box; }
+.route-state { color-scheme: dark; background: #0b141c; color: #edf2f3; min-height: 100svh; font: 16px/1.5 system-ui, sans-serif; padding: 0 24px 48px; box-sizing: border-box; }
 .route-state * { box-sizing: border-box; }
 .route-state-content { max-width: 720px; margin: auto; }
 .route-state header { display: flex; gap: 24px; justify-content: space-between; border-bottom: 1px solid #344655; padding: 24px 0; }
