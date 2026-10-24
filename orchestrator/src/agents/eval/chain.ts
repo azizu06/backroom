@@ -14,6 +14,7 @@ import { createCollectionsPlannerSpecialist } from '../roles/collections';
 import { MemoryVendorEvidenceStore, type VendorToolDeps } from '../tools/vendor';
 import { ApifyBudget } from '../tools/vendor-apify';
 import { MemoryStateStore } from '../../store';
+import { createRouter } from '../../router';
 import { createNorthfieldRepository, northfield, northfieldInvoice, northfieldSource, PayablesSeat } from '../../payables';
 import type { FinanceRepository, InvoiceFields } from '../../payables';
 
@@ -51,7 +52,9 @@ export async function auditCase(store: MemoryStateStore, id: string, refs: strin
 }
 
 export async function runInvoice(id: string, options: { caseId?: string; pendingBankChange?: boolean; senderDomain?: string;
-  candidate?: InvoiceFields; repository?: FinanceRepository; state?: MemoryStateStore } = {}) {
+  candidate?: InvoiceFields; repository?: FinanceRepository; state?: MemoryStateStore;
+  /** P12: route extraction through the production router with GX10 healthy or cut; records routing audits. */
+  gx10?: 'healthy' | 'cut' } = {}) {
   const caseId = options.caseId ?? `ap:${id}`;
   const trace: Trace[] = [];
   const repository = options.repository ?? await createNorthfieldRepository();
@@ -69,11 +72,22 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
 
   // Explicit oracle-fed mock: this tests the schema/evidence path, NOT document reading ability.
   let extraction: ExtractionArtifact | undefined;
+  const gx10: typeof fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+    output: options.candidate ?? fields, confidence: 1,
+  }) } }] }), { status: 200 });
+  // P12 link cut: every GX10 request fails; the canned Anthropic transport returns the same oracle candidate.
+  const cut: typeof fetch = async () => { throw new TypeError('fetch failed'); };
+  const cloudBodies: { system: string; messages: unknown }[] = [];
+  const router = options.gx10 && createRouter({ stateStore: state, anthropicApiKey: 'offline-eval-not-a-key', anthropicModel: 'claude-sonnet-5-5',
+    fetch: async (url, init) => {
+      if (!String(url).startsWith('https://api.anthropic.com/')) return options.gx10 === 'cut' ? cut(url, init) : gx10(url, init);
+      cloudBodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ model: 'claude-sonnet-5-5', stop_reason: 'end_turn', usage: { input_tokens: 1500, output_tokens: 400 },
+        content: [{ type: 'text', text: JSON.stringify({ output: options.candidate ?? fields, confidence: 0.95 }) }] });
+    } });
   const extractor: ExtractorDependencies = { readDocument: async () => ({ text }),
     saveExtraction: async (_ctx, artifact) => { extraction = artifact; return `extraction:${caseId}`; },
-    fetch: async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
-      output: options.candidate ?? fields, confidence: 1,
-    }) } }] }), { status: 200 }) };
+    fetch: options.gx10 === 'cut' ? cut : gx10, ...(router && { router, audit: state }) };
   const verifier: VendorToolDeps = { loadCase: async () => ({ vendorId: fields.vendorId, kind: 'invoice',
     senderDomain: source.senderDomain, claimedAccountId: fields.bankAccountId }), vendors: repository,
     bankChangeRisk: { check: async () => ({ score: 0, label: 'FAKE: synthetic fraud risk (not checked)' }) },
@@ -138,6 +152,10 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
   return { id, caseId, vendorDecision, historical: seedInvoice.status === 'paid',
     actual: ['failed', 'paused', 'cancelled'].includes(dispatched.status) ? 'ERROR' as const
       : result.status === 'paid' ? 'ALLOW' as const : 'HOLD' as const,
+    routing: { audits: (await state.listAudit()).filter(row => row.action === 'extraction_routed')
+      .map(row => ({ route: row.route, ruleIds: row.ruleIds, model: row.inputs?.model, latencyMs: row.latencyMs, costUsd: row.costUsd })),
+      cloudRequests: cloudBodies.length,
+      cloudTextOnly: cloudBodies.every(body => JSON.stringify(body.messages) === JSON.stringify([{ role: 'user', content: JSON.stringify(text) }])) },
     extraction: extraction?.fields, assessment, vendor: verdict, result, mockDebits: receipts.length, destinations, trace,
     runtime: { status: dispatched.status, reason: dispatched.reason,
       activations: dispatched.activations.map(row => ({ role: row.role, kind: row.kind, reason: row.reason, model: row.model })),
