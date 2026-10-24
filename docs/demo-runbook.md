@@ -10,15 +10,21 @@ web host's gateway; external sponsor checks remain separate. Keep the rehearsal 
 ## In-app operator console and external-action inventory
 
 After starting the owned host once, open **Operator** in the office toolbar (or
-Play HUD), at `http://127.0.0.1:<DEMO_PORT>/operator`. Press **Unlock local
-operator session**. The host checks the socket, exact numeric loopback Host and
-Origin before minting an eight-hour HttpOnly, SameSite=Strict cookie using its
-server-held `DEMO_CONTROL_SECRET`. No control key is sent to the browser.
-The public tunnel cannot unlock this console. For a remote host, an operator
-may use a private SSH forward with the **same local and remote demo port**;
-do not expose the private supervisor port. This is host operation authority,
-not controller approval authority. `/controller` and approval pages still use
-their own passkey checks. A normal `next dev` server cannot unlock the console.
+Play HUD) on the printed public URL. Enter the operator code
+(`CONTROLLER_ENROLLMENT_SECRET` in `.env.local` or `.demo/private.env`) once and
+press **Sign in**. The host issues one eight-hour HttpOnly, SameSite=Strict
+(Secure on HTTPS) session cookie, `backroom_session`. That one session unlocks this
+console, the office desk phone's **Request call**, the audit wall and the policy
+editor; each still checks the cookie and its own origin rule on the server. The code
+is checked in constant time at `POST /api/session` only, and five wrong codes lock
+that client out for a minute. Only the declared public origin (`DEMO_PUBLIC_URL` /
+`WEBAUTHN_ORIGIN`) and the host's own `http://127.0.0.1:<DEMO_PORT>` are accepted;
+any other origin is rejected. On the host itself, **Unlock local operator session**
+still works without the code: the host checks the socket, exact numeric loopback
+Host and Origin before minting a console-only cookie with its server-held
+`DEMO_CONTROL_SECRET`. A normal `next dev` server cannot unlock the console.
+Neither session is approval authority: `/controller` and approval pages keep
+Dana's passkey checks, and the pay page is unchanged.
 
 All console actions require the configured host origin and operator session,
 accept no arbitrary commands or arguments, serialize against each other (OFF
@@ -263,21 +269,22 @@ network activity; preflight itself is read-only and makes no model calls.
 
 ## Phone / operator setup
 
-- Demo operator: big screen; use the printed **local** `/office` URL on the laptop
-  for its anonymous SpacetimeDB subscription, and public `/audit`, `/policy` and
-  `/inbox` as needed. Reload the office after reset so it subscribes to the new DB.
-  The DB WebSocket remains loopback-only: a phone/public-origin office on another
-  device is not connected through the web tunnel. Dana and pay pages use HTTPS
-  HTTP APIs and do not need that WebSocket. Memory mode remains a labeled preview.
-  Confirm the office connection indicator before judging.
+- Demo operator: big screen; open the printed public **Office** URL and sign in once
+  at **Operator** (see above). Every other view is a click away: the office toolbar
+  links Operator, whose steps link the office, Dana's controller QR, the payment
+  link, Inbox, Audit wall and Attack demo, with Controller inbox and Policy editor
+  under **Advanced**. The office's state socket goes through the web host's own origin
+  (`/__state/`, `web/lib/demo/state-proxy.ts`), so the public page shows **State
+  connected**. Reload the office after reset so it subscribes to the new DB. Memory
+  mode remains a labeled preview. Confirm the office connection indicator before judging.
 - Dana: open public `/controller` on the passkey phone. Use the private
   `CONTROLLER_ENROLLMENT_SECRET` from `.env.local` or generated `.demo/private.env`;
   never display it. Complete registration before resetting for the pitch, then tap
   **Sign in with passkey** and leave the page open (screen on, volume up): each new
   escalation chimes and opens on that screen by itself, so nobody shares a link
   during the call. See `docs/m6-approvals.md` "Live controller inbox".
-- Audit operator: unlock `/audit` with the private `CONTROLLER_ENROLLMENT_SECRET` from the
-  same source. Policy operator: use the separate `POLICY_DEMO_PIN`.
+- Audit and policy: already unlocked by the operator sign-in on the same browser.
+  The separate `POLICY_DEMO_PIN` remains a fallback on `/policy`.
 - Network operator: hotspot/wired internet, charged backup phone, audible volume,
   both laptop and phone on the exact public HTTPS origin. Localhost belongs to
   the laptop; a phone cannot use it. Check the Sunday `DEMO_OVERRIDE` indicator
@@ -303,6 +310,22 @@ See [payment delivery](payment-delivery.md) for the verified headless QR/pay
 receipt and the process-local link lifetime. A live phone end-to-end receipt is
 still pending A0; the echo T1 test is not that receipt. Browser voice's current
 smoke command is documented in `docs/t1-cartesia.md`.
+
+## Single-URL click script
+
+1. Open the printed public **Office** URL on the big screen. Check **State connected**.
+2. Click **Operator**, enter the operator code once, **Sign in**, then **Reset company**
+   when the script calls for it.
+3. **Open the office**, walk to the Collections desk phone and press **Request call**
+   (rings only with `DEMO_VOICE=1`; otherwise it says no call placed).
+4. Dana's phone scans the console's controller QR (public `/controller`) and signs in
+   with the passkey, the only approval authority.
+5. From the console, open **Inbox**, **Audit wall** and **Attack demo**; **Advanced**
+   holds **Policy editor**. None asks for the code again. `/real-vs-sim` stays at its
+   printed URL until the shared nav lands.
+
+Proof against an owned host: `SINGLE_ORIGIN_URL=<public origin> pnpm --filter
+@backroom/web exec playwright test --config playwright.single-origin.config.ts`.
 
 ## Three-minute sequence (truthful current checkout)
 
