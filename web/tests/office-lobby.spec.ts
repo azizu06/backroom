@@ -171,10 +171,10 @@ test('office desk monitors survive the Collections escalation preview', async ({
   await page.getByRole('button', { name: 'Preview escalation' }).click();
   await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Collections', exact: true }).click();
-  // Once the focus camera settles, the empty right strip of the Collections screen shows the panel's #1d2420 (min channel 29),
+  // The larger monitor moved its face up/right; sample its reserved right strip for #1d2420 (min channel 29),
   // not the bright accent face (#a9bc8f) behind it, while the lit desk top beside it stays bright.
   await expect.poll(() => patchBrightness(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
-  await expect.poll(() => patchBrightness(page, canvas, [-5.074, 1.135, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(60);
+  await expect.poll(() => patchBrightness(page, canvas, [-4.31, 1.54, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(60);
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -272,8 +272,8 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const treasury = page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: /^Treasury/ });
   await treasury.click();
   await expect(treasury).toHaveAttribute('aria-pressed', 'true');
-  // A red part of the DENY sign board (right of the 'DENIED' line), on the aisle side of the door.
-  const sign = [6.95, 1.2, 0.56] as const;
+  // The taller DENY board keeps a blank red strip at the right; sample between its wrapped rule rows.
+  const sign = [6.95, 1.04, 0.55] as const;
   // Let the focus camera settle: the sign's spot stops changing and is not red before the denial.
   await page.waitForTimeout(2500);
   expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
