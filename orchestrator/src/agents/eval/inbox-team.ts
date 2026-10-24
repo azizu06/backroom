@@ -111,11 +111,14 @@ async function runOptOut(sample: InboxNarration) {
   const flagMatrix = demoAgentsEnabled({ BACKROOM_DEMO: '1' }) === true
     && demoAgentsEnabled({}) === false
     && demoAgentsEnabled({ DEMO_AGENTS: '1' }) === true
+    && demoAgentsEnabled({ DEMO_AGENTS: '0' }) === false
     && demoAgentsEnabled({ BACKROOM_DEMO: '1', DEMO_AGENTS: '0' }) === false;
   const prior = process.env.BACKROOM_DEMO;
   const priorAgents = process.env.DEMO_AGENTS;
+  const priorOrigin = process.env.DEMO_PUBLIC_URL;
   process.env.BACKROOM_DEMO = '1';
   process.env.DEMO_AGENTS = '0';
+  process.env.DEMO_PUBLIC_URL = 'http://localhost';
   let narrated: unknown = 'NOT_CALLED';
   let hostCreated = true;
   let httpStatus = 0;
@@ -131,7 +134,7 @@ async function runOptOut(sample: InboxNarration) {
     const preset = inboxPresets.find(row => row.id === '4471')!;
     const form = new FormData();
     for (const [key, value] of Object.entries({ ...preset, presetId: preset.id })) form.set(key, value);
-    const response = await createInboxHTTP({ store: () => offline })(new Request('http://localhost/api/inbox', {
+    const response = await createInboxHTTP({ store: () => offline, origin: () => 'http://localhost' })(new Request('http://localhost/api/inbox', {
       method: 'POST', headers: { origin: 'http://localhost' }, body: form }));
     httpStatus = response.status;
     const body = await response.json() as { decision?: { kind?: string; ruleIds?: string[] } };
@@ -152,5 +155,6 @@ async function runOptOut(sample: InboxNarration) {
     await resetInboxAgents();
     if (prior === undefined) delete process.env.BACKROOM_DEMO; else process.env.BACKROOM_DEMO = prior;
     if (priorAgents === undefined) delete process.env.DEMO_AGENTS; else process.env.DEMO_AGENTS = priorAgents;
+    if (priorOrigin === undefined) delete process.env.DEMO_PUBLIC_URL; else process.env.DEMO_PUBLIC_URL = priorOrigin;
   }
 }

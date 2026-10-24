@@ -4,12 +4,12 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "ae9d164a34b8b9ca5bd36672c5a98316c00ca23e",
+    "baseCommit": "be2f138242ce649739d0a523bd2fa10e1f5a3eb3",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
       "orchestrator/src/agents/eval/conversation.ts": "405f533151f8fab92f53be87b882d80415e3700a4ea9fb52aeccaad0f4d43dfc",
-      "orchestrator/src/agents/eval/inbox-team.ts": "32be9ae90c120f93be8362a912547c48b9f90bbede270c158fb9ce8fc2250312",
+      "orchestrator/src/agents/eval/inbox-team.ts": "80d03acb4a7d1e6bc4339f0b9f8ce1e64cf9975cd320d1b3866d91487dc7e87b",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
       "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
@@ -19,7 +19,7 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "8d27c80d75ded270b5bc3bb40f3b064d74d8c271a738b144167dcf0a13e454be"
+      "orchestrator/src/agents/eval/scoreboard.ts": "bdd5f609449644196ba6400aa6618193acc8248786218516b732d9c505da1872"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",

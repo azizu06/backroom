@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `ae9d164a34b8b9ca5bd36672c5a98316c00ca23e`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `be2f138242ce649739d0a523bd2fa10e1f5a3eb3`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -27,7 +27,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | 3/3 (100%) |
 | AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | 9/9 (100%) |
 | Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | 6/6 (100%) |
-| Demo inbox agent team: five roles, office handoffs, hold-only payment, DEMO_AGENTS=0 | 1/1 (100%) |
+| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0) | 1/1 (100%) |
 | P10 Collections dispatcher tool isolation (not policy rule agreement) | 1/1 (100%) |
 | P04 dispatcher bank-change application (software passkey, fixture providers) | 1/1 (100%) |
 | P04 missing/denied/spoken approval guards | 3/3 (100%) |
