@@ -17,7 +17,7 @@ import {
   frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
-import { bakedArtRequested } from '../../lib/office/baked-art';
+import { bakedArtRequested, withoutHiddenAuditBoard } from '../../lib/office/baked-art';
 import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 
@@ -56,7 +56,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
   // Bundled footprints; appended only for ?art=baked so the default collision set is unchanged.
   const baked = useMemo(() => bakedArtRequested(location.search), []);
   const colliders = useMemo(
-    () => officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX])),
+    () => withoutHiddenAuditBoard(officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX])), baked),
     [roomsKey, baked],
   );
   const [spawn] = useState(() => playSpawn(location.search, colliders));
