@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { northfield, northfieldInvoice } from '../../payables';
@@ -126,10 +126,15 @@ for (const row of legacy.reports) {
 }
 gaps.push({ id: 'AR_RUNTIME', detail: 'AR probes exercise real specialist DomainTools with a Collections reducer lease, but do not drive the dispatcher/post-call role or a voice conversation. Those end-to-end runtime outcomes remain unmeasured.' });
 const metrics = score(observations);
+const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
+const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
 const rates = {
   extractionMockFieldFidelity: fraction(fieldCorrect, fieldTotal),
-  sourceDocumentExtractionAccuracy: { numerator: null, denominator: null, percent: null, reason: 'No model reads PDFs; mock candidates are fixture-fed.' },
+  // Recorded live GX10 run (pdf-extraction.ts); the deterministic scoreboard only reads its committed result.
+  sourceDocumentExtractionAccuracy: pdfRun ? { ...fraction(pdfRun.fieldsCorrect, pdfRun.fieldsTotal), exactItems: pdfRun.exactItems, items: pdfRun.items,
+    model: pdfRun.model, recordedAt: pdfRun.recordedAt, p50LatencyMs: pdfRun.p50LatencyMs }
+    : { numerator: null, denominator: null, percent: null, reason: 'No recorded GX10 PDF run.' },
   ...metrics,
   exactAPRules: fraction(gradedAP.filter(row => row.exactRuleMatch === true).length, gradedAP.filter(row => row.exactRuleMatch !== null).length),
   collectionsPermits: fraction(permits.filter(row => row.match === true).length, permits.filter(row => row.match !== null).length),
@@ -144,7 +149,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'pdf-extraction.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
@@ -157,6 +162,7 @@ const report = {
     providers: 'Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.',
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
     payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 has a separate Collections runtime tool-isolation probe; its NOT_IN_BADGE reference is a direct policy check, not a runtime permission error. P11 recovery and P12 failover remain legacy checks/gaps.',
+    pdfExtraction: pdfRun ? `${pdfRun.scope} Recorded ${pdfRun.recordedAt} at ${String(pdfRun.baseCommit).slice(0, 7)}; p50 ${pdfRun.p50LatencyMs} ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.` : 'not recorded',
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
@@ -182,7 +188,8 @@ const lines = [
   'Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).', '',
   '| Measurement | Result |', '| --- | --- |',
   `| Extraction field fidelity, fixture-fed mock (8 fields × 83 invoices) | ${display(rates.extractionMockFieldFidelity)} |`,
-  '| Source/PDF extraction accuracy | Not measured |',
+  rates.sourceDocumentExtractionAccuracy.numerator === null ? '| Source/PDF extraction accuracy | Not measured |'
+    : `| Source/PDF extraction accuracy, GX10 ${pdfRun.model} on PDF text (recorded live ${String(pdfRun.recordedAt).slice(0, 10)}; ${pdfRun.exactItems}/${pdfRun.items} invoices exact) | ${display(rates.sourceDocumentExtractionAccuracy as any)} |`,
   `| Initial AP pay/hold decisions vs key | ${display(rates.decisions)} |`,
   `| Vendor fraud catch (lookalike sender only) | ${display(rates.fraudCatch)} |`,
   `| Duplicate catch | ${display(rates.duplicateCatch)} |`,

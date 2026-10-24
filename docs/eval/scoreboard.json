@@ -4,16 +4,17 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "862c882256cfaf8e95ed03478cda9bca677e93a3",
+    "baseCommit": "9a191ffd234c01281112e5d11ddc8b71abb5b547",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "82bc1146624f5786bc1fb33b6bda7001d3528efb8efd6b5560050e3842fd968e",
+      "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "d8e87c9cf5eb79a9e13bad005430af5d7e207f76a72da309cb87512fc9629258"
+      "orchestrator/src/agents/eval/scoreboard.ts": "206be1c1dfd5205aedaf241eb98b2908d567626664c2b3c59b85f6937465bb4a"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
@@ -47,6 +48,7 @@
     "providers": "Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.",
     "fraudDefinition": "Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.",
     "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 has a separate Collections runtime tool-isolation probe; its NOT_IN_BADGE reference is a direct policy check, not a runtime permission error. P11 recovery and P12 failover remain legacy checks/gaps.",
+    "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
@@ -64,10 +66,14 @@
       "percent": 100
     },
     "sourceDocumentExtractionAccuracy": {
-      "numerator": null,
-      "denominator": null,
-      "percent": null,
-      "reason": "No model reads PDFs; mock candidates are fixture-fed."
+      "numerator": 579,
+      "denominator": 581,
+      "percent": 99.66,
+      "exactItems": 81,
+      "items": 83,
+      "model": "gpt-oss:20b",
+      "recordedAt": "2026-10-24T18:51:17.743Z",
+      "p50LatencyMs": 2850
     },
     "decisions": {
       "numerator": 10,
