@@ -113,16 +113,17 @@ Validation: `pnpm -r build` passed, including static generation of `/t8`;
 `pnpm -r test` passed 143 tests after rebasing on the merged orchestrator/gateway
 (94 policy, 48 orchestrator, 1 module reducer).
 
-## Rebase validation (01:17 PDT)
+## Rebase validation (01:18 PDT)
 
-Rebased onto main through `3dc7798` (CRS, payables, collections, passkey approvals,
-LLM OFF, recovery, core demo, red-team and real/sim panel). Kept both sets of shared
-env names and ignore rules, the LLM-control/passkey documentation pointers, and
-all existing lockfile dependencies alongside the T8 additions.
+Rebased onto main through `ded1f59` (including the new audit and Cartesia voice
+work). Kept both sets of shared env names and ignore rules, LLM-control/passkey
+documentation pointers, all existing lockfile dependencies, and the newly added
+#15 audit adapter contract in `spacetime/README.md` alongside the T8 dev loop.
+The module README now follows the repository's Node 22+ requirement.
 
 - `pnpm install --frozen-lockfile`, `pnpm -r typecheck`, `pnpm -r test`,
-  `pnpm -r build`: PASS; 317 workspace tests (94 policy, 182 orchestrator,
-  40 web, 1 SpacetimeDB).
+  `pnpm -r build`: PASS; 355 workspace tests (94 policy, 218 orchestrator,
+  42 web, 1 SpacetimeDB).
 - Red-team replay Vitest suite: 28 PASS; its standalone TypeScript check: PASS.
 - `pnpm --filter @backroom/web test:approvals:browser`: 1 PASS, including real
   local passkey verification for Deny / Approve / Counter.

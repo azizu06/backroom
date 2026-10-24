@@ -5,7 +5,7 @@ This is the small go/no-go module, not the full §4.7 schema or the orchestrator
 
 ## Dev loop
 
-Requires Node 20+, pnpm, and SpacetimeDB **2.13.0** (CLI and SDK pinned together).
+Requires Node 22+, pnpm, and SpacetimeDB **2.13.0** (CLI and SDK pinned together).
 Official installation: <https://spacetimedb.com/docs/>.
 
 ```sh
