@@ -42,6 +42,27 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(errors).toEqual([]);
 });
 
+test('office demo guide and keyboard shortcuts help open and restore focus', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  const guideButton = page.getByRole('button', { name: 'Demo guide' });
+  await guideButton.click();
+  const guide = page.getByRole('dialog', { name: 'Try this' });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('Treasury');
+  await page.keyboard.press('Escape');
+  await expect(guide).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+  await page.locator('body').press('?');
+  const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(shortcuts).toBeVisible();
+  await expect(shortcuts).toContainText('Interact');
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('office ask-why pauses on a broken chain and resumes when verified', async ({ page }) => {
   let valid = false;
   await page.route('**/api/audit/entries', route => route.fulfill({ json: {
