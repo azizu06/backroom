@@ -11,8 +11,8 @@ export function DeskPhonePanel() {
   const status = call.status === 'idle' ? 'Idle · no call' : call.status === 'ringing' ? `Ringing · ${call.callerLabel ?? 'Unknown caller'}`
     : call.status === 'live' ? call.speakingAgentId ? `Live · ${agent} speaking` : 'Live · connected' : `Ended · ${call.endReason ?? 'Call ended'}`;
   return <div className='desk-phone-panel'>
-    <p data-testid='phone-status'>{status}</p>
-    <div aria-live='polite' aria-relevant='additions text'><ol aria-label='Call transcript' data-testid='phone-transcript'>
+    <p role='status' data-testid='phone-status'>{status}</p>
+    <div aria-live='polite' aria-relevant='additions text'><ol tabIndex={0} aria-label='Call transcript' data-testid='phone-transcript'>
       {call.transcript.map(line => <li key={line.id}><strong>{line.speaker === 'agent' ? line.agentId === 'collections' ? 'Collections' : agent : call.callerLabel ?? 'Caller'}</strong>: {line.text}</li>)}
     </ol></div>
     <p>{CALL_DISCLOSURE}</p>
