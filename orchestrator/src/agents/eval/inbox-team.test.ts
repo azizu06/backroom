@@ -5,7 +5,11 @@ afterEach(() => vi.unstubAllGlobals());
 
 it('runs the real inbox roles through createInboxAgents and does not pay or replace the seat decision', async () => {
   vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
+  const priorVendorCrs = process.env.VENDOR_CRS;
+  process.env.VENDOR_CRS = 'live';
+  try {
   const run = await runInboxTeam();
+  expect(process.env.VENDOR_CRS).toBe('live');
   expect(run.checks, JSON.stringify({ reason: run.reason, roles: run.roles, payment: run.payment, assessment: run.assessment, optOut: run.optOut, caseStatus: run.caseStatus })).toEqual({
     fiveRoles: true,
     syntheticCost: true,
@@ -37,4 +41,8 @@ it('runs the real inbox roles through createInboxAgents and does not pay or repl
   expect(run.optOut).toMatchObject({ narrated: false, hostCreated: false, mismatchedOrigin: 403, httpStatus: 200, agentAudits: 0, recordedDecision: expect.any(String) });
   expect(run.optOut.responseRules).toContain('LOOKALIKE_DOMAIN');
   expect(run.optOut.recordedRules).toEqual(run.optOut.responseRules);
+  } finally {
+    if (priorVendorCrs === undefined) delete process.env.VENDOR_CRS;
+    else process.env.VENDOR_CRS = priorVendorCrs;
+  }
 });

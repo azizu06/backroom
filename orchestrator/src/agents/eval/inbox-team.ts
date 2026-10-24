@@ -103,7 +103,7 @@ export async function runInboxTeam() {
       assessment: assessment?.verdict ?? null,
       payment: payment ? { status: payment.status ?? null, verdict: payment.verdict ?? null, ruleIds: paymentRules } : null,
       seatDecision: seatAfter?.decision ?? null, syntheticCostUsd: result?.costUsd ?? null, providerRequests, optOut: optOut.observed,
-      scope: 'Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. That HTTP entry reads DEMO_PUBLIC_URL and rejects a mismatched Origin. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.' };
+      scope: 'Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. That HTTP entry reads DEMO_PUBLIC_URL and rejects a mismatched Origin. Its payables seat is forced to VENDOR_CRS=fake for the request and the previous value is restored, so a live setting cannot replace the lookalike hold or place a CRS call. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.' };
   } finally { globalThis.fetch = priorFetch; }
 }
 
@@ -116,9 +116,11 @@ async function runOptOut(sample: InboxNarration) {
   const prior = process.env.BACKROOM_DEMO;
   const priorAgents = process.env.DEMO_AGENTS;
   const priorOrigin = process.env.DEMO_PUBLIC_URL;
+  const priorVendorCrs = process.env.VENDOR_CRS;
   process.env.BACKROOM_DEMO = '1';
   process.env.DEMO_AGENTS = '0';
   process.env.DEMO_PUBLIC_URL = 'https://evil.example';
+  process.env.VENDOR_CRS = 'fake';
   let narrated: unknown = 'NOT_CALLED';
   let hostCreated = true;
   let httpStatus = 0;
@@ -163,5 +165,6 @@ async function runOptOut(sample: InboxNarration) {
     if (prior === undefined) delete process.env.BACKROOM_DEMO; else process.env.BACKROOM_DEMO = prior;
     if (priorAgents === undefined) delete process.env.DEMO_AGENTS; else process.env.DEMO_AGENTS = priorAgents;
     if (priorOrigin === undefined) delete process.env.DEMO_PUBLIC_URL; else process.env.DEMO_PUBLIC_URL = priorOrigin;
+    if (priorVendorCrs === undefined) delete process.env.VENDOR_CRS; else process.env.VENDOR_CRS = priorVendorCrs;
   }
 }
