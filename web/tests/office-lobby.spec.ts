@@ -55,23 +55,32 @@ test('office demo guide and keyboard shortcuts help open and restore focus', asy
   await page.keyboard.press('Escape');
   await expect(guide).toHaveCount(0);
   await expect(guideButton).toBeFocused();
-  await page.locator('body').press('?');
+  await guideButton.focus();
+  await page.keyboard.press('?');
   const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(shortcuts).toBeVisible();
   await expect(shortcuts).toContainText('Interact');
-  // Focus stays inside the modal on Tab and Shift+Tab, so Escape still closes it.
+  // Native modal dialogs keep sequential focus inside while the background is inert.
   const close = shortcuts.getByRole('button', { name: 'Close' });
-  await page.keyboard.press('Tab');
-  await expect(close).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(close).toBeFocused();
+  for (let index = 0; index < 3; index++) {
+    await page.keyboard.press('Tab');
+    await expect(shortcuts).toContainText('Keyboard shortcuts');
+    await expect(shortcuts).toContainText('Interact');
+    expect(await page.evaluate(() => document.activeElement?.closest('dialog')?.classList.contains('office-shortcuts'))).toBe(true);
+  }
   await page.keyboard.press('Escape');
   await expect(shortcuts).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
   await page.getByLabel('Office view').selectOption('play');
   await page.locator('.play-surface').press('?');
   await expect(shortcuts).toBeVisible();
+  for (let index = 0; index < 3; index++) {
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement?.closest('dialog')?.classList.contains('office-shortcuts'))).toBe(true);
+  }
   await page.keyboard.press('Escape');
   await expect(shortcuts).toHaveCount(0);
+  await expect(page.locator('.play-surface')).toBeFocused();
   expect(errors).toEqual([]);
 });
 
