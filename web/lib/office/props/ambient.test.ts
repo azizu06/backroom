@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeAgent, type OfficeAudit, type OfficeSnapshot, type SeatId } from '../state';
 import {
-  AMBIENT_FPS, GLOW_MEAN, GLOW_PERIOD, IDLE_BUSY, SWAY_MAX, ambientActive, ambientDesks, busyLevel, cursorBlink, plantSway, screenGlow,
+  AMBIENT_FPS, CURSOR_SIZE, GLOW_MEAN, GLOW_PERIOD, IDLE_BUSY, SWAY_MAX, ambientActive, ambientDesks, busyLevel, cursorBlink, cursorPoint, plantSway, screenGlow,
 } from './ambient';
+import { MONITOR_MAX_LINES } from './monitors';
 
 const snapshot = (patch: Partial<OfficeSnapshot> = {}): OfficeSnapshot => ({ ...INITIAL_OFFICE, connection: 'preview', ...patch });
 const agent = (seatId: SeatId, targetAnchor: OfficeAgent['targetAnchor'] = seatId): OfficeAgent =>
@@ -105,5 +106,34 @@ describe('ambientDesks', () => {
     ]);
     expect(ambientDesks(snapshot({ rooms: [{ id: 'dana', rowId: 'r' }, { id: 'lobby', rowId: 'l' }] }))).toEqual([{ room: 'dana', seed: 3 }]);
     expect(ambientDesks(snapshot({ rooms: [] }))).toEqual([]);
+  });
+});
+
+describe('cursorPoint', () => {
+  // Desk-local monitor face (DeskMonitors): 0.66 x 0.36 centred at (-0.35, 1.18); 19 px line step = 0.0475.
+  const left = -0.35 - 0.33, right = -0.35 + 0.33, top = 1.18 + 0.18, bottom = 1.18 - 0.18;
+
+  it('sits inside the screen, at the left text margin, one line below the last body line', () => {
+    for (let lines = 0; lines <= MONITOR_MAX_LINES; lines++) {
+      const [x, y] = cursorPoint(lines);
+      expect(x - CURSOR_SIZE[0] / 2).toBeGreaterThan(left);
+      expect(x + CURSOR_SIZE[0] / 2).toBeLessThan(left + 0.05);
+      expect(y + CURSOR_SIZE[1] / 2).toBeLessThan(top);
+      expect(y - CURSOR_SIZE[1] / 2).toBeGreaterThan(bottom);
+    }
+    expect(cursorPoint(1)[1] - cursorPoint(2)[1]).toBeCloseTo(0.0475, 6);
+    expect(cursorPoint(2)[0]).toBe(cursorPoint(1)[0]);
+  });
+
+  it('stays clear of the heading, the status pill and the empty right strip', () => {
+    // Heading baseline at 27 px and the pill (y 12..30 px) end 0.075 below the top; the right strip starts past the centre.
+    const [x, y] = cursorPoint(0);
+    expect(y + CURSOR_SIZE[1] / 2).toBeLessThan(top - 0.075);
+    expect(x).toBeLessThan(right - 0.33);
+  });
+
+  it('clamps to the screen line slots', () => {
+    expect(cursorPoint(-2)).toEqual(cursorPoint(0));
+    expect(cursorPoint(MONITOR_MAX_LINES + 3)).toEqual(cursorPoint(MONITOR_MAX_LINES));
   });
 });

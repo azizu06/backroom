@@ -1,4 +1,5 @@
 import { visibleRooms, type AnchorId, type OfficeSnapshot } from '../state';
+import { MONITOR_MAX_LINES } from './monitors';
 
 /** Ambient ticks per second while active: a low on-demand rate, never a continuous render loop. */
 export const AMBIENT_FPS = 6;
@@ -54,4 +55,24 @@ export function busyLevel(snapshot: OfficeSnapshot, room: AnchorId): number {
 export function ambientDesks(snapshot: OfficeSnapshot): { room: AmbientDesk; seed: number }[] {
   const rooms = visibleRooms(snapshot);
   return AMBIENT_DESKS.flatMap((room, seed) => rooms.includes(room) ? [{ room, seed }] : []);
+}
+
+/**
+ * DeskMonitors' screen layout (see drawScreen): a 256 x 144 px texture on a 0.66 x 0.36 face centred at
+ * desk-local (-0.35, 1.18); body lines start at x 10 px with baselines at 50 + i * 19 px, 13 px type.
+ */
+const SCREEN_TEX_W = 256, SCREEN_TEX_H = 144, SCREEN_FACE_W = 0.66, SCREEN_FACE_H = 0.36, SCREEN_CENTER = [-0.35, 1.18] as const;
+const TEXT_LEFT_PX = 10, FIRST_BASELINE_PX = 50, LINE_STEP_PX = 19;
+/** Cursor block size in screen-texture pixels: one 13 px glyph cell. */
+export const CURSOR_PX = [6, 10] as const;
+export const CURSOR_SIZE = [CURSOR_PX[0] * SCREEN_FACE_W / SCREEN_TEX_W, CURSOR_PX[1] * SCREEN_FACE_H / SCREEN_TEX_H] as const;
+
+/** Desk-local (x, y) centre of the text cursor: the start of the empty line after the screen's last body line. */
+export function cursorPoint(lineCount: number): readonly [x: number, y: number] {
+  const slot = Math.min(Math.max(Math.floor(lineCount), 0), MONITOR_MAX_LINES);
+  const px = TEXT_LEFT_PX + CURSOR_PX[0] / 2, py = FIRST_BASELINE_PX + slot * LINE_STEP_PX - CURSOR_PX[1] / 2;
+  return [
+    SCREEN_CENTER[0] - SCREEN_FACE_W / 2 + px * SCREEN_FACE_W / SCREEN_TEX_W,
+    SCREEN_CENTER[1] + SCREEN_FACE_H / 2 - py * SCREEN_FACE_H / SCREEN_TEX_H,
+  ];
 }
