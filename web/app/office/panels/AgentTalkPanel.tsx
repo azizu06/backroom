@@ -59,7 +59,7 @@ function AgentTalkBody({ panel, askWhy }: { panel: PlayPanel; askWhy?: (question
       <span className='agent-talk-portrait' style={{ background: talk.speaker.color }} aria-hidden='true'>{talk.speaker.name.slice(0, 1).toUpperCase()}</span>
       <p><strong>{talk.speaker.name}</strong><br /><span className='agent-talk-role'>{talk.speaker.role}</span></p>
     </div>
-    <p className='agent-talk-line' data-tone={talk.greeting.tone}>“<HandoffText text={talk.greeting.text} />”</p>
+    <p className='agent-talk-line' data-tone={talk.greeting.tone}>“<Said line={talk.greeting} />”</p>
     {talk.lines.length > 0 && <ol className='agent-talk-recent' aria-label={`What ${talk.speaker.name} did lately`}>
       {talk.lines.map(line => <li key={line.id} data-tone={line.tone}><Said line={line} /></li>)}
     </ol>}

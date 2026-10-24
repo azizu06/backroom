@@ -73,7 +73,12 @@ function auditLine(row: OfficeAudit, i: number): TalkLine {
 
 function handoffSentence(row: Handoff, relation: Relation): string {
   const from = handoffAgentName(row.fromRole), to = handoffAgentName(row.toRole), name = caseName(row);
-  const text = relation === 'human' ? `${from} → ${to} on ${name} needs me: ${row.reason}`
+  const text = relation === 'human' ? {
+      offered: `${from} → ${to} on ${name} needs me: ${row.reason}`,
+      accepted: `${from} → ${to} on ${name} needs me: ${row.reason}`,
+      completed: `${from} → ${to} on ${name} finished`,
+      rejected: `${from} → ${to} on ${name} was returned: ${row.reason}`,
+    }[row.status]
     : relation === 'from' ? {
       offered: `I offered ${name} to ${to}: ${row.reason}`,
       accepted: `${to} took ${name} from me: ${row.reason}`,
@@ -121,7 +126,9 @@ function working(desk: Desk): TalkLine {
   if (desk.state.trim()) parts.push(sentence(`Right now: ${desk.state.trim()}${desk.target ? ` (${anchorLabel(desk.target)})` : ''}`));
   const row = latest(desk);
   if (row && (row.status !== 'completed' || !parts.length)) {
-    parts.push(sentence(row.status === 'completed' ? `My last handoff: ${handoffSentence(row, desk.relation(row))}` : `I'm on ${caseName(row)}: ${caseStatus(row, desk.relation(row))}`));
+    const relation = desk.relation(row);
+    const finished = row.status === 'completed' || (row.status === 'rejected' && relation === 'human');
+    parts.push(sentence(finished ? `My last handoff: ${handoffSentence(row, relation)}` : `I'm on ${caseName(row)}: ${caseStatus(row, relation)}`));
     tone = handoffTone(row);
   }
   if (desk.escalation) tone = 'passkey';
@@ -171,7 +178,7 @@ function talk(desk: Desk, speaker: AgentTalk['speaker'], askWhy: string): AgentT
   const now = working(desk);
   const intro = sentence(`I'm ${speaker.name}, ${speaker.role.toLowerCase()}`);
   return {
-    speaker, greeting: line('greeting', `${intro} ${now.text}`, now.tone), lines: lines(desk),
+    speaker, greeting: line('greeting', `${intro} ${now.text}`, now.tone, now.ruleIds, now.receiptIds), lines: lines(desk),
     replies: { working: now, stopped: stopped(desk), next: next(desk) }, askWhy,
   };
 }
