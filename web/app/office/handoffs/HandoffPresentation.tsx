@@ -38,7 +38,8 @@ function useHandoffs(snapshot: OfficeSnapshot) {
   // Explicit mock mode also works when the live public table is present but empty.
   const rows = mock ? mockRows : snapshot.handoffs ?? NO_HANDOFFS;
   const openEscalation = snapshot.agents.some(agent => !!agent.escalationId);
-  const stage = mock?.stage ?? (snapshot.handoffs || openEscalation ? live : null);
+  // Only a feed with rows brings the handoff team onto the floor; an escalation alone leaves the base office as is.
+  const stage = mock?.stage ?? (rows.length ? live : null);
   useEffect(() => { if (stage?.update(rows, Date.now(), openEscalation)) requestSceneFrame(); }, [stage, rows, openEscalation]);
   return { stage, rows };
 }
