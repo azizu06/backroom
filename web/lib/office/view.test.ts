@@ -80,6 +80,30 @@ describe("office viewport after a lost WebGL context", () => {
   });
 });
 
+describe("play view mode", () => {
+  it("draws the 3D scene like the orbit and fixed cameras", () => {
+    const play = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "play" });
+    expect(play.mode).toBe("play");
+    expect(play.sceneAttempt).toBe(0);
+    expect(viewportLayers(play)).toEqual({ floorPlan: false, scene: { key: 0, visible: true } });
+  });
+
+  it("falls back to the floor plan on a lost context and picking Play again mounts a fresh scene", () => {
+    const play = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "play" });
+    const lost = viewportReducer(play, { type: "lost", attempt: 0 });
+    expect(viewportLayers(lost)).toEqual({ floorPlan: true, scene: { key: 0, visible: false } });
+    expect(viewportReducer(lost, { type: "restored", attempt: 0 })).toEqual(play);
+    const again = viewportReducer(lost, { type: "pick", mode: "play" });
+    expect(viewportLayers(again)).toEqual({ floorPlan: false, scene: { key: 1, visible: true } });
+  });
+
+  it("leaving Play for another camera keeps the healthy canvas", () => {
+    const play = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "play" });
+    expect(viewportReducer(play, { type: "pick", mode: "walk" })).toEqual({ mode: "walk", lostContext: false, sceneAttempt: 0 });
+    expect(viewportReducer(play, { type: "pick", mode: "play" })).toBe(play);
+  });
+});
+
 describe("tour view mode", () => {
   const tour = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "tour" });
 
