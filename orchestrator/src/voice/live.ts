@@ -8,6 +8,7 @@ import { dialCollectionCall, type DialInput } from './index';
 import { provisionVoice, type VoiceTool } from './tools';
 import { createVoiceHandler, VoiceJournal } from './server';
 import { LocalGatewayStore } from './local-store';
+import { withVoiceEvidence } from './evidence';
 
 const required = (name: string) => { const v = process.env[name]; if (!v) throw new Error(`Missing ${name}`); return v; };
 const root = '.env.voice';
@@ -32,7 +33,7 @@ if (command === 'setup') {
   const gateway = createGateway({ secret: () => gatewaySecret, store });
   const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId });
   const adminDigest = createHash('sha256').update(`Bearer ${required('VOICE_ADMIN_SECRET')}`).digest();
-  createServer(async (req, res) => {
+  createServer(withVoiceEvidence(async (req, res) => {
     try {
       if (req.method === 'GET' && req.url === '/health') { res.end('ok'); return; }
       if (req.method === 'POST' && req.url === '/_admin/dial') {
@@ -68,5 +69,5 @@ if (command === 'setup') {
         ...(req.method !== 'GET' && req.method !== 'HEAD' ? { body: raw } : {}) }));
       res.writeHead(result.status, Object.fromEntries(result.headers)); res.end(await result.text());
     } catch { res.writeHead(503).end('VOICE_UNAVAILABLE'); }
-  }).listen(port, '127.0.0.1', () => console.log(`M4 local synthetic demo listening on ${port}. No call placed.`));
+  }, line => appendFileSync(`${root}/http-evidence.jsonl`, line + '\n', { mode: 0o600 }))).listen(port, '127.0.0.1', () => console.log(`M4 local synthetic demo listening on ${port}. No call placed.`));
 } else throw new Error('Usage: tsx src/voice/live.ts setup|serve|dial');
