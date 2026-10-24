@@ -10,6 +10,7 @@ import { Desks } from './Desks';
 import { Doors } from './Doors';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
+import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
 import type { SceneMount } from './types';
@@ -26,4 +27,5 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'lobby-inbox', instanced: false, Component: LobbyInbox },
   { id: 'receipt-printer', instanced: false, Component: ReceiptPrinter },
   { id: 'lobby-deny-stamp', instanced: false, Component: LobbyDenyStamp },
+  { id: 'performance', instanced: false, Component: Performance },
 ];
