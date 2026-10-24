@@ -9,6 +9,8 @@ import {
 } from '../../../lib/office/props/dressing';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { ROLES } from '../../../lib/office/palette';
+import { bakedReplacesProps } from '../../../lib/office/baked-art';
+import { useBakedArtRequested } from '../mounts/BakedArt';
 
 const SIGN_TEX_W = 256, SIGN_TEX_H = 64;
 
@@ -65,6 +67,11 @@ const DressingMeshes = memo(function DressingMeshes({ dressing }: { dressing: Dr
 export function RoomDressing({ snapshot }: { snapshot: OfficeSnapshot }) {
   const rooms = visibleRooms(snapshot).join(',');
   // Rebuilt only when the set of visible rooms changes, not on every snapshot.
-  const dressing = useMemo(() => dressingFor(snapshot), [rooms]); // eslint-disable-line react-hooks/exhaustive-deps
+  const baked = useBakedArtRequested();
+  const dressing = useMemo(() => {
+    const all = dressingFor(snapshot);
+    // Under ?art=baked the baked lobby brings its own plants; drop the procedural plant (pot and foliage) inside it.
+    return baked ? { ...all, plants: all.plants.filter(plant => !bakedReplacesProps(baked, plant.room)) } : all;
+  }, [rooms, baked]); // eslint-disable-line react-hooks/exhaustive-deps
   return <DressingMeshes dressing={dressing} />;
 }
