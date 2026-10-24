@@ -15,6 +15,6 @@ export function LiveOffice({ config, presets }: { config: OfficeConnectionConfig
     <p role='status'>Subscribed intake receipts · {snapshot.inboxCount}</p>
     <ul aria-label='Subscribed inbox receipts'>{snapshot.inboxReceipts?.slice(-10).reverse().map(row =>
       <li key={row.id} data-inbox-audit-id={row.id}><a href={`/audit?entry=${encodeURIComponent(row.id)}#audit-replay`}>{row.summary}</a> · {row.decision}</li>)}</ul>
-    <InboxTray presets={presets} />
+    <InboxTray presets={presets} headingLevel={3} />
   </>} />;
 }

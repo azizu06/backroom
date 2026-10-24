@@ -7,20 +7,31 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "crs:wiring:live": "tsx src/collections/crs-live.ts",
     "crs:live": "tsx src/integrations/crs/live.ts",
     "why:smoke": "tsx src/why/smoke.ts",
     "start": "tsx src/demo.ts",
     "dev": "tsx src/demo.ts",
     "demo:recovery": "tsx src/recovery/demo.ts",
-    "apify:live": "tsx src/collections/apify-live.ts"
+    "apify:live": "tsx src/collections/apify-live.ts",
+    "vision:live": "tsx src/metrics/vision-live.ts",
+    "x402:wallet": "tsx src/x402/wallet.ts",
+    "x402:live": "tsx src/x402/live.ts",
+    "handoff:serve": "tsx src/voice/handoff-server.ts",
+    "handoff:live": "tsx src/voice/handoff-smoke.ts"
   },
   "dependencies": {
     "@backroom/nessie": "workspace:*",
     "@backroom/policy": "workspace:*",
+    "@hyzyla/pdfium": "3.0.0",
     "@noble/hashes": "2.0.1",
     "@simplewebauthn/server": "^14.0.3",
+    "@x402/core": "^2.28.0",
+    "@x402/evm": "^2.28.0",
     "ajv": "8.17.1",
-    "spacetimedb": "2.13.0"
+    "sharp": "0.34.5",
+    "spacetimedb": "2.13.0",
+    "viem": "^2.57.10"
   },
   "devDependencies": {
     "@types/node": "20.19.39",
@@ -38,6 +49,8 @@
     "./reducer": "./src/reducer-engine.ts",
     "./spacetime-client": "./src/spacetime-client/index.ts",
     "./spacetime-client/types": "./src/spacetime-client/types.ts",
-    "./replay": "./src/replay/index.ts"
+    "./replay": "./src/replay/index.ts",
+    "./handoff-client": "./src/voice/handoff-client.ts",
+    "./handoff": "./src/voice/handoff.ts"
   }
 }

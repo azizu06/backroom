@@ -1,6 +1,6 @@
 import { isDomain, isDuplicate, isLookalike } from "./ap";
-import { DEFAULT_POLICY, computeEnvelope, validPolicy } from "./config";
-export { DEFAULT_POLICY, savePolicy, computeEnvelope } from "./config";
+import { DEFAULT_POLICY, computeEnvelope, validPolicy, CRS_FRAUD_RISK_THRESHOLD } from "./config";
+export { DEFAULT_POLICY, savePolicy, computeEnvelope, CRS_FRAUD_RISK_THRESHOLD } from "./config";
 import { POLICY_SENTENCES, RULE_SENTENCES, type RuleId } from "./sentences";
 import type { Badge, Action, ActionRequest, Context, Decision, Policy, Plan } from "./types";
 export type * from "./types";
@@ -98,6 +98,9 @@ export function evaluate(badge: Badge, request: ActionRequest, context: Context)
     if (!vendor || !nonempty(vendor.id) || !isDomain(vendor.knownDomain)) {
       return block(policy, "INVALID_INPUT", "DENY", "I need a valid vendor record.");
     }
+    const score = context.signals?.fraudRiskScore;
+    if (score !== undefined && (!Number.isFinite(score) || score < 0 || score > 100)) return block(policy, "INVALID_INPUT", "DENY", "The CRS fraud risk is invalid.");
+    if (score !== undefined && score >= CRS_FRAUD_RISK_THRESHOLD) return block(policy, "FRAUD_RISK_HOLD", "ESCALATE", "Dana must review the CRS fraud risk before this bank change or payment.");
     const source = action.type === "propose_bank_change" ? action.emailDomain : vendor.sourceDomain;
     if ((action.type === "propose_bank_change" || source !== undefined) && !isDomain(source)) return block(policy, "INVALID_INPUT", "DENY", "I need a valid sender domain.");
     if (source && isLookalike(vendor.knownDomain, source)) {

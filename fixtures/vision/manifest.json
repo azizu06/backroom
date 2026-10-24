@@ -1,0 +1,119 @@
+[
+  {
+    "id": "rotated-photo",
+    "file": "rotated-photo.jpg",
+    "mediaType": "image/jpeg",
+    "source": "fixtures/company/sources/invoices/4401.pdf",
+    "sourceSha256": "9a23705dca630089135f6048b127f9d80a91300799918498a436d4093eeee480",
+    "sha256": "19189641631006a95e34d4e2a87e561c8573674f3438376f9b99988fc62e0fd9",
+    "senderDomain": "papertrail.example",
+    "expected": {
+      "kind": "invoice",
+      "invoiceId": "4401",
+      "vendorId": "papertrail",
+      "poId": "PO-4401",
+      "amountCents": 64000,
+      "adjustmentCents": 0,
+      "currency": "USD",
+      "bankAccountId": "bank-master:papertrail",
+      "lineItems": [
+        {
+          "description": "Papertrail Print Co - 09/2026 service delivery",
+          "quantity": 1,
+          "unitPriceCents": 64000
+        }
+      ]
+    },
+    "expectedRule": "IN_BADGE",
+    "trap": false
+  },
+  {
+    "id": "low-res-duplicate",
+    "file": "low-res-duplicate.png",
+    "mediaType": "image/png",
+    "source": "fixtures/company/sources/invoices/4419.pdf",
+    "sourceSha256": "3653bce467340ad34e491fec09f41b9e13a0cac3c0619ffb40f1bde7f5e0d315",
+    "sha256": "fc746e82d9b7d2c550d45bdc8667a6abf3d8156a3c7cf97e431958f1e8dfc714",
+    "senderDomain": "acme-supply.com",
+    "expected": {
+      "kind": "invoice",
+      "invoiceId": "4419",
+      "vendorId": "acme",
+      "poId": "PO-4419",
+      "amountCents": 123700,
+      "adjustmentCents": 3700,
+      "currency": "USD",
+      "bankAccountId": "bank-master:acme",
+      "lineItems": [
+        {
+          "description": "Archive paper cartons",
+          "quantity": 20,
+          "unitPriceCents": 5000
+        },
+        {
+          "description": "Presentation sleeve packs",
+          "quantity": 10,
+          "unitPriceCents": 2000
+        }
+      ]
+    },
+    "expectedRule": "DUPLICATE_INVOICE",
+    "trap": true
+  },
+  {
+    "id": "multi-page-bank-change",
+    "file": "multi-page-bank-change.pdf",
+    "mediaType": "application/pdf",
+    "source": "fixtures/company/sources/invoices/4471.pdf",
+    "sourceSha256": "c6f74aa6d6c36963cff4ff94c0261ef3c0911cf2464a16c167ca5bfe8f6ecd0f",
+    "sha256": "0ba56bb5b308bd475a6c73d5688471baecec2cfd7ca33dd655fee9d2d79637f1",
+    "senderDomain": "acme-supp1y.com",
+    "expected": {
+      "kind": "invoice",
+      "invoiceId": "4471",
+      "vendorId": "acme",
+      "poId": "PO-4471",
+      "amountCents": 89000,
+      "adjustmentCents": 0,
+      "currency": "USD",
+      "bankAccountId": "SYNTHETIC-ATTACK-9911",
+      "lineItems": [
+        {
+          "description": "September packing bench supplies",
+          "quantity": 1,
+          "unitPriceCents": 89000
+        }
+      ]
+    },
+    "expectedRule": "LOOKALIKE_DOMAIN",
+    "trap": true
+  },
+  {
+    "id": "handwritten-total-no-po",
+    "file": "handwritten-total-no-po.png",
+    "mediaType": "image/png",
+    "source": "fixtures/company/sources/invoices/4481.pdf",
+    "sourceSha256": "4b865bbf9467219d8019d6ace0d15c4f63a4ca91f712e6b37c7141aa89cbdf27",
+    "sha256": "b927ab068077c983992e0d1638f47b3ec8fd1d07a3b124674aa55a6f7ffff04a",
+    "senderDomain": "harborhardware.example",
+    "expected": {
+      "kind": "invoice",
+      "invoiceId": "4481",
+      "vendorId": "harbor",
+      "poId": null,
+      "amountCents": 85000,
+      "adjustmentCents": 0,
+      "currency": "USD",
+      "bankAccountId": "bank-master:harbor",
+      "lineItems": [
+        {
+          "description": "Unplanned shelf fittings",
+          "quantity": 1,
+          "unitPriceCents": 85000
+        }
+      ]
+    },
+    "expectedRule": "NO_PO",
+    "trap": true
+  }
+]

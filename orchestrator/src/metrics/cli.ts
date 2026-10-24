@@ -10,6 +10,7 @@ import { runEval } from '../eval/harness';
 import { replayCorpus, type CorpusCase } from '../../../fixtures/redteam/replay';
 import { benchmarkCases, renderBenchmark, type BenchmarkReceipt } from './inbox-benchmark';
 import { existsSync } from 'node:fs';
+import { visionMetricRow, type VisionReceipt } from './vision';
 import { auditMetrics, missing, renderRoutes, table, type AuditRun } from './report';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -86,6 +87,9 @@ async function main() {
     ['Live completed model local share (C2)', metrics.localShare, 'Counts local + gx10_fallback / all completed model decisions in verified live chains; corpus generation excluded.'],
     ['Estimated model cost per completed decision', metrics.costPerDecision === undefined ? missing('no verified live model decisions') : `$${metrics.costPerDecision.toFixed(6)}`, 'Mean recorded costUsd; estimates exclude hardware/electricity, telephony, failed requests and retries.'],
     ['GX10 → cloud fallback events', metrics.models.length ? metrics.fallbacks : missing('no verified live model decisions'), 'route=cloud_fallback; gx10_fallback is the opposite direction (cloud → GX10).']);
+
+  const visionPath = 'docs/evidence/gx10-vision/receipt.json';
+  if (existsSync(resolve(root, visionPath))) rows.push(visionMetricRow(json(visionPath) as VisionReceipt));
 
   // Historical receipts are kept separate from fresh chain-derived aggregates.
   const smoke = json('fixtures/t10/router-smoke.json');

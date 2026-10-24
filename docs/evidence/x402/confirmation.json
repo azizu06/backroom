@@ -1,0 +1,18 @@
+{
+  "label": "x402 testnet",
+  "network": "eip155:84532",
+  "transaction": "0xd3b8eb8bb4ecc2d718819b22345477926b4efff6356cfeae30cc8392c775246a",
+  "authorizationNonce": "0xa0d3136f3ba69507b8fd5ac702bd2c706cca1c8993c1bcadf52094a8c4fce74c",
+  "payer": "0xFd21518bcEba9b901A233b46A47cf1341E3E75b2",
+  "payTo": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+  "amountUnits": "10000",
+  "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "blockNumber": "49641713",
+  "confirmedAt": "2026-10-24T14:03:08.314Z",
+  "checks": [
+    "chain 84532",
+    "transaction success",
+    "exact test-USDC Transfer",
+    "matching AuthorizationUsed nonce"
+  ]
+}
