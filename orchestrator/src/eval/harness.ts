@@ -12,6 +12,7 @@ import { NessieClient, type Transaction } from '@backroom/nessie';
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
+import { createApprovalBridge } from '../../../web/lib/approvals/gateway';
 import { createApifyHealthCheck, createApifyRunner, runPreCall } from '../collections';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
@@ -451,6 +452,49 @@ async function plantedPlanCase(step: PolicyStep): Promise<{ kind: string; seams:
   return { kind: 'PARTIALLY_PAID', seams };
 }
 
+async function plantedExceptionCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  if (step.operation !== 'Dana_denies_exception_then_offer_two_no_fee_waiver') return;
+  const seams = ['gateway:propose_plan', 'passkey:test-authenticator'];
+  const now = Date.parse('2026-10-24T18:00:00Z');
+  const call: GatewayCall = {
+    callId: 'eval-exception-1042', agentId: 'collections-eval', invoiceId: '1042', clientId: 'client-02',
+    contactName: 'Summit Design Partners', companyName: 'Northfield Studio', amountCents: 495000,
+    receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1,
+    identityConfirmed: true, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {},
+  };
+  const state = new MemoryStateStore();
+  const gateway = new MemoryGatewayStore([call], state);
+  const handle = createGateway({ secret: () => 'eval-offline-secret', store: gateway, approvalBridge: createApprovalBridge(state, () => now) });
+  const post = async (tool: string, nonce: string, fields: Record<string, unknown> = {}) => {
+    const response = await handle(tool, new Request('http://offline.invalid/api/tools/' + tool, {
+      method: 'POST', headers: { authorization: 'Bearer eval-offline-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ call_id: call.callId, webhook_request_id: `${call.callId}:${nonce}`, ...fields }),
+    }));
+    return await response.json() as { kind?: string; rule_ids?: string[]; plan_id?: string; escalation_id?: string; can_confirm?: boolean; approval_status?: string; plan?: { installments?: number; waiveFee?: boolean; firstPaymentPct?: number; durationDays?: number; discountPct?: number } };
+  };
+  const waiver = await post('propose_plan', 'waiver', { installments: 4, first_payment_pct: 50, duration_days: 30, waive_fee: true, discount_pct: 0 });
+  const escalated = await post('propose_plan', 'four', { installments: 4, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+  const pending = escalated.escalation_id ? await post('check_approval', 'pending', { escalation_id: escalated.escalation_id }) : undefined;
+  if (waiver.kind !== 'DENY' || !waiver.rule_ids?.includes('FEES_NON_WAIVABLE') || waiver.plan_id || escalated.kind !== 'ESCALATE' || !escalated.escalation_id || pending?.kind !== 'PENDING' || pending.can_confirm !== false) {
+    return { kind: 'EXCEPTION_NOT_DENIED', seams };
+  }
+  const controller = new ControllerApprovals(state, { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'eval-test-only' }, () => now);
+  const authenticator = new TestAuthenticator();
+  const registration = await controller.registrationOptions('eval-test-only');
+  await controller.register('eval-test-only', registration.challengeId, authenticator.registration(registration.options.challenge));
+  const challenge = await controller.decisionOptions(escalated.escalation_id, { kind: 'Deny' });
+  const decided = await controller.decide(escalated.escalation_id, challenge.challengeId, authenticator.assertion(challenge.options.challenge));
+  const relayed = await post('check_approval', 'denied', { escalation_id: escalated.escalation_id });
+  const offered = await post('propose_plan', 'two', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+  const saved = await gateway.transact(call.callId, current => current);
+  const plan = offered.plan;
+  const onlyTwo = saved.plans.length === 1 && saved.plans[0]?.installments === 2 && saved.plans[0]?.waiveFee === false;
+  if (decided.status !== 'denied' || decided.method !== 'passkey' || relayed.approval_status !== 'denied' || relayed.can_confirm !== false || offered.kind !== 'ALLOW' || plan?.installments !== 2 || plan.waiveFee !== false || plan.firstPaymentPct !== 50 || plan.durationDays !== 30 || plan.discountPct !== 0 || !onlyTwo) {
+    return { kind: 'EXCEPTION_NOT_DENIED', seams };
+  }
+  return { kind: 'TWO_PAYMENT_OFFER', seams };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -475,13 +519,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step);
+        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step);
         const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
