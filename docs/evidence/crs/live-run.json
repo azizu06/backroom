@@ -1,0 +1,21 @@
+{
+  "measuredAt": "2026-10-24T10:43:51.144Z",
+  "operator": "Anthony Terry (MarioTeachesTyping), own CRS Cal Hacks sandbox account",
+  "command": "pnpm --filter @backroom/orchestrator crs:live (CRS_TEST_ID=6)",
+  "host": "https://api-sandbox.stitchcredit.com/api",
+  "persona": "P06 (Chapter 7 discharged), CRS persona data @crscreditapi/crs-calhacks-mcp-server@1.1.2",
+  "evidence": {
+    "publicRecords": {"source":"crs_sandbox","product":"publicRecords","testIdentityId":6,"label":"SANDBOX: test identity #6","checkedAt":"2026-10-24T10:43:50.888Z","responseHash":"aac4def95cc135cf77544283e21dc393daa9d7fe3824e04aa09141fba27aac35","summary":{"bankruptcies":1,"judgments":0,"liens":0}},
+    "fraudRisk": {"source":"crs_sandbox","product":"fraudRisk","testIdentityId":6,"label":"SANDBOX: test identity #6","checkedAt":"2026-10-24T10:43:51.144Z","responseHash":"c5c5f0e710e9e625c64da24ee0c0481fa0716bb20f4aabcbd4ffec39a94c8798","summary":{"fraudRiskScore":12}}
+  },
+  "expectedFromCrsPersonaData": {
+    "publicRecords": "BankruptciesFound/JudgmentsFound/LiensFound: 1 bankruptcy Ch.7 discharged",
+    "fraudRisk": "risk.score 12 (low)"
+  },
+  "matchesExpected": true,
+  "notes": [
+    "Two successful (HTTP 200, parsed) sandbox responses after one login; output is the client's projected evidence only, no token or raw body.",
+    "Not run: business credit and OFAC. The Cal Hacks sandbox has no such product (account OpenAPI checked 2026-10-24).",
+    "Billable flag in CRS GET /users/logs not captured here."
+  ]
+}
