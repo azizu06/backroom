@@ -8,6 +8,7 @@ import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../.
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
+import { OfficeProps } from './props/OfficeProps';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -213,6 +214,7 @@ export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, l
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
     {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />)}
     </Instances>
+    <OfficeProps snapshot={snapshot} />
     <CameraRig focus={focus} fixed={fixed} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
