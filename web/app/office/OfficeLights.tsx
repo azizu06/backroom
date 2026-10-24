@@ -1,0 +1,73 @@
+'use client';
+
+import { useMemo, useSyncExternalStore } from 'react';
+import { ContactShadows } from '@react-three/drei';
+import { ACESFilmicToneMapping, MeshStandardMaterial } from 'three';
+import { LOW_POWER_QUERY, OFFICE_LAMPS, OFFICE_EXPOSURE, officeLightRig, officeLowPower } from '../../lib/office/lighting';
+import { ROLES } from '../../lib/office/palette';
+import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
+import type { FurniturePiece } from '../../lib/office/furniture';
+import { StaticBoxes, StaticInstances, UNIT_BOX } from './mounts/StaticGeometry';
+
+export const OFFICE_RENDERER = { antialias: true, powerPreference: 'high-performance' as const,
+  toneMapping: ACESFilmicToneMapping, toneMappingExposure: OFFICE_EXPOSURE };
+
+type SavingConnection = EventTarget & { saveData?: boolean };
+const connection = () => (navigator as Navigator & { connection?: SavingConnection }).connection;
+function subscribeLowPower(onChange: () => void) {
+  const query = window.matchMedia(LOW_POWER_QUERY);
+  const network = connection();
+  query.addEventListener('change', onChange);
+  network?.addEventListener('change', onChange);
+  window.addEventListener('popstate', onChange);
+  return () => {
+    query.removeEventListener('change', onChange);
+    network?.removeEventListener('change', onChange);
+    window.removeEventListener('popstate', onChange);
+  };
+}
+export function useOfficeLowPower() {
+  return useSyncExternalStore(subscribeLowPower,
+    () => officeLowPower(window.location.search, window.matchMedia(LOW_POWER_QUERY).matches, connection()?.saveData), () => false);
+}
+
+// Shared with the lazy scene's lifetime. Emissive shades stay warm even with lamp pools disabled.
+const SHADE_MATERIAL = new MeshStandardMaterial({ color: ROLES.lampLight, emissive: ROLES.lampLight,
+  emissiveIntensity: 0.65, roughness: 0.9 });
+
+/** Two static geometry batches, no shadow-casting lamp geometry and no animation subscriptions. */
+function Lamps({ rooms }: { rooms: string }) {
+  const { bodies, shades } = useMemo(() => {
+    const bodies: FurniturePiece[] = [], shades: FurniturePiece[] = [];
+    for (const lamp of OFFICE_LAMPS.filter(lamp => rooms.split(',').includes(lamp.room))) {
+      const [x, y, z] = lamp.base;
+      const width = lamp.floor ? 0.35 : 0.22;
+      bodies.push({ at: [x, y + 0.025, z], size: [width, 0.05, width], color: ROLES.frame },
+        { at: [x, y + lamp.height / 2, z], size: [0.035, lamp.height, 0.035], color: ROLES.frame });
+      shades.push({ at: [x, y + lamp.height, z], size: [width + 0.1, 0.16, width + 0.1], color: ROLES.lampLight });
+    }
+    return { bodies, shades };
+  }, [rooms]);
+  if (!bodies.length) return null;
+  return <group name='office:lamps'>
+    <StaticBoxes pieces={bodies} castShadow={false} />
+    <StaticInstances pieces={shades} geometry={UNIT_BOX} material={SHADE_MATERIAL} castShadow={false} />
+  </group>;
+}
+
+export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot; lowPower: boolean }) {
+  const { key, fill, hemisphere, pointLights, contactShadows } = officeLightRig(lowPower);
+  const rooms = visibleRooms(snapshot);
+  return <>
+    <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
+    <directionalLight position={key.position} color={key.color} intensity={key.intensity} castShadow={key.castShadow}
+      shadow-mapSize={[key.shadow.mapSize, key.shadow.mapSize]} shadow-bias={key.shadow.bias}
+      shadow-camera-near={key.shadow.near} shadow-camera-far={key.shadow.far}
+      shadow-camera-left={key.shadow.left} shadow-camera-right={key.shadow.right} shadow-camera-top={key.shadow.top} shadow-camera-bottom={key.shadow.bottom} />
+    <directionalLight position={fill.position} color={fill.color} intensity={fill.intensity} castShadow={fill.castShadow} />
+    {pointLights.filter(light => rooms.includes(light.room)).map(({ room, ...light }) => <pointLight key={room} {...light} />)}
+    {/* Demand frames only; dropping this pass entirely is essential in low-power mode. */}
+    {contactShadows && <ContactShadows {...contactShadows} />}
+    <Lamps rooms={rooms.join(',')} />
+  </>;
+}

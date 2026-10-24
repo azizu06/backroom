@@ -1,5 +1,5 @@
 .play-hud > .play-room-entry { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 240px); text-align: center; pointer-events: none; }
-.play-room-entry span { display: block; padding: 7px 14px; border: 1px solid #8b987b; background: #272f25; color: #d0d6c6; font-size: 13px; overflow-wrap: anywhere; animation: play-room-entry 1600ms ease-in-out both; }
+.play-room-entry span { display: block; padding: 7px 14px; border: 1px solid var(--office-lavender); border-radius: 12px; box-shadow: var(--office-plate-shadow); background: var(--office-cream); color: var(--office-navy); font-size: 13px; overflow-wrap: anywhere; animation: play-room-entry 1600ms ease-in-out both; }
 @keyframes play-room-entry {
   0%, 100% { opacity: 0; }
   10%, 80% { opacity: 1; }
