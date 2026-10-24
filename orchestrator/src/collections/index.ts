@@ -59,11 +59,17 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
     bankruptcy: input.context.signals?.bankruptcy === true || credit?.bankruptcy === true,
     ofacHit: input.context.signals?.ofacHit === true || credit?.ofacStatus === 'hit',
     closedBusiness: input.context.signals?.closedBusiness === true || !!health?.signals.some(signal => signal.type === 'maps_status' && signal.value === 'permanently_closed'),
-    active: [...new Set([...(input.context.signals?.active ?? []), ...(credit?.activeSignals ?? []), ...(!health ? ['health_check_pending'] : [])])],
+    active: [...new Set([...(input.context.signals?.active ?? []), ...(credit?.activeSignals ?? []), ...(!health ? ['health_check_pending'] : []),
+      // Apify found a different public phone number than the one we are about to dial.
+      ...(health?.signals.some(signal => signal.type === 'phone_match' && signal.value === false) ? ['phone_mismatch'] : [])])],
   } };
   const checked = evaluate('collections', { type: 'call_client' }, context);
   await audit('pre_call_permit', { decision: checked.kind, ruleIds: checked.ruleIds, inputs: { decision: checked } });
   if (checked.kind !== 'ALLOW') return stop(checked);
+  // C17: the call may proceed, but Dana sees a warning and identity comes before any invoice detail.
+  const warnings = context.signals?.active?.includes('phone_mismatch') ? ['PHONE_MISMATCH_WARN'] : [];
+  if (warnings.length) await audit('phone_mismatch_warn', { decision: 'ALLOW', ruleIds: warnings,
+    inputs: { identityCaution: true, ownerWarning: 'The number on file differs from the public listing; confirm identity before any invoice detail.' } });
   if (!credit || credit.ofacStatus !== 'clear') {
     await audit('pre_call_blocked', { decision: 'DENY', inputs: { reason: 'Credit/OFAC check unavailable' } });
     return { status: 'blocked', reason: 'Credit/OFAC check unavailable' };
@@ -86,5 +92,5 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   await audit('plan_validated', { decision: plan ? 'ALLOW' : 'DENY', inputs: { valid: !!plan, ...(plan ? { plan } : {}) } });
   if (!plan) return { status: 'blocked', reason: 'Invalid call plan or terms outside the envelope' };
   return { status: 'ready', envelope, plan, summary: `${!health ? 'health check pending. ' : ''}${renderCallPlan(plan)}`, healthCheckPending: !health,
-    route: draft.route, model: draft.model, evidenceRefs: refs, signals: context.signals ?? {} };
+    route: draft.route, model: draft.model, evidenceRefs: refs, signals: context.signals ?? {}, ...(warnings.length && { warnings }) };
 }
