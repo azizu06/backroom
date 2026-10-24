@@ -52,7 +52,13 @@ describe('monitorScreen', () => {
     expect(screen.lines[1]!.text.endsWith('…')).toBe(true);
     expect('Invoice 1042 · four installments → Dana'.startsWith(screen.lines[1]!.text.slice(0, -1))).toBe(true);
     expect(screen.status).toEqual({ decision: 'ESCALATE', key: 'escalate' });
-    expect(monitorScreen(snapshot(), 'dana')).toEqual({ heading: OFFICE_ANCHORS.dana.name, lines: [{ kind: 'awaiting', text: 'Awaiting you: 0' }], status: null });
+  });
+
+  it('shows Dana idle with no stale pill once nothing is awaiting', () => {
+    const idle = { heading: OFFICE_ANCHORS.dana.name, lines: [{ kind: 'awaiting', text: 'Awaiting you: 0' }, { kind: 'idle', text: 'Idle' }], status: null };
+    expect(monitorScreen(snapshot(), 'dana')).toEqual(idle);
+    // An earlier escalation stays in the audit after the folder is resolved; the screen must not keep showing it.
+    expect(monitorScreen(snapshot({ agents: [agent()], audit: [row('1', 'ESCALATE', 'collections', 'Invoice 1042 · four installments → Dana')] }), 'dana')).toEqual(idle);
   });
 
   it('caps a screen at 4 lines and is deterministic', () => {

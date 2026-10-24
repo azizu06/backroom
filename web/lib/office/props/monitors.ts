@@ -32,10 +32,11 @@ export function monitorScreen(snapshot: OfficeSnapshot, room: MonitorDesk): Moni
   const heading = OFFICE_ANCHORS[room].name;
   if (room === 'dana') {
     const awaiting = snapshot.agents.filter(agent => agent.escalationId).length;
-    const newest = snapshot.audit.findLast(row => row.decision === 'ESCALATE');
+    // The newest escalation and its pill show only while a folder is actually waiting; no stale pill afterwards.
+    const newest = awaiting ? snapshot.audit.findLast(row => row.decision === 'ESCALATE') : undefined;
     return {
       heading,
-      lines: [line('awaiting', `Awaiting you: ${awaiting}`), ...newest ? [line('escalation', newest.summary)] : []],
+      lines: [line('awaiting', `Awaiting you: ${awaiting}`), ...newest ? [line('escalation', newest.summary)] : awaiting ? [] : [line('idle', 'Idle')]],
       status: status(newest),
     };
   }
