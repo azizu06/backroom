@@ -63,7 +63,8 @@ export function AttackDemoPanel() {
     try {
       const response = await fetch('/api/attack-demo', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ text, ...(selected ? { presetId: selected } : {}), mode }),
+        // An unedited preset goes by id so the service keeps its simulated sender domain; edited text wins upstream.
+        body: JSON.stringify(selected ? { presetId: selected, mode } : { text, mode }),
       });
       const value: unknown = await response.json().catch(() => null);
       if (!mounted.current) return;
