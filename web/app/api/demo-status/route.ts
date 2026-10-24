@@ -1,5 +1,5 @@
 import { getRouterHealth, getStateStore } from '@backroom/orchestrator';
-import type { DemoStatus } from '../../../lib/real-vs-sim';
+import { unprobedServices, type DemoStatus } from '../../../lib/real-vs-sim';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +9,7 @@ export function GET() {
   const status: DemoStatus = {
     measuredAt: new Date().toISOString(),
     llmEnabled: getStateStore().llmEnabled,
+    notProbed: [...unprobedServices],
     gx10: health ? {
       localEnabled: health.localEnabled,
       localAvailable: health.localAvailable,

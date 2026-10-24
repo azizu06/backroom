@@ -5,7 +5,13 @@
 .real-sim h1, .real-sim h2, .real-sim h3, .real-sim p { margin: 0; }
 .real-sim h2 { font-size: 15px; font-weight: 650; }
 .real-sim a { color: #d8d8e0; text-underline-offset: 3px; }
-.real-sim a:focus-visible { outline: 2px solid #f2f2f7; outline-offset: 4px; }
+.real-sim a:focus-visible, .real-sim button:focus-visible { outline: 2px solid #f2f2f7; outline-offset: 4px; }
+.real-sim-actions { display: flex; align-items: center; gap: 12px; }
+.real-sim-toggle { font: inherit; font-size: 12px; min-height: 28px; padding: 4px 10px; color: #f2f2f7; background: #2c2c30; border: 1px solid #5a5a61; border-radius: 4px; cursor: pointer; }
+.real-sim-toggle:hover { background: #3a3a3f; }
+.real-sim-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.real-sim-overlay[data-expanded=false] .real-sim-header { margin-bottom: 4px; }
+.real-sim-overlay[data-expanded=false] .real-sim-note { margin-top: 0; }
 .real-sim-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .real-sim h3 { font-size: 12px; color: #c9c9d1; font-weight: 600; margin-bottom: 4px; }
 .real-sim ul { list-style: none; padding: 0; margin: 0; }

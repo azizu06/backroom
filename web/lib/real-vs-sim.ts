@@ -19,8 +19,17 @@ export const disclosureItems = [
   { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'Simulated card payment; the demo creates a sandbox Nessie deposit.' },
 ] as const satisfies readonly DisclosureItem[];
 
+/** Services /api/demo-status observes in this server process. Everything else is never probed here. */
+export const probedServices = ['gx10'] as const satisfies readonly ServiceId[];
+export const unprobedServices = disclosureItems
+  .filter(item => item.kind === 'real' && !(probedServices as readonly string[]).includes(item.id))
+  .map(item => item.id as ServiceId);
+export const NOT_PROBED_LABEL = 'Not probed in this process';
+
 export type DemoStatus = {
   measuredAt: string;
+  /** Always sent by /api/demo-status; optional so older payloads still parse. */
+  notProbed?: ServiceId[];
   llmEnabled: boolean;
   gx10: {
     localEnabled: boolean;
@@ -32,11 +41,14 @@ export type DisclosureStatus = { label: string; tone: 'neutral' | 'good' | 'warn
 
 export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | null, now = Date.now()): DisclosureStatus {
   if (item.kind === 'sandbox') return { label: 'Simulated', tone: 'neutral' };
+  const probed = (probedServices as readonly string[]).includes(item.id);
+  const notProbed: DisclosureStatus = { label: NOT_PROBED_LABEL, tone: 'neutral' };
   // Do not retain an ON/online claim after a disconnected or stalled status poll.
   if (!status || !Number.isFinite(Date.parse(status.measuredAt)) || now - Date.parse(status.measuredAt) > 30_000) {
-    return { label: 'Unverified', tone: 'neutral' };
+    return probed ? { label: 'Unverified', tone: 'neutral' } : notProbed;
   }
   if (['phone', 'claude', 'gx10'].includes(item.id) && !status.llmEnabled) return { label: 'LLM OFF', tone: 'warning' };
+  if (!probed) return notProbed;
   if (item.id === 'gx10' && status.gx10) {
     if (!status.gx10.localEnabled) return { label: 'Disabled', tone: 'warning' };
     const checkedAt = Date.parse(status.gx10.checkedAt ?? '');

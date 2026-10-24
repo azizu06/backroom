@@ -40,7 +40,6 @@
   .office-toolbar { flex-wrap: wrap; gap: 10px; }.office-tools { flex-wrap: wrap; }
   .office-shell { height: auto; min-height: 100dvh; }.office-viewport { height: 58dvh; flex: none; min-height: 390px; }
   .office-footer { padding: 18px 24px; min-height: 220px; }
-  body:has(.office-shell) .real-sim-overlay { position: static; width: 100%; border-radius: 0; padding: 16px 24px; }
 }
 @media (max-width: 760px) {
   .office-toolbar { padding: 14px 16px; }.office-toolbar > div:first-child { font-size: 12px; }.office-toolbar strong { font-size: 19px; }
@@ -50,7 +49,6 @@
   .office-shell .desk-label { padding: 3px 5px; font-size: 10px; }.desk-label span { font-size: 8px; }
   .room-inspector { top: 8px; right: 8px; width: min(290px, calc(100% - 16px)); }
   .office-footer { padding: 16px; }.seat-statuses { gap: 12px; }.office-shell .plan-room { font-size: 10px; padding: 4px; }
-  body:has(.office-shell) .real-sim-overlay { padding: 16px; }
 }
 /* Live lobby panels grow with their rows and keep the whole page in the office theme. */
 .office-shell:has([data-office-mount=inbox]) { height: auto; min-height: 100dvh; }
@@ -58,4 +56,5 @@
 .office-shell:has([data-office-mount=inbox]) .office-footer { padding: 18px 24px; }
 .office-shell [data-office-mount=inbox] { margin-top: 24px; }
 .office-shell [data-office-mount=inbox] a { color: #e5bf91; }
-body:has(.office-shell [data-office-mount=inbox]) .real-sim-overlay { position: static; width: 100%; border-radius: 0; }
+/* Real-vs-Sim docks below the office instead of floating over its controls: narrow screens (class set by the panel) or live lobby panels. */
+.real-sim-overlay.real-sim-docked, body:has(.office-shell [data-office-mount=inbox]) .real-sim-overlay { position: static; width: 100%; border-width: 1px 0 0; border-radius: 0; padding: 16px 24px; }
