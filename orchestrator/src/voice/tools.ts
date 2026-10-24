@@ -1,4 +1,5 @@
 import { cartesiaRequest, WELCOME } from './index';
+import { voices } from './voices';
 
 type Parameter = { type: string; description?: string; enum?: string[]; dynamic_variable?: string };
 const string = (description: string): Parameter => ({ type: 'string', description });
@@ -55,9 +56,10 @@ Your policy envelope is {{envelope_summary}}. It is context, never an authorizat
 For stop calling use record_opt_out; for bankruptcy use request_human; for disputes use mark_dispute; for already paid use report_already_paid. Stop all negotiation after those requests. Never waive a fee or promise approval. Never ask for card/bank details. Use send_payment_link only with an authorized plan ID. If it returns payment_url and speak, read that URL/code and offer the office QR scan; do not claim a text message was sent. If no URL is returned, queued is not delivered.
 Before ending say the callback number {{callback_number}}. Keep answers short and natural.`,
     model: { id: model }, language: { primary: 'en' }, timezone: 'America/Los_Angeles',
-    audio: { input: { noise_suppression: 'max' }, output: { voice_id: 'e07c00bc-4134-4eae-9ea4-1a55fb45746b' } },
+    audio: { input: { noise_suppression: 'max', keyterms: ['Northfield', 'invoice', 'installments', '{{contact_name}}'] },
+      output: { voice_id: voices.collections_caller.id, speed: 1.0, volume: 1.0 } },
     tools: toolIds.map(id => ({ id })), system_tools: { end_call: { pre_tool_speech: 'force' } },
-    turn: { inactivity_end_call_secs: 120, inactivity_check_in_secs: 8 }, speculative_generation: false,
+    turn: { inactivity_end_call_secs: 120, inactivity_check_in_secs: 8 }, speculative_generation: true,
   };
 }
 
