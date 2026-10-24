@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { Invocation } from "./parser";
-import { decidePlan, type DecidePlan } from "./policy-adapter";
+import {
+  decidePlan,
+  type DecidePlan,
+  type GatewayPolicyDecision,
+} from "./policy-adapter";
 import type { AuditEntry, GatewayCall, PlanTerms, ToolResult } from "./store";
 
 const sameTerms = (a: PlanTerms, b: PlanTerms) =>
@@ -15,26 +19,23 @@ const deny = (rule: string, speak: string): ToolResult => ({
   speak,
   rule_ids: [rule],
 });
-const reasons: Record<string, string> = {
-  FEES_NON_WAIVABLE: "I cannot waive the late fee under my current authority.",
-  MAX_DISCOUNT: "I cannot discount this invoice under my current authority.",
-  NOT_IN_BADGE: "I am not authorized to agree to those terms.",
-};
 function audit(
   call: GatewayCall,
   input: Invocation,
   kind: AuditEntry["kind"],
   ruleIds: string[],
   plan?: PlanTerms,
+  decision?: GatewayPolicyDecision,
 ): AuditEntry {
   const entry: AuditEntry = {
     id: randomUUID(),
     action: input.tool,
     kind,
     ruleIds,
-    policyVersion: call.policyVersion,
+    policyVersion: decision?.policyVersion ?? call.policyVersion,
     webhookRequestId: input.webhookRequestId,
     ...(plan && { plan }),
+    ...(decision && { decision }),
   };
   call.audits.push(entry);
   return entry;
@@ -145,6 +146,40 @@ export function executeTool(
         "ALLOW_REQUIRED",
         "I need an authorized plan before creating a payment link.",
       );
+    const decision = decide(call, plan, plan.firstPaymentCents);
+    if (decision.kind !== "ALLOW") {
+      const checked = audit(
+        call,
+        input,
+        decision.kind,
+        decision.ruleIds,
+        plan,
+        decision,
+      );
+      if (decision.kind === "ESCALATE") {
+        const escalation = {
+          id: randomUUID(),
+          status: "pending" as const,
+          toHuman: decision.toHuman,
+          ruleIds: decision.ruleIds,
+          plan,
+        };
+        call.escalations.push(escalation);
+        return {
+          kind: "ESCALATE",
+          can_confirm: false,
+          speak: decision.reason,
+          rule_ids: decision.ruleIds,
+          audit_id: checked.id,
+          escalation_id: escalation.id,
+        };
+      }
+      return {
+        ...deny(decision.ruleIds[0] ?? "INVALID_INPUT", decision.reason),
+        rule_ids: decision.ruleIds,
+        audit_id: checked.id,
+      };
+    }
     const existing = call.links.find((link) => link.planId === plan.id);
     const link = existing ?? {
       id: randomUUID(),
@@ -157,7 +192,7 @@ export function executeTool(
       link.path = `/pay/${link.id}`;
       call.links.push(link);
       call.outbox.push({ type: "send_payment_link", linkId: link.id });
-      audit(call, input, "RECORDED", ["PAYMENT_LINK_CREATED"]);
+      audit(call, input, "ALLOW", decision.ruleIds, plan, decision);
     }
     return {
       kind: "RECORDED",
@@ -175,11 +210,13 @@ export function executeTool(
       decision.kind,
       decision.ruleIds,
       input.plan,
+      decision,
     );
     if (decision.kind === "ALLOW") {
-      const totalCents = Math.round(
-        (call.amountCents * (100 - input.plan.discountPct)) / 100,
-      );
+      const totalCents =
+        Math.round(
+          call.receivable.principalCents * (1 - input.plan.discountPct / 100),
+        ) + (input.plan.waiveFee ? 0 : call.receivable.lateFeeCents);
       const plan = {
         ...input.plan,
         id: randomUUID(),
@@ -188,7 +225,7 @@ export function executeTool(
         firstPaymentCents:
           input.plan.installments === 1
             ? totalCents
-            : Math.ceil((totalCents * input.plan.firstPaymentPct) / 100),
+            : Math.round((totalCents * input.plan.firstPaymentPct) / 100),
       };
       call.plans.push(plan);
       return {
@@ -221,11 +258,7 @@ export function executeTool(
       };
     }
     return {
-      ...deny(
-        decision.ruleIds[0] ?? "NOT_IN_BADGE",
-        reasons[decision.ruleIds[0] ?? ""] ??
-          "I cannot agree to those terms under my current authority.",
-      ),
+      ...deny(decision.ruleIds[0] ?? "NOT_IN_BADGE", decision.reason),
       rule_ids: decision.ruleIds,
       audit_id: entry.id,
     };

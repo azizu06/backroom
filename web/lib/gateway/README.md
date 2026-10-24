@@ -46,8 +46,9 @@ Reusing an ID with changed arguments, a different tool, or a different call is a
 ## State and integration
 
 `store.ts` exports `GatewayStore` and gateway domain types. At trusted server
-bootstrap, call `installGatewayStore(adapter)` from `runtime.ts`. The adapter must
-resolve Cartesia call IDs to server-owned invoice/client records; never trust an
+bootstrap, call `installGatewayStore(adapter)` from `runtime.ts`. The adapter must supply `receivable: { principalCents, lateFeeCents }` alongside
+the total `amountCents`, and may supply trusted `policyState: { policy, signals }`.
+It must resolve Cartesia call IDs to server-owned invoice/client records; never trust an
 invoice ID, amount, policy version, approval, or payment recipient from voice.
 
 The included `MemoryGatewayStore(calls)` clones and serializes transactions,
@@ -71,10 +72,14 @@ permission to confirm: resubmit exact terms through policy. There is no voice
 approval endpoint. The approval backend must validate the passkey before writing.
 
 `policy-adapter.ts` is the only consumer of the policy package's exported API.
-Until #11 lands it calls the deny-all stub. Negotiation tests inject decisions at
-this seam; the policy engine's own suite owns threshold correctness. Rebind this
-adapter to the merged #11 action/context contract before the live call. No model
-or GX10 request is needed for this deterministic gateway.
+It maps gateway terms into the real nested policy `Plan` and passes identity,
+saved policy/version, risk signals, and principal/fee amounts from trusted state.
+The production evaluator runs both for proposals and again before a link is
+queued, so a fresh bankruptcy/OFAC/dispute signal or changed policy blocks links.
+Cents rounding and fee retention match the policy package. Complete decisions
+(including exact policy quotes) are retained on decision audit entries.
+Negotiation tests exercise the real package: no policy decisions are mocked.
+No model or GX10 request is needed for this deterministic gateway.
 
 ## Verification
 

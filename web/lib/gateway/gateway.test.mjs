@@ -1,5 +1,6 @@
 import { createGateway } from "./http";
 import { MemoryGatewayStore } from "./store";
+import { DEFAULT_POLICY, savePolicy } from "../../../policy/src/index";
 
 const seed = () => ({
   callId: "call-1",
@@ -8,6 +9,7 @@ const seed = () => ({
   contactName: "Jordan",
   companyName: "Northfield",
   amountCents: 10000,
+  receivable: { principalCents: 9500, lateFeeCents: 500 },
   currency: "USD",
   policyVersion: 1,
   identityConfirmed: false,
@@ -76,7 +78,7 @@ describe("Cartesia tool gateway", () => {
 
   it.each([
     [{ waive_fee: true }, "DENY", "FEES_NON_WAIVABLE"],
-    [{}, "ALLOW", "PLAN_ALLOWED"],
+    [{}, "ALLOW", "IN_BADGE"],
     [{ installments: 4 }, "ESCALATE", "MAX_INSTALLMENTS"],
   ])(
     "gates the negotiation through policy: %j -> %s",
@@ -84,27 +86,9 @@ describe("Cartesia tool gateway", () => {
       const call = seed();
       call.identityConfirmed = true;
       const store = new MemoryGatewayStore([call]);
-      const decide = (call, plan) =>
-        plan.waiveFee
-          ? {
-              kind: "DENY",
-              ruleIds: ["FEES_NON_WAIVABLE"],
-              reason: "ignored model-facing prose",
-              policyVersion: 1,
-            }
-          : plan.installments > 2
-            ? {
-                kind: "ESCALATE",
-                ruleIds: ["MAX_INSTALLMENTS"],
-                reason: "untrusted prose",
-                toHuman: "dana",
-                policyVersion: 1,
-              }
-            : { kind: "ALLOW", ruleIds: ["PLAN_ALLOWED"], policyVersion: 1 };
       const gateway = createGateway({
         secret: () => "test-secret",
         store,
-        decide,
       });
       const response = await gateway(
         "propose_plan",
@@ -130,6 +114,12 @@ describe("Cartesia tool gateway", () => {
       const saved = await store.transact("call-1", (call) => call);
       expect(saved.audits).toHaveLength(1);
       expect(saved.audits[0]).toMatchObject({ kind, ruleIds: [rule] });
+      expect(saved.audits[0].decision).toMatchObject({
+        kind,
+        policyVersion: 1,
+      });
+      if (kind !== "ALLOW")
+        expect(saved.audits[0].decision.quote.text).toEqual(expect.any(String));
       if (kind === "ALLOW") expect(result.audit_id).toBe(saved.audits[0].id);
       if (kind === "ESCALATE") expect(saved.escalations).toHaveLength(1);
       if (rule === "FEES_NON_WAIVABLE")
@@ -144,11 +134,6 @@ describe("Cartesia tool gateway", () => {
     const gateway = createGateway({
       secret: () => "test-secret",
       store,
-      decide: () => ({
-        kind: "ALLOW",
-        ruleIds: ["PLAN_ALLOWED"],
-        policyVersion: 1,
-      }),
     });
     const body = {
       call_id: "call-1",
@@ -180,11 +165,6 @@ describe("Cartesia tool gateway", () => {
     const gateway = createGateway({
       secret: () => "test-secret",
       store,
-      decide: () => ({
-        kind: "ALLOW",
-        ruleIds: ["PLAN_ALLOWED"],
-        policyVersion: 1,
-      }),
     });
     const invoke = async (tool, args, id = tool) =>
       (
@@ -420,11 +400,6 @@ describe("Cartesia tool gateway", () => {
     const gateway = createGateway({
       secret: () => "test-secret",
       store,
-      decide: () => ({
-        kind: "ALLOW",
-        ruleIds: ["PLAN_ALLOWED"],
-        policyVersion: 1,
-      }),
     });
     const response = await gateway(
       "propose_plan",
@@ -441,5 +416,94 @@ describe("Cartesia tool gateway", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({ can_confirm: false });
     expect(await memory.transact("call-1", (c) => c.audits)).toEqual([]);
+  });
+  it("uses saved policy settings and rejects a stale version through the real adapter", async () => {
+    const draft = structuredClone(DEFAULT_POLICY);
+    draft.badges.collections.limits.maxInstallments = 3;
+    const policy = savePolicy(DEFAULT_POLICY, draft);
+    const call = seed();
+    call.identityConfirmed = true;
+    call.policyVersion = 2;
+    call.policyState = { policy };
+    const store = new MemoryGatewayStore([call]);
+    const gateway = createGateway({ secret: () => "test-secret", store });
+    const body = {
+      call_id: "call-1",
+      webhook_request_id: "saved-policy",
+      installments: 3,
+      first_payment_pct: 50,
+      duration_days: 30,
+      waive_fee: false,
+      discount_pct: 0,
+    };
+    expect(
+      await (await gateway("propose_plan", request(body))).json(),
+    ).toMatchObject({ kind: "ALLOW", can_confirm: true });
+    expect(
+      await store.transact("call-1", (c) => c.audits[0].policyVersion),
+    ).toBe(2);
+    await store.transact("call-1", (c) => {
+      c.policyVersion = 1;
+    });
+    expect(
+      await (
+        await gateway(
+          "propose_plan",
+          request({ ...body, webhook_request_id: "stale-policy" }),
+        )
+      ).json(),
+    ).toMatchObject({
+      kind: "DENY",
+      can_confirm: false,
+      rule_ids: ["INVALID_INPUT"],
+    });
+    expect(
+      await store.transact("call-1", (c) => c.audits[1].policyVersion),
+    ).toBe(2);
+  });
+
+  it("retains fees, rounds cents per policy, and rechecks fresh stop signals before queuing a link", async () => {
+    const call = seed();
+    call.identityConfirmed = true;
+    call.amountCents = 11002;
+    call.receivable = { principalCents: 10000, lateFeeCents: 1002 };
+    const store = new MemoryGatewayStore([call]);
+    const gateway = createGateway({ secret: () => "test-secret", store });
+    const invoke = async (tool, args, id = tool) =>
+      (
+        await gateway(
+          tool,
+          request({ call_id: "call-1", webhook_request_id: id, ...args }),
+        )
+      ).json();
+    const allowed = await invoke("propose_plan", {
+      installments: 2,
+      first_payment_pct: 51,
+      duration_days: 30,
+      waive_fee: false,
+      discount_pct: 0,
+    });
+    expect(allowed.plan).toMatchObject({
+      totalCents: 11002,
+      firstPaymentCents: 5611,
+    });
+    expect(
+      await invoke("send_payment_link", { plan_id: allowed.plan_id }),
+    ).toMatchObject({ kind: "RECORDED", amount_cents: 5611 });
+    await store.transact("call-1", (c) => {
+      c.policyState = { signals: { bankruptcy: true } };
+    });
+    expect(
+      await invoke(
+        "send_payment_link",
+        { plan_id: allowed.plan_id },
+        "after-bankruptcy",
+      ),
+    ).toMatchObject({
+      kind: "ESCALATE",
+      can_confirm: false,
+      rule_ids: ["BANKRUPTCY_STOP"],
+    });
+    expect(await store.transact("call-1", (c) => c.outbox)).toHaveLength(1);
   });
 });

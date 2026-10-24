@@ -1,3 +1,8 @@
+import type {
+  GatewayPolicyDecision,
+  GatewayPolicyState,
+} from "./policy-adapter";
+
 export interface GatewayCall {
   callId: string;
   invoiceId: string;
@@ -5,6 +10,8 @@ export interface GatewayCall {
   contactName: string;
   companyName: string;
   amountCents: number;
+  receivable: { principalCents: number; lateFeeCents: number };
+  policyState?: GatewayPolicyState;
   currency: string;
   policyVersion: number;
   identityConfirmed: boolean;
@@ -45,6 +52,7 @@ export interface AuditEntry {
   policyVersion: number;
   webhookRequestId: string;
   plan?: PlanTerms;
+  decision?: GatewayPolicyDecision;
 }
 export interface AllowedPlan extends PlanTerms {
   id: string;
