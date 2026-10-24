@@ -11,11 +11,25 @@ it('cites the committed scoreboard rows in the sponsor kit', () => {
   const kit = read('docs/sponsor-deliverables.md');
   const fraction = (rate: { numerator: number; denominator: number }) => `${rate.numerator}/${rate.denominator}`;
   const rates = scoreboard.rates;
-  for (const key of ['arConversations', 'precallStops', 'callButton', 'inboxTeam', 'judgeCalls', 'approvalExpiry', 'gx10Failover', 'legacyCompleteScenarios'] as const) {
-    expect(kit, key).toContain(fraction(rates[key]));
-  }
+  const row = (label: string) => {
+    const line = kit.split('\n').find(entry => entry.startsWith('|') && entry.includes(label));
+    expect(line, label).toBeTruthy();
+    return line ?? '';
+  };
+  const cited: Array<[string, { numerator: number; denominator: number }]> = [
+    ['AR scripted calls', rates.arConversations],
+    ['Pre-call stops', rates.precallStops],
+    ['In-app call button', rates.callButton],
+    ['Demo inbox agent team', rates.inboxTeam],
+    ['C5 judge calls', rates.judgeCalls],
+    ['Live-call approval expiry', rates.approvalExpiry],
+    ['P12 GX10 cut', rates.gx10Failover],
+    ['no unexecuted integration step', rates.legacyCompleteScenarios],
+  ];
+  for (const [label, rate] of cited) expect(row(label), label).toContain(fraction(rate));
   const pdf = rates.sourceDocumentExtractionAccuracy;
-  expect(kit).toContain(fraction(pdf));
-  expect(kit).toContain(`${pdf.exactItems}/${pdf.items}`);
-  expect(kit).toContain(scoreboard.provenance.inputs['docs/eval/pdf-extraction.json']);
+  const pdfRow = row('Recorded PDF extraction');
+  expect(pdfRow).toContain(fraction(pdf));
+  expect(pdfRow).toContain(`${pdf.exactItems}/${pdf.items}`);
+  expect(pdfRow).toContain(scoreboard.provenance.inputs['docs/eval/pdf-extraction.json']);
 });
