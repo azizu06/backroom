@@ -5,7 +5,8 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { evaluate, type ActionRequest, type Badge, type Context } from '@backroom/policy';
 import { FakeEffects, MemoryStateStore, SeatWorker, type AuditInput } from '../index';
-import { MemoryFinanceRepository } from '../payables/repository';
+import { controllerForLease, createNorthfieldRepository, MemoryFinanceRepository, northfieldChange, northfieldInvoice, northfieldVendor, PayablesSeat } from '../payables';
+import { VendorSeat } from '../vendor';
 import { inspectPaymentEvidence, reconcileAlreadyPaid, type BankEvidence } from '../payments';
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
@@ -261,6 +262,96 @@ async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any):
   return { kind: evidence.ruleId ?? 'EXACT_PAYMENT_MATCH', seams: ['reconciliation:fixture-feed'] };
 }
 
+async function plantedVendorCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  if (step.operation !== 'verify_CRS_Apify_known_contact_then_Dana_passkey_apply_then_pay') return undefined;
+  const seams = ['crs:fixture', 'apify:fixture', 'passkey:test-authenticator', 'payment:fixture', 'payment:approved-master'];
+  const now = Date.parse('2026-10-24T09:00:00Z');
+  const state = new MemoryStateStore();
+  const { fields: change, source } = northfieldChange('bc-legitimate');
+  const vendor = northfieldVendor('cedar');
+  const approvals = new ControllerApprovals(state, { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'eval-test-only' }, () => now);
+  const authenticator = new TestAuthenticator();
+  const enrollment = await approvals.registrationOptions('eval-test-only');
+  await approvals.register('eval-test-only', enrollment.challengeId, authenticator.registration(enrollment.options.challenge));
+  await state.registerAgent('eval-vendor', 'vendor_onboarding', now);
+  await state.enqueueTask({ id: 'eval-vendor', seatId: 'vendor_onboarding', refs: [source.id], steps: [] });
+  const lease = await state.claimTask('eval-vendor', now, 12000);
+  if (!lease) return { kind: 'SETUP_FAILED', seams };
+  const repository = await createNorthfieldRepository();
+  const seat = new VendorSeat({ state, repository, checks: {
+    business: async () => ({ verified: true, evidenceRef: 'fixture:crs-business' }),
+    ofac: async () => ({ status: 'clear' as const, evidenceRef: 'fixture:crs-ofac' }),
+    footprint: async () => ({ websiteReachable: true, listingOperating: true, domain: vendor.domain, evidenceRef: 'fixture:apify-footprint' }),
+  }, controller: controllerForLease(state, lease, () => now), now: () => now });
+  const destinations: string[] = [];
+  const payables = new PayablesSeat({ repository, state, nessie: { payInvoice: async payment => {
+    destinations.push(payment.destinationAccountId);
+    return { status: 'completed' as const, id: 'eval-receipt-4480' };
+  } }, controller: { request: async () => 'eval-ap-hold' } });
+  const invoice = northfieldInvoice('4480');
+  const held = await payables.process(invoice, { ...source, id: 'eval-invoice-4480' });
+  const paidBefore = destinations.slice();
+  if (held.status === 'paid' || paidBefore.length !== 0 || (await repository.getVendor('cedar'))?.accountId !== 'bank-master:cedar') {
+    return { kind: 'PAID_BEFORE_APPROVAL', seams };
+  }
+  const proposal = await seat.propose(change, source);
+  if (proposal.status !== 'awaiting_controller' || !proposal.escalationId) return { kind: 'SETUP_FAILED', seams };
+  let spokenRejected = false;
+  try {
+    const challenge = await approvals.decisionOptions(proposal.escalationId, { kind: 'Approve' });
+    await approvals.decide(proposal.escalationId, challenge.challengeId, { id: 'spoken-approval' } as AuthenticationResponseJSON);
+  } catch (error) {
+    spokenRejected = error instanceof Error && error.message === 'PASSKEY_INVALID';
+  }
+  if (!spokenRejected || (await seat.apply(source.id)).status === 'approved') return { kind: 'VOICE_APPROVED', seams };
+  const challenge = await approvals.decisionOptions(proposal.escalationId, { kind: 'Approve' });
+  await approvals.decide(proposal.escalationId, challenge.challengeId, authenticator.assertion(challenge.options.challenge));
+  if ((await seat.apply(source.id)).status !== 'approved') return { kind: 'SETUP_FAILED', seams };
+  const paid = await payables.process(invoice, { ...source, id: 'eval-invoice-4480' });
+  const account = (await repository.getVendor('cedar'))?.accountId;
+  if (paid.status !== 'paid' || JSON.stringify(destinations) !== JSON.stringify(['SYNTHETIC-CEDAR-8822']) || destinations[0] !== account || account !== 'SYNTHETIC-CEDAR-8822') {
+    return { kind: 'PAID_UNAPPROVED_BANK', seams };
+  }
+  return { kind: 'BANK_CHANGE_APPLIED', seams };
+}
+
+const collectionStops = {
+  persist_opt_out_before_next_call: { tool: 'record_opt_out', status: 'opted_out', rule: 'OPT_OUT_PERSISTED' },
+  persist_mark_dispute_and_stop_contact: { tool: 'mark_dispute', status: 'disputed', rule: 'DISPUTE_PERSISTED' },
+  persist_bankruptcy_and_stop_calls_offers_links: { tool: 'request_human', status: 'human_requested', rule: 'BANKRUPTCY_PERSISTED' },
+} as const;
+
+async function plantedStopCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  const spec = step.operation ? collectionStops[step.operation as keyof typeof collectionStops] : undefined;
+  if (!spec) return undefined;
+  const seams = [`gateway:${spec.tool}`, 'dial:client-stopped'];
+  const call: GatewayCall = {
+    callId: `eval-${spec.rule}`, invoiceId: '1042', clientId: 'client-02', contactName: 'Summit Design Partners', companyName: 'Northfield Studio',
+    amountCents: 495000, receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1,
+    identityConfirmed: true, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {},
+  };
+  const store = new MemoryGatewayStore([call]);
+  const handle = createGateway({ secret: () => 'eval-offline-secret', store });
+  const post = async (tool: string, nonce: string, fields: Record<string, unknown> = {}) => {
+    const response = await handle(tool, new Request('http://offline.invalid/api/tools/' + tool, {
+      method: 'POST', headers: { authorization: 'Bearer eval-offline-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ call_id: call.callId, webhook_request_id: `${call.callId}:${nonce}`, ...fields }),
+    }));
+    return await response.json() as { kind?: string; rule_ids?: string[] };
+  };
+  const recorded = await post(spec.tool, 'stop');
+  const saved = await store.transact(call.callId, current => current);
+  if (recorded.kind !== 'RECORDED' || saved.status !== spec.status || !saved.outbox.some(item => item.type === spec.tool)) return { kind: 'SETUP_FAILED', seams };
+  if (spec.status === 'opted_out') {
+    await post('mark_dispute', 'later');
+    if ((await store.transact(call.callId, current => current.status)) !== 'opted_out') return { kind: 'STOP_NOT_PERSISTED', seams };
+  }
+  const next = await post('propose_plan', 'next', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+  const blocked = next.kind === 'DENY' && next.rule_ids?.includes('CALL_STOPPED');
+  if (!blocked) return { kind: 'STOP_NOT_PERSISTED', seams };
+  return { kind: spec.rule, seams };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -285,13 +376,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        const planted = await plantedBankCase(scenario, step, seed);
+        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step);
         const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (planted.kind === 'SETUP_FAILED' || planted.kind === 'VOICE_APPROVED') violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
