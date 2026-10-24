@@ -6,8 +6,9 @@
 .room-inspector summary:focus-visible,
 .room-inspector a:focus-visible,
 .office-toolbar select:focus-visible {
-  outline: 2px solid #f3dfb9;
+  outline: 2px solid var(--office-aqua);
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--office-navy);
 }
 
 .office-shell .visually-hidden {
