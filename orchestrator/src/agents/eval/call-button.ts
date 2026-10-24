@@ -119,6 +119,8 @@ export async function runCallButton() {
     const readyResponse = await readyOffice.click({});
     const readyBody = await readyResponse.json() as { ok?: boolean; error?: string; message?: string };
     const readyAudit = readyOffice.audits.at(-1);
+    const secondResponse = await readyOffice.click({});
+    const secondBody = await secondResponse.json() as { ok?: boolean; error?: string; message?: string };
     const foreignResponse = await readyOffice.clickFrom('https://evil.example');
     const foreignBody = await foreignResponse.json() as { ok?: boolean; error?: string };
     const loopbackOffice = await office(readyPublished, network, { requestOrigin: LOOPBACK, loopbackOrigin: LOOPBACK });
@@ -141,6 +143,9 @@ export async function runCallButton() {
         && readyBody.message === 'Ringing the allowlisted demo phone. Answer on speaker.'
         && readyOffice.counts.providerAttempts === 1 && readyOffice.counts.relayCalls === 1
         && readyAudit?.outcome === 'accepted' && readyAudit.code === 'DIAL_ACCEPTED' && readyOffice.adminAudits.length === 0,
+      cooldown: quiet && secondResponse.status === 429 && secondBody.ok === false && secondBody.error === 'COOLDOWN'
+        && secondBody.message === 'Line cooling down. Try again in 20 s.'
+        && readyOffice.counts.providerAttempts === 1 && readyOffice.counts.relayCalls === 1,
       foreign: quiet && foreignResponse.status === 403 && foreignBody.ok === false && foreignBody.error === 'ORIGIN_REJECTED'
         && readyOffice.counts.providerAttempts === 1 && readyOffice.counts.relayCalls === 1,
       loopback: quiet && loopbackResponse.status === 200 && loopbackBody.ok === true
@@ -155,7 +160,7 @@ export async function runCallButton() {
       invalid: { status: invalidResponse.status, error: invalidBody.error ?? null, providerAttempts: invalidAttempts, relayCalls: invalidRelayCalls },
       ready: { status: readyResponse.status, ok: readyBody.ok === true, error: readyBody.error ?? null, audit: readyAudit ?? null,
         providerAttempts: readyOffice.counts.providerAttempts },
-      scope: 'Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia.',
+      scope: 'Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia.',
     };
   } finally { globalThis.fetch = prior; }
 }
