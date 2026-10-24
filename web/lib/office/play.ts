@@ -30,6 +30,9 @@ export const LOOK_SENSITIVITY = 0.0025;
 export const SPAWN = { position: [-5, 0.9] as const, yaw: 0 } as const;
 export const FLOOR = { minX: -8, maxX: 8, minZ: -5.5, maxZ: 5.5 } as const;
 export const TREASURY_DOOR: FloorPosition = [5, 1.15];
+/** Lobby counter (see the lobby footprint in officeColliders); hosts the read-only payment link. */
+export const PAYLINK_KIOSK: FloorPosition = [-4.4, 3.1];
+export const PAYLINK_RADIUS = 0.7;
 
 export type Vec2 = readonly [x: number, z: number];
 export interface Box { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
@@ -153,19 +156,20 @@ export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: numb
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" };
+export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" } | { kind: "paylink" };
 export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
 export function targetKey(target: PlayTarget | null): string {
-  return !target ? "" : target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : "treasury";
+  return !target ? "" : target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : target.kind;
 }
 
-/** Agents at their drawn (motion) positions, each visible desk at its room centre, and the Treasury door. */
+/** Agents at their drawn (motion) positions, each visible desk at its room centre, the Treasury door and the lobby payment kiosk. */
 export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[]): PlayCandidate[] {
   const visible = new Set(rooms);
   return [
     ...agents.map(agent => ({ target: { kind: "agent", id: agent.id } as const, position: agent.position, radius: AGENT_RADIUS })),
     ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: DESK_RADIUS })),
     ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: DOOR_RADIUS }] : []),
+    ...(visible.has("lobby") ? [{ target: { kind: "paylink" } as const, position: PAYLINK_KIOSK, radius: PAYLINK_RADIUS }] : []),
   ];
 }
 
@@ -238,19 +242,25 @@ export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPan
       entries: entries(snapshot, row => row.seatId === target.room),
     };
   }
-  const denial = matchingDenial(snapshot, "treasury");
-  const row = denial && snapshot.audit.find(entry => entry.id === denial.auditId);
-  return {
-    kind: "treasury", title: OFFICE_ANCHORS.treasury.name, locked: "Locked · Dana only",
-    denial: row ? { id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds } : undefined,
-    entries: [],
-  };
+  if (target.kind === "treasury") {
+    const denial = matchingDenial(snapshot, "treasury");
+    const row = denial && snapshot.audit.find(entry => entry.id === denial.auditId);
+    return {
+      kind: "treasury", title: OFFICE_ANCHORS.treasury.name, locked: "Locked · Dana only",
+      denial: row ? { id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds } : undefined,
+      entries: [],
+    };
+  }
+  target.kind satisfies "paylink";
+  return { kind: "paylink", title: "Payment link kiosk", entries: [] };
 }
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {
   if (target.kind === "agent") return `Talk to ${snapshot.agents.find(row => row.id === target.id)?.name ?? target.id}`;
   if (target.kind === "desk") return target.room === "dana" ? `Inspect ${OFFICE_ANCHORS.dana.name}` : `Inspect ${OFFICE_ANCHORS[target.room].name} desk`;
-  return "Treasury door";
+  if (target.kind === "treasury") return "Treasury door";
+  target.kind satisfies "paylink";
+  return "Scan to pay · payment link kiosk";
 }
 
 /** What the lazy scene needs from Office to run Play; `hud` receives data-player-* attributes. */

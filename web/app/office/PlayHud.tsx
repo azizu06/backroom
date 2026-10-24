@@ -5,6 +5,7 @@ import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import PaymentLinkPanel from '../../components/PaymentLinkPanel';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -53,7 +54,8 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
   return <section className='play-panel' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
-    <header><h2 id={headingId}>{panel.title}</h2><button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
+    <header>{/* PaymentLinkPanel brings its own h2, so the kiosk title is not a second peer heading. */}
+      {panel.kind === 'paylink' ? <p id={headingId}><strong>{panel.title}</strong></p> : <h2 id={headingId}>{panel.title}</h2>}<button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
     {panel.state && <p className='play-panel-state'>{panel.state}</p>}
     {panel.task && <p>{panel.task}</p>}
     {panel.kind === 'desk' && (panel.badge ? <>
@@ -67,11 +69,12 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
     {panel.kind === 'treasury' && panel.denial && <p className='denial-text' role='status' data-denial-audit={panel.denial.id}>
       <strong>{panel.denial.decision}</strong> Entry denied · rule {panel.denial.ruleIds.join(', ')} · audit <code>{panel.denial.id}</code>
     </p>}
-    {panel.kind !== 'treasury' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
+    {panel.kind === 'paylink' && <PaymentLinkPanel />}
+    {panel.kind !== 'treasury' && panel.kind !== 'paylink' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
       <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
       <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
-    <button className='play-panel-ask' onClick={askWhy}>Ask why</button>
+    {panel.kind !== 'paylink' && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
   </section>;
 }
 
