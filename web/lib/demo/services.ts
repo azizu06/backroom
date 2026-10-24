@@ -75,7 +75,7 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
   // The same Apify rows prepare() records, rebuilt from its cached evidence.
   const precall = (): PrecallEvidence => ({ preCall: { ...status().services.preCall,
-    ...(preCall?.status === 'ready' && 'warnings' in preCall ? { warnings: preCall.warnings } : {}) },
+    ...(preCall?.status === 'ready' && preCall.warnings ? { warnings: preCall.warnings } : {}) },
     signals: evidence.health ? signalsFromHealth('1042', evidence.health, healthCheck.label ?? 'provided') : [] });
   return { bank, accountId, status, precall,
     async prepare(state: StateStore) {
