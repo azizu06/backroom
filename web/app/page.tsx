@@ -1,9 +1,9 @@
-import { Office } from "./office";
+import { MockOffice } from "./office";
 
 export default function Page() {
   return (
-    <main style={{ height: "100vh" }}>
-      <Office />
+    <main>
+      <MockOffice />
     </main>
   );
 }
