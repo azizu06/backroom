@@ -10,6 +10,8 @@ import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
 import { INITIAL_VIEWPORT, boundaryStateForProps, reportViewFailure, viewportLayers, viewportReducer, type BoundaryState, type ViewMode } from '../../lib/office/view';
 import { OfficeLobby } from './OfficeLobby';
+import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
+import { PLAY_HINT, PlayHud } from './PlayHud';
 import type { RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
@@ -121,6 +123,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
   function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
+  // Play is first person over the same scene; exiting returns to the view chosen before it.
+  const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
+  const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
+  const prePlay = useRef<ViewMode>('walk');
+  useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
+  function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
   }, []);
@@ -145,6 +153,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         </fieldset>
         <label htmlFor='office-view'>View <select id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
           <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option>
+          <option value='play'>Play (first person)</option>
         </select></label>
       </div>
     </header>
@@ -159,7 +168,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={mode === 'tween'} paused={!layers.scene.visible} focus={focus} labels={labels} onFailure={onFailure} onRestored={onRestored} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={mode === 'tween'} paused={!layers.scene.visible} focus={focus} labels={labels} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} />
           </div>
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
@@ -171,8 +180,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           })}
         </>}
       </ViewBoundary>
+      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? PLAY_HINT : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
     <footer className='office-footer'>
