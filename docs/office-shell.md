@@ -45,8 +45,7 @@ which consumes the same subscribed snapshot.
 - The web test command enables Vitest globals for the gateway tests inherited
   from main. Gateway files are unchanged.
 - `pnpm --filter @backroom/web typecheck` and `pnpm --filter @backroom/web build`.
-- After rebasing onto the integrated main: `pnpm -r typecheck`, `pnpm -r test`
-  (319 passed: 43 web, 94 policy, 182 orchestrator), `pnpm -r build`, and
+- After rebasing onto the integrated main: `pnpm -r typecheck`, `pnpm -r test`, `pnpm -r build`, and
   `pnpm --filter @backroom/web test:approvals:browser` (one passkey E2E test) pass.
 - Real signed-in Chrome via `chrome-devtools-axi`, `pnpm --filter @backroom/web dev
   --port 3109`: both desk targets, fixed camera, 2D retargeting, and simulated WebGL
