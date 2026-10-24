@@ -3,14 +3,15 @@ import { authorizedPaymentLink } from './authorization';
 
 function project(call: GatewayCall, link: PaymentLink, now: number) {
   if (!link.shortCode || !link.expiresAt || !authorizedPaymentLink(call, link.id, now)) return;
-  return { code: link.shortCode, path: link.path, amountCents: link.amountCents, expiresAt: link.expiresAt };
+  return { code: link.shortCode, amountCents: link.amountCents, expiresAt: link.expiresAt };
 }
 export async function resolvePaymentCode(store: GatewayStore, code: string, now = Date.now()) {
   code = code.toUpperCase();
   if (!/^[A-F0-9]{10}$/.test(code)) return;
   const call = await store.findPaymentCode?.(code);
   const link = call?.links.find(row => row.shortCode === code);
-  return call && link ? project(call, link, now) : undefined;
+  const delivery = call && link ? project(call, link, now) : undefined;
+  return delivery && link ? { ...delivery, path: link.path } : undefined;
 }
 export async function activePaymentDelivery(store: GatewayStore, now = Date.now()) {
   const call = await store.activePaymentCall?.();
