@@ -16,7 +16,9 @@
     "apify:live": "tsx src/collections/apify-live.ts",
     "vision:live": "tsx src/metrics/vision-live.ts",
     "x402:wallet": "tsx src/x402/wallet.ts",
-    "x402:live": "tsx src/x402/live.ts"
+    "x402:live": "tsx src/x402/live.ts",
+    "handoff:serve": "tsx src/voice/handoff-server.ts",
+    "handoff:live": "tsx src/voice/handoff-smoke.ts"
   },
   "dependencies": {
     "@backroom/nessie": "workspace:*",
@@ -47,6 +49,8 @@
     "./reducer": "./src/reducer-engine.ts",
     "./spacetime-client": "./src/spacetime-client/index.ts",
     "./spacetime-client/types": "./src/spacetime-client/types.ts",
-    "./replay": "./src/replay/index.ts"
+    "./replay": "./src/replay/index.ts",
+    "./handoff-client": "./src/voice/handoff-client.ts",
+    "./handoff": "./src/voice/handoff.ts"
   }
 }
