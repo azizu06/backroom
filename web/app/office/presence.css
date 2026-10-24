@@ -1,0 +1,4 @@
+.office-tools .presence-toggle, .presence-chip { color: #d0d6c6; font-size: 12px; white-space: nowrap; }
+.office-tools .presence-toggle { gap: 5px; }
+.presence-chip { padding: 4px 8px; background: #272f25; border: 1px solid #8b987b; border-radius: 12px; }
+@media (max-width: 760px) { .office-tools .presence-toggle, .presence-chip { font-size: 11px; } }

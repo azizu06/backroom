@@ -2,7 +2,19 @@
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
-import { OFFICE_ANCHORS, anchorLabel, matchingDenial, type AnchorId, type FloorPosition, type OfficeSnapshot } from "./state";
+import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
+import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
+import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
+import { AGENT_RADIUS } from "./targets/agent";
+import { DESKS, DESK_RADIUS, DESK_SIZE } from "./targets/desk";
+import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
+import { SERVER_ROOM } from "./targets/server";
+import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
+import type { CoworkerSpot, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+
+// Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
+export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
+export type { CoworkerSpot, PlayPanelEntry, PlayTarget, Vec2 };
 
 export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
@@ -19,19 +31,11 @@ export const PLAYER_RADIUS = 0.28;
 export const INTERACT_RANGE = 1.1;
 /** Half-angle of the pick cone in radians; widened up close (see pickTarget) so you keep what you stand at. */
 export const PICK_CONE = 0.35;
-/** Interact radii: the size of the thing. A desk is approximated by the circle inscribed in its footprint. */
-export const AGENT_RADIUS = 0.45;
-export const DOOR_RADIUS = 0.65;
-export const DESK_SIZE = { width: 2.25, depth: 1.05 } as const;
-export const DESK_RADIUS = DESK_SIZE.depth / 2;
 export const PITCH_LIMIT = 1.2;
 export const LOOK_SENSITIVITY = 0.0025;
 /** Lobby aisle, facing -z toward the Collections desk. */
 export const SPAWN = { position: [-5, 0.9] as const, yaw: 0 } as const;
 export const FLOOR = { minX: -8, maxX: 8, minZ: -5.5, maxZ: 5.5 } as const;
-export const TREASURY_DOOR: FloorPosition = [5, 1.15];
-
-export type Vec2 = readonly [x: number, z: number];
 export interface Box { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 
 /** Camera convention: yaw 0 looks toward -z. */
@@ -41,12 +45,12 @@ export function rightOf(yaw: number): [number, number] { return [Math.cos(yaw), 
 function box(x: number, z: number, width: number, depth: number): Box {
   return { minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 };
 }
-const DESKS = ["collections", "payables", "vendor_onboarding", "dana"] as const satisfies readonly AnchorId[];
+export const SERVER_ROOM_BOX: Box = box(SERVER_ROOM.position[0], SERVER_ROOM.position[1], SERVER_ROOM.size.width, SERVER_ROOM.size.depth);
 const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfies readonly AnchorId[];
 
 /**
- * Solid footprints mirroring the layout drawn in web/app/office/scene.tsx (OfficeScene, Desk, Door, Plant).
- * Keep in sync with that file. The Treasury is locked: its doorway is closed by a barrier.
+ * Solid footprints mirroring the layout drawn in web/app/office/scene.tsx and its mounts (web/app/office/mounts:
+ * Desks, Doors, Plants, LobbyCounter, TreasuryVault). Keep in sync with those files. The Treasury is locked: its doorway is closed by a barrier.
  * `extra` takes footprints of room geometry mounted elsewhere (e.g. a self-contained room at an anchor),
  * so new furniture becomes solid without editing this list.
  */
@@ -115,6 +119,10 @@ export class PlayInput {
   readonly joystick: [number, number] = [0, 0];
   lookYaw = 0;
   lookPitch = 0;
+  /** Walking speed multiplier from the viewer's Play settings. */
+  speed = 1;
+  /** Game-feel switches from the viewer's Play settings; the rig also applies reduced motion. */
+  feel: FeelFlags = DEFAULT_FEEL;
   press(control: PlayControl) { this.held.add(control); }
   release(control: PlayControl) { this.held.delete(control); }
   setJoystick(x: number, y: number) {
@@ -140,7 +148,7 @@ export function moveIntent(input: PlayInput, yaw: number, dt: number): [number, 
   const side = (input.held.has("right") ? 1 : 0) - (input.held.has("left") ? 1 : 0) + input.joystick[0];
   const length = Math.hypot(ahead, side);
   if (!length || dt <= 0) return [0, 0];
-  const scale = Math.min(1, 1 / length) * WALK_SPEED * dt;
+  const scale = Math.min(1, 1 / length) * WALK_SPEED * input.speed * dt;
   const [fx, fz] = forwardOf(yaw), [rx, rz] = rightOf(yaw);
   return [(fx * ahead + rx * side) * scale, (fz * ahead + rz * side) * scale];
 }
@@ -153,20 +161,19 @@ export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: numb
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export type PlayTarget = { kind: "agent"; id: string } | { kind: "desk"; room: AnchorId } | { kind: "treasury" };
 export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
 export function targetKey(target: PlayTarget | null): string {
-  return !target ? "" : target.kind === "agent" ? `agent:${target.id}` : target.kind === "desk" ? `desk:${target.room}` : "treasury";
+  if (!target) return "";
+  return playTargetModule(target.kind).key?.(target) ?? target.kind;
 }
 
-/** Agents at their drawn (motion) positions, each visible desk at its room centre, and the Treasury door. */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[]): PlayCandidate[] {
-  const visible = new Set(rooms);
-  return [
-    ...agents.map(agent => ({ target: { kind: "agent", id: agent.id } as const, position: agent.position, radius: AGENT_RADIUS })),
-    ...DESKS.filter(room => visible.has(room)).map(room => ({ target: { kind: "desk", room } as const, position: OFFICE_ANCHORS[room].center, radius: DESK_RADIUS })),
-    ...(visible.has("treasury") ? [{ target: { kind: "treasury" } as const, position: TREASURY_DOOR, radius: DOOR_RADIUS }] : []),
-  ];
+/**
+ * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
+ * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
+ */
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = []): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), coworkers };
+  return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 
 /**
@@ -194,63 +201,18 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
 }
 
 export function headBob(distance: number, moving: boolean, reduced: boolean): number {
-  return reduced || !moving ? 0 : Math.sin(distance * 7) * 0.035;
+  return reduced || !moving ? 0 : bobHeight(distance, 1);
 }
 
-export interface PlayPanelEntry { readonly id: string; readonly decision: string; readonly summary: string; readonly ruleIds: readonly string[] }
-export interface PlayPanel {
-  readonly kind: PlayTarget["kind"];
-  readonly title: string;
-  readonly state?: string;
-  readonly task?: string;
-  readonly badge?: { readonly policyVersion: number; readonly limits: readonly (readonly [string, string])[] };
-  readonly seated?: readonly { readonly id: string; readonly name: string; readonly state: string }[];
-  readonly locked?: string;
-  readonly denial?: PlayPanelEntry;
-  readonly entries: readonly PlayPanelEntry[];
-}
-const MAX_ENTRIES = 8;
-function entries(snapshot: OfficeSnapshot, match: (row: OfficeSnapshot["audit"][number]) => boolean): PlayPanelEntry[] {
-  return snapshot.audit.filter(match).reverse().slice(0, MAX_ENTRIES)
-    .map(row => ({ id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds }));
-}
-function valueText(value: unknown): string {
-  return typeof value === "object" ? JSON.stringify(value) : String(value);
-}
+export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;
 
-/** Display data for the interaction panel; null when the target is no longer in the snapshot. */
+/** Display data for the interaction panel (from the target's registry module); null when the target is no longer in the snapshot. */
 export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPanel | null {
-  if (target.kind === "agent") {
-    const agent = snapshot.agents.find(row => row.id === target.id);
-    if (!agent) return null;
-    return {
-      kind: "agent", title: `${agent.name} · ${agent.id}`, state: agent.state,
-      task: `Task · ${anchorLabel(agent.targetAnchor)}${agent.escalationId ? ` · escalation folder ${agent.escalationId}` : ""}`,
-      entries: entries(snapshot, row => row.agentId === agent.id),
-    };
-  }
-  if (target.kind === "desk") {
-    const badge = snapshot.badges.find(row => row.seatId === target.room);
-    return {
-      kind: "desk", title: OFFICE_ANCHORS[target.room].name,
-      badge: badge && { policyVersion: badge.policyVersion, limits: Object.entries(badge.limits).map(([key, value]) => [key, valueText(value)] as const) },
-      seated: snapshot.agents.filter(agent => agent.seatId === target.room).map(agent => ({ id: agent.id, name: agent.name, state: agent.state })),
-      entries: entries(snapshot, row => row.seatId === target.room),
-    };
-  }
-  const denial = matchingDenial(snapshot, "treasury");
-  const row = denial && snapshot.audit.find(entry => entry.id === denial.auditId);
-  return {
-    kind: "treasury", title: OFFICE_ANCHORS.treasury.name, locked: "Locked · Dana only",
-    denial: row ? { id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds } : undefined,
-    entries: [],
-  };
+  return playTargetModule(target.kind).panel(snapshot, target);
 }
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {
-  if (target.kind === "agent") return `Talk to ${snapshot.agents.find(row => row.id === target.id)?.name ?? target.id}`;
-  if (target.kind === "desk") return target.room === "dana" ? `Inspect ${OFFICE_ANCHORS.dana.name}` : `Inspect ${OFFICE_ANCHORS[target.room].name} desk`;
-  return "Treasury door";
+  return playTargetModule(target.kind).label(snapshot, target);
 }
 
 /** What the lazy scene needs from Office to run Play; `hud` receives data-player-* attributes. */
@@ -258,4 +220,6 @@ export interface PlayBridge {
   readonly input: PlayInput;
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };
+  /** Other viewers in Play (soft targets), read on each rig frame. */
+  readonly coworkers?: { readonly current: readonly CoworkerSpot[] };
 }
