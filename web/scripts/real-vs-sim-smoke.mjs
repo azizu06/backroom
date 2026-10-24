@@ -58,15 +58,17 @@ try {
     await page.reload();
     await page.getByText('LLM OFF · model work paused', { exact: false }).waitFor();
     assert.equal(await page.getByText('LLM OFF', { exact: true }).filter({ visible: true }).count(), 3);
-    assert.equal(await page.getByText('Not probed in this process', { exact: true }).filter({ visible: true }).count(), 3);
+    // Without probe results the other three real services claim nothing.
+    assert.equal(await page.getByText('Unverified', { exact: true }).filter({ visible: true }).count(), 3);
+    assert.equal(await page.getByText('Not probed in this process', { exact: true }).filter({ visible: true }).count(), 0);
     await page.screenshot({ path: resolve(out, `off-${name}.png`), fullPage: true });
     await page.unroute('**/api/demo-status');
     await page.route('**/api/demo-status', route => route.fulfill({ status: 503 }));
     await page.reload();
     await page.getByText('Live status unavailable', { exact: false }).waitFor();
-    // Only the probed GX10 is Unverified without a status; the five never-probed services say so instead.
-    assert.equal(await page.getByText('Unverified', { exact: true }).filter({ visible: true }).count(), 1);
-    assert.equal(await page.getByText('Not probed in this process', { exact: true }).filter({ visible: true }).count(), 5);
+    // Without a status every real service is Unverified; none is claimed online or unprobed.
+    assert.equal(await page.getByText('Unverified', { exact: true }).filter({ visible: true }).count(), 6);
+    assert.equal(await page.getByText('Not probed in this process', { exact: true }).filter({ visible: true }).count(), 0);
     // Document routes retain enough scroll space for their controls above the fixed panel.
     await page.unroute('**/api/demo-status');
     await page.goto(`${base}/controller`);
