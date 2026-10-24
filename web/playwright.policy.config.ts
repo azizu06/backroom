@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
-  testDir: './tests', testMatch: 'policy.spec.ts', workers: 1, retries: 0,
+  testDir: './tests', testMatch: ['policy.spec.ts', 'fetch-errors.spec.ts'], workers: 1, retries: 0,
   use: { baseURL: 'http://localhost:3034', headless: true, viewport: { width: 1440, height: 1100 } },
   webServer: {
     command: 'pnpm exec next start --port 3034', url: 'http://localhost:3034/policy', reuseExistingServer: false,
