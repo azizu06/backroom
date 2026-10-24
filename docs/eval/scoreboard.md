@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `37cc03f298e83b756104952fe25e93d65a248780`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `3094f8a16e1d8d91af0015ec886f2b429a3b0c92`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -69,9 +69,6 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 
 ## Disagreements and unexecuted evidence
 
-- **P03/1:signals**: Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct.
-- **P04/0:signals**: Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct.
-- **P07/0:signals**: Tool signal list [PAYEE_NOT_IN_MASTER,OFAC_STOP] differs from key [OFAC_STOP]; authoritative sealed decision is [OFAC_STOP]. Signal lists and decision rules are distinct.
 - **P01**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P07**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P11**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
