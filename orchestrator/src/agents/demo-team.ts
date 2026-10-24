@@ -5,16 +5,16 @@ import { createNorthfieldRepository, northfieldInvoice, northfieldSource } from 
 import type { DomainTool, Json, Role, Specialist } from './contracts';
 import type { CaseRequest } from './dispatcher';
 import type { ScriptStep } from './mock-query';
-import { createRoleRegistry, type RoleRegistry } from './roles';
+import { auditorCorrections, createRoleRegistry, type RoleRegistry } from './roles';
+import { MemoryHandoffStore, type AgentCaseStore } from './handoff-store';
 import type { CallRecordView } from './roles/collections';
 import type { CollectionsCase } from './tools/collections';
 import { ApifyBudget } from './tools/vendor-apify';
 import { MemoryVendorEvidenceStore } from './tools/vendor';
 
-/** Synthetic demo team: the merged role modules (intake, extractor, vendor, payables,
- * collections) on network-free Northfield fixtures, plus stand-ins for the auditor (not yet
- * merged) and the reconciler (its real module needs the host's Collections task lease, see
- * roles/reconciler.md). A merged role replaces its stub
+/** Synthetic demo team: six merged role modules (intake, extractor, vendor, payables,
+ * collections, auditor) on network-free Northfield fixtures, plus a stand-in reconciler
+ * (its real module binds the host's Collections task lease; see roles/reconciler.md). A merged role replaces its stub
  * by being added to `createRoleRegistry`. All data is synthetic; no bank, call or Apify. */
 export const AP_INVOICE = '4401';
 export const DEMO_CASES = (owner = 'aziz'): CaseRequest[] => [
@@ -35,13 +35,11 @@ export const STAND_INS: Partial<Record<Role, Specialist>> = {
   reconciler: spec('reconciler', ['auditor', 'collections'], 'Check the already-paid claim with match_payment. Exact matches go to auditor citing the match ref; missing evidence goes back to collections.', [
     stub('match_payment', 'Code-owned exact match of the claimed payment against the bank feed', none, (_, caseId) => ({ matched: true, artifactRef: `${caseId}:match` })),
   ]),
-  auditor: spec('auditor', ['intake', 'extractor', 'vendor', 'payables', 'collections', 'reconciler'], 'Close out with read_audit and give a one-line cited summary. Do not hand off when evidence is complete.', [
-    stub('read_audit', 'Read this case\'s audit and evidence chain', none, (_, caseId) => ({ complete: true, artifactRef: `${caseId}:closeout` })),
-  ]),
 };
 
-export async function createDemoTeam() {
+export async function createDemoTeam(options: { store?: (control: MemoryStateStore) => AgentCaseStore } = {}) {
   const control = new MemoryStateStore();
+  const store = options.store?.(control) ?? new MemoryHandoffStore({ audit: control });
   const repository = await createNorthfieldRepository();
   const payments: string[] = [];
   const seat = new PayablesSeat({ repository, state: control, controller: { request: async () => 'esc-demo' }, paymentRail: 'nessie',
@@ -73,9 +71,13 @@ export async function createDemoTeam() {
       budget: new ApifyBudget(), evidence,
     },
     collections: { cases: { load: async () => collectionsCase }, outcomes: { read: async () => call }, audit: control },
+    auditor: { store: control,
+      loadCase: async caseId => ({ refs: [caseId.startsWith('ap-') ? AP_INVOICE : '1042'],
+        correctionCount: auditorCorrections((await store.getCase(caseId))!) }),
+      loadReceipt: async id => id.startsWith('nessie-demo-') ? { id, status: 'completed' } : undefined },
   });
   const roles: RoleRegistry = { ...STAND_INS, ...registered };
-  return { control, roles, payments, evidence, extractions };
+  return { control, store, roles, payments, evidence, extractions };
 }
 
 const ref = (o: unknown[], i: number, key = 'artifactRef') => String((o[i] as Record<string, unknown>)[key]);
@@ -98,5 +100,10 @@ export const DEMO_SCRIPTS: Record<Role, () => ScriptStep[]> = {
     { tool: 'request_payment', args: {} }],
   collections: () => [{ tool: 'get_call_outcome', args: {} }, handoff('reconciler', 'Client says invoice 1042 is already paid; find the bank evidence.', o => [(o[0] as { allowedRefs: string[] }).allowedRefs[0]!])],
   reconciler: () => [{ tool: 'match_payment', args: {} }, handoff('auditor', 'Claimed payment matched exactly in the bank feed.', o => [ref(o, 0)])],
-  auditor: () => [{ tool: 'read_audit', args: {} }],
+  auditor: () => [{ tool: 'read_audit', args: {} }, { tool: 'verify_chain', args: {} }, { tool: 'record_case_summary', args: o => {
+    const ids = ((o[1] as { auditIds: string[] }).auditIds).slice(-6);
+    const money = (o[1] as { moneyAuditIds: string[] }).moneyAuditIds;
+    const citations = [...new Set([...money, ...ids])];
+    return { summary: `Case closed with a complete evidence trail ${citations.map(id => `[entry:${id}]`).join(' ')}.`, citations };
+  } }],
 };

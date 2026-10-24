@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createDemoTeam, DEMO_CASES, DEMO_SCRIPTS } from './demo-team';
 import type { Role } from './contracts';
 import { Dispatcher } from './dispatcher';
-import { MemoryHandoffStore } from './handoff-store';
+import type { MemoryHandoffStore } from './handoff-store';
 import { scriptedQuery, type ScriptedCall } from './mock-query';
 import { ClaudeAgentRuntime } from './runtime';
 import { FileUsageLedger, MemoryUsageLedger } from './usage';
@@ -18,15 +18,15 @@ import { FileUsageLedger, MemoryUsageLedger } from './usage';
 const live = process.argv.includes('--live');
 
 async function main() {
-  const { control, roles, payments } = await createDemoTeam();
-  const store = new MemoryHandoffStore({ audit: control });
-  store.subscribe(row => console.log(`  [office] #${row.sequence} ${row.fromAgentId} -> ${row.toAgentId} ${row.status}`
+  const { control, roles, payments, store } = await createDemoTeam();
+  (store as MemoryHandoffStore).subscribe(row => console.log(`  [office] #${row.sequence} ${row.fromAgentId} -> ${row.toAgentId} ${row.status}`
     + `${row.correction ? ' (correction)' : ''}${row.errorCode ? ` ${row.errorCode}` : ''} | voice=${row.toVoiceRole} "${row.line}"`));
   const calls: ScriptedCall[] = [];
   const runtime = new ClaudeAgentRuntime({
     credential: live ? () => execFileSync('security', ['find-generic-password', '-s', 'backroom-anthropic-key', '-w'], { encoding: 'utf8' }).trim() : () => 'mock-no-network',
     ...(live ? {} : { query: scriptedQuery(role => DEMO_SCRIPTS[role as Role]?.() ?? [], { calls }) }),
     recordArtifacts: (ctx, refs) => store.recordArtifacts(ctx, refs),
+    onDiagnostic: d => console.log(`  [diagnostic] ${d.role} ${d.code}: ${d.detail}`),
   });
   const ledger = live ? new FileUsageLedger() : new MemoryUsageLedger();
   const dispatcher = new Dispatcher({ runtime, store, control, roles, runnerId: 'demo-runner', ledger, mode: 'development',

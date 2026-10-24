@@ -20,6 +20,8 @@ export interface ClaudeRuntimeOptions extends ToolHooks {
   drainMs?: number;
   /** Override for the SDK's per-activation `maxBudgetUsd`. */
   maxBudgetUsd?: (spec: Specialist) => number;
+  /** Server-side diagnostics for failed activations; detail is bounded and key-redacted. */
+  onDiagnostic?(event: { activationId: string; role: string; code: string; detail: string }): void;
 }
 
 const PREAMBLE = (spec: Specialist) => [
@@ -72,9 +74,8 @@ export class ClaudeAgentRuntime implements AgentRuntime {
         tools: [], disallowedTools: [...BUILTIN_TOOL_NAMES], allowedTools: allowedNames, permissionMode: 'dontAsk',
         mcpServers: { [server.name]: server }, settingSources: [], persistSession: false,
         maxTurns: this.options.maxTurns ?? 6, maxBudgetUsd: this.options.maxBudgetUsd?.(spec) ?? ACTIVATION_BUDGET_USD[spec.model],
+        // allowedTools pre-approves (and would shadow canUseTool); the catch-all hook is the gate.
         abortController: controller, hooks: { PreToolUse: [{ hooks: [gate] }] },
-        canUseTool: async (name, toolInput) => allowed.has(name) && !session.sealed
-          ? { behavior: 'allow', updatedInput: toolInput } : { behavior: 'deny', message: 'Tool not available to this specialist' },
       };
       stream = (this.options.query ?? defaultQuery)({ prompt: userPrompt(ctx, input), options }, definitions);
       // Consume the complete stream; the latest result is the cumulative receipt.
@@ -88,6 +89,8 @@ export class ClaudeAgentRuntime implements AgentRuntime {
       }
     } catch (error) {
       // A staged handoff survives an abort during drain; anything else fails closed.
+      this.options.onDiagnostic?.({ activationId: activation.activationId, role: spec.role, code: codeOf(error),
+        detail: String(error instanceof Error ? error.message : error).replace(/sk-ant-[\w-]+/g, '[redacted]').slice(0, 400) });
       if (!session.staged || unexpected) failure = activation.signal.aborted ? { kind: 'paused', reason: reasonOf(activation.signal) }
         : { kind: 'failed', reason: controller.signal.aborted ? String(controller.signal.reason) : codeOf(error) };
     } finally {
@@ -102,6 +105,8 @@ export class ClaudeAgentRuntime implements AgentRuntime {
     if (session.staged) return { kind: 'handoff', request: session.staged, usage };
     if (activation.signal.aborted) return { kind: 'paused', reason: reasonOf(activation.signal), usage };
     if (session.held) return { kind: 'held', artifactRefs: session.held.artifactRefs, usage };
+    if (!last || last.subtype !== 'success' || last.is_error) this.options.onDiagnostic?.({ activationId: activation.activationId, role: spec.role,
+      code: last?.subtype ?? 'NO_RESULT', detail: (last && 'errors' in last ? last.errors.join('; ') : '').replace(/sk-ant-[\w-]+/g, '[redacted]').slice(0, 400) });
     if (!last || last.subtype !== 'success' || last.is_error) return { kind: 'failed', reason: last?.subtype === 'success' ? 'MODEL_ERROR' : last?.subtype.toUpperCase() ?? 'NO_RESULT', usage };
     return { kind: 'done', artifactRefs: [...session.producedRefs], usage };
   }

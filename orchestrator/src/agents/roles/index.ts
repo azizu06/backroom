@@ -9,6 +9,8 @@ import { createIntakeSpecialist, runIntakeActivation, type IntakePorts } from '.
 import { createExtractorSpecialist, type ExtractorDependencies } from './extractor';
 import { createReconciler } from './reconciler';
 import type { ReconciliationDependencies } from '../tools/reconciliation';
+import { createAuditTools, validateAuditorCorrection, type AuditDependencies } from '../tools/audit';
+import { createAuditor, runAuditor } from './auditor';
 
 /** How the dispatcher runs one role. Only `specialist` is required. */
 export interface RoleModule {
@@ -18,6 +20,8 @@ export interface RoleModule {
   run?(runtime: AgentRuntime, spec: Specialist, ctx: ToolContext, input: Json): Promise<ActivationResult>;
   /** Code-owned pre-commit guard. Throw an UPPER_SNAKE code to reject the staged handoff. */
   beforeCommit?(ctx: ToolContext, request: HandoffRequest, state: CaseState): Promise<void>;
+  /** Code-owned refs (e.g. audit ids) this activation may cite, recorded as case evidence before it runs. */
+  evidenceRefs?(ctx: ToolContext): Promise<string[]>;
   /** Runs after the store committed this role's handoff. */
   afterCommit?(ctx: ToolContext, record: HandoffRecord, state: CaseState): Promise<void>;
 }
@@ -35,6 +39,8 @@ export interface RoleDeps {
   payables?: PayablesToolDeps;
   vendor?: VendorToolDeps;
   collections?: PostCallDeps;
+  /** Host's `loadCase` supplies the persisted `correctionCount`; use `auditorCorrections(state)`. */
+  auditor?: AuditDependencies;
 }
 
 /** Role workers: add one line per role below (and its deps to RoleDeps). */
@@ -46,6 +52,7 @@ export function createRoleRegistry(deps: RoleDeps): RoleRegistry {
   if (deps.payables) registry.payables = payablesRole(deps.payables);
   if (deps.vendor) registry.vendor = vendorRole(deps.vendor);
   if (deps.collections) registry.collections = collectionsRole(deps.collections);
+  if (deps.auditor) registry.auditor = auditorRole(deps.auditor);
   return registry;
 }
 
@@ -54,6 +61,21 @@ export function correctionReturns(state: CaseState, from: Role, to: Role): numbe
   return state.handoffs.filter(h => h.from === from && h.to === to && h.status !== 'rejected').length;
 }
 
+/** Persisted committed auditor correction returns for this case. */
+export const auditorCorrections = (state: CaseState) => state.handoffs.filter(h => h.from === 'auditor' && h.status !== 'rejected').length;
+
+export function auditorRole(deps: AuditDependencies): RoleModule {
+  const ids = (value: unknown) => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+  return {
+    specialist: ctx => createAuditor(ctx, deps),
+    run: (runtime, _spec, ctx, input) => runAuditor(runtime, ctx, input, deps),
+    beforeCommit: (ctx, request) => validateAuditorCorrection(ctx, request, deps),
+    async evidenceRefs(ctx) {
+      const check = await createAuditTools(deps).verifyChain.execute(ctx, {}) as { auditIds?: unknown; missing?: { auditId?: unknown }[] };
+      return [...new Set([...ids(check.auditIds), ...ids((check.missing ?? []).map(m => m.auditId))])];
+    },
+  };
+}
 export function intakeRole(ports: IntakePorts): RoleModule {
   return {
     specialist: ctx => createIntakeSpecialist(ctx, ports),

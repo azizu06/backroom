@@ -12,7 +12,7 @@ import { FileUsageLedger, LEDGER_LIMITS, MemoryUsageLedger, type UsageLedger } f
 
 async function setup(scripts: Partial<Record<Role, () => ScriptStep[]>> = DEMO_SCRIPTS, ledger: UsageLedger = new MemoryUsageLedger()) {
   const team = await createDemoTeam();
-  const store = new MemoryHandoffStore({ audit: team.control });
+  const store = team.store as MemoryHandoffStore;
   const office: string[] = [];
   store.subscribe(row => office.push(`${row.fromRole}>${row.toRole}:${row.status}`));
   const runtime = new ClaudeAgentRuntime({ credential: () => 'mock', recordArtifacts: (ctx, refs) => store.recordArtifacts(ctx, refs),

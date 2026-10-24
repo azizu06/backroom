@@ -12,7 +12,7 @@ import type { Role } from '../../orchestrator/src/agents/contracts';
 test('agent handoff reducers run the AR chain atomically and publish only the sanitized projection', async () => {
   const { h, transport, store: state } = harnessStore();
   const store = new SpacetimeHandoffStore(transport);
-  const team = await createDemoTeam();
+  const team = await createDemoTeam({ store: () => store });
   const runtime = new ClaudeAgentRuntime({ credential: () => 'mock', query: scriptedQuery(role => DEMO_SCRIPTS[role as Role]()),
     recordArtifacts: (ctx, refs) => store.recordArtifacts(ctx, refs) });
   const dispatcher = new Dispatcher({ runtime, store, control: state, roles: team.roles, runnerId: 'runner', ledger: new MemoryUsageLedger() });
