@@ -15,7 +15,11 @@
     "state:live": "pnpm --filter @backroom/spacetime test:live",
     "state:seed": "pnpm --filter @backroom/orchestrator exec tsx ../spacetime/scripts/seed.ts",
     "metrics": "pnpm --filter @backroom/orchestrator exec tsx src/metrics/cli.ts",
-    "demo:parity": "pnpm --filter @backroom/orchestrator exec tsx ../web/scripts/parity.ts"
+    "demo:parity": "pnpm --filter @backroom/orchestrator exec tsx ../web/scripts/parity.ts",
+    "demo:up": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts up",
+    "demo:reset": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts reset",
+    "demo:down": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts down",
+    "demo:health": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts health"
   },
   "devDependencies": {
     "typescript": "5.9.3"
