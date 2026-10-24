@@ -1,11 +1,12 @@
 export interface DemoStatus {
+  live?: boolean; bank?: 'mock' | 'nessie_sandbox'; services?: { preCall?: { status: string; reason?: string }; model: { mode: string; cloud: string }; nessie: { mode: string }; apify: { mode: string; status: string; runId?: string }; crs: { mode: string; status: string; products: string[]; ofac: string; businessCredit: string } };
   llmEnabled: boolean; stateStore: 'memory' | 'spacetime'; voice: boolean;
   approvePath?: string; payPath?: string; workersHealthy?: boolean; tunnelUrl?: string;
 }
 export interface HealthRow { name: string; ok: boolean; detail: string }
 /** Read-only, bounded probes. Never log URLs (Nessie carries its key in a query). */
 export async function probeDependencies(options: {
-  env: NodeJS.ProcessEnv; status: DemoStatus; live?: boolean; fetch?: typeof fetch;
+  env: NodeJS.ProcessEnv; status: DemoStatus; live?: boolean; fetch?: typeof fetch; hostRows?: HealthRow[];
 }): Promise<HealthRow[]> {
   const { env, status } = options;
   const http = options.fetch ?? fetch;
@@ -27,12 +28,12 @@ export async function probeDependencies(options: {
   return [
     { name: 'Web + seats', ok: status.workersHealthy !== false, detail: status.workersHealthy === false ? 'worker stopped' : 'web responding; shared-process seats' },
     { name: 'SpacetimeDB', ok: status.stateStore === 'spacetime', detail: status.stateStore === 'memory' ? 'unused: process-local memory mode' : 'adapter connected' },
-    await probe('GX10 router', `${(env.GX10_BASE_URL || 'http://100.117.44.20:11434/v1').replace(/\/$/, '')}/models`, 'not configured'),
-    { name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present; not a call-readiness test' : 'missing' },
+    ...(options.hostRows ?? [await probe('GX10 router', `${(env.GX10_BASE_URL || 'http://100.117.44.20:11434/v1').replace(/\/$/, '')}/models`, 'not configured')]),
+    ...(!options.hostRows ? [{ name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present; not a call-readiness test' : 'missing' }] : []),
     { name: 'Voice relay', ok: status.voice, detail: status.voice ? 'running; no call placed' : 'disabled or not configured' },
-    await probe('Nessie', nessie, 'key/account missing; rehearsal bank is mock'),
+    ...(options.hostRows ? [] : [await probe('Nessie', nessie, 'key/account missing; rehearsal bank is mock')]),
     await probe('Tunnel', status.tunnelUrl ? `${status.tunnelUrl}/__demo/ping` : undefined, 'disabled'),
-    { name: 'LLM OFF', ok: !status.llmEnabled, detail: status.llmEnabled ? 'ON; model calls allowed' : 'OFF; code paths remain active' },
-    { name: 'Cloud fallback', ok: false, detail: 'unverified; OpenRouter reported 402. Do not promise fallback without a live receipt' },
+    { name: status.live ? 'LLM control' : 'LLM OFF', ok: status.live ? status.llmEnabled : !status.llmEnabled, detail: status.llmEnabled ? 'ON; model calls allowed' : 'OFF; code paths remain active' },
+    ...(options.hostRows ? [] : [{ name: 'Cloud fallback', ok: false, detail: 'unverified; no web-host inference receipt' }]),
   ];
 }
