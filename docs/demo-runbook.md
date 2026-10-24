@@ -172,3 +172,83 @@ phone by Sun 3 AM. This document does not claim those rehearsals happened.
 4. **CRS / Apify / Nessie down:** try live first only in the owning opt-in smoke;
    cached evidence needs an actual `cached at hh:mm` timestamp. This host's mock
    bank is labeled mock and never counts as a Nessie T4 pass or cached live result.
+
+## Optional judge moment: GX10 month burst (#29)
+
+Keep this separate from `demo:up` and the three-minute core take. The single
+command generates **925 synthetic AP inbox items** (37 per company × 25 companies),
+then runs the real `processInbox` → schema validation → Payables/Vendor seats →
+code policy/leased controller escalations path with bounded concurrent company
+workers. No cloud call, Nessie HTTP write, external vendor check, or dial is
+available. Approved payments have explicitly **simulated** receipts. State is
+isolated in memory per company; it is not the office's shared database.
+
+```sh
+pnpm demo:burst -- --companies 25 --month 2026-09
+```
+
+The command runs `gx10 gpu` before inference and prints the shared GPU state;
+it fails closed if that preflight fails. Default concurrency is **2**, capped at
+8. Coordinate an idle window with teammates before a full burst; never unload
+someone else's model. Use `--model qwen3:8b` for a smaller model or opt in to
+`--model gpt-oss:120b` for quality over speed. The fixed transport allowlist accepts
+only the GX10's exact Ollama completion endpoint and rejects redirects and cloud
+fallback before network I/O, even when cloud keys are present in the shell.
+The normal router's interactive 5-second circuit breaker is isolated per task
+for this batch; each request has a 120-second timeout. This does not change the
+application router or its global OFF switch. This standalone process owns an
+isolated ON store; stop this command with Ctrl-C to stop its work.
+
+Rehearse a small sample first:
+
+```sh
+pnpm demo:burst -- --companies 1 --month 2026-09 --items-per-company 1 --concurrency 1
+pnpm demo:burst -- --companies 25 --month 2026-09 --plan
+```
+
+The second command only generates the workload and plan receipt. Generation is
+reproducible code, with Northfield September invoice patterns, historical paid
+invoices as duplicate evidence, unchanged approved Acme master for the duplicate
+cohort, pending legitimate Cedar bank changes, and four frozen inbox red-team
+traps per company. Company/date envelopes are generated for the requested month;
+underlying line-item descriptions and IDs retain their fixture provenance. This
+is a cloned synthetic stress workload, not 25 independently sampled businesses,
+and does not claim PDF OCR or transcript processing.
+
+Live JSON progress prints every second and after each completed item: cumulative
+items/s, returned token counts and tokens/s, holds by rule, generic traps held,
+expected-rule trap matches, false holds, model failures, simulated payments and
+successful-task local share. A failed model call followed by a code safety hold
+is counted as **both failure and hold**. Missing provider usage makes token rate
+and cost comparison `null`; it never becomes zero. Model retries count toward
+usage. Local share describes completed model tasks; failed task counts remain
+visible. With no completed model tasks it is `null`.
+
+Receipts are written under `.demo/burst/<run-id>/`: `manifest.json` includes the
+source SHA and exact generated input, `events.jsonl` includes the manifest hash,
+GPU preflight, item results, router failure categories, real seat audit entries
+and progress, and `summary.json` contains the final aggregate. Existing audit
+wall/metrics adapters can consume these files; **this command does not mount a
+new UI or publish these rows to SpacetimeDB**. Exit status is nonzero for model
+failures, missed holds, or missing expected trap rules. A killed take retains its
+partial JSONL but has no complete summary; never label it complete.
+
+Cloud-equivalent dollars are an **operator-priced estimate**, never a measured
+cloud bill or benchmark. Supply both `--input-usd-per-million N` and
+`--output-usd-per-million N` for your chosen comparison; without both, the value
+is `null`. The receipt records the supplied rates. Actual cloud spend is zero
+because cloud transport is forbidden.
+
+Expected wall time: reserve **tens of minutes to hours** for all 925 items,
+depending on model/load; this is a planning allowance, not a measured completion
+claim. Use the first sample's observed items/s to budget `925 / itemsPerSecond`
+seconds, then rerun at the intended concurrency. Do the long take before judging
+and show its labeled receipt; use a small live sample for the optional moment.
+A laptop comparison has not been measured: show actual GX10 throughput and model
+identity rather than claiming a speedup or that no laptop could run it.
+
+The [one-item live smoke receipt](evidence/burst/smoke.json) measured 3.24 seconds,
+2 completed local tasks, 1,199 prompt + 164 output tokens, zero model failures,
+and one simulated payment on `gpt-oss:20b`. It is a connectivity/path smoke, not
+a 925-item throughput result. The runner's `tokensPerSecond` includes input plus
+output; `outputTokensPerSecond` isolates generated output.
