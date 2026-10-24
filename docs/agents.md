@@ -63,14 +63,19 @@ bank adapter or voice dialer is supplied. Vendor checks use the configured CRS
 client with fixture-owned identity mappings; unmapped/unavailable identities hold.
 Paid Apify checks have zero narration allowance and report `skipped_budget`.
 
-SpacetimeDB mode shares the demo runtime's exact transport, so the existing
-`agent_handoff_public` subscription receives the rows. Memory mode uses
-`MemoryHandoffStore` and its subscription feed; the office remains labeled preview.
+SpacetimeDB mode shares the demo runtime's exact transport and publishes rows to
+`agent_handoff_public`. The office's current `OFFICE_QUERIES` subscription in
+`web/lib/office/spacetime.ts` excludes that table: publication is tested, but live
+handoff display still needs an office consumer. Memory mode exposes the same row
+shape through `MemoryHandoffStore.subscribe`; the office uses static preview data
+and is not connected to that host feed.
 The Mac host reads its own `ANTHROPIC_API_KEY` at activation time. No key is copied
 to GX10 or a team env file. The repo-root `FileUsageLedger` persists across reset:
 $0.50 per demo case, $0.02 Haiku/$0.08 Sonnet activation reservations, $40 hard stop
 ($25 warning; demo may use the $35–$40 reserve). Reset/stop aborts and fences open
 cases with `DEMO_RESET`, drains queries, then replaces the StateStore/transport.
+If the dispatcher already made a case terminal between reset's read and stop,
+reset confirms that state and continues; storage failures remain retryable.
 Narration failures cannot replace or delay the recorded inbox HTTP response.
 
 Verification (mocked QueryFn; no paid calls):
@@ -84,9 +89,9 @@ The full five-role mocked case reports **$0.002** in synthetic SDK receipts
 (5 × $0.0004); actual provider spend is **$0**. This is accounting evidence,
 not a live-provider cost measurement.
 
-## Office projection (Diego)
+## Office projection contract (Diego)
 
-Subscribe to `SELECT * FROM agent_handoff_public` (client: `db.agentHandoffPublic`). In-process demos get the
+To connect the pending office consumer, subscribe to `SELECT * FROM agent_handoff_public` (client: `db.agentHandoffPublic`). In-process demos get the
 same row shape from `MemoryHandoffStore.subscribe`. Matching `audit_entry` rows use `action` values
 `agent_handoff_offered|accepted|completed|rejected`, with the same projection in `inputs`.
 

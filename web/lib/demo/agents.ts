@@ -133,7 +133,15 @@ export function createInboxAgents(options: {
     const cancellations = await Promise.allSettled(running.map(async ([caseId, row]) => {
       await row.opened;
       const state = await store.getCase(caseId);
-      if (state && ['open', 'paused'].includes(state.status)) await store.stopCase(caseId, 'cancelled', 'DEMO_RESET');
+      if (state && ['open', 'paused'].includes(state.status)) {
+        try { await store.stopCase(caseId, 'cancelled', 'DEMO_RESET'); }
+        catch (error) {
+          // The dispatcher can finish/cancel between separate durable read/stop requests.
+          // Only a confirmed terminal state makes this race safe; storage failures still retry.
+          const latest = await store.getCase(caseId);
+          if (!latest || !['done', 'held', 'failed', 'cancelled'].includes(latest.status)) throw error;
+        }
+      }
     }));
     await drain();
     if (cancellations.some(row => row.status === 'rejected')) throw new Error('DEMO_AGENT_CANCEL_FAILED');

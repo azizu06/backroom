@@ -109,6 +109,34 @@ describe('judge inbox production role narration', () => {
     expect(await host.store.getCase('agent:judge:sample')).toMatchObject({ status: 'cancelled', reason: 'DEMO_RESET' });
   });
 
+  it('reset succeeds when the dispatcher cancels after the host reads an open case', async () => {
+    let entered!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const query: QueryFn = ({ options }) => {
+      const stream = (async function* () {
+        entered();
+        await new Promise<void>(resolve => options.abortController!.signal.addEventListener('abort', () => resolve(), { once: true }));
+        throw new Error('Operation aborted');
+        yield {} as never;
+      })();
+      return Object.assign(stream, { close: vi.fn() });
+    };
+    const { host, input } = await setup({ query });
+    const pending = host.submit(input);
+    await started;
+    const readCase = host.store.getCase.bind(host.store);
+    vi.spyOn(host.store, 'getCase').mockImplementationOnce(async caseId => {
+      const snapshot = await readCase(caseId);
+      expect(snapshot?.status).toBe('open');
+      // Pin the real dispatcher cancellation between reset's read and stop requests.
+      await pending;
+      return snapshot;
+    });
+    await expect(host.stop()).resolves.toBeUndefined();
+    expect(await readCase('agent:judge:sample')).toMatchObject({ status: 'cancelled', reason: 'CANCELLED' });
+    expect((await host.ledger.usage('aziz')).reservedUsd).toBe(0);
+  });
+
   it('reset fences an active SDK turn, drains it and refuses new cases', async () => {
     let entered!: () => void;
     const started = new Promise<void>(resolve => { entered = resolve; });

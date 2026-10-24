@@ -85,7 +85,9 @@ narration with the Mac host's own `ANTHROPIC_API_KEY`. Keep that key Mac-only.
 Global LLM OFF still prevents all SDK queries. Narration can hold, never pay or
 approve, and cannot change the inbox receipt. Existing vendor guards can end the
 chain early (Northfield vendor CRS identities are currently unmapped); this is a
-hold, not vendor clearance. See [agent host wiring and tests](agents.md#judge-inbox-host).
+hold, not vendor clearance. Handoff rows are published to `agent_handoff_public`;
+the office does not yet subscribe to that table, so the reducer test proves row
+publication, not visible handoff animation. See [agent host wiring and tests](agents.md#judge-inbox-host).
 The demo case cap is $0.50 and the persistent ledger hard stop is $40. The mocked
 five-role chain reports $0.002 in synthetic receipts with $0 actual spend.
 
