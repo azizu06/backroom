@@ -4,19 +4,20 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "9a191ffd234c01281112e5d11ddc8b71abb5b547",
+    "baseCommit": "795915737fa6886d8cf522993318a95029e10507",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
-      "orchestrator/src/agents/eval/chain.ts": "82bc1146624f5786bc1fb33b6bda7001d3528efb8efd6b5560050e3842fd968e",
+      "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
       "orchestrator/src/agents/eval/conversation.ts": "43befa9ccb698838405497d48b5099214d72431a221dc00c6f355f337b23e228",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
+      "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "7cf4805a85b0cb8b472b7d9ff0fe4d03a2d7c564f657f92f5952c92347be034f"
+      "orchestrator/src/agents/eval/scoreboard.ts": "054e176521854092abc683b35a4d6c3a55a5004d035ae0902493a2d876539019"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -54,9 +55,10 @@
     "extraction": "Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.",
     "providers": "Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.",
     "fraudDefinition": "Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.",
-    "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 failover remains a legacy gap.",
+    "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.",
     "recovery": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.",
     "arConversations": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.",
+    "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
@@ -141,6 +143,11 @@
       "denominator": 1,
       "percent": 100
     },
+    "gx10Failover": {
+      "numerator": 10,
+      "denominator": 10,
+      "percent": 100
+    },
     "arConversations": {
       "numerator": 6,
       "denominator": 6,
@@ -181,6 +188,11 @@
       },
       "historical": true,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -259,6 +271,11 @@
       "caseId": "ap:3001",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3001",
@@ -410,6 +427,11 @@
       },
       "historical": true,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -488,6 +510,11 @@
       "caseId": "ap:3003",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3003",
@@ -626,6 +653,11 @@
       "caseId": "ap:3004",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3004",
@@ -764,6 +796,11 @@
       "caseId": "ap:3005",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3005",
@@ -902,6 +939,11 @@
       "caseId": "ap:3006",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3006",
@@ -1040,6 +1082,11 @@
       "caseId": "ap:3007",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3007",
@@ -1178,6 +1225,11 @@
       "caseId": "ap:3008",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3008",
@@ -1316,6 +1368,11 @@
       "caseId": "ap:3009",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3009",
@@ -1454,6 +1511,11 @@
       "caseId": "ap:3010",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3010",
@@ -1592,6 +1654,11 @@
       "caseId": "ap:3011",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3011",
@@ -1730,6 +1797,11 @@
       "caseId": "ap:3012",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3012",
@@ -1868,6 +1940,11 @@
       "caseId": "ap:3013",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3013",
@@ -2006,6 +2083,11 @@
       "caseId": "ap:3014",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3014",
@@ -2144,6 +2226,11 @@
       "caseId": "ap:3015",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3015",
@@ -2282,6 +2369,11 @@
       "caseId": "ap:3016",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3016",
@@ -2420,6 +2512,11 @@
       "caseId": "ap:3017",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3017",
@@ -2558,6 +2655,11 @@
       "caseId": "ap:3018",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3018",
@@ -2696,6 +2798,11 @@
       "caseId": "ap:3019",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3019",
@@ -2834,6 +2941,11 @@
       "caseId": "ap:3020",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3020",
@@ -2972,6 +3084,11 @@
       "caseId": "ap:3021",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3021",
@@ -3110,6 +3227,11 @@
       "caseId": "ap:3022",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "3022",
@@ -3261,6 +3383,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -3353,6 +3480,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -3446,6 +3578,11 @@
       },
       "historical": true,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -3524,6 +3661,11 @@
       "caseId": "ap:4001",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4001",
@@ -3675,6 +3817,11 @@
       },
       "historical": true,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -3753,6 +3900,11 @@
       "caseId": "ap:4003",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4003",
@@ -3891,6 +4043,11 @@
       "caseId": "ap:4004",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4004",
@@ -4029,6 +4186,11 @@
       "caseId": "ap:4005",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4005",
@@ -4167,6 +4329,11 @@
       "caseId": "ap:4006",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4006",
@@ -4305,6 +4472,11 @@
       "caseId": "ap:4007",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4007",
@@ -4443,6 +4615,11 @@
       "caseId": "ap:4008",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4008",
@@ -4581,6 +4758,11 @@
       "caseId": "ap:4009",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4009",
@@ -4719,6 +4901,11 @@
       "caseId": "ap:4010",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4010",
@@ -4857,6 +5044,11 @@
       "caseId": "ap:4011",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4011",
@@ -4995,6 +5187,11 @@
       "caseId": "ap:4012",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4012",
@@ -5133,6 +5330,11 @@
       "caseId": "ap:4013",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4013",
@@ -5271,6 +5473,11 @@
       "caseId": "ap:4014",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4014",
@@ -5409,6 +5616,11 @@
       "caseId": "ap:4015",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4015",
@@ -5547,6 +5759,11 @@
       "caseId": "ap:4016",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4016",
@@ -5685,6 +5902,11 @@
       "caseId": "ap:4017",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4017",
@@ -5823,6 +6045,11 @@
       "caseId": "ap:4018",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4018",
@@ -5961,6 +6188,11 @@
       "caseId": "ap:4019",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4019",
@@ -6099,6 +6331,11 @@
       "caseId": "ap:4020",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4020",
@@ -6237,6 +6474,11 @@
       "caseId": "ap:4021",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4021",
@@ -6375,6 +6617,11 @@
       "caseId": "ap:4022",
       "historical": true,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4022",
@@ -6526,6 +6773,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -6618,6 +6870,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -6711,6 +6968,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -6789,6 +7051,11 @@
       "caseId": "ap:4401",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4401",
@@ -6944,6 +7211,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -7022,6 +7294,11 @@
       "caseId": "ap:5003",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5003",
@@ -7164,6 +7441,11 @@
       "caseId": "ap:5004",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5004",
@@ -7306,6 +7588,11 @@
       "caseId": "ap:5005",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5005",
@@ -7448,6 +7735,11 @@
       "caseId": "ap:5006",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5006",
@@ -7590,6 +7882,11 @@
       "caseId": "ap:5007",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5007",
@@ -7732,6 +8029,11 @@
       "caseId": "ap:5008",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5008",
@@ -7874,6 +8176,11 @@
       "caseId": "ap:5009",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5009",
@@ -8016,6 +8323,11 @@
       "caseId": "ap:5010",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5010",
@@ -8158,6 +8470,11 @@
       "caseId": "ap:5011",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5011",
@@ -8300,6 +8617,11 @@
       "caseId": "ap:5012",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5012",
@@ -8442,6 +8764,11 @@
       "caseId": "ap:5013",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5013",
@@ -8584,6 +8911,11 @@
       "caseId": "ap:5014",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5014",
@@ -8726,6 +9058,11 @@
       "caseId": "ap:5015",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5015",
@@ -8868,6 +9205,11 @@
       "caseId": "ap:5016",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5016",
@@ -9010,6 +9352,11 @@
       "caseId": "ap:5017",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5017",
@@ -9152,6 +9499,11 @@
       "caseId": "ap:5018",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5018",
@@ -9294,6 +9646,11 @@
       "caseId": "ap:5019",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5019",
@@ -9436,6 +9793,11 @@
       "caseId": "ap:5020",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5020",
@@ -9578,6 +9940,11 @@
       "caseId": "ap:5021",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5021",
@@ -9720,6 +10087,11 @@
       "caseId": "ap:5022",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "5022",
@@ -9875,6 +10247,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -9967,6 +10344,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -10060,6 +10442,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -10151,6 +10538,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -10246,6 +10638,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -10325,6 +10722,11 @@
       "caseId": "ap:4481",
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4481",
@@ -10465,6 +10867,11 @@
       "caseId": "ap:4482",
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4482",
@@ -10618,6 +11025,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -10710,6 +11122,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -10790,6 +11207,11 @@
       "caseId": "ap:4485",
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4485",
@@ -12561,6 +12983,11 @@
       },
       "historical": false,
       "actual": "HOLD",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {},
       "vendor": {
         "decision": "ALLOW",
@@ -12640,6 +13067,11 @@
       "caseId": "P04:after",
       "historical": false,
       "actual": "ALLOW",
+      "routing": {
+        "audits": [],
+        "cloudRequests": 0,
+        "cloudTextOnly": true
+      },
       "assessment": {
         "invoice": {
           "invoiceId": "4480",
@@ -12918,6 +13350,368 @@
       }
     ]
   },
+  "failover": [
+    {
+      "id": "P01:4401",
+      "scenarioId": "P01",
+      "invoiceId": "4401",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "ALLOW",
+        "status": "paid",
+        "ruleIds": [
+          "IN_BADGE"
+        ],
+        "vendor": null,
+        "mockDebits": 1,
+        "runtime": "done",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:handoff",
+          "payables:handoff",
+          "auditor:done"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P02:4419",
+      "scenarioId": "P02",
+      "invoiceId": "4419",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": "held",
+        "ruleIds": [
+          "DUPLICATE_INVOICE"
+        ],
+        "vendor": null,
+        "mockDebits": 0,
+        "runtime": "done",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:handoff",
+          "payables:handoff",
+          "auditor:done"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P03:4471",
+      "scenarioId": "P03",
+      "invoiceId": "4471",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": null,
+        "ruleIds": [
+          "LOOKALIKE_DOMAIN"
+        ],
+        "vendor": "ESCALATE",
+        "mockDebits": 0,
+        "runtime": "held",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:held"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P03:4471",
+      "scenarioId": "P03",
+      "invoiceId": "4471",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": null,
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "vendor": "ESCALATE",
+        "mockDebits": 0,
+        "runtime": "held",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:held"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P04:4480",
+      "scenarioId": "P04",
+      "invoiceId": "4480",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": null,
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "vendor": "ESCALATE",
+        "mockDebits": 0,
+        "runtime": "held",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:held"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P05:4481",
+      "scenarioId": "P05",
+      "invoiceId": "4481",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": "held",
+        "ruleIds": [
+          "NO_PO"
+        ],
+        "vendor": null,
+        "mockDebits": 0,
+        "runtime": "done",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:handoff",
+          "payables:handoff",
+          "auditor:done"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P06:4482",
+      "scenarioId": "P06",
+      "invoiceId": "4482",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": "held",
+        "ruleIds": [
+          "OVER_LIMIT"
+        ],
+        "vendor": null,
+        "mockDebits": 0,
+        "runtime": "done",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:handoff",
+          "payables:handoff",
+          "auditor:done"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P07:4483",
+      "scenarioId": "P07",
+      "invoiceId": "4483",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": null,
+        "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "vendor": "ESCALATE",
+        "mockDebits": 0,
+        "runtime": "held",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:held"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P08:4484",
+      "scenarioId": "P08",
+      "invoiceId": "4484",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": null,
+        "ruleIds": [
+          "PAYEE_NOT_IN_MASTER"
+        ],
+        "vendor": "ESCALATE",
+        "mockDebits": 0,
+        "runtime": "held",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:held"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "id": "P09:4485",
+      "scenarioId": "P09",
+      "invoiceId": "4485",
+      "match": true,
+      "sameOutcome": true,
+      "outcome": {
+        "actual": "HOLD",
+        "status": "held",
+        "ruleIds": [
+          "OVER_LIMIT"
+        ],
+        "vendor": null,
+        "mockDebits": 0,
+        "runtime": "done",
+        "roles": [
+          "intake:handoff",
+          "extractor:handoff",
+          "vendor:handoff",
+          "payables:handoff",
+          "auditor:done"
+        ]
+      },
+      "baselineRoutes": [
+        "local"
+      ],
+      "cutRoutes": [
+        "cloud_fallback"
+      ],
+      "fallbackAudited": true,
+      "cloudRequests": 1,
+      "cloudTextOnly": true,
+      "syntheticFallbackCostUsd": 0.007,
+      "models": [
+        "claude-sonnet-5-5"
+      ]
+    }
+  ],
   "conversations": [
     {
       "id": "promise",
@@ -13698,8 +14492,8 @@
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
     },
     {
-      "id": "P12",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "id": "P12:scope",
+      "detail": "No keyed AP invoice step to replay for P10; their GX10 failover is not measured here."
     },
     {
       "id": "C05",
