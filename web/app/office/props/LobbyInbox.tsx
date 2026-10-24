@@ -1,12 +1,12 @@
 'use client';
 
 import { useLayoutEffect, useRef } from 'react';
-import { Html } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { Object3D, type InstancedMesh } from 'three';
 import { visibleRooms } from '../../../lib/office/state';
 import { INBOX_SHEET_LIMIT, inboxSheets } from '../../../lib/office/props/inboxStack';
 import type { SceneMountProps } from '../mounts/types';
+import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 
 function Papers({ count }: { count: number }) {
   const mesh = useRef<InstancedMesh>(null);
@@ -30,6 +30,25 @@ function Papers({ count }: { count: number }) {
   </instancedMesh>;
 }
 
+function Label({ count }: { count: number }) {
+  const text = `Inbox · ${count}`;
+  const texture = useCanvasTexture(256, 64, ctx => {
+    ctx.fillStyle = '#272f25';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.strokeStyle = '#8b987b';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, 252, 60);
+    ctx.fillStyle = '#d0d6c6';
+    ctx.font = `700 34px ${PROP_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 34, 236);
+  }, [text]);
+  return <mesh position={[0, 0.035, 0.31]} rotation={[-Math.PI / 2, 0, 0]}>
+    <planeGeometry args={[0.3, 0.075]} /><meshBasicMaterial map={texture} toneMapped={false} />
+  </mesh>;
+}
+
 /** Sits entirely on the existing lobby counter, inside its Play collider. */
 export function LobbyInbox({ snapshot }: SceneMountProps) {
   if (!visibleRooms(snapshot).includes('lobby')) return null;
@@ -39,8 +58,6 @@ export function LobbyInbox({ snapshot }: SceneMountProps) {
       <boxGeometry args={[0.02, 0.08, 0.5]} /><meshStandardMaterial color='#272f25' />
     </mesh>)}
     <Papers count={snapshot.inboxCount} />
-    <Html center position={[0, 0.035, 0.28]} style={{ pointerEvents: 'none' }}>
-      <span style={{ display: 'block', whiteSpace: 'nowrap', fontSize: 10, padding: '2px 5px', background: '#272f25', border: '1px solid #8b987b', color: '#d0d6c6' }}>Inbox · {snapshot.inboxCount}</span>
-    </Html>
+    <Label count={snapshot.inboxCount} />
   </group>;
 }
