@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { disclosureItems, getDisclosureStatus, type DemoStatus } from '../lib/real-vs-sim';
 import './RealVsSim.css';
@@ -8,7 +8,18 @@ import './RealVsSim.css';
 export function RealVsSim({ detailed = false }: { detailed?: boolean }) {
   const pathname = usePathname();
   const [status, setStatus] = useState<DemoStatus | null>(null);
+  const panel = useRef<HTMLElement>(null);
+  const [panelHeight, setPanelHeight] = useState(280);
   const hidden = !detailed && pathname === '/real-vs-sim';
+
+  useEffect(() => {
+    if (hidden || detailed || !panel.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setPanelHeight(entry.target.getBoundingClientRect().height + 24);
+    });
+    observer.observe(panel.current);
+    return () => observer.disconnect();
+  }, [hidden, detailed]);
 
   useEffect(() => {
     if (hidden) return;
@@ -35,7 +46,9 @@ export function RealVsSim({ detailed = false }: { detailed?: boolean }) {
 
   if (hidden) return null;
   return (
-    <aside className={`real-sim ${detailed ? 'real-sim-detail' : 'real-sim-overlay'}`} aria-label="Real versus simulated disclosure">
+    <>
+    {!detailed && pathname !== '/' && !pathname.startsWith('/office') && <div aria-hidden="true" style={{ height: panelHeight, background: '#1c1c1e' }} />}
+    <aside ref={panel} className={`real-sim ${detailed ? 'real-sim-detail' : 'real-sim-overlay'}`} aria-label="Real versus simulated disclosure">
       <header className="real-sim-header">
         {detailed ? <h1>Real vs. simulated</h1> : <h2>Real vs. simulated</h2>}
         {!detailed && <a href="/real-vs-sim">Details ↗</a>}
@@ -63,5 +76,6 @@ export function RealVsSim({ detailed = false }: { detailed?: boolean }) {
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
       {detailed && <p className="real-sim-note">Status refreshes every 10 seconds. GX10 health and LLM control reflect this server process; separate processes need the shared state adapter. Unverified means no fresh observation is available.</p>}
     </aside>
+    </>
   );
 }

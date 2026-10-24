@@ -2,7 +2,8 @@
 
 `web/components/RealVsSim.tsx` is mounted by the root layout, above the canvas on
 all routes. `/real-vs-sim` shows the detailed version instead of duplicating the
-compact panel. The ten disclosure entries and their types live in
+compact panel. Document routes reserve measured scroll clearance so the fixed
+panel does not cover their final form controls. The ten disclosure entries and their types live in
 `web/lib/real-vs-sim.ts`.
 
 The public, read-only `GET /api/demo-status` returns only `measuredAt`,

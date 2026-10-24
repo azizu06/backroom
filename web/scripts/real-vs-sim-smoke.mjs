@@ -45,6 +45,17 @@ try {
     await page.reload();
     await page.getByText('Live status unavailable', { exact: false }).waitFor();
     assert.equal(await page.getByText('Unverified', { exact: true }).count(), 6);
+    // Document routes retain enough scroll space for their controls above the fixed panel.
+    await page.unroute('**/api/demo-status');
+    await page.goto(`${base}/controller`);
+    const setupButton = page.getByRole('button', { name: 'Create Dana’s passkey' });
+    await setupButton.waitFor();
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const controlBounds = await setupButton.boundingBox();
+    const disclosureBounds = await page.getByRole('complementary').boundingBox();
+    assert(controlBounds.y + controlBounds.height <= disclosureBounds.y);
+    await page.goto(`${base}/approve/nonexistent-disclosure-check`);
+    await page.getByRole('complementary').waitFor();
     assert.deepEqual(errors, []);
     await page.close();
   }
