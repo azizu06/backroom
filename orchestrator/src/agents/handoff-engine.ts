@@ -215,10 +215,13 @@ export function resumeCase(state: CaseState) {
   state.status = 'open'; state.reason = undefined;
 }
 
-/** Escape-free display text: drop control chars/angle brackets, mask long digit runs and emails. */
+/** Public/TTS text: remove links and mask identifiers before truncating. */
 export function safeText(value: string, max: number): string {
   const text = String(value).replace(/[\x00-\x1f\x7f<>]/g, ' ')
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]')
+    .replace(/\b(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s]+|\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:[/?#][^\s]*)?/gi, '[link]')
+    // Three or more groups catch separated accounts without masking decimal amounts.
+    .replace(/\d+(?:[. _\/-]+\d+){2,}/g, run => `••${run.replace(/\D/g, '').slice(-4)}`)
     .replace(/\d[\d -]{5,}\d/g, run => `••${run.replace(/\D/g, '').slice(-4)}`)
     .replace(/\s+/g, ' ').trim();
   return Array.from(text).length > max ? `${Array.from(text).slice(0, max - 1).join('')}…` : text;
