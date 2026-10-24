@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "831c3919e66799aab70018bea69cc8b8914de5ed",
+    "baseCommit": "33beb64cc85a7542e6ba1d93c173801dfc7fde02",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
@@ -19,7 +19,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "5fa4ceca2b271accbb7a6488adc0dd3f4871aca1bde709b946dab3f0f12f23c3",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "40628be22ce1dab77fbb62b58b65100aa488511fc17837ea2d26fa1f8f5c2c63"
+      "orchestrator/src/agents/eval/scoreboard.ts": "dd54f28efce1f1d6e2283e5a182deebc35c12fdd39b92319aaabb29e9b1a1163"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
