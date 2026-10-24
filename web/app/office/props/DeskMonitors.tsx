@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { PlaneGeometry } from 'three';
 import { OFFICE_ANCHORS, type OfficeSnapshot } from '../../../lib/office/state';
 import { MONITOR_DESKS, monitorInteraction, monitorScreen, monitorScreenKey, type MonitorDesk, type MonitorScreen, type MonitorStatusKey } from '../../../lib/office/props/monitors';
 import { useCanvasTexture } from './useCanvasTexture';
@@ -9,6 +10,7 @@ const MONO_FONT = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mo
 const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: '#a9bc8f', deny: '#ed6252', escalate: '#e0b365', recorded: '#8c9c87' };
 const LINE_COLORS = { agent: '#e8efe4', away: '#c9d4c3', folder: '#e0b365', idle: '#7f8c80', awaiting: '#e8efe4', escalation: '#c9d4c3' } as const;
 const TEX_W = 256, TEX_H = 144, FACE_W = 0.66, FACE_H = 0.36;
+const SCREEN_GEOMETRY = new PlaneGeometry(FACE_W, FACE_H);
 /** Desk-local screen spot: 1.5 mm in front of the face scene.tsx draws at z -0.18 (front at -0.1725). */
 const SCREEN_AT = [-0.35, 1.18, -0.171] as const;
 const MONITORS = Object.fromEntries(MONITOR_DESKS.map(room => [room, monitorInteraction(room)])) as Record<MonitorDesk, ReturnType<typeof monitorInteraction>>;
@@ -48,7 +50,7 @@ function Screen({ snapshot, room }: { snapshot: OfficeSnapshot; room: MonitorDes
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawScreen(ctx, screen, color), [key, color]);
   return <group name={`prop:monitor:${room}`} position={[x, 0, z]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
     <mesh position={SCREEN_AT}>
-      <planeGeometry args={[FACE_W, FACE_H]} />
+      <primitive object={SCREEN_GEOMETRY} attach='geometry' />
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>
   </group>;
