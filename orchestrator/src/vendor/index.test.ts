@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStateStore } from '../store';
-import { MemoryFinanceRepository, controllerForLease } from '../payables';
+import { controllerForLease } from '../payables';
 import { ControllerApprovals, type ControllerDecision } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
 import { VendorSeat } from './index';
 
-// Temporary P04/P07/P08 cases, not stream D's canonical fixtures.
-const vendor = { id: 'legit', domain: 'legit.example', accountId: 'old-approved', approved: true, revision: 1 };
-const change = { kind: 'bank_change' as const, vendorId: 'legit', domain: 'legit.example', bankAccountId: 'new-approved' };
-const source = { id: 'change-1', source: 'judge' as const, senderDomain: 'legit.example' };
+import { createNorthfieldRepository, northfieldChange, northfieldInvoice, northfieldVendor } from '../payables/northfield';
+
+const vendor = northfieldVendor('cedar');
+const { fields: change, source } = northfieldChange('bc-legitimate');
 async function setup() {
   let now = 1000;
   const state = new MemoryStateStore();
@@ -26,9 +26,9 @@ async function setup() {
   const checks = {
     business: vi.fn(async () => ({ verified: true, evidenceRef: 'crs-business-1' })),
     ofac: vi.fn(async () => ({ status: 'clear' as 'clear' | 'hit' | 'unknown', evidenceRef: 'crs-ofac-1' })),
-    footprint: vi.fn(async () => ({ websiteReachable: true, listingOperating: true, domain: 'legit.example', evidenceRef: 'apify-1' })),
+    footprint: vi.fn(async () => ({ websiteReachable: true, listingOperating: true, domain: vendor.domain, evidenceRef: 'apify-1' })),
   };
-  const repository = new MemoryFinanceRepository({ vendors: [vendor], purchaseOrders: [{ id: 'PO-1', vendorId: 'legit', amountCents: 64000, lineItems: [{ description: 'Service', quantity: 1, unitPriceCents: 64000 }] }] });
+  const repository = await createNorthfieldRepository();
   const seat = new VendorSeat({ state, repository, checks, controller: controllerForLease(state, lease, () => now), now: () => now });
   return { seat, state, repository, checks, decide, advance: (ms: number) => { now += ms; } };
 }
@@ -38,11 +38,11 @@ describe('Vendor verification and controller gate', () => {
     const proposal = await seat.propose(change, source);
     expect(proposal.status).toBe('awaiting_controller');
     expect((await state.getAgent('vendor-seat'))?.targetAnchor).toBe('Dana_desk');
-    expect((await repository.getVendor(vendor.id))?.accountId).toBe('old-approved');
+    expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
     expect((await seat.apply(source.id)).status).toBe('awaiting_controller');
     await decide(proposal.escalationId!);
     expect((await seat.apply(source.id)).status).toBe('approved');
-    expect((await repository.getVendor(vendor.id))?.accountId).toBe('new-approved');
+    expect((await repository.getVendor(vendor.id))?.accountId).toBe('SYNTHETIC-CEDAR-8822');
     expect((await seat.apply(source.id)).status).toBe('approved');
     expect((await repository.getVendor(vendor.id))?.revision).toBe(2);
   });
@@ -52,24 +52,23 @@ describe('Vendor verification and controller gate', () => {
     const result = await seat.propose(change, source);
     expect(result.status).toBe(status === 'hit' ? 'rejected' : 'held');
     expect(result.decision.ruleIds).toContain(status === 'hit' ? 'OFAC_STOP' : 'INVALID_INPUT');
-    expect((await repository.getVendor(vendor.id))?.accountId).toBe('old-approved');
+    expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
   });
   it('holds a vendor with no footprint and rejects a lookalike without trusting its proposed domain', async () => {
     const { seat, checks } = await setup();
-    checks.footprint.mockResolvedValue({ websiteReachable: false, listingOperating: false, domain: 'legit.example', evidenceRef: 'apify-1' });
+    checks.footprint.mockResolvedValue({ websiteReachable: false, listingOperating: false, domain: vendor.domain, evidenceRef: 'apify-1' });
     expect((await seat.propose(change, source)).status).toBe('held');
     const other = await setup();
-    expect((await other.seat.propose({ ...change, domain: 'leg1t.example' }, { ...source, senderDomain: 'leg1t.example' })).decision.ruleIds).toContain('LOOKALIKE_DOMAIN');
+    expect((await other.seat.propose({ ...change, domain: 'cedarfre1ght.example' }, { ...source, senderDomain: 'cedarfre1ght.example' })).decision.ruleIds).toContain('LOOKALIKE_DOMAIN');
   });
 });
 
 it('cannot pay the new account before approval; the held invoice pays after master application', async () => {
   const { seat, state, repository, decide } = await setup();
   const { PayablesSeat } = await import('../payables');
-  const lines = [{ description: 'Service', quantity: 1, unitPriceCents: 64000 }];
   const pay = vi.fn(async () => ({ status: 'completed' as const, id: 'receipt-1' }));
   const ap = new PayablesSeat({ repository, state, nessie: { payInvoice: pay }, controller: { request: async () => 'ap-hold' } });
-  const invoice = { kind: 'invoice' as const, invoiceId: '4500', vendorId: 'legit', poId: 'PO-1', amountCents: 64000, currency: 'USD' as const, bankAccountId: 'new-approved', lineItems: lines };
+  const invoice = northfieldInvoice('4480');
   expect((await ap.process(invoice, { ...source, id: 'invoice-1' })).status).toBe('held');
   expect(pay).not.toHaveBeenCalled();
   const proposal = await seat.propose(change, source);
@@ -87,7 +86,7 @@ it('does not accept an unbound or passkey-less controller approval', async () =>
   expect((await seat.apply(source.id)).status).toBe('awaiting_controller');
   get.mockResolvedValue({ ...pending, status: 'approved', method: 'passkey', decidedAt: 1001, evidenceRefs: ['unrelated'] });
   expect((await seat.apply(source.id)).status).toBe('awaiting_controller');
-  expect((await repository.getVendor(vendor.id))?.accountId).toBe('old-approved');
+  expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
 });
 it('does not apply a denial or an approval based on a stale master revision', async () => {
   for (const denied of [true, false]) {
@@ -96,7 +95,7 @@ it('does not apply a denial or an approval based on a stale master revision', as
     await decide(proposal.escalationId!, { kind: denied ? 'Deny' : 'Approve' });
     if (!denied) await repository.saveVendor({ ...vendor, revision: 2 });
     expect((await seat.apply(source.id)).status).toBe(denied ? 'rejected' : 'held');
-    expect((await repository.getVendor(vendor.id))?.accountId).toBe('old-approved');
+    expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
   }
 });
 it('proposes a new verified vendor but adds it to the master only after approval', async () => {
@@ -115,7 +114,7 @@ it('persists an immutable proposal before requesting approval, and recovers a lo
   const request = vi.fn().mockRejectedValueOnce(new Error('lost escalation response')).mockResolvedValue(pending.id);
   const seat = new VendorSeat({ state, repository, checks, controller: { request } });
   await expect(seat.propose(change, source)).rejects.toThrow('lost escalation response');
-  expect((await repository.getBankChange(source.id))?.fields.bankAccountId).toBe('new-approved');
+  expect((await repository.getBankChange(source.id))?.fields.bankAccountId).toBe('SYNTHETIC-CEDAR-8822');
   await expect(seat.propose({ ...change, bankAccountId: 'substituted-account' }, source)).rejects.toThrow('PROPOSAL_ID_CONFLICT');
   expect((await seat.propose(change, source)).escalationId).toBe(pending.id);
   expect(request).toHaveBeenCalledTimes(2);
@@ -126,7 +125,7 @@ it('holds payments to the old master account while a bank change awaits the cont
   const { PayablesSeat } = await import('../payables');
   const pay = vi.fn(async () => ({ status: 'completed' as const, id: 'receipt-1' }));
   const ap = new PayablesSeat({ repository, state, nessie: { payInvoice: pay }, controller: { request: async () => 'ap-hold' } });
-  const result = await ap.process({ kind: 'invoice', invoiceId: '4500', vendorId: 'legit', poId: 'PO-1', amountCents: 64000, currency: 'USD', bankAccountId: 'old-approved', lineItems: [{ description: 'Service', quantity: 1, unitPriceCents: 64000 }] }, { ...source, id: 'invoice-1' });
+  const result = await ap.process({ ...northfieldInvoice('4480'), bankAccountId: vendor.accountId }, { ...source, id: 'invoice-1' });
   expect(result.decision.ruleIds).toContain('BANK_CHANGE_HOLD');
   expect(pay).not.toHaveBeenCalled();
 });
@@ -138,5 +137,5 @@ it.each(['Counter', 'timeout'] as const)('holds the bank change on the shared co
   } else advance(60000);
   expect((await seat.apply(source.id)).status).toBe('held');
   expect((await state.getEscalation(proposal.escalationId!))?.status).toBe(outcome === 'Counter' ? 'counter' : 'pending_owner');
-  expect((await repository.getVendor(vendor.id))?.accountId).toBe('old-approved');
+  expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
 });

@@ -12,7 +12,7 @@ it('runs the 3D-closed collection loop through denial, Dana, authorized payment 
       approval: { approval_status: 'denied', can_confirm: false },
       allowed: { kind: 'ALLOW', can_confirm: true },
       amountCents: 247500, invoiceState: 'partially_paid',
-      balanceBeforeCents: 1000000, balanceAfterCents: 1247500,
+      balanceBeforeCents: 2400000, balanceAfterCents: 2647500,
     });
     expect(run.preCall).toMatchObject({ status: 'ready', model: 'scripted-fixture' });
     expect(run.controllerRow).toMatchObject({ status: 'denied', method: 'passkey', decision: { kind: 'Deny' } });
@@ -59,4 +59,18 @@ it('detects audit tampering and keeps why citations attached to the recorded rul
   }
   run.entries[0]!.action = 'tampered';
   expect(verifyChain(run.entries)).toBe(false);
+});
+
+
+it('replays frozen AP traps, controller-approved Cedar change, and unmatched already-paid deposit', async () => {
+  const { runNorthfieldPayables } = await import('./northfield');
+  const run = await runNorthfieldPayables();
+  expect(run.results).toHaveLength(8);
+  expect(run.payments.map(row => [row.invoiceId, row.destinationAccountId])).toEqual([
+    ['4401', 'bank-master:papertrail'], ['4480', 'SYNTHETIC-CEDAR-8822'],
+  ]);
+  expect(run.unverified).toBe('held');
+  expect(run.sanctioned).toBe('rejected');
+  expect(run.alreadyPaid).toBe('exception');
+  expect(run.entries.find(row => row.action === 'bank_change_approved')?.actor).toBe('human');
 });

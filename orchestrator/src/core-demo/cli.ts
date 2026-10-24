@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { runNorthfieldPayables } from './northfield';
 import { runCoreDemo, runInboxTrap } from './core';
 import type { DemoBank } from './bank';
 
@@ -34,6 +35,8 @@ async function main() {
     console.log(JSON.stringify(trap));
     if (!trap.chainValid) throw new Error('CORE_DEMO: invalid trap audit chain');
   }
+  const ap = await runNorthfieldPayables();
+  console.log('NORTHFIELD AP | ' + JSON.stringify(ap));
   if (!run.chainValid) throw new Error('CORE_DEMO: invalid collection audit chain');
   console.log('PASS: core loop, both bank-change traps, LLM OFF and audit chains. Synthetic run; phone/human-passkey/T4 live gates remain separate.');
 }

@@ -27,7 +27,7 @@ export async function masterPayment(input: Record<string, unknown>, master: Vend
   if (typeof invoiceId !== 'string' || !invoiceId || typeof vendorId !== 'string' || !vendorId ||
       !Number.isSafeInteger(amountCents) || Number(amountCents) <= 0 || sourceAccount !== 'operating') throw new PaymentBoundaryError();
   const vendor = await master.getVendor(vendorId);
-  if (!vendor || vendor.id !== vendorId || !vendor.approved || vendor.ofacHit ||
+  if (!vendor || vendor.id !== vendorId || !vendor.approved || vendor.inMaster === false || vendor.ofacHit ||
       typeof vendor.accountId !== 'string' || !vendor.accountId || await master.hasPendingBankChange(vendorId) ||
       (!wrapped && input.destinationAccountId !== vendor.accountId)) throw new PaymentBoundaryError();
   return { invoiceId, vendorId, amountCents: Number(amountCents), sourceAccount, destinationAccountId: vendor.accountId };

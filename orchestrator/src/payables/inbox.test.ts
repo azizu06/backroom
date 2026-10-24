@@ -1,3 +1,4 @@
+import { northfieldInvoice } from './northfield';
 import { expect, it, vi } from 'vitest';
 import { MemoryStateStore } from '../store';
 import { createRouter } from '../router';
@@ -32,7 +33,7 @@ it('uses two local schema attempts then cloud and still blocks privilege fields'
   expect(payables.process).not.toHaveBeenCalled();
 });
 it('validates extraction twice locally before accepting a cloud result, passing only typed fields to the seat', async () => {
-  const fields = { kind: 'invoice', invoiceId: '4500', vendorId: 'acme', poId: 'PO-1', amountCents: 64000, currency: 'USD', bankAccountId: 'approved', lineItems: [{ description: 'Paper', quantity: 1, unitPriceCents: 64000 }] };
+  const fields = northfieldInvoice('4401');
   const replies = [{ kind: 'invoice' }, { ...fields, approved: true }, { ...fields, amountCents: '64000' }, fields];
   const http = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ output: replies.shift(), confidence: 1 }) } }], usage: { cost: 0 } })));
   const { options, payables } = setup(createRouter({ fetch: http, cloudApiKey: 'synthetic' }).route);

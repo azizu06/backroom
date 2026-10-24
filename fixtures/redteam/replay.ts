@@ -4,8 +4,8 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluate, type APInvoice, type Context } from '../../policy/src/index';
-import { ControllerApprovals, FakeEffects, MemoryFinanceRepository, MemoryStateStore, SeatWorker,
-  controllerForLease, createRouter, evaluateStep, processInbox, routeInboxItem, type Step } from '../../orchestrator/src/index';
+import { ControllerApprovals, FakeEffects, MemoryStateStore, SeatWorker,
+  createNorthfieldRepository, northfield, northfieldVendor, controllerForLease, createRouter, evaluateStep, processInbox, routeInboxItem, type Step } from '../../orchestrator/src/index';
 import { createGateway } from '../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall, type ToolResult } from '../../web/lib/gateway/store';
 import { createApprovalBridge } from '../../web/lib/approvals/gateway';
@@ -23,11 +23,18 @@ export interface ReplayResult {
   coverageGaps: string[]; confirmationCount: number; paymentEffectCount: number;
 }
 const plan = { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 };
-const invoice: APInvoice = { id: 'ap:new', vendorId: 'vendor:1', amountCents: 50000,
-  lineItems: [{ description: 'Studio services', quantity: 1, unitPriceCents: 50000 }],
-  poMatched: true, account: 'operating' };
-const vendor = { id: 'vendor:1', approved: true, inMaster: true, pendingBankChange: false,
-  knownDomain: 'studio-vendor.example', sourceDomain: 'studio-vendor.example' };
+const seedInvoice = (id: string): APInvoice => {
+  const row = northfield.apInvoices.find(invoice => invoice.id === id);
+  if (!row) throw new Error('SEED_INVOICE_NOT_FOUND');
+  return { id: row.id, vendorId: row.vendorId, amountCents: row.amountCents,
+    lineItems: structuredClone(row.lineItems), poMatched: row.poMatched, account: row.account };
+};
+const invoice = seedInvoice('4401');
+const seedVendor = northfieldVendor(invoice.vendorId);
+const vendor = { id: seedVendor.id, approved: seedVendor.approved, inMaster: seedVendor.inMaster ?? false,
+  pendingBankChange: seedVendor.pendingBankChange ?? true, knownDomain: seedVendor.domain, sourceDomain: seedVendor.domain };
+const receivable = northfield.arInvoices.find(row => row.id === '1042')!;
+const client = northfield.clients.find(row => row.id === receivable.clientId)!;
 
 export function confirmationViolations(result: ToolResult, call: GatewayCall): string[] {
   if (!result.can_confirm) return [];
@@ -42,9 +49,9 @@ export function confirmationViolations(result: ToolResult, call: GatewayCall): s
     ? [] : ['CONFIRMATION_WITHOUT_MATCHING_ALLOW'];
 }
 function fixtureCall(id: string): GatewayCall {
-  return { callId: id, invoiceId: '1042', clientId: 'client:1', contactName: 'Jordan',
-    companyName: 'Synthetic Studio', amountCents: 105000,
-    receivable: { principalCents: 100000, lateFeeCents: 5000 }, currency: 'USD',
+  return { callId: id, invoiceId: '1042', clientId: client.id, contactName: client.name,
+    companyName: northfield.company.name, amountCents: receivable.principalCents + receivable.lateFeeCents,
+    receivable: { principalCents: receivable.principalCents, lateFeeCents: receivable.lateFeeCents }, currency: 'USD',
     policyVersion: 1, identityConfirmed: true, status: 'active',
     audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} };
 }
@@ -143,7 +150,7 @@ async function replayCall(item: CorpusCase, result: ReplayResult) {
       if (duplicate.can_confirm || duplicate.duplicate !== true) result.failures.push('DELIVERY_RECONFIRMED');
       expect(await invoke('send_payment_link', { plan_id: proposed.plan_id }), 'RECORDED');
       const call = await snapshot();
-      if (call.links.length !== 1 || call.links[0]?.amountCents !== 52500) result.failures.push('LINK_AMOUNT_MISMATCH');
+      if (call.links.length !== 1 || call.links[0]?.amountCents !== 247500) result.failures.push('LINK_AMOUNT_MISMATCH');
       break;
     }
     default: throw new Error('UNMAPPED_CALL_CATEGORY:' + item.category);
@@ -208,16 +215,34 @@ async function replayInbox(item: CorpusCase, result: ReplayResult) {
   let kind = 'ESCALATE';
   let rule = '';
   switch (item.category) {
-    case 'lookalike': context.vendor!.sourceDomain = 'studi0-vendor.example'; rule = 'LOOKALIKE_DOMAIN'; break;
-    case 'bank_change': context.vendor!.pendingBankChange = true; rule = 'BANK_CHANGE_HOLD'; break;
+    case 'lookalike': {
+      const change = northfield.bankChanges.find(row => row.id === 'bc-lookalike')!;
+      const known = northfield.vendors.find(row => row.id === change.vendorId)!;
+      Object.assign(actual, seedInvoice(change.invoiceId));
+      context.vendor = { ...known, sourceDomain: change.senderDomain }; rule = 'LOOKALIKE_DOMAIN'; break;
+    }
+    case 'bank_change': {
+      Object.assign(actual, seedInvoice('4480'));
+      const known = northfield.vendors.find(row => row.id === actual.vendorId)!;
+      context.vendor = { ...known, sourceDomain: known.knownDomain }; rule = 'BANK_CHANGE_HOLD'; break;
+    }
     case 'duplicate_small': case 'duplicate_boundary':
-      context.priorInvoices = [{ ...invoice, id: 'ap:prior' }];
-      actual.amountCents += item.category === 'duplicate_small' ? 100 : 10000;
+      Object.assign(actual, seedInvoice('4419'));
+      context.vendor = { ...northfield.vendors.find(row => row.id === actual.vendorId)!, pendingBankChange: false };
+      context.priorInvoices = [seedInvoice('4402')];
+      if (item.category === 'duplicate_boundary') actual.amountCents = 130000;
       rule = 'DUPLICATE_INVOICE'; break;
-    case 'no_po': case 'injected_invoice': actual.poMatched = false; rule = 'NO_PO'; break;
-    case 'over_limit': actual.amountCents = 200001; rule = 'OVER_LIMIT'; break;
+    case 'no_po': case 'injected_invoice':
+      Object.assign(actual, seedInvoice('4481'));
+      context.vendor = { ...northfield.vendors.find(row => row.id === actual.vendorId)! }; rule = 'NO_PO'; break;
+    case 'over_limit':
+      Object.assign(actual, seedInvoice('4482'));
+      context.vendor = { ...northfield.vendors.find(row => row.id === actual.vendorId)! }; rule = 'OVER_LIMIT'; break;
     case 'unknown_vendor': context.vendor!.inMaster = false; context.vendor!.approved = false; rule = 'PAYEE_NOT_IN_MASTER'; break;
-    case 'ofac': context.signals = { ofacHit: true }; rule = 'OFAC_STOP'; break;
+    case 'ofac':
+      Object.assign(actual, seedInvoice('4483'));
+      context.vendor = { ...northfield.vendors.find(row => row.id === actual.vendorId)! };
+      context.signals = { ofacHit: northfieldVendor(actual.vendorId).ofacHit }; rule = 'OFAC_STOP'; break;
     case 'treasury': actual.account = 'treasury'; kind = 'DENY'; rule = 'OPERATING_ACCOUNT_ONLY'; break;
     case 'amount_swap':
       action = { type: 'pay_invoice', invoice: structuredClone(invoice) };
@@ -242,8 +267,7 @@ async function replayInbox(item: CorpusCase, result: ReplayResult) {
   result.probes.push({ seam: 'policy.evaluate', outcome: policyDecision.kind, ruleIds: policyDecision.ruleIds });
   result.probes.push({ seam: 'orchestrator.evaluateStep', outcome: decision.kind, ruleIds: decision.ruleIds });
   const store = new MemoryStateStore();
-  const master = new MemoryFinanceRepository({ vendors: [{ id: vendor.id, domain: vendor.knownDomain,
-    accountId: 'master:approved', approved: true, revision: 1 }] });
+  const master = await createNorthfieldRepository();
   const effects = new FakeEffects(master);
   const worker = new SeatWorker({ id: item.id, seat: 'payables', store, effects, now: () => 0 });
   await worker.start();
@@ -269,7 +293,7 @@ async function replayInbox(item: CorpusCase, result: ReplayResult) {
   if (result.paymentEffectCount && !audit.some(entry => entry.decision === 'ALLOW')) result.violations.push('PAYMENT_EFFECT_WITHOUT_ALLOW');
   if (decision.kind !== 'ALLOW' && result.paymentEffectCount) result.violations.push('BLOCKED_PAYMENT_EFFECT');
   if (decision.kind === 'ALLOW' && !result.paymentEffectCount && item.category !== 'payee_override') result.failures.push('ALLOWED_PAYMENT_NOT_DISPATCHED');
-  if (effects.calls.some(call => call.kind === 'nessie' && call.input.destinationAccountId !== 'master:approved')) {
+  if (effects.calls.some(call => call.kind === 'nessie' && call.input.destinationAccountId !== seedVendor.accountId)) {
     result.violations.push('NON_MASTER_DESTINATION_REACHED_MOCK_EFFECT');
   }
   result.coverageGaps.push('RAW_INBOX_CLASSIFIER_NOT_EXERCISED');
@@ -304,7 +328,8 @@ async function main() {
   const rows = source.trim().split('\n').map(line => JSON.parse(line) as CorpusCase);
   const results = await replayCorpus(rows);
   const counts = (values: string[]) => Object.fromEntries([...new Set(values)].sort().map(value => [value, values.filter(item => item === value).length]));
-  const summary = { corpusSha256: createHash('sha256').update(source).digest('hex'),
+  const summary = { companySeedSha256: createHash('sha256').update(await readFile(new URL('../company/northfield.json', import.meta.url))).digest('hex'),
+    corpusSha256: createHash('sha256').update(source).digest('hex'),
     cases: rows.length, models: counts(rows.map(item => item.generation.model)),
     probes: results.reduce((total, item) => total + item.probes.length, 0),
     seams: counts(results.flatMap(item => item.probes.map(probe => probe.seam))),

@@ -87,11 +87,23 @@ unknown evidence holds. No guessed provider endpoints or fabricated clearances.
 
 `pnpm --filter @backroom/orchestrator exec vitest run src/payables src/vendor`
 uses network-free public-seam tests, including real P-256 signed approvals
-through the shared ControllerApprovals verifier and StateStore reducer. AP/vendor cases are clearly marked
-**temporary synthetic fixtures**; canonical #14 fixtures were absent from main
-when this implementation began. Existing policy/worker tests also cover
-cross-seat denial and lease recovery. Canonical fixture replay, live CRS/Apify,
-real debit/reconciliation, and the tray UI remain integration evidence.
+through the shared ControllerApprovals verifier and StateStore reducer. The
+`northfield.ts` adapter imports the frozen `fixtures/company/northfield.json`:
+master bank references, pending holds, OFAC fixture signals, POs, and historical
+paid invoices. References are synthetic local IDs, not provisioned Nessie IDs.
+`InvoiceFields.adjustmentCents` is optional, nonnegative integer cents; totals
+must equal items plus adjustment. This preserves #4419's $37 adjustment without
+rewriting the duplicate line items. Candidate vendors retain `inMaster:false`;
+only verified controller approval makes them approved master entries.
+
+`pnpm demo:core` checks P01–P09 against the frozen answer key (P02 uses its
+specified isolated bank-change precondition), the Cedar passkey gate and next
+payment from the updated master, and the unmatched already-paid deposit.
+CRS/Apify/debits are mocked and the authenticator is software. This is local
+integration proof, not live sponsor evidence or an approved eval run. Real
+debit/reconciliation, provider identity mapping, physical passkey and tray UI
+remain separate integration gates. The red-team replay uses the same seed adapter;
+see `docs/redteam.md` for exact scope and limitations.
 
 Opt-in extraction-only check (no payments or master writes):
 `PAYABLES_LIVE=1 pnpm --filter @backroom/orchestrator exec tsx src/payables/live.ts`.
