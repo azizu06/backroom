@@ -5,3 +5,8 @@ export function evaluatorSourceHash(source: Buffer | string): string {
   // Only evaluator text is canonicalized; frozen fixtures keep byte-exact hashes.
   return createHash('sha256').update(source.toString().replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
+
+/** SHA-256 of raw file bytes. Same normalization as scoreboard input hashes: none. */
+export function inputFileSha256(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}

@@ -1,4 +1,5 @@
 import type { ControllerApprovals } from '@backroom/orchestrator';
+import { applyInboxBankChange } from '../inbox/proposals';
 
 type JSONBody = Record<string, unknown>;
 function json(value: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -64,7 +65,10 @@ export function createApprovalHTTP(service: () => ControllerApprovals, origin: (
       }
       if (scope === 'approval' && action === 'decide') {
         exact(body, ['challengeId', 'response']);
-        return json({ escalation: await approvals.decide(id, String(body.challengeId), body.response as Parameters<ControllerApprovals['decide']>[2]) });
+        const escalation = await approvals.decide(id, String(body.challengeId), body.response as Parameters<ControllerApprovals['decide']>[2]);
+        // The passkey is already recorded. A missing proposal leaves that decision unchanged.
+        const bankChange = await applyInboxBankChange(id).catch(() => undefined);
+        return json(bankChange ? { escalation, bankChange } : { escalation });
       }
       return json({ error: 'NOT_FOUND' }, 404);
     } catch (error) {

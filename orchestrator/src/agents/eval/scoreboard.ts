@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +13,7 @@ import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
 import { runBadgeAttack } from './badge-attack';
-import { evaluatorSourceHash } from './provenance';
+import { evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
 
 // All outbound network attempts fail closed, including accidental provider calls in future adapters.
@@ -22,7 +21,7 @@ globalThis.fetch = async () => { throw new Error('EVAL_NETWORK_FORBIDDEN'); };
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const read = (path: string) => JSON.parse(readFileSync(join(root, path), 'utf8'));
-const sha = (path: string) => createHash('sha256').update(readFileSync(join(root, path))).digest('hex');
+const sha = (path: string) => inputFileSha256(readFileSync(join(root, path)));
 const command = 'pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts';
 const key = read('fixtures/answer-key/expected.json');
 const manifest = read('fixtures/answer-key/frozen-manifest.json');
@@ -211,7 +210,8 @@ const report = {
       const path = `orchestrator/src/agents/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
-      'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json'].map(path => [path, sha(path)])),
+      'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json',
+      ...(pdfRun ? [PDF_RESULT_PATH] : [])].map(path => [path, sha(path)])),
     keyVersion: key.version, signoff: key.signoff, authorship: key.authorship },
   scope: { apItems: invoiceRuns.length, arItems: receivables.length, scenarios: legacy.reports.length,
     apRuntime: 'Production ClaudeAgentRuntime + Dispatcher + role registry + handoff store + in-memory usage ledger; injected scripted QueryFn.',

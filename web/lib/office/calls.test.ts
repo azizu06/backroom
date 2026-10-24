@@ -138,7 +138,7 @@ describe('call state', () => {
     vi.stubGlobal('window', { location: { search: '?calls=mock&callsSpeed=fast' } });
     const updates = vi.fn();
     const unsubscribe = callStore.subscribe(updates);
-    vi.advanceTimersByTime(2_000);
+    vi.advanceTimersByTime(500);
     expect(callStore.getSnapshot().status).toBe('live');
     expect(callStore.getSnapshot().transcript.length).toBeGreaterThan(0);
     expect(callStore.getSnapshot().transcript[0]?.text).toContain('Thanks for calling back');
