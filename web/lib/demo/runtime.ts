@@ -110,6 +110,10 @@ export async function createDemoRuntime() {
   await reset();
   return { reset, stop, health: () => services.health(),
     clientStopped: () => gatewayStore.clientStopped('northfield-jordan'),
+    endVoiceCall: async (sessionId: string) => {
+      if (!/^[a-f0-9-]{36}$/.test(sessionId)) throw new Error('INVALID_SESSION');
+      await getStateStore().expireEscalations(Date.now(), sessionId);
+    },
     registerVoiceCall: async (sessionId: string) => {
       // Trusted synthetic invoice only. HTTP cannot supply identity, plans or amounts.
       if (!/^[a-f0-9-]{36}$/.test(sessionId)) throw new Error('INVALID_SESSION');

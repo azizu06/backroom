@@ -22,6 +22,11 @@ it('provisions all nine real gateway schemas with hidden IDs and nonce assignmen
   const config = managedConfig(['tool']);
   expect(config.initial_message).toContain('This call is recorded.');
   expect(config.instructions).toContain('No voice approval ever counts.');
+  expect(config.instructions).toContain('approval_status expired or pending_owner and may_reask true');
+  expect(config.instructions).toContain('call propose_plan again immediately');
+  expect(config.instructions).toContain('Do not say Dana will confirm by email while this call is open.');
+  expect(voiceTools.check_approval.description).toContain('may_reask true');
+  expect(voiceTools.check_approval.description).toContain('call propose_plan again immediately');
 });
 
 it('updates existing tools without the create-only type field', async () => {

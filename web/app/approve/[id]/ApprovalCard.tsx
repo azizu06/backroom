@@ -61,7 +61,7 @@ export default function ApprovalCard({ id }: { id: string }) {
   const closed = row && row.status !== 'pending';
   const canDecide = !!row && !closed && seconds > 0 && registered && !busy;
   const shownError = error || pollError;
-  const status = missing ? 'Request not found' : !row && shownError ? 'Request unavailable' : !row ? 'Loading request' : row.status === 'pending_owner' ? 'Follow-up needed'
+  const status = missing ? 'Request not found' : !row && shownError ? 'Request unavailable' : !row ? 'Loading request' : row.status === 'expired' ? 'Request expired' : row.status === 'pending_owner' ? 'Follow-up needed'
     : row.status === 'pending' ? `Client waiting · ${seconds}s` : `Dana ${row.status === 'counter' ? 'countered' : row.status}`;
   return <main className={styles.page}>
     <div className={styles.sheet}>
@@ -98,8 +98,8 @@ export default function ApprovalCard({ id }: { id: string }) {
           <details><summary>Evidence references</summary><ul>{row.evidenceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul></details>
         </section>
         {closed ? <section className={styles.result} aria-live="polite">
-          <h2>{row.status === 'pending_owner' ? 'Dana will confirm by email today.' : 'Your decision is recorded.'}</h2>
-          <p>{row.method === 'passkey' ? 'Confirmed with Dana’s passkey. The clerk can now relay your decision on the call.' : 'The call’s 60-second review window ended. No terms were approved.'}</p>
+          <h2>{row.status === 'pending_owner' ? 'Dana will confirm by email today.' : row.status === 'expired' ? 'This request expired.' : 'Your decision is recorded.'}</h2>
+          <p>{row.method === 'passkey' ? 'Confirmed with Dana’s passkey. The clerk can now relay your decision on the call.' : row.status === 'expired' ? 'No terms were approved. The clerk may ask once to send a fresh request.' : 'The review window ended. No terms were approved.'}</p>
           {row.decision?.kind === 'Counter' && <p>{row.decision.terms.installments} payments · {row.decision.terms.firstPaymentPct}% first · {row.decision.terms.durationDays} days</p>}
         </section> : <section className={styles.section}>
           {!registered && <p className={styles.error}>Dana’s passkey is not set up. <a href="/controller">Set up the controller passkey</a> before reviewing requests.</p>}

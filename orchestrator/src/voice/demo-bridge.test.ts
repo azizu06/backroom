@@ -13,6 +13,8 @@ it('registers privately and relays tools into demo state with a public speakable
   expect(await response.json()).toMatchObject({ payment_url: 'https://demo.example/p/AB12CD3456', amount_cents: 247500,
     speak: expect.stringContaining('A B 1 2 C D 3 4 5 6') });
   expect(network.mock.calls[2]![1]?.headers).toBeInstanceOf(Headers);
+  await bridge.endCall('session-id');
+  expect(network.mock.calls.at(-1)).toMatchObject(['http://127.0.0.1:3000/__demo/voice-call-ended', { body: '{"sessionId":"session-id"}' }]);
   expect(() => createDemoVoiceBridge({ port: 3000, controlSecret: 'secret', publicOrigin: 'http://localhost:3000' })).toThrow('PUBLIC_HTTPS_ORIGIN_REQUIRED');
 });
 it('fails closed when shared registration is unavailable', async () => {

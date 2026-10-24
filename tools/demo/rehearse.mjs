@@ -109,7 +109,7 @@ try {
     await page.getByRole('button', { name: 'Create Dana’s passkey' }).click();
     await expect(page.getByRole('heading', { name: 'Dana’s passkey is ready.' })).toBeVisible();
     await shot('01-controller', 'Real verifier, Chromium software authenticator; no human biometrics');
-    const state = await control('reset'); // Fresh 60-second escalation; enrollment survives reset.
+    const state = await control('reset'); // Fresh live-call escalation; enrollment survives reset.
     await page.goto(`${state.publicUrl}${state.approvePath}`);
     await expect(page.getByText('MAX_INSTALLMENTS', { exact: true })).toBeVisible();
     await shot('02-four-payments', 'Four-payment escalation with immutable policy evidence');
