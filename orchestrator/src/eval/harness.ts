@@ -11,6 +11,7 @@ import { inspectPaymentEvidence, reconcileAlreadyPaid, type BankEvidence } from 
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
+import { createApifyHealthCheck, createApifyRunner, runPreCall } from '../collections';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
 
@@ -358,6 +359,45 @@ async function plantedStopCase(step: PolicyStep): Promise<{ kind: string; seams:
   return { kind: spec.rule, seams };
 }
 
+async function plantedClosedCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  if (step.operation !== 'persist_Apify_source_URL_timestamp_closed_wins_even_if_CRS_credit_good') return;
+  const seams = ['apify:fixture', 'crs:fixture'];
+  const sourceUrl = 'https://example.com/closed';
+  const observedAt = '2026-10-24T09:00:00Z';
+  const calls: string[] = [];
+  const http: typeof fetch = async input => {
+    calls.push(String(input));
+    if (calls.length === 1) return Response.json({ data: { id: 'evalClosed', status: 'SUCCEEDED', defaultDatasetId: 'evaldataset' } });
+    if (calls.length === 2) return Response.json([{ signals: [{ type: 'maps_status', value: 'permanently_closed', sourceUrl, observedAt }] }]);
+    throw new Error('unexpected Apify call');
+  };
+  let drafted = false;
+  const audit = new MemoryStateStore();
+  const result = await runPreCall({
+    clientId: 'client-1042', invoiceId: '1042', testIdentityId: 7,
+    company: { name: 'Public demo company', website: 'https://example.com' },
+    context: { client: { type: 'business', phoneNumber: '+15555550100', dnc: false, localWeekday: 1, localHour: 10,
+      consent: { source: 'synthetic', text: 'test consent', timestamp: '2026-10-24T01:00:00Z', number: '+15555550100' } } },
+  }, {
+    health: createApifyHealthCheck(createApifyRunner({ token: 'eval-offline-token', fetch: http })),
+    audit,
+    planner: { draft: async () => { drafted = true; throw new Error('planner'); } },
+    credit: { check: async () => ({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [],
+      evidence: [{ product: 'businessCredit', checkedAt: observedAt, responseHash: 'ab'.repeat(32), creditScore: 720 }] }) },
+    escalate: async () => {},
+  });
+  const rows = await audit.listAudit();
+  const health = rows.find(row => row.action === 'health_check')?.inputs;
+  const credit = rows.find(row => row.action === 'credit_check')?.inputs;
+  const kept = Array.isArray(health?.signals) ? health.signals[0] as { sourceUrl?: string; observedAt?: string; value?: string } : undefined;
+  const evidence = Array.isArray(credit?.evidence) ? credit.evidence[0] as { creditScore?: number } : undefined;
+  const blocked = result.status === 'blocked' && result.decision?.kind === 'ESCALATE' && result.decision.ruleIds.includes('CLOSED_BUSINESS_STOP');
+  if (!blocked || drafted || calls.length !== 2 || kept?.sourceUrl !== sourceUrl || kept.observedAt !== observedAt || kept.value !== 'permanently_closed' || credit?.ofacStatus !== 'clear' || evidence?.creditScore !== 720) {
+    return { kind: 'CLOSED_NOT_PERSISTED', seams };
+  }
+  return { kind: 'CLOSED_BUSINESS_STOP', seams };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -382,13 +422,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step);
+        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step);
         const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
