@@ -72,6 +72,11 @@ describe("collisions", () => {
     expect(inTreasury(walk([1.9, 5.2], [1, 0], 10, noPlant))).toBe(false);
   });
 
+  it("lets the player walk out of a collider that appeared on top of them", () => {
+    const trap = { minX: -1, maxX: 1, minZ: -1, maxZ: 1 };
+    const out = movePlayer([0, 0.2], [0, 0.05], [trap], PLAYER_RADIUS);
+    expect(out).toEqual([0, 0.25]);
+  });
   it("accepts extra room geometry as solid footprints", () => {
     const extra = { minX: 6, maxX: 7.5, minZ: 0.2, maxZ: 0.8 };
     const withRoom = officeColliders(ALL, [extra]);

@@ -104,6 +104,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
   function interact() {
     const current = targetRef.current;
     if (!current) return;
+    releaseStick();
     input.clear();
     releasePointer();
     requestSceneFrame();
@@ -168,6 +169,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     if (drag.current?.id === event.pointerId) drag.current = null;
   }
   function steer(event: PointerEvent<HTMLDivElement>) {
+    if (panel) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const radius = rect.width / 2 || 1;
     const x = (event.clientX - rect.left - radius) / radius;
@@ -200,7 +202,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     {touch && <>
       <p className='play-touch-hint'>Drag to look · stick to move</p>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
-        onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick}>
+        onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
         <span ref={knob} />
       </div>
       {prompt && <button className='play-interact' onClick={interact}>Interact</button>}
