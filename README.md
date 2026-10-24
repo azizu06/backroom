@@ -79,7 +79,7 @@ sender domain; it never releases the actual lookalike payment.
 | Controller (#20) | Real approval bridge, StateStore escalation/desk target, `ControllerApprovals` registration and signed assertion verification, then gateway `check_approval` | Exported software `TestAuthenticator` supplies P-256 signatures; no human phone/Face ID tap. The recorded human actor describes the verifier contract, not evidence of an actual Dana tap |
 | Pay page + bank (#21) | Link amount comes only from the committed ALLOW plan; real `PaymentService` and Nessie SDK | CLI click/email delivery and bank HTTP are simulated. Mobile page: see [M7 setup](docs/m7-payments.md) |
 | Reconciliation (#21) | Exported job checks unique deposit ID, exact memo, completed status, amount; reducer transitions + receipt | Balance display uses the SDK's exact API-derived label, never settlement evidence. Seed short/duplicate/already-paid tests fail closed |
-| Inbox/payables (#22) | Real `routeInboxItem`, `SeatWorker`, `evaluateStep`, escalation and Dana target | Typed #4471 fixture replaces email/PDF extraction and the not-yet-merged payables pipeline; no vendor master mutation |
+| Inbox/payables (#22) | Real `routeInboxItem`, `SeatWorker`, `evaluateStep`, escalation and Dana target | Typed #4471 fixture bypasses email/PDF extraction and the merged PayablesSeat pipeline in this command; no vendor master mutation |
 | Ask why (#23) | Real retrieval and cited deterministic templates; `audit_N` maps to StateStore `audit:N` in evidence refs | Explicit offline option; no Claude call or TTS |
 | LLM OFF (#47) | Real store switch, router `LLM_OFF`, inbox routing and policy enforcement | No model needed for either typed bank-change run; OFF never simulates a new voice call |
 
@@ -161,3 +161,33 @@ Read [tables, reducers and setup](spacetime/README.md),
 [rehearsal guide](docs/test-v1.md) labels its default mock bank and software paths.
 Evidence from a local server, a memory adapter, a hosted instance and a synthetic
 run must retain those distinctions.
+Hosted state and browser catch-up were separately verified in the retained
+[Maincloud parity receipts](docs/evidence/maincloud-parity/README.md). These use
+hosted state and a Mac browser, not proof of the GX10 web host. See
+[current host/reset/fallback operations](docs/demo-runbook.md). Neither receipt
+proves a live call or human approval; the historical standalone docs above do
+not describe the current hosted-authentication status.
+
+### Current CRS implementation (distinct from live evidence)
+
+Merged code consumes sandbox public records before calls and sandbox fraud risk
+for vendor changes/payments. Any bankruptcy record stops the call
+(`BANKRUPTCY_STOP`); counts do not distinguish open from discharged bankruptcy.
+Fraud risk at least 70 holds the bank change/payment for Dana
+(`FRAUD_RISK_HOLD`, NF-028). Defaults remain fake; `PRECALL_CRS` and `VENDOR_CRS`
+select opt-in sandbox clients, and OFAC stays unavailable rather than clear.
+See the [consumer contract](orchestrator/src/collections/README.md).
+The P06 client receipt linked above is not an end-to-end P07/P13 wiring run;
+that credentialed wiring receipt remains pending in the sponsor checklist.
+This documentation does not enable or change either integration.
+
+### Implementation and evidence index
+
+- [Seven agent roles and runtime limits](docs/agents.md)
+- [GX10 model measurements](docs/t10-gx10.md), [ten-company burst](docs/evidence/burst/ten-company/README.md), and [document vision receipts](docs/evidence/gx10-vision/README.md)
+- [Base Sepolia testnet x402](docs/x402.md) (not real-money settlement)
+- [Payment-link delivery](docs/payment-delivery.md) and [isolated judge attack service](docs/attack-demo.md)
+- [Cost attribution](docs/cost-summary.md) and [offline scoreboard](docs/eval/scoreboard.md)
+
+Each source has its own execution scope and failures. These links do not imply
+that the whole phone, human-approval and bank flow has been live-tested.
