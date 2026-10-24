@@ -1,0 +1,300 @@
+{
+  "issue": 6,
+  "spec": "8.1 T5; 4.8",
+  "observedAt": "2026-10-24T07:48:29.086Z",
+  "company": "Kim's Island Chinese Restaurant, Staten Island, New York",
+  "status": "PASS",
+  "elapsedSecs": 16.891982199999998,
+  "totalCostUsd": 0.01075,
+  "runOptions": {
+    "timeout": "50",
+    "maxTotalChargeUsd": "0.50",
+    "restartOnError": "false"
+  },
+  "accountPreflight": {
+    "observedAt": "2026-10-24T07:48:29.086Z",
+    "plan": "FREE",
+    "includedMonthlyCreditUsd": 5,
+    "monthlyUsageUsd": 0.00005180851982495639,
+    "includedCreditRemainingUsd": 4.999948191480175
+  },
+  "results": [
+    {
+      "name": "maps",
+      "actor": "compass~crawler-google-places",
+      "input": {
+        "placeIds": [
+          "ChIJJQz5EZzKw4kRCZ95UajbyGw"
+        ],
+        "maxCrawledPlacesPerSearch": 1,
+        "language": "en",
+        "skipClosedPlaces": false,
+        "scrapePlaceDetailPage": false,
+        "scrapeDirectories": false,
+        "scrapeContacts": false,
+        "maximumLeadsEnrichmentRecords": 0,
+        "maxReviews": 0,
+        "maxImages": 0,
+        "scrapeReviewsPersonalData": false,
+        "enableCompetitorAnalysis": false
+      },
+      "schemaBuildId": "EH35UvIrsV0hnZG0Y",
+      "schemaBuildNumber": "0.14.775",
+      "pricing": {
+        "model": "PAY_PER_EVENT",
+        "effectiveAt": "2026-06-30T13:23:33.247Z",
+        "minimumConfigurableCapUsd": 0.5,
+        "events": {
+          "place-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.004
+          },
+          "filter-applied": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.001
+          },
+          "place-details-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.002
+          },
+          "contact-details-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.002
+          },
+          "lead-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "lead-email-verified": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "social-profile-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "review-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0005
+          },
+          "image-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0005
+          },
+          "competitor-analyzed": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.025
+          },
+          "apify-actor-start": {
+            "priceUsd": 0.00005,
+            "freeTierPriceUsd": null
+          }
+        }
+      },
+      "run": {
+        "runId": "g2nGZ2liBXaf6zuUy",
+        "status": "SUCCEEDED",
+        "buildId": "EH35UvIrsV0hnZG0Y",
+        "startedAt": "2026-10-24T07:48:30.557Z",
+        "finishedAt": "2026-10-24T07:48:46.878Z",
+        "durationSecs": 16.321,
+        "costUsd": 0.0062,
+        "chargedEventCounts": {
+          "place-scraped": 1,
+          "filter-applied": 0,
+          "place-details-scraped": 1,
+          "contact-details-scraped": 0,
+          "lead-scraped": 0,
+          "lead-email-verified": 0,
+          "social-profile-scraped": 0,
+          "review-scraped": 0,
+          "image-scraped": 0,
+          "competitor-analyzed": 0,
+          "apify-actor-start": 4
+        }
+      },
+      "items": [
+        {
+          "title": "Kim's Island",
+          "url": "https://www.google.com/maps/search/?api=1&query=Kim's%20Island&query_place_id=ChIJJQz5EZzKw4kRCZ95UajbyGw",
+          "placeId": "ChIJJQz5EZzKw4kRCZ95UajbyGw",
+          "website": "http://kimsislandsi.com/",
+          "permanentlyClosed": false,
+          "temporarilyClosed": false,
+          "scrapedAt": "2026-10-24T07:48:41.492Z"
+        }
+      ],
+      "initialReportedCostUsd": 0.0002,
+      "billingVerified": true,
+      "billingObservedAt": "2026-10-24T07:50:04.244Z"
+    },
+    {
+      "name": "search",
+      "actor": "apify~google-search-scraper",
+      "input": {
+        "queries": "Kim's Island Chinese Restaurant Staten Island",
+        "maxPagesPerQuery": 1,
+        "countryCode": "us",
+        "languageCode": "en",
+        "maximumLeadsEnrichmentRecords": 0,
+        "aiOverview": {
+          "scrapeFullAiOverview": false
+        },
+        "aiModeSearch": {
+          "enableAiMode": false
+        },
+        "geminiSearch": {
+          "enableGemini": false
+        },
+        "perplexitySearch": {
+          "enablePerplexity": false
+        },
+        "chatGptSearch": {
+          "enableChatGpt": false
+        },
+        "copilotSearch": {
+          "enableCopilot": false
+        },
+        "websiteContentScraper": {
+          "enable": false
+        },
+        "focusOnPaidAds": false,
+        "saveHtml": false,
+        "saveHtmlToKeyValueStore": false
+      },
+      "schemaBuildId": "G3YvRcwtJopIgVcSA",
+      "schemaBuildNumber": "0.0.468",
+      "pricing": {
+        "model": "PAY_PER_EVENT",
+        "effectiveAt": "2026-10-07T10:39:55.497Z",
+        "minimumConfigurableCapUsd": 0.5,
+        "events": {
+          "search-page-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0045
+          },
+          "ai-overview-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.003
+          },
+          "ai-mode-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "perplexity-ai-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "chatgpt-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "copilot-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "gemini-result-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.2
+          },
+          "lead-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "lead-email-verified": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.1
+          },
+          "ads-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.0065
+          },
+          "website-content-scraped": {
+            "priceUsd": null,
+            "freeTierPriceUsd": 0.008
+          },
+          "apify-actor-start": {
+            "priceUsd": 0.00005,
+            "freeTierPriceUsd": null
+          }
+        }
+      },
+      "run": {
+        "runId": "cbeY9kR5A5W31hAk8",
+        "status": "SUCCEEDED",
+        "buildId": "G3YvRcwtJopIgVcSA",
+        "startedAt": "2026-10-24T07:48:30.455Z",
+        "finishedAt": "2026-10-24T07:48:34.934Z",
+        "durationSecs": 4.479,
+        "costUsd": 0.004549999999999999,
+        "chargedEventCounts": {
+          "search-page-scraped": 1,
+          "ai-overview-scraped": 0,
+          "ai-mode-result-scraped": 0,
+          "perplexity-ai-result-scraped": 0,
+          "chatgpt-result-scraped": 0,
+          "copilot-result-scraped": 0,
+          "gemini-result-scraped": 0,
+          "lead-scraped": 0,
+          "lead-email-verified": 0,
+          "ads-scraped": 0,
+          "website-content-scraped": 0,
+          "apify-actor-start": 1
+        }
+      },
+      "items": [
+        {
+          "url": "http://www.google.com/search?q=Kim%27s+Island+Chinese+Restaurant+Staten+Island&gl=us&hl=en",
+          "organicResults": [
+            {
+              "title": "Kim's Island – Staten Island, NY | Order Online",
+              "url": "https://kimsislandsi.com/"
+            },
+            {
+              "title": "Kim's Island Restaurant in Staten Island / Menus & Photos",
+              "url": "https://whereyoueat.com/Kims-Island-new-288.html"
+            },
+            {
+              "title": "Kim's Island - Restaurant Reviews",
+              "url": "https://www.yelp.com/biz/kims-island-staten-island"
+            },
+            {
+              "title": "Kim's Island – Staten Island, NY | Order Online - Eaters365",
+              "url": "https://www.eaters365.com/kimsislandsi?menu=1"
+            },
+            {
+              "title": "KIM'S ISLAND CHINESE RESTAURANT, Staten Island",
+              "url": "https://www.tripadvisor.com/Restaurant_Review-g48682-d4714204-Reviews-Kim_s_Island_Chinese_Restaurant-Staten_Island_New_York.html"
+            },
+            {
+              "title": "Directions to Kim's Island Chinese Restaurant",
+              "url": "https://www.mapquest.com/directions/to/us/new-york/kims-island-chinese-restaurant-21342711"
+            },
+            {
+              "title": "Who makes the best Chinese food on Staten Island?",
+              "url": "https://www.reddit.com/r/statenisland/comments/187t7aw/who_makes_the_best_chinese_food_on_staten_island/"
+            },
+            {
+              "title": "What are the best Chinese food places in the area of 10307?!",
+              "url": "https://www.facebook.com/groups/WhereSIEats/posts/1259374681174258/"
+            },
+            {
+              "title": "Menus for Kim's Island - Staten Island - SinglePlatform",
+              "url": "http://places.singleplatform.com/kims-island/menu"
+            },
+            {
+              "title": "Kim's Island Chinese Restaurant - New York City, NY",
+              "url": "https://nextdoor.com/page/kims-island-chinese-restaurant-staten-island-ny"
+            }
+          ]
+        }
+      ],
+      "initialReportedCostUsd": 0.00005,
+      "billingVerified": true,
+      "billingObservedAt": "2026-10-24T07:50:04.344Z"
+    }
+  ],
+  "cachedDataAvailable": true,
+  "initialReportedTotalCostUsd": 0.00025,
+  "timingNote": "elapsedSecs measures the original concurrent start-to-dataset workload; later read-only billing refresh is recorded separately by billingObservedAt."
+}
