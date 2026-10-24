@@ -1,4 +1,4 @@
-.office-shell { color-scheme: dark; height: 100dvh; min-height: 480px; display: flex; flex-direction: column; background: #202620; color: #e4e5dc; font: 15px/1.5 "Avenir Next", Avenir, sans-serif; }
+.office-shell { color-scheme: dark; height: 100dvh; min-height: calc(480px + var(--office-disclosure-clearance, 0px)); padding-bottom: var(--office-disclosure-clearance, 0px); box-sizing: border-box; display: flex; flex-direction: column; background: #202620; color: #e4e5dc; font: 15px/1.5 "Avenir Next", Avenir, sans-serif; }
 .office-shell * { box-sizing: border-box; }
 .office-toolbar { min-height: 76px; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid #41493d; }
 .office-toolbar strong { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
@@ -8,7 +8,7 @@
 .office-shell button { background: #c4d0ad; color: #20281b; border-color: #c4d0ad; font-weight: 600; }
 .office-shell button:hover { background: #d3ddbf; }
 .office-shell :focus-visible { outline: 2px solid #e5bf91; outline-offset: 4px; }
-.office-viewport { flex: 1; position: relative; min-height: 320px; overflow: hidden; }
+.office-viewport { flex: 1; position: relative; min-height: 240px; overflow: hidden; }
 .office-caption { position: absolute; bottom: 20px; left: 32px; font-size: 13px; color: #b8c1ac; pointer-events: none; }
 .desk-label { white-space: nowrap; font-size: 14px; color: #eceade; background: #30382df0; border: 1px solid #6e7862; border-radius: 4px; padding: 5px 12px; pointer-events: none; }
 .agent-label { font-size: 12px; color: #26301e; background: #d4dfbf; padding: 2px 9px; border-radius: 4px; white-space: nowrap; pointer-events: none; }

@@ -164,13 +164,26 @@ export function Office({ source, controls }: { source: OfficeState; controls?: R
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
   const [mode, setMode] = useState<ViewMode>("walk");
   const [lostContext, setLostContext] = useState(false);
+  const shell = useRef<HTMLElement>(null);
   const labels: OfficeLabels = { collections: useRef(null), dana: useRef(null), agent: useRef(null) };
   const onFailure = useCallback(() => setLostContext(true), []);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) setMode("tween");
   }, []);
+  useEffect(() => {
+    const disclosure = document.querySelector(".real-sim-overlay");
+    if (!disclosure) return;
+    // The root layout owns this fixed panel; keep office controls above it.
+    const reserve = () => shell.current?.style.setProperty(
+      "--office-disclosure-clearance", `${disclosure.getBoundingClientRect().height + 24}px`,
+    );
+    reserve();
+    const observer = new ResizeObserver(reserve);
+    observer.observe(disclosure);
+    return () => observer.disconnect();
+  }, []);
   const agent = snapshot.agent;
-  return <section className="office-shell" aria-label="Backroom office">
+  return <section ref={shell} className="office-shell" aria-label="Backroom office">
     <header className="office-toolbar">
       <div><strong>Backroom</strong><span className="toolbar-divider">/</span><span>Office</span></div>
       <label className="view-picker">View <select value={mode} onChange={(event) => setMode(event.target.value as ViewMode)}>

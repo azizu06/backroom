@@ -43,8 +43,11 @@ which consumes the same subscribed snapshot.
   clamped resumed frame. No network calls. Test file: 55 lines; no repeated setup
   or snapshot assertions.
 - The web test command enables Vitest globals for the gateway tests inherited
-  from main; together the two suites pass 26 tests. Gateway files are unchanged.
+  from main. Gateway files are unchanged.
 - `pnpm --filter @backroom/web typecheck` and `pnpm --filter @backroom/web build`.
+- After rebasing onto the integrated main: `pnpm -r typecheck`, `pnpm -r test`
+  (319 passed: 43 web, 94 policy, 182 orchestrator), `pnpm -r build`, and
+  `pnpm --filter @backroom/web test:approvals:browser` (one passkey E2E test) pass.
 - Real signed-in Chrome via `chrome-devtools-axi`, `pnpm --filter @backroom/web dev
   --port 3109`: both desk targets, fixed camera, 2D retargeting, and simulated WebGL
   context loss verified. Walking position changed in samples at 52, 303, 554,
@@ -56,6 +59,15 @@ which consumes the same subscribed snapshot.
 - `docs/evidence/t9/office-collections.png` and `office-dana.png` show the two desk
   states (the second in fixed-camera mode). `office-mobile.png` shows the narrow
   layout. Screenshots are endpoint evidence, not a recording of the walk.
+- The integrated root layout mounts a fixed real-versus-simulated disclosure.
+  The office reserves its measured height so it cannot cover the mock control.
+  `office-rebased-desktop.png` and `office-rebased-mobile.png` show this
+  integration with the avatar in motion. To reproduce after `pnpm -r build`,
+  start `pnpm --filter @backroom/web exec next start --port 3109`, then run
+  `pnpm --filter @backroom/web exec node scripts/office-smoke.mjs` (override
+  `DEMO_URL` for a different port). This isolated headless browser check covers
+  movement, both fallback selections, ten disclosure entries, controls clear of
+  the panel, no horizontal overflow, and no page errors at 1440×900 and 390×844.
 
 Scope is T9 only: one floor, two desks, one avatar, and a replaceable subscription.
 The larger M10 rooms/badges/audit wall and live T8 wiring belong to later work.
