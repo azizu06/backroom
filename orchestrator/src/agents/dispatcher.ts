@@ -75,7 +75,13 @@ export class Dispatcher {
     const stop = async (status: Exclude<CaseOutcome, 'done'>, reason: string) => {
       // An old query's late cancellation must not cancel a replacement's activation.
       if (activeContext) {
-        try { await store.assertActive(activeContext.activation); }
+        try {
+          if (store.stopActiveCase) {
+            await store.stopActiveCase(activeContext.activation, status, reason);
+            return finish(status, reason);
+          }
+          await store.assertActive(activeContext.activation);
+        }
         catch (error) { return finish('failed', code(error, 'STALE_STOP')); }
       }
       await store.stopCase(request.caseId, status, reason);

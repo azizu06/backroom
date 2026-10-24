@@ -20,6 +20,8 @@ export interface AgentCaseStore extends HandoffStore {
   reject(ctx: ToolContext, request: HandoffRequest, errorCode: string): Promise<HandoffRecord>;
   finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string): Promise<void>;
   stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string): Promise<void>;
+  /** Atomic activation-owned stop, implemented beside memory expiry recovery. */
+  stopActiveCase?(activation: Activation, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string): Promise<void>;
   resumeCase(caseId: string): Promise<void>;
   /** Explicit expiry takeover. Optional until a durable adapter implements the same contract. */
   recoverExpired?(caseId: string): Promise<boolean>;
@@ -96,6 +98,12 @@ export class MemoryHandoffStore implements AgentCaseStore {
   }
   stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string) {
     return this.apply(caseId, s => engine.stopCase(s, { status, reason, now: this.now() }));
+  }
+  stopActiveCase(activation: Activation, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string) {
+    return this.fenced(activation, 'stop', () => this.apply(activation.caseId, s => {
+      engine.assertActive(s, claim(activation), this.now());
+      engine.stopCase(s, { status, reason, now: this.now() });
+    }));
   }
   resumeCase(caseId: string) { return this.apply(caseId, s => engine.resumeCase(s)); }
   async recoverExpired(caseId: string): Promise<boolean> {

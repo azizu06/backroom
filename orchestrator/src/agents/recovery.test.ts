@@ -30,6 +30,8 @@ it('recovers only expired activations in the same case and audits fenced writes 
   expect(second.activation.leaseToken).toBeGreaterThan(first.activation.leaseToken!);
   await expect(store.recordArtifacts(ctx, ['forged:stale'])).rejects.toThrow();
   await expect(store.finish(ctx, 'held')).rejects.toThrow();
+  expect(typeof store.stopActiveCase).toBe('function');
+  await expect(store.stopActiveCase(ctx.activation, 'cancelled', 'CANCELLED')).rejects.toThrow();
   await expect(store.commit(ctx, { to: 'auditor', artifactRefs: ['invoice:4401'], reason: 'stale', summary: 'stale' })).rejects.toThrow();
   const state = (await store.getCase('recovery'))!;
   expect(state.activeActivationId).toBe(second.activation.activationId);
@@ -38,7 +40,7 @@ it('recovers only expired activations in the same case and audits fenced writes 
   expect(state.knownRefs).not.toContain('forged:stale');
   const rows = await audit.listAudit();
   expect(rows.filter(row => row.action === 'agent_activation_recovered')).toHaveLength(1);
-  expect(rows.filter(row => row.action === 'agent_activation_write_rejected')).toHaveLength(4);
+  expect(rows.filter(row => row.action === 'agent_activation_write_rejected')).toHaveLength(5);
   expect((await audit.verifyAuditChain()).valid).toBe(true);
 });
 
