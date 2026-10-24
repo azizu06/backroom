@@ -8,8 +8,9 @@ import { OFFICE_LIGHTING } from '../../../lib/office/lighting';
 import { DESKS } from '../../../lib/office/targets/desk';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './StaticGeometry';
 import type { SceneMountProps } from './types';
+import { ROLES } from '../../../lib/office/palette';
 
-const SCREEN_MATERIAL = new MeshPhysicalMaterial({ color: '#ffffff', emissive: '#ffffff', ...OFFICE_LIGHTING.screen });
+const SCREEN_MATERIAL = new MeshPhysicalMaterial({ color: ROLES.wall, emissive: ROLES.wall, ...OFFICE_LIGHTING.screen });
 // three applies instance colour to the diffuse channel; the original screens also tinted their glow.
 SCREEN_MATERIAL.onBeforeCompile = shader => {
   shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>

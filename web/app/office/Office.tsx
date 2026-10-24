@@ -29,6 +29,7 @@ import { ViewBoundary } from './ViewBoundary';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
+import './lobby.css';
 import './tags.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
