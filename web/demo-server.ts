@@ -1,6 +1,8 @@
 // Single local process: Next route chunks, seats, gateway and controller share globals.
 import next from 'next';
-import { createServer, request as proxyRequest } from 'node:http';
+import { demoBindHost, voiceRelayPath } from '../tools/demo/host';
+import { request as proxyRequest, type RequestListener } from 'node:http';
+import { listenDemo } from '../tools/demo/listen';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDemoRuntime } from './lib/demo/runtime';
@@ -17,7 +19,7 @@ async function main() {
   const handle = app.getRequestHandler();
   const active = new Set<Promise<void>>();
   let resetting = false;
-  const server = createServer(async (req, res) => {
+  const handler: RequestListener = async (req, res) => {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
     if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end(`demo ${runtime.status().bank}; ${process.env.STATE_STORE} state`); return; }
     if (path.startsWith('/__demo/')) {
@@ -74,10 +76,11 @@ async function main() {
       res.writeHead(409).end(); return;
     }
     if (resetting) { res.writeHead(503).end('Demo resetting; retry shortly'); return; }
-    if (path.startsWith('/_cartesia/')) {
+    const relayPath = voiceRelayPath(path);
+    if (relayPath !== undefined) {
       if (process.env.DEMO_VOICE_RUNNING !== '1') { res.writeHead(503).end('Voice relay disabled'); return; }
       const upstream = proxyRequest({ hostname: '127.0.0.1', port: Number(process.env.VOICE_PORT || 8788),
-        path: (req.url || '').slice('/_cartesia'.length), method: req.method,
+        path: relayPath + new URL(req.url || '/', 'http://localhost').search, method: req.method,
         headers: { ...req.headers, host: `127.0.0.1:${process.env.VOICE_PORT || 8788}` }, timeout: 10000 }, response => {
         res.writeHead(response.statusCode || 502, response.headers); response.pipe(res);
       });
@@ -90,12 +93,14 @@ async function main() {
     const settled = () => { active.delete(done); finish(); };
     res.once('finish', settled); res.once('close', settled);
     try { await handle(req, res); } catch { if (!res.headersSent) res.writeHead(500); res.end('Demo request failed'); }
-  });
-  server.listen(port, '127.0.0.1');
+  };
+  const host = demoBindHost(process.env);
+  const listeners = await listenDemo(handler, port, host);
+  console.log(`Demo bound: ${host}:${port}${host === '127.0.0.1' ? '' : ` and 127.0.0.1:${port}`}`);
   let closing = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
     if (closing) return; closing = true;
-    server.close(); void runtime.stop().then(() => app.close()).finally(() => process.exit(0));
+    void listeners.close().then(() => runtime.stop()).then(() => app.close()).finally(() => process.exit(0));
   });
   console.log(`Demo ready: shared state, ${runtime.status().bank}, no phone call placed.`);
 

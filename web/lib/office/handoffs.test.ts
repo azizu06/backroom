@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import type { AgentHandoffPublic } from '@backroom/orchestrator/spacetime-client/types';
 import { HANDOFF_AGENTS, HANDOFF_ROLES, FLOOR_AGENTS, compareHandoffs, handoffFlag, handoffFromRow, handoffGroups, handoffLine, handoffRoute, handoffSpot, needsHandoffHuman } from './handoffs';
 import { insideAny, officeColliders } from './play';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
@@ -43,7 +44,8 @@ describe('handoff public contract', () => {
     expect(handoffGroups([b, c, a])).toEqual([{ caseDisplayId: 'INV-3', rows: [c] }, { caseDisplayId: 'INV-2', rows: [a, b] }]);
   });
   it('projects the public rows through the office adapter without affecting other state', () => {
-    const snapshot = projectOfficeRows({ agents: [], rooms: [], seats: [], badges: [], escalations: [], audit: [], control: [], handoffs: [null, raw] });
+    const publicRow: AgentHandoffPublic = { ...raw, acceptedAt: undefined, completedAt: undefined, decisionRef: undefined, errorCode: undefined };
+    const snapshot = projectOfficeRows({ agents: [], rooms: [], seats: [], badges: [], escalations: [], audit: [], control: [], handoffs: [publicRow] });
     expect(snapshot.handoffs).toEqual([raw]);
     expect(snapshot.agents).toEqual([]);
   });

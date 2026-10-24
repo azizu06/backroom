@@ -1,7 +1,6 @@
-import { handoffFromRow, upsertHandoffs } from './handoffs';
-import { publicHandoffTable } from './handoff-subscription';
+import { projectHandoffRows } from './handoff-subscription';
 import { DbConnection } from '@backroom/orchestrator/spacetime-client';
-import type { Agent, AuditEntry, Badge, Escalation, Room, Seat, RuntimeControl } from '@backroom/orchestrator/spacetime-client/types';
+import type { Agent, AgentHandoffPublic, AuditEntry, Badge, Escalation, Room, Seat, RuntimeControl } from '@backroom/orchestrator/spacetime-client/types';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot, type OfficeAudit, type SeatId } from './state';
 
 export interface OfficeConnectionConfig { uri: string; database: string }
@@ -10,6 +9,7 @@ export const OFFICE_QUERIES = ['agent', 'room', 'seat', 'badge', 'escalation', '
 export interface OfficeRows {
   agents: Agent[]; rooms: Room[]; seats: Seat[]; badges: Badge[];
   escalations: Escalation[]; audit: AuditEntry[]; control: RuntimeControl[];
+  handoffs?: readonly AgentHandoffPublic[];
 }
 function anchor(value: string): AnchorId | undefined {
   const id = value.toLowerCase().replace(/[-_]desk$/, '');
@@ -22,7 +22,7 @@ const object = (value: string): Record<string, unknown> => {
   return parsed as Record<string, unknown>;
 };
 /** Projection only: no permission inference, model call, reducer, or business effect. */
-export function projectOfficeRows(rows: OfficeRows & { handoffs?: readonly unknown[] }): OfficeSnapshot {
+export function projectOfficeRows(rows: OfficeRows): OfficeSnapshot {
   const rooms = rows.rooms.flatMap(row => {
     const id = anchor(row.id);
     return id ? [{ id, rowId: row.id }] : [];
@@ -52,7 +52,7 @@ export function projectOfficeRows(rows: OfficeRows & { handoffs?: readonly unkno
   });
   const inboxReceipts = audit.filter(row => ['submit_inbox_item', 'judge_inbox_decision', 'route_inbox_item'].includes(row.action));
   return { agents, rooms, badges, audit, denials, inboxReceipts, inboxCount: inboxReceipts.length,
-    ...(rows.handoffs ? { handoffs: upsertHandoffs([], rows.handoffs.flatMap(row => { const h = handoffFromRow(row); return h ? [h] : []; })) } : {}),
+    ...(rows.handoffs ? { handoffs: projectHandoffRows(rows.handoffs) } : {}),
     connection: 'live', llmEnabled: rows.control.find(row => row.id === 'global')?.llmEnabled ?? null };
 }
 
@@ -88,7 +88,7 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
           publish(projectOfficeRows({ agents: [...db.db.agent.iter()], rooms: [...db.db.room.iter()],
             seats: [...db.db.seat.iter()], badges: [...db.db.badge.iter()], escalations: [...db.db.escalation.iter()],
             audit: [...db.db.auditEntry.iter()], control: [...db.db.runtimeControl.iter()],
-            handoffs: publicHandoffTable(db.db) ? [...publicHandoffTable(db.db)!.iter()] : undefined,
+            handoffs: [...db.db.agentHandoffPublic.iter()],
           }));
         } catch { failed(); }
       };
@@ -104,15 +104,14 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
             };
             if (!hooked) {
               for (const table of [db.db.agent, db.db.room, db.db.seat, db.db.badge, db.db.escalation, db.db.auditEntry, db.db.runtimeControl,
-                ...[publicHandoffTable(db.db)].filter(table => table !== undefined),
+                db.db.agentHandoffPublic,
               ]) {
                 table.onInsert(changed); table.onUpdate(changed); table.onDelete(changed);
               }
               hooked = true;
             }
             db.subscriptionBuilder().onApplied(() => { applied = true; refresh(db); })
-              .onError(failed).subscribe(publicHandoffTable(db.db) ? OFFICE_QUERIES
-                : OFFICE_QUERIES.filter(query => !query.endsWith('agent_handoff_public')));
+              .onError(failed).subscribe(OFFICE_QUERIES);
           }).onConnectError(failed).onDisconnect(failed).build();
       } catch { failed(); }
     },

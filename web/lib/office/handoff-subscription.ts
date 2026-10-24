@@ -1,10 +1,10 @@
-/** Narrow compatibility boundary until the shared generated #152 bindings land. No private rows. */
-interface PublicHandoffTable {
-  iter(): Iterable<unknown>;
-  onInsert(changed: () => void): void;
-  onUpdate(changed: () => void): void;
-  onDelete(changed: () => void): void;
-}
-export function publicHandoffTable(db: object): PublicHandoffTable | undefined {
-  return (db as { agentHandoffPublic?: PublicHandoffTable }).agentHandoffPublic;
+import type { AgentHandoffPublic } from '@backroom/orchestrator/spacetime-client/types';
+import { handoffFromRow, upsertHandoffs } from './handoffs';
+
+/** Re-project the subscribed public cache, keyed by handoffId. Deletions disappear on refresh too. */
+export function projectHandoffRows(rows: readonly AgentHandoffPublic[]) {
+  return upsertHandoffs([], rows.flatMap(row => {
+    const handoff = handoffFromRow(row);
+    return handoff ? [handoff] : [];
+  }));
 }
