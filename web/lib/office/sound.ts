@@ -14,8 +14,8 @@ export type OneShotCue = Exclude<SoundCue, 'roomTone'>;
 export type CueTimes = Partial<Record<OneShotCue, number>>;
 export const SOUND_PREFERENCE_KEY = 'office.sound';
 export const SOUND_COOLDOWN_MS = 800;
-/** Footsteps arrive several times a second; every other cue keeps the default. */
-export const CUE_COOLDOWN_MS: Partial<Record<OneShotCue, number>> = { step: 120 };
+/** Footsteps are already spaced by distance (>= 150 ms apart at 2x speed); this only stops overlapping cues. Every other cue keeps the default. */
+export const CUE_COOLDOWN_MS: Partial<Record<OneShotCue, number>> = { step: 60 };
 export function cooldownFor(kind: OneShotCue): number { return CUE_COOLDOWN_MS[kind] ?? SOUND_COOLDOWN_MS; }
 
 export function soundPreference(storage?: Pick<Storage, 'getItem'>): 'on' | 'off' {
