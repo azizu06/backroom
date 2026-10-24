@@ -24,3 +24,14 @@ it('bounded live probes hide credential URLs and require successful responses', 
   expect(rows.find(row => row.name === 'LLM OFF')).toMatchObject({ ok: false });
   expect(JSON.stringify(rows)).not.toContain('private-');
 });
+
+it('uses web host service observations even if the health CLI has different credentials', async () => {
+  const hostRows = [{ name: 'Nessie', ok: false, detail: 'unused: web host uses mock bank' },
+    { name: 'CRS', ok: false, detail: 'FAKE fixture client' }];
+  const http = async () => { throw new Error('must not probe CLI credentials'); };
+  const rows = await probeDependencies({ env: { NESSIE_API_KEY: 'wrong-process-key', NESSIE_ACCOUNT_ID: 'wrong-process-account' },
+    status: { llmEnabled: false, stateStore: 'memory', voice: false }, live: true, hostRows, fetch: http });
+  expect(rows.filter(row => row.name === 'Nessie')).toEqual([hostRows[0]]);
+  expect(rows).toContainEqual(hostRows[1]);
+  expect(rows.some(row => row.name === 'Cloud fallback')).toBe(false);
+});

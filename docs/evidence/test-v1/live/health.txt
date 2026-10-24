@@ -1,0 +1,11 @@
+GREEN Web + seats: web responding; shared-process seats
+GREEN SpacetimeDB: adapter connected
+GREEN Cartesia key: present in web host; not a call-readiness test
+GREEN Nessie: web host sandbox adapter read account + posted deposits; not settlement
+GREEN GX10 router: host configured model listed; inference not tested by health
+RED Cloud fallback: Anthropic configured in host; inference not probed by health
+GREEN Apify: live: complete; at most one $0.10 Actor attempt per host
+RED CRS: FAKE fixture client: complete; public records/fraud risk only; OFAC/business credit unavailable
+RED Voice relay: disabled or not configured
+RED Tunnel: disabled
+GREEN LLM control: ON; model calls allowed
