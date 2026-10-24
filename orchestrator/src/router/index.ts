@@ -182,12 +182,13 @@ export function createRouter(options: RouterOptions = {}) {
   }
   /** Cloud-only call for a caller that already observed a local outage on this request. Same OFF,
    * confidence, usage and cost checks as route(); never retries GX10. Text tasks only. */
-  async function fallback<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>): Promise<RouteResult<T> | LlmOffResult> {
+  async function fallback<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>, options: { signal?: AbortSignal } = {}): Promise<RouteResult<T> | LlmOffResult> {
     if (!Object.hasOwn(TASK_ROUTES, taskType) || TASK_ROUTES[taskType] !== 'local' || taskType === 'document_extraction') throw new Error(`Cloud fallback unsupported for task type: ${taskType}`);
-    return run(taskType, input, schema, true);
+    return run(taskType, input, schema, true, options.signal);
   }
-  async function run<T>(taskType: TaskType, input: unknown, schema: OutputSchema<T> | undefined, skipLocal: boolean): Promise<RouteResult<T> | LlmOffResult> {
-    const signal = state().llmSignal;
+  async function run<T>(taskType: TaskType, input: unknown, schema: OutputSchema<T> | undefined, skipLocal: boolean, caller?: AbortSignal): Promise<RouteResult<T> | LlmOffResult> {
+    // A caller's signal (e.g. a cancelled case) stops requests like the global OFF switch does.
+    const signal = caller ? AbortSignal.any([state().llmSignal, caller]) : state().llmSignal;
     if (!state().llmEnabled || signal.aborted) return llmOff();
     if (!Object.hasOwn(TASK_ROUTES, taskType)) throw new Error(`Unsupported task type: ${taskType}; in-call speech belongs to Cartesia`);
     const start = now();
@@ -260,7 +261,7 @@ export function route<T = unknown>(taskType: TaskType, input: unknown, schema?: 
   return singleton.route(taskType, input, schema);
 }
 /** Cloud-only fallback through the process router after a caller's own local attempt failed. */
-export function routeCloudFallback<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>) {
+export function routeCloudFallback<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>, options?: { signal?: AbortSignal }) {
   if (!singleton) { singleton = createRouter(); singleton.start(); }
-  return singleton.fallback(taskType, input, schema);
+  return singleton.fallback(taskType, input, schema, options);
 }
