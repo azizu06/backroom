@@ -236,3 +236,43 @@ test.describe('play mode on a phone', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test('play settings change speed and invert Y, persist per viewer and return focus to the play surface', async ({ page }) => {
+  const errors = await startPlay(page);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Play settings' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("slider", { name: /Look sensitivity/ })).toBeFocused();
+  await expect(dialog).toContainText('Movement speed 1×');
+
+  await dialog.getByRole("slider", { name: /Movement speed/ }).fill('2');
+  await dialog.getByRole("checkbox", { name: /Invert Y/ }).check();
+  await expect(dialog).toContainText('Movement speed 2×');
+  const stored = await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'));
+  expect(JSON.parse(stored ?? '{}')).toEqual({ sensitivity: 1, invertY: true, speed: 2 });
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
+
+  // Walking still works after closing the panel (speed scaling itself is covered by the unit test).
+  const start = await player(page);
+  await page.keyboard.down('w');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('w');
+  const moved = await player(page);
+  expect(start.z - moved.z).toBeGreaterThan(0.3);
+
+  // Leaving and re-entering Play keeps the saved values.
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeFocused();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(dialog).toContainText('Movement speed 2×');
+  await expect(dialog.getByRole("checkbox", { name: /Invert Y/ })).toBeChecked();
+  await dialog.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(dialog).toContainText('Movement speed 1×');
+  expect(await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'))).toBeNull();
+  expect(errors).toEqual([]);
+});

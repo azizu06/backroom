@@ -118,6 +118,8 @@ export class PlayInput {
   readonly joystick: [number, number] = [0, 0];
   lookYaw = 0;
   lookPitch = 0;
+  /** Walking speed multiplier from the viewer's Play settings. */
+  speed = 1;
   press(control: PlayControl) { this.held.add(control); }
   release(control: PlayControl) { this.held.delete(control); }
   setJoystick(x: number, y: number) {
@@ -143,7 +145,7 @@ export function moveIntent(input: PlayInput, yaw: number, dt: number): [number, 
   const side = (input.held.has("right") ? 1 : 0) - (input.held.has("left") ? 1 : 0) + input.joystick[0];
   const length = Math.hypot(ahead, side);
   if (!length || dt <= 0) return [0, 0];
-  const scale = Math.min(1, 1 / length) * WALK_SPEED * dt;
+  const scale = Math.min(1, 1 / length) * WALK_SPEED * input.speed * dt;
   const [fx, fz] = forwardOf(yaw), [rx, rz] = rightOf(yaw);
   return [(fx * ahead + rx * side) * scale, (fz * ahead + rz * side) * scale];
 }
