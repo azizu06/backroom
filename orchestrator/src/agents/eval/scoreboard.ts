@@ -7,6 +7,7 @@ import { northfield, northfieldInvoice } from '../../payables';
 import { runEval, scriptedPersona } from '../../eval/harness';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
+import { evaluatorSourceHash } from './provenance';
 import { score, type Observation } from './score';
 
 // All outbound network attempts fail closed, including accidental provider calls in future adapters.
@@ -133,8 +134,9 @@ const rates = {
 const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
-    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'bank-change.ts', 'score.ts', 'scoreboard.ts'].map(name => {
-      const path = `orchestrator/src/agents/eval/${name}`; return [path, sha(path)];
+    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
+    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'bank-change.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+      const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json'].map(path => [path, sha(path)])),

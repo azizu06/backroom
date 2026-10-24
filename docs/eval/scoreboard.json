@@ -5,12 +5,14 @@
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
     "baseCommit": "7f8ff937bdc2c951f93fa579308c01e562404aac",
+    "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
-      "orchestrator/src/agents/eval/chain.ts": "d41811b04ab5f948002629c650c8d68a06b33812c28dacdaf8237fb72dfd6565",
-      "orchestrator/src/agents/eval/runtime.ts": "85b1f036e317fa7340ec317839c3c580a893ba664712361dabc4942e561c8ab9",
+      "orchestrator/src/agents/eval/chain.ts": "7a0f2b04edf485f82ffce07539506682160ecd6d662838c6d9a602e8da280c4e",
+      "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
-      "orchestrator/src/agents/eval/score.ts": "4ab95756e70dc30739dde0f0781ff9a5cd7a92f315b068ac5436dfc9d09690f0",
-      "orchestrator/src/agents/eval/scoreboard.ts": "eb7631f8c4e8776d8c4a6e43d54a27d294d65f1c57df6c6a1b6b9f0e1e47af86"
+      "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
+      "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
+      "orchestrator/src/agents/eval/scoreboard.ts": "981fd64509e57204bff6947366d544e7cc4dc1816b4314d84084b04b5d583dee"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
