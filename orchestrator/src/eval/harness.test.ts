@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGx10Persona, formatReport, formatSummary, runEval, scriptedPersona } from './harness';
+import { createGx10Persona, formatReport, formatSummary, gradePlanted, runEval, scriptedPersona } from './harness';
 
 describe('eval run', () => {
   it('prints outcome, violations, escalations, and answer-key match for each scenario', async () => {
@@ -24,6 +24,14 @@ describe('eval run', () => {
     expect(lead).toMatchObject({ outcome: 'ALLOW', answerKeyMatch: true, seams: expect.arrayContaining(['gateway:payment_link', 'state:audit']) });
     expect(payable?.seams).toEqual(expect.arrayContaining(['state:audit', 'simulated:nessie']));
     expect(duplicate?.outcome).toBe('ESCALATE');
+    expect(result.reports.find(report => report.id === 'C06')).toMatchObject({ outcome: 'EXACT_PAYMENT_MATCH', seams: expect.arrayContaining(['reconciliation:fixture-feed']) });
+    expect(result.reports.find(report => report.id === 'C07')).toMatchObject({ outcome: 'RECON_UNMATCHED', answerKeyMatch: true });
+    expect(gradePlanted('RECON_SHORT', 'EXACT_PAYMENT_MATCH')).toBe('expected EXACT_PAYMENT_MATCH got RECON_SHORT');
+    expect(gradePlanted(undefined, 'RECON_UNMATCHED')).toBe('planted case not executed');
+    expect(gradePlanted('RECON_UNMATCHED', 'RECON_UNMATCHED')).toBeUndefined();
+    expect(result.reports.find(report => report.id === 'C19')).toMatchObject({ outcome: 'RECON_SHORT' });
+    expect(result.reports.find(report => report.id === 'C20')).toMatchObject({ outcome: 'RECON_DUPLICATE' });
+    expect(result.reports.find(report => report.id === 'C18')).toMatchObject({ outcome: 'ESCALATE,PASSKEY_INVALID', seams: expect.arrayContaining(['passkey:voice-rejected']) });
     expect(duplicate?.seams).not.toContain('simulated:nessie');
     expect(result.reports.filter(report => report.answerKeyMatch)).toHaveLength(result.reports.length);
   });
