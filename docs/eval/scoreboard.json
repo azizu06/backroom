@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "37cc03f298e83b756104952fe25e93d65a248780",
+    "baseCommit": "3094f8a16e1d8d91af0015ec886f2b429a3b0c92",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
@@ -241,7 +241,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -347,7 +350,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -480,7 +484,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -586,7 +593,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -729,7 +737,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -872,7 +881,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1015,7 +1025,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1158,7 +1169,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1301,7 +1313,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1444,7 +1457,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1587,7 +1601,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1730,7 +1745,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1873,7 +1889,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2016,7 +2033,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2159,7 +2177,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2302,7 +2321,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2445,7 +2465,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2588,7 +2609,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2731,7 +2753,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2874,7 +2897,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3017,7 +3041,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3160,7 +3185,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3303,7 +3329,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3435,6 +3462,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -3535,6 +3565,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -3631,7 +3664,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -3737,7 +3773,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3870,7 +3907,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -3976,7 +4016,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4119,7 +4160,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4262,7 +4304,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4405,7 +4448,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4548,7 +4592,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4691,7 +4736,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4834,7 +4880,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4977,7 +5024,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5120,7 +5168,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5263,7 +5312,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5406,7 +5456,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5549,7 +5600,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5692,7 +5744,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5835,7 +5888,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5978,7 +6032,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6121,7 +6176,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6264,7 +6320,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6407,7 +6464,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6550,7 +6608,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6693,7 +6752,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6825,6 +6885,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -6925,6 +6988,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -7021,7 +7087,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -7127,7 +7196,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7264,7 +7334,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -7370,7 +7443,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7517,7 +7591,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7664,7 +7739,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7811,7 +7887,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7958,7 +8035,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8105,7 +8183,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8252,7 +8331,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8399,7 +8479,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8546,7 +8627,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8693,7 +8775,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8840,7 +8923,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8987,7 +9071,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9134,7 +9219,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9281,7 +9367,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9428,7 +9515,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9575,7 +9663,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9722,7 +9811,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9869,7 +9959,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10016,7 +10107,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10163,7 +10255,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10299,6 +10392,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -10399,6 +10495,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -10495,7 +10594,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -10595,6 +10697,9 @@
         ],
         "ruleIds": [
           "LOOKALIKE_DOMAIN"
+        ],
+        "evidenceRuleIds": [
+          "LOOKALIKE_DOMAIN"
         ]
       },
       "result": {},
@@ -10692,7 +10797,10 @@
           "ACCOUNT_DIFFERS_FROM_MASTER",
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -10798,7 +10906,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -10943,7 +11052,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -11077,6 +11187,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -11176,6 +11289,9 @@
           "SITE_UNREACHABLE"
         ],
         "ruleIds": [
+          "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER"
         ]
       },
@@ -11283,7 +11399,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -11613,7 +11730,9 @@
       "actualRules": [
         "BANK_CHANGE_HOLD"
       ],
-      "reportedSignalRules": [],
+      "reportedSignalRules": [
+        "BANK_CHANGE_HOLD"
+      ],
       "exactRuleMatch": true,
       "runtime": {
         "status": "held",
@@ -11670,7 +11789,9 @@
       "actualRules": [
         "BANK_CHANGE_HOLD"
       ],
-      "reportedSignalRules": [],
+      "reportedSignalRules": [
+        "BANK_CHANGE_HOLD"
+      ],
       "exactRuleMatch": true,
       "runtime": {
         "status": "held",
@@ -11884,7 +12005,6 @@
         "OFAC_STOP"
       ],
       "reportedSignalRules": [
-        "PAYEE_NOT_IN_MASTER",
         "OFAC_STOP"
       ],
       "exactRuleMatch": true,
@@ -13037,7 +13157,10 @@
           "ACCOUNT_DIFFERS_FROM_MASTER",
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -13143,7 +13266,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -15315,18 +15439,6 @@
     ]
   },
   "gaps": [
-    {
-      "id": "P03/1:signals",
-      "detail": "Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct."
-    },
-    {
-      "id": "P04/0:signals",
-      "detail": "Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct."
-    },
-    {
-      "id": "P07/0:signals",
-      "detail": "Tool signal list [PAYEE_NOT_IN_MASTER,OFAC_STOP] differs from key [OFAC_STOP]; authoritative sealed decision is [OFAC_STOP]. Signal lists and decision rules are distinct."
-    },
     {
       "id": "P01",
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
