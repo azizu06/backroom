@@ -11,7 +11,7 @@
       "orchestrator/src/agents/eval/conversation.ts": "405f533151f8fab92f53be87b882d80415e3700a4ea9fb52aeccaad0f4d43dfc",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
-      "orchestrator/src/agents/eval/call-button.ts": "474b7e48cfd33efacede88e6aeb0cf1f3ef1dfb4b8d9ca67e1c3c9fff2194707",
+      "orchestrator/src/agents/eval/call-button.ts": "c94265f4aee67eddd8b6368e1415ace8ee71f13f277940625b5e931ea7c29729",
       "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
@@ -19,7 +19,7 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "6632e7640bfdc61ef03e1df676f5068067d13ba004fce03512b3fe85c248db07"
+      "orchestrator/src/agents/eval/scoreboard.ts": "d0bd3c909cfe5b165611432e8c0b4b6055f90230c5b0d4bc55da85d95e0b938c"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -63,7 +63,7 @@
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
     "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
-    "callButton": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs the collections line; its fetch posts to that admin dial and returns the admin status/body. dial() is a stub that records providerRequest() and performs no HTTP. A body that includes a phone number is rejected before the relay. No CRS, Apify, model, or live dial.",
+    "callButton": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. No network and no Cartesia.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
@@ -14313,19 +14313,27 @@
     "blocked": {
       "status": 409,
       "error": "PRECALL_BLOCKED",
+      "providerAttempts": 0,
+      "admin": {
+        "status": 409,
+        "body": "PRECALL_BLOCKED:Credit/OFAC check unavailable"
+      },
       "audit": {
         "outcome": "refused",
         "code": "PRECALL_BLOCKED",
         "detail": "Credit/OFAC check unavailable"
       },
-      "dialCalls": 0,
-      "providerRequests": 0
+      "adminAudit": {
+        "action": "CALL_BLOCKED_PRECALL",
+        "ruleIds": [],
+        "reason": "Credit/OFAC check unavailable"
+      }
     },
     "invalid": {
       "status": 400,
       "error": "INVALID_REQUEST",
-      "dialCalls": 0,
-      "providerRequests": 0
+      "providerAttempts": 0,
+      "relayCalls": 0
     },
     "ready": {
       "status": 200,
@@ -14335,10 +14343,9 @@
         "outcome": "accepted",
         "code": "DIAL_ACCEPTED"
       },
-      "dialCalls": 1,
-      "providerRequests": 1
+      "providerAttempts": 1
     },
-    "scope": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs the collections line; its fetch posts to that admin dial and returns the admin status/body. dial() is a stub that records providerRequest() and performs no HTTP. A body that includes a phone number is rejected before the relay. No CRS, Apify, model, or live dial."
+    "scope": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. No network and no Cartesia."
   },
   "legacy": {
     "signoff": "approved",
