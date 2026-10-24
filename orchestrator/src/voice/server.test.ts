@@ -55,6 +55,7 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
   it('records tool-only assistant turns without text without unlocking disclosure or identity', async () => {
     const f = await fixture();
     const turn = { role: 'assistant', was_interrupted: false, tool_calls: [{ name: 'verify_identity_result', arguments: { result: 'confirmed' }, result: '{}' }] };
+    expect((await f.event('null-tool-only', { ...turn, text: null })).status).toBe(200);
     const receipt = await f.event('tool-only', turn);
     expect(receipt.status).toBe(200);
     expect(await (await f.event('tool-only', turn)).json()).toEqual({ duplicate: true });
