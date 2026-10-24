@@ -31,8 +31,8 @@ export type HealthSignal = HealthEvidence & (
   | { type: 'maps_status'; value: 'operating' | 'permanently_closed' | 'temporarily_closed' | 'unknown' }
   | { type: 'distress_news' | 'phone_match' | 'website_reachable'; value: boolean }
 );
-export interface HealthResult { signals: readonly HealthSignal[] }
-export interface HealthCheck { check(company: PublicCompany, signal: AbortSignal): Promise<HealthResult> }
+export interface HealthResult { signals: readonly HealthSignal[]; apifyRunId?: string }
+export interface HealthCheck { label?: string; check(company: PublicCompany, signal: AbortSignal): Promise<HealthResult> }
 /** No free-form instructions or speech. Code renders the validated choices and amounts. */
 export interface CallPlan {
   tone: 'neutral' | 'empathetic';

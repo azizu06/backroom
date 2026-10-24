@@ -1,0 +1,52 @@
+{
+  "measuredAt": "2026-10-24T09:26:09.587Z",
+  "actorId": "WQJ4xRGzZN1xj967Z",
+  "build": "0.0.3",
+  "company": {
+    "name": "Kim's Island Chinese Restaurant, Staten Island, New York",
+    "website": "http://kimsislandsi.com/"
+  },
+  "runId": "guBODDnPcXO4bX1Ph",
+  "latencyMs": 2358,
+  "status": "complete",
+  "signals": [
+    {
+      "observedAt": "2026-10-24T09:26:09.066Z",
+      "sourceUrl": "http://kimsislandsi.com/",
+      "type": "website_reachable",
+      "value": true
+    }
+  ],
+  "label": "Apify: live run guBODDnPcXO4bX1Ph",
+  "chainValid": true,
+  "limits": {
+    "maxTotalChargeUsd": 0.1,
+    "actorTimeoutSecs": 35,
+    "preCallDeadlineSecs": 40,
+    "mapsRuns": 0,
+    "retries": 0
+  },
+  "simulated": [
+    "AR company/client/consent",
+    "CRS",
+    "call plan/model",
+    "phone call",
+    "Nessie",
+    "controller passkey"
+  ],
+  "note": "T5 public-company probe is separate from the synthetic AR company; website signal only, no fresh Maps claim. Initial core demo used its fixed clock for the health audit (0 ms); end-to-end latency was measured with performance.now. Live health audit now uses wall time.",
+  "healthLatencyMs": 0,
+  "latencyScope": "complete core demo including the Apify pre-call",
+  "platform": {
+    "status": "SUCCEEDED",
+    "buildNumber": "0.0.3",
+    "startedAt": "2026-10-24T09:26:07.659Z",
+    "finishedAt": "2026-10-24T09:26:09.305Z",
+    "usageTotalUsd": 0.00006043649558226268,
+    "options": {
+      "timeoutSecs": 35,
+      "memoryMbytes": 128,
+      "maxTotalChargeUsd": 0.1
+    }
+  }
+}

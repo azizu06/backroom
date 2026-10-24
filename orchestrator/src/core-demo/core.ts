@@ -4,7 +4,7 @@ import { MemoryStateStore, SeatWorker, FakeEffects, routeInboxItem, createRouter
 import { northfield } from '../payables';
 import { askWhy, type WhyAuditEntry } from '../why';
 import type { AuditEntry, StateStore } from '../store';
-import { runPreCall, createCallPlanner, fakeCreditCheck, fakeHealthCheck, type CallPlanner } from '../collections';
+import { runPreCall, createCallPlanner, fakeCreditCheck, createPreCallHealthCheck, APIFY_DEMO_COMPANY, type CallPlanner } from '../collections';
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
 import { createApprovalBridge } from '../../../web/lib/approvals/gateway';
@@ -30,7 +30,7 @@ const requireThat: (condition: unknown, message: string) => asserts condition = 
 };
 export function verifyChain(entries: AuditEntry[]): boolean { return verifyAudit(entries).valid; }
 
-export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string; store?: StateStore; planner?: CallPlanner; now?: () => number } = {}) {
+export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string; store?: StateStore; planner?: CallPlanner; now?: () => number; apify?: 'live' } = {}) {
   const NOW = options.now?.() ?? Date.parse('2026-10-24T18:00:00Z');
   const store = options.store ?? new MemoryStateStore();
   const gatewayStore = new MemoryGatewayStore([baseCall()], store);
@@ -56,30 +56,32 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
 
   await store.registerAgent('collections-demo', 'collections', NOW);
   await store.enqueueTask({ id: 'collect-1042', seatId: 'collections', refs: ['1042'], idempotencyKey: 'ar:1042:1', steps: [] });
-  const lease = await store.claimTask('collections-demo', NOW, options.planner ? 60000 : 12000);
+  const lease = await store.claimTask('collections-demo', NOW, options.planner || options.apify === 'live' ? 60000 : 12000);
   requireThat(lease, 'collection lease missing');
   await store.insertInvoice({ id: '1042', kind: 'ar', state: 'overdue' });
-  // Real #17 pipeline with explicit synthetic CRS/Apify/model transports.
+  // Real #17 pipeline; CRS/model stay synthetic, Apify is separately opt-in.
   if (seedClient.type !== 'business' && seedClient.type !== 'consumer') throw new Error('CORE_DEMO: invalid seed client type');
   const context: Context = { client: { ...seedClient, type: seedClient.type, localWeekday: 6, localHour: 11 },
     demoOverride: { visible: true, logged: true }, signals: {} };
-  transcript.push('DEMO_OVERRIDE visible + logged: synthetic Saturday call. Pre-call signals: FAKE clear CRS/Apify.');
+  transcript.push(`DEMO_OVERRIDE visible + logged: synthetic Saturday call. CRS: FAKE clear; Apify: ${options.apify === 'live' ? 'live requested (T5 public company)' : 'FAKE'}.`);
   await store.appendAudit({ ts: NOW, actor: 'system', seat: 'collections', action: 'fake_pre_call_signals',
     ruleIds: ['DEMO_FIXTURE'], policyVersion: 1, refs: ['1042'], route: 'test_stub',
-    inputs: { simulated: true, context }, latencyMs: 0, costUsd: 0 });
+    inputs: { simulated: true, context, apify: options.apify ?? 'fake' }, latencyMs: 0, costUsd: 0 });
   const fixtureRouter = createRouter({ stateStore: store, cloudApiKey: 'test-fixture', cloudModel: 'scripted-fixture',
     now: () => NOW, fetch: async () => Response.json({ choices: [{ message: { content: JSON.stringify({
       confidence: 1, output: { tone: 'neutral', offerOrder: ['pay_in_full', 'installments'],
         plan: { installments: 2, firstPaymentPct: 50, totalDays: 30, waiveFees: false, discountPct: 0 } },
     }) } }], usage: { cost: 0 } }) });
   const preCall = await runPreCall({ clientId: seedClient.id, invoiceId: '1042', testIdentityId: 7,
-    company: { name: seedClient.name, website: 'https://example.com' }, context }, {
+    company: options.apify === 'live' ? APIFY_DEMO_COMPANY : { name: seedClient.name, website: 'https://example.com' }, context }, {
     credit: fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] }),
-    health: fakeHealthCheck({ signals: [] }), planner: options.planner ?? createCallPlanner({ cloudRoute: fixtureRouter.route }),
+    health: createPreCallHealthCheck({ ...process.env, PRECALL_APIFY: options.apify === 'live' ? 'live' : 'fake' }), planner: options.planner ?? createCallPlanner({ cloudRoute: fixtureRouter.route }),
     audit: { appendAudit: entry => store.appendAudit(entry.action === 'call_plan' && !options.planner
       ? { ...entry, actor: 'system', route: 'test_stub' } : entry) },
-    escalate: async decision => { await store.createEscalation(lease, decision, NOW); }, now: () => NOW,
+    escalate: async decision => { await store.createEscalation(lease, decision, NOW); }, now: options.now ?? (options.apify === 'live' ? Date.now : () => NOW),
   });
+  const healthAudit = (await store.listAudit()).find(entry => entry.action === 'health_check');
+  transcript.push(`Pre-call health: ${healthAudit?.inputs?.label ?? 'FAKE'}; ${healthAudit?.inputs?.status ?? 'pending'}.`);
   requireThat(preCall.status === 'ready', `pre-call ${preCall.status}${preCall.status === 'ready' ? '' : ': ' + preCall.reason}${preCall.status === 'blocked' && preCall.decision ? ' [' + preCall.decision.ruleIds.join(',') + ']' : ''}`);
   // Recheck permission at the simulated dial boundary after preparation.
   const permit = evaluate('collections', { type: 'call_client' }, context);
