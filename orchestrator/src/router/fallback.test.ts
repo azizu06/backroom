@@ -31,3 +31,21 @@ it('fallback() rejects low-confidence cloud output like route()', async () => {
   const router = createRouter({ stateStore: new MemoryStateStore(), anthropicApiKey: 'test', fetch: http });
   await expect(router.fallback('field_extraction', 'x')).rejects.toThrow('confidence too low');
 });
+
+it('fallback() never starts a cloud request for a caller that is already cancelled', async () => {
+  const http = vi.fn<typeof fetch>();
+  const router = createRouter({ stateStore: new MemoryStateStore(), anthropicApiKey: 'test', fetch: http });
+  const controller = new AbortController();
+  controller.abort('CANCELLED');
+  expect(await router.fallback('field_extraction', 'x', undefined, { signal: controller.signal })).toMatchObject({ kind: 'LLM_OFF' });
+  expect(http).not.toHaveBeenCalled();
+});
+
+it('fallback() aborts an in-flight cloud request when the caller cancels', async () => {
+  const controller = new AbortController();
+  let seen: AbortSignal | undefined;
+  const http: typeof fetch = async (_url, init) => { seen = init?.signal ?? undefined; controller.abort('CANCELLED'); throw new DOMException('aborted', 'AbortError'); };
+  const router = createRouter({ stateStore: new MemoryStateStore(), anthropicApiKey: 'test', fetch: http });
+  expect(await router.fallback('field_extraction', 'x', undefined, { signal: controller.signal })).toMatchObject({ kind: 'LLM_OFF' });
+  expect(seen?.aborted).toBe(true);
+});
