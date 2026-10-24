@@ -145,3 +145,28 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   await expect(dialog.locator('code')).toHaveText(/^preview-denial-\d+$/);
   expect(errors).toEqual([]);
 });
+
+test.describe('play mode on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('caption shows the touch hint and the joystick is visible', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/office');
+    await requireWebGL(page);
+    const select = page.getByLabel('Office view');
+    await expect(select).toBeEnabled();
+    // Narrow screens may prefer another initial view; retry until hydrated so the pick sticks.
+    await expect(async () => {
+      await select.selectOption({ label: 'Play (first person)' });
+      await expect(surface(page)).toBeVisible({ timeout: 1_000 });
+    }).toPass();
+    await expect(select).toHaveValue('play');
+    const caption = page.getByTestId('office-viewport').locator('.office-caption');
+    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Exit Play to leave');
+    await expect(caption).not.toContainText('WASD');
+    await expect(page.locator('.play-joystick')).toBeVisible();
+    await expect(page.locator('.play-touch-hint')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
