@@ -8,11 +8,13 @@ import { isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
-import { INITIAL_VIEWPORT, boundaryStateForProps, reportViewFailure, viewportLayers, viewportReducer, type BoundaryState, type ViewMode } from '../../lib/office/view';
+import { INITIAL_VIEWPORT, boundaryStateForProps, isFixedCamera, reportViewFailure, viewportLayers, viewportReducer, type BoundaryState, type ViewMode } from '../../lib/office/view';
+import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStops } from '../../lib/office/tour';
 import { OfficeLobby } from './OfficeLobby';
-import type { RoomLabels } from './scene';
+import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
+import './tags.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -121,6 +123,42 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
   function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
+  const tagElements = useRef(new Map<string, HTMLDivElement>());
+  const agentTag = useCallback<AgentTagLookup>(id => tagElements.current.get(id), []);
+  const touring = mode === 'tour';
+  const [tour, setTour] = useState<{ stops: AnchorId[]; index: number } | null>(null);
+  const rooms = visibleRooms(snapshot);
+  const roomsRef = useRef(rooms);
+  roomsRef.current = rooms;
+  const stopTour = useCallback(() => dispatch({ type: 'endTour' }), []);
+  // The tour only moves the camera: each stop is a focus change, and finishing returns to the full floor.
+  useEffect(() => {
+    if (!touring) return;
+    const stops = tourStops(roomsRef.current);
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setInspecting(null);
+    function step() {
+      const index = tourIndexAt(Date.now() - started, stops.length);
+      if (index === null) {
+        setFocus(null);
+        dispatch({ type: 'endTour' });
+        return;
+      }
+      setTour({ stops, index });
+      setFocus(stops[index]!);
+      timer = setTimeout(step, Math.max(0, started + (index + 1) * TOUR_STEP_MS - Date.now()));
+    }
+    step();
+    return () => { clearTimeout(timer); setTour(null); };
+  }, [touring]);
+  // Added after the switch to the tour commits, so the select interaction that started it does not cancel it.
+  useEffect(() => {
+    if (!touring) return;
+    for (const type of TOUR_INTERRUPT_EVENTS) window.addEventListener(type, stopTour, { capture: true, passive: true });
+    return () => { for (const type of TOUR_INTERRUPT_EVENTS) window.removeEventListener(type, stopTour, { capture: true }); };
+  }, [touring, stopTour]);
+  const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
   }, []);
@@ -144,7 +182,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
         <label htmlFor='office-view'>View <select id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
-          <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option>
+          <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option><option value='tour'>Tour</option>
         </select></label>
       </div>
     </header>
@@ -159,8 +197,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={mode === 'tween'} paused={!layers.scene.visible} focus={focus} labels={labels} onFailure={onFailure} onRestored={onRestored} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} />
           </div>
+          {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
+          {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
+            ref={element => { if (!element) return; tagElements.current.set(agent.id, element); return () => { if (tagElements.current.get(agent.id) === element) tagElements.current.delete(agent.id); }; }}>
+            <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
+          </div>)}</div>}
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
@@ -172,7 +215,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         </>}
       </ViewBoundary>
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
+      <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
+      {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
     <footer className='office-footer'>
