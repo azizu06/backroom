@@ -20,7 +20,8 @@
     "demo:reset": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts reset",
     "demo:down": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts down",
     "demo:health": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts health",
-    "demo:live": "pnpm --filter @backroom/orchestrator exec tsx src/core-demo/live.ts"
+    "demo:live": "pnpm --filter @backroom/orchestrator exec tsx src/core-demo/live.ts",
+    "demo:burst": "pnpm --filter @backroom/orchestrator exec tsx src/burst/cli.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3"

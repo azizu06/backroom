@@ -1,0 +1,161 @@
+{
+  "measuredAt": "2026-10-24T13:29:21.268Z",
+  "steps": [
+    {
+      "name": "01-controller",
+      "detail": "Real verifier, Chromium software authenticator; no human biometrics"
+    },
+    {
+      "name": "02-four-payments",
+      "detail": "Four-payment escalation with immutable policy evidence"
+    },
+    {
+      "name": "03-denied",
+      "detail": "Passkey denial recorded while LLM ON"
+    },
+    {
+      "name": "04-pay",
+      "detail": "Real Nessie sandbox deposit/reuse and exact reconciliation; display is not settlement"
+    },
+    {
+      "name": "05-inbox-4419",
+      "detail": "Frozen typed trap held by code with LLM ON"
+    },
+    {
+      "name": "05-inbox-4471",
+      "detail": "Frozen typed trap held by code with LLM ON"
+    },
+    {
+      "name": "06-audit-link",
+      "detail": "Inbox link opens its exact audit entry; full chain verifies"
+    },
+    {
+      "name": "07-ask-why-live",
+      "detail": "Web host Anthropic model answer with verified citations"
+    },
+    {
+      "name": "08-real-vs-sim",
+      "detail": "Process observations, not a claim that separate live probes ran here"
+    },
+    {
+      "name": "09-policy-v2",
+      "detail": "Saved max 3; subsequent three-payment gateway request ALLOW"
+    },
+    {
+      "name": "live-freeform-inbox",
+      "detail": "GX10 classification + local-first routed field extraction, code holds the trap",
+      "modelEvidence": [
+        {
+          "action": "inbox_classified",
+          "route": "local",
+          "costUsd": 0,
+          "latencyMs": 1726.2874999999985,
+          "model": "gpt-oss:20b"
+        },
+        {
+          "action": "fields_extracted",
+          "route": "local",
+          "costUsd": 0,
+          "latencyMs": 5003.447875000013,
+          "model": "gpt-oss:20b"
+        }
+      ]
+    },
+    {
+      "name": "10-office-orbit",
+      "detail": "Local loopback Spacetime subscription connected"
+    },
+    {
+      "name": "11-office-fixed",
+      "detail": "Fixed camera fallback"
+    },
+    {
+      "name": "11-room-lobby",
+      "detail": "Manual camera preset: Lobby"
+    },
+    {
+      "name": "11-room-collections",
+      "detail": "Manual camera preset: Collections"
+    },
+    {
+      "name": "11-room-payables",
+      "detail": "Manual camera preset: Payables"
+    },
+    {
+      "name": "11-room-vendor",
+      "detail": "Manual camera preset: Vendor Desk"
+    },
+    {
+      "name": "11-room-danas",
+      "detail": "Manual camera preset: Dana’s desk"
+    },
+    {
+      "name": "11-room-treasury",
+      "detail": "Manual camera preset: Treasury · Locked"
+    },
+    {
+      "name": "12-office-plan",
+      "detail": "Same subscribed state in 2D"
+    },
+    {
+      "name": "office-tour",
+      "detail": "Available modes: Orbit camera, Fixed camera, Floor plan"
+    }
+  ],
+  "errors": [],
+  "state": "spacetime",
+  "bank": "nessie_sandbox",
+  "llm": "ON",
+  "services": {
+    "model": {
+      "mode": "GX10_then_Anthropic",
+      "cloud": "configured_not_probed"
+    },
+    "nessie": {
+      "mode": "sandbox"
+    },
+    "apify": {
+      "mode": "live",
+      "status": "complete",
+      "runId": "zfahKaaV3oAVtzlJI"
+    },
+    "crs": {
+      "mode": "FAKE",
+      "status": "complete",
+      "products": [
+        "publicRecords",
+        "fraudRisk"
+      ],
+      "ofac": "unavailable",
+      "businessCredit": "unavailable"
+    }
+  },
+  "whyResult": {
+    "answer": "Invoice 1042 was escalated because a propose_plan action in the collections seat was evaluated against rule MAX_INSTALLMENTS and its outcome was recorded as escalated [entry:8183a61b-7a7e-4702-8fb0-db21c24fa6c4]. A create_escalation action by code then recorded the escalation under the same rule, with the propose_plan entry among its evidence references [entry:audit:3]. The audit entries do not give the specific installment count or limit that triggered the rule, so the exact reason for exceeding it is unavailable. Separately, another propose_plan action and a send_payment_link action for this invoice were each recorded as allowed under rule IN_BADGE [entry:c0ae998d-6967-4fad-be13-c7ae92e1503e] [entry:7d4516cb-fee0-4972-baf1-8078d68a6df7].",
+    "citations": [
+      "8183a61b-7a7e-4702-8fb0-db21c24fa6c4",
+      "audit:3",
+      "c0ae998d-6967-4fad-be13-c7ae92e1503e",
+      "7d4516cb-fee0-4972-baf1-8078d68a6df7"
+    ],
+    "source": "model"
+  },
+  "modelEvidence": [
+    {
+      "action": "inbox_classified",
+      "route": "local",
+      "costUsd": 0,
+      "latencyMs": 1726.2874999999985,
+      "model": "gpt-oss:20b"
+    },
+    {
+      "action": "fields_extracted",
+      "route": "local",
+      "costUsd": 0,
+      "latencyMs": 5003.447875000013,
+      "model": "gpt-oss:20b"
+    }
+  ],
+  "passkey": "software test authenticator",
+  "phone": "not dialed"
+}

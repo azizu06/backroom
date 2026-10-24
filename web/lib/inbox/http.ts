@@ -38,6 +38,7 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
     if (!text.trim() && !file) return json({ error: 'Type a scenario or choose an attachment.' }, 400);
     try {
       const state = (options.store ?? getStateStore)();
+      const fileBytes = file ? Buffer.from(await file.arrayBuffer()) : undefined;
       const id = `judge:${randomUUID()}`;
       let seat: 'payables' | 'vendor_onboarding' = 'payables';
       let fields: InvoiceFields | VendorFields | null = null;
@@ -65,21 +66,23 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       const seeded = preset ? presetFields(preset) : undefined;
       if (seeded) { fields = seeded; seat = seeded.kind === 'invoice' ? 'payables' : 'vendor_onboarding'; }
       const result = seeded ? seeded.kind === 'invoice' ? await payables.process(seeded, source) : await vendor.propose(seeded, source) : await processInbox({ id, source: 'judge', kind: kind as 'email' | 'invoice',
-        senderDomain: sender.trim().toLowerCase(), text: file ? '' : text }, {
+        senderDomain: sender.trim().toLowerCase(), text, ...(file && fileBytes ? { attachment: { mediaType: file.type, bytes: fileBytes } } : {}) }, {
         state, controller, modelRoute: options.modelRoute,
         payables: { process: async (value, source) => { fields = value; seat = 'payables'; return payables.process(value, source); } },
         vendor: { propose: async (value, source) => { fields = value; seat = 'vendor_onboarding'; return vendor.propose(value, source); } },
       });
       const attachment = file ? { name: file.name.slice(0, 200), type: file.type, size: file.size,
-        sha256: createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex') } : null;
+        sha256: createHash('sha256').update(fileBytes!).digest('hex') } : null;
       const entry = await state.appendAudit({ ts: Date.now(), actor: 'code', seat, action: 'judge_inbox_decision',
         decision: result.decision.kind, ruleIds: result.decision.ruleIds, policyVersion: result.decision.policyVersion,
         refs: [id, ...result.evidenceRefs, ...(result.escalationId ? [result.escalationId] : [])], route: 'code', latencyMs: 0, costUsd: 0,
         inputs: { scenario_source: 'judge', extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized', decision: result.decision, fields, attachment,
-          text, senderDomain: sender, kind, attachmentParsed: false } });
-      return json({ id, scenario_source: 'judge', seat, fields, ...result, attachment,
+          text, senderDomain: sender, kind, attachmentParsed: !!file && !!fields } });
+      const documentRoute = 'documentRoute' in result ? result.documentRoute : null;
+      const documentModelAttempted = 'documentModelAttempted' in result && result.documentModelAttempted;
+      return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
         extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
-        notice: file ? 'Attachment fingerprint recorded. File contents are not parsed or retained; held for human review. Paste the relevant text to test extraction.'
+        notice: file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. No bank debit is configured. File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
           : 'Synthetic Northfield company. No bank debit or live vendor verification is configured. Approvals require the controller’s passkey.',
         auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay` });
     } catch { return json({ error: 'Intake could not record a decision. Try again; no payment was submitted.' }, 503); }

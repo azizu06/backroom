@@ -125,3 +125,12 @@ VendorSeat treats a matching current approved account as already applied, only
 when both domains match and there is no pending change or sanctions signal.
 A different account still needs verification and the bound controller passkey
 workflow; resending an approved change does not reopen that workflow.
+
+## Optional x402 testnet rail (#7)
+
+`PAYMENT_RAIL=x402` selects the server-only x402 adapter; unset remains Nessie.
+The approved master must hold the exact `x402:eip155:84532:<wallet>` account ID.
+Existing policy, sender/PO/master/duplicate checks and reservations still apply;
+the adapter reruns policy before signing. Preserve `SeatResult.paymentRail` when
+showing receipts. Setup, endpoint contracts, testnet receipt and persistence
+limits: [`docs/x402.md`](../../../docs/x402.md).
