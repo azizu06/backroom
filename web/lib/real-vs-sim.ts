@@ -1,6 +1,10 @@
 import type { ServiceProbe } from './demo-probes';
 
 export type ServiceId = 'phone' | 'claude' | 'gx10' | 'apify' | 'policy' | 'spacetime';
+/** Sandbox services that carry a status only when the demo web host reports one. */
+export type HostSandboxId = 'nessie' | 'crs';
+export type StatusId = ServiceId | HostSandboxId;
+export const hostSandboxServices = ['nessie', 'crs'] as const satisfies readonly HostSandboxId[];
 export type DisclosureItem = {
   id: ServiceId | 'crs' | 'nessie' | 'company' | 'card';
   kind: 'real' | 'sandbox';
@@ -10,9 +14,9 @@ export type DisclosureItem = {
 
 export const disclosureItems = [
   { id: 'phone', kind: 'real', label: 'Phone call', description: 'A real voice connection through Cartesia. Verified from the latest voice webhook receipt written by the call receiver.' },
-  { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments. Verified from a committed route receipt plus a credential present in this process; no paid call is made per page load.' },
+  { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments. Verified from a committed route receipt, or from validated pre-call inference in this demo host; no paid call is made per page load.' },
   { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
-  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt.' },
+  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run in this demo host.' },
   { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
   { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live SpacetimeDB database probe, or shown as a fixture when the in-memory store is used.' },
   { id: 'crs', kind: 'sandbox', label: 'CRS test identities', description: 'Sandbox identities only; no real customer credit reports.' },
@@ -53,7 +57,7 @@ export type DemoStatus = {
     checkedAt: string | null;
   } | null;
   probesCheckedAt?: string | null;
-  services?: Partial<Record<ServiceId, ServiceProbe>>;
+  services?: Partial<Record<StatusId, ServiceProbe>>;
 };
 export type DisclosureStatus = { label: string; tone: 'neutral' | 'good' | 'warning'; detail?: string };
 
@@ -83,10 +87,15 @@ function probeStatus(probe: ServiceProbe, now: number): DisclosureStatus {
 }
 
 export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | null, now = Date.now()): DisclosureStatus {
-  if (item.kind === 'sandbox') return { label: 'Simulated', tone: 'neutral' };
   const unverified: DisclosureStatus = { label: 'Unverified', tone: 'neutral' };
   // Do not retain an ON/online claim after a disconnected or stalled status poll.
-  if (!status || !Number.isFinite(Date.parse(status.measuredAt)) || now - Date.parse(status.measuredAt) > STATUS_MAX_AGE_MS) return unverified;
+  const current = !!status && Number.isFinite(Date.parse(status.measuredAt)) && now - Date.parse(status.measuredAt) <= STATUS_MAX_AGE_MS;
+  if (item.kind === 'sandbox') {
+    // Sandbox rows stay Simulated unless the demo host reports their adapter; a sandbox is never 'real'.
+    const probe = current && (hostSandboxServices as readonly string[]).includes(item.id) ? status!.services?.[item.id as HostSandboxId] : undefined;
+    return probe ? probeStatus(probe, now) : { label: 'Simulated', tone: 'neutral' };
+  }
+  if (!current || !status) return unverified;
   if (['phone', 'claude', 'gx10'].includes(item.id) && !status.llmEnabled) return { label: 'LLM OFF', tone: 'warning' };
   const id = item.id as ServiceId;
   if (status.notProbed?.includes(id)) return { label: NOT_PROBED_LABEL, tone: 'neutral' };
