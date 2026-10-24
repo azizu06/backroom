@@ -1,8 +1,15 @@
 import { expect, it, vi } from 'vitest';
 import type { Decision } from '@backroom/policy';
-import { runPreCall } from './index';
-import { createPreCallCreditCheck } from './crs';
+import { runPreCall, type PreCallInput } from './index';
+import { createCrsFixtureClient } from '../integrations/crs/sandbox';
+import { createPreCallCreditCheck, createCrsPublicRecordsCheck } from './crs';
 import { MemoryStateStore } from '../store';
+
+const input = (): PreCallInput => ({ clientId: 'synthetic', invoiceId: '1042', testIdentityId: 7,
+    company: { name: 'Synthetic', website: 'https://example.com' },
+    context: { client: { type: 'business', phoneNumber: '+15555550100', dnc: false, localWeekday: 1, localHour: 10,
+      consent: { source: 'test', text: 'consent', timestamp: '2026-10-24T01:00:00Z', number: '+15555550100' } } },
+  });
 
 const crsHttp = () => vi.fn<typeof fetch>(async url => {
   if (String(url).endsWith('/users/login')) return Response.json({ token: 'test-only' });
@@ -16,11 +23,7 @@ it('P07 public records stop and escalate before planning; OFAC remains unavailab
   await store.enqueueTask({ id: 'crs-precall', seatId: 'collections', refs: ['1042'], steps: [] });
   const lease = (await store.claimTask('crs-test', now, 60_000))!;
   const escalate = vi.fn(async (decision: Extract<Decision, { kind: 'ESCALATE' }>) => { await store.createEscalation(lease, decision, now); });
-  const result = await runPreCall({ clientId: 'synthetic', invoiceId: '1042', testIdentityId: 7,
-    company: { name: 'Synthetic', website: 'https://example.com' },
-    context: { client: { type: 'business', phoneNumber: '+15555550100', dnc: false, localWeekday: 1, localHour: 10,
-      consent: { source: 'test', text: 'consent', timestamp: '2026-10-24T01:00:00Z', number: '+15555550100' } } },
-  }, { credit: createPreCallCreditCheck({ PRECALL_CRS: 'live', CRS_USERNAME: 'test', CRS_PASSWORD: 'test' }, http),
+  const result = await runPreCall(input(), { credit: createPreCallCreditCheck({ PRECALL_CRS: 'live', CRS_USERNAME: 'test', CRS_PASSWORD: 'test' }, http),
     health: { check: async () => ({ signals: [] }) }, planner: { draft }, audit: store, escalate });
   expect(result).toMatchObject({ status: 'blocked', decision: { kind: 'ESCALATE', ruleIds: ['BANKRUPTCY_STOP'], quote: { sentenceId: 'NF-010' } } });
   expect(escalate).toHaveBeenCalledOnce();
@@ -47,4 +50,17 @@ it('default pre-call fake is explicit and makes no network call', async () => {
   expect(check.label).toBe('FAKE');
   expect(await check.check(7)).toMatchObject({ ofacStatus: 'clear', evidence: [] });
   expect(http).not.toHaveBeenCalled();
+});
+
+it.each(['fixture-rejected', 'missing-credentials', 'http-failure'] as const)('labels %s as unavailable rather than sandbox evidence in pre-call audit', async failure => {
+  const http = vi.fn<typeof fetch>(async () => new Response('', { status: 503 }));
+  const credit = failure === 'fixture-rejected' ? createCrsPublicRecordsCheck(createCrsFixtureClient())
+    : createPreCallCreditCheck({ PRECALL_CRS: 'live', ...(failure === 'http-failure' ? { CRS_USERNAME: 'test', CRS_PASSWORD: 'test' } : {}) }, http);
+  const store = new MemoryStateStore(), draft = vi.fn();
+  expect(await runPreCall(input(), { credit, audit: store, health: { check: async () => ({ signals: [] }) },
+    planner: { draft }, escalate: async () => {} })).toMatchObject({ status: 'blocked' });
+  expect((await store.listAudit()).find(row => row.action === 'credit_check')?.inputs).toMatchObject({
+    label: 'CRS unavailable: no accepted evidence', ofacStatus: 'unknown', evidence: [],
+  });
+  expect(draft).not.toHaveBeenCalled();
 });

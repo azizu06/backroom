@@ -45,5 +45,5 @@ export async function assessBankChangeRisk(check: BankChangeRisk, vendorId: stri
     return { ...(decision.ruleIds.includes('FRAUD_RISK_HOLD') ? { decision } : {}),
       inputs: { label: result.label, fraudRiskScore: result.score, checkedAt: result.checkedAt, responseHash: result.responseHash },
       refs: result.responseHash ? [`crs:sha256:${result.responseHash}`] : [] };
-  } catch { return { decision: hold('INVALID_INPUT'), inputs: { label: 'CRS sandbox: fraud risk unavailable' }, refs: [] }; }
+  } catch { return { decision: hold('INVALID_INPUT'), inputs: { label: 'CRS unavailable: no accepted fraud risk evidence' }, refs: [] }; }
 }

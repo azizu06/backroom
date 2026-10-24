@@ -41,7 +41,9 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   const [credit, health] = await Promise.all([
     boundedCreditCheck(deps.credit, input.testIdentityId).then(async result => {
       await audit('credit_check', { latencyMs: now() - creditStart, inputs: {
-        label: deps.credit.label === 'CRS sandbox' ? `CRS sandbox: test identity #${input.testIdentityId}` : deps.credit.label ?? 'provided (source unverified)',
+        label: deps.credit.label === 'CRS sandbox'
+          ? result?.evidence.length ? `CRS sandbox: test identity #${input.testIdentityId}` : 'CRS unavailable: no accepted evidence'
+          : deps.credit.label ?? 'provided (source unverified)',
         ...(deps.credit.label === 'CRS sandbox' ? { ofacAvailability: 'not available in sandbox' } : {}), ofacStatus: result?.ofacStatus ?? 'unknown',
         evidence: result?.evidence ?? [],
       } });

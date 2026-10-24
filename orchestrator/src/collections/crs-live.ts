@@ -1,6 +1,7 @@
 /** One explicit P07 public-record / P13 fraud-risk probe through code policy; never dials, models, or pays. */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { CrsError } from '../integrations/crs';
 import { MemoryStateStore } from '../store';
 import { runPreCall } from './index';
 import { createPreCallCreditCheck } from './crs';
@@ -55,4 +56,8 @@ async function main() {
   writeFileSync(`${directory}wiring-live-run.json`, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log('PASS: docs/evidence/crs/wiring-live-run.json (summaries and hashes only)');
 }
-main().catch(() => { console.error('CRS wiring probe failed; verify credentials and sandbox availability. No raw provider error recorded.'); process.exitCode = 1; });
+main().catch(error => {
+  // CrsError is a fixed client-authored code/status message; never print arbitrary provider exceptions.
+  console.error(error instanceof CrsError ? error.message : 'CRS wiring probe failed; verify credentials and sandbox availability. No raw provider error recorded.');
+  process.exitCode = 1;
+});
