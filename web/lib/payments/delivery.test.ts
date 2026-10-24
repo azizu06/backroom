@@ -57,7 +57,8 @@ it('publishes a loopback origin only when the supervisor marks the host offline'
     }
     process.env.DEMO_PUBLIC_URL = 'https://demo.example';
     expect(paymentPublicOrigin()).toEqual({ origin: 'https://demo.example', localOnly: false });
-    for (const url of ['http://demo.example', 'http://127.0.0.1:3300/pay', 'http://127.0.0.1:3300?x=1', 'http://u:p@127.0.0.1:3300', 'http://0.0.0.0:3300']) {
+    for (const url of ['http://demo.example', 'http://127.0.0.1:3300/pay', 'http://127.0.0.1:3300?x=1', 'http://u:p@127.0.0.1:3300', 'http://0.0.0.0:3300',
+      'http://localhost.example.com', 'http://127.0.0.1.example.com', 'http://127.example.com', 'http://127.0.0.256', 'https://localhost.attacker.example']) {
       process.env.DEMO_PUBLIC_URL = url;
       expect(paymentPublicOrigin).toThrow();
     }
