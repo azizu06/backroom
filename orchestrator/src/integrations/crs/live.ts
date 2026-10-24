@@ -1,8 +1,12 @@
 /** Opt-in live T3 probe. All configuration stays server-side; only evidence is printed. */
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { existsSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CrsClient, CrsError, type CrsOptions } from './index.js';
 import { CRS_CALHACKS_SANDBOX, CRS_SANDBOX_IDENTITIES } from './sandbox.js';
+
+const envPath = fileURLToPath(new URL('../../../../.env.local', import.meta.url));
+if (existsSync(envPath)) process.loadEnvFile(envPath);
 
 async function main(): Promise<void> {
   if (process.env.CRS_LIVE !== '1' || !process.env.CRS_USERNAME || !process.env.CRS_PASSWORD) {

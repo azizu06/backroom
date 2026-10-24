@@ -42,7 +42,10 @@ business credit and OFAC stay unconfigured and fail before login.
 
 Live probe with only credentials (no module): `CRS_LIVE=1 CRS_USERNAME=… CRS_PASSWORD=…
 CRS_TEST_ID=6 pnpm --filter @backroom/orchestrator crs:live` runs public records then fraud
-risk and prints only evidence. Credentials come from the CRS email invite (a human signup).
+risk and prints only evidence. Credentials come from the CRS email invite (a human signup);
+the probe also reads them from the repo-root `.env.local` (gitignored). Afterwards, CRS's
+`GET /users/logs` shows `billable: false` for persona matches. The account OpenAPI
+(checked 2026-10-24) lists the same routes and no business-credit or OFAC product.
 
 ## What is verified, and what remains unavailable
 
