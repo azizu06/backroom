@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { getStateStore } from '@backroom/orchestrator';
+import { getStateStore, runX402Console, type X402ConsoleRun } from '@backroom/orchestrator';
 import { probeDependencies, type DemoStatus, type HealthRow } from '../../../tools/demo/health';
 import { preflight } from '../../../orchestrator/src/demo-ops/preflight';
 import { demoControl, operatorRoot } from './control';
@@ -50,6 +50,10 @@ export async function runOperatorAction(action: OperatorAction): Promise<unknown
     return { llmEnabled: getStateStore().llmEnabled };
   }
   if (action === 'status' || action === 'reset') return demoControl(action);
+  // Signer stays server-side; the result carries only labels, public addresses, hashes and audit ids.
+  if (action === 'x402_simulated' || action === 'x402_testnet' || action === 'x402_blocked') {
+    return runX402Console(action.slice('x402_'.length) as X402ConsoleRun, getStateStore());
+  }
   if (action === 'health' || action === 'preflight') {
     const status = await demoControl('status') as DemoStatus & { publicUrl: string };
     return action === 'preflight' ? preflight(process.env, status)
