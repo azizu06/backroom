@@ -7,7 +7,8 @@ import { TestAuthenticator } from '../approvals/testing/authenticator';
 import { PayablesSeat, controllerForLease, createNorthfieldRepository, northfield, northfieldChange,
   northfieldInvoice, northfieldSource, northfieldVendor, type PayablesClient } from '../payables';
 import { VendorSeat } from '../vendor';
-import { reconcile } from './bank';
+import { inspectPaymentEvidence } from '../payments';
+import { paymentMemo } from '@backroom/nessie';
 
 export async function runNorthfieldPayables() {
   const now = Date.parse(northfield.snapshotAt);
@@ -98,9 +99,11 @@ export async function runNorthfieldPayables() {
   // The planted already-paid deposit has neither an exact invoice memo nor the amount for #1046.
   const ar = northfield.arInvoices.find(row => row.id === '1046')!;
   const deposit = northfield.bankTransactions.find(row => row.id === 'seed-credit-unmatched')!;
-  const unmatched = reconcile({ accountId: 'receivables', invoiceId: ar.id, installment: 1,
-    amountCents: ar.principalCents + ar.lateFeeCents }, deposit.id,
-    [{ _id: deposit.id, amount: deposit.amountCents / 100, description: deposit.memo, status: 'completed' }]);
+  const evidence = inspectPaymentEvidence({ linkId: 'unmatched-claim', memo: paymentMemo({ invoiceId: ar.id, installment: 1 }),
+    amountCents: ar.principalCents + ar.lateFeeCents, depositId: deposit.id },
+    [{ _id: deposit.id, amount: deposit.amountCents / 100, description: deposit.memo, status: 'completed',
+      medium: 'balance', transaction_date: deposit.postedAt.slice(0, 10) }]);
+  const unmatched = evidence.ruleId ? 'exception' : 'partially_paid';
   if (unmatched !== 'exception') throw new Error('CORE_DEMO: unmatched already-paid deposit reconciled');
   return { results, payments, unverified: unverified.status, alreadyPaid: unmatched,
     sanctioned: sanctioned.status, provenance: 'Frozen synthetic Northfield; mocked CRS/Apify/debits; software test passkey', entries: await state.listAudit() };
