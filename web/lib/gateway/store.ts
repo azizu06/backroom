@@ -79,6 +79,9 @@ export interface PaymentLink {
   auditId: string;
   amountCents: number;
   path: string;
+  shortCode?: string;
+  createdAt?: number;
+  expiresAt?: number;
 }
 export interface ToolResult {
   kind: "ALLOW" | "DENY" | "ESCALATE" | "CONTEXT" | "RECORDED" | "PENDING";
@@ -92,6 +95,10 @@ export interface ToolResult {
  */
 export interface GatewayStore {
   /** Trusted server-only lookup by opaque payment capability; no call IDs supplied by clients. */
+  registerCall?(call: GatewayCall): Promise<void>;
+  clientStopped?(clientId: string): Promise<boolean>;
+  findPaymentCode?(code: string): Promise<GatewayCall | undefined>;
+  activePaymentCall?(): Promise<GatewayCall | undefined>;
   findPaymentCall?(linkId: string): Promise<GatewayCall | undefined>;
   transact<T>(
     callId: string,
@@ -117,6 +124,26 @@ export class MemoryGatewayStore implements GatewayStore {
     for (const call of calls)
       this.calls.set(call.callId, structuredClone(call));
   }
+  async registerCall(call: GatewayCall): Promise<void> {
+    const run = this.tail.then(() => {
+      if (this.calls.has(call.callId)) throw new GatewayError(409, 'CALL_EXISTS');
+      this.calls.set(call.callId, structuredClone(call));
+    });
+    this.tail = run.catch(() => undefined); return run;
+  }
+  async clientStopped(clientId: string) {
+    await this.tail;
+    return [...this.calls.values()].some(call => call.clientId === clientId && call.status !== 'active');
+  }
+  async findPaymentCode(code: string) {
+    await this.tail;
+    return structuredClone([...this.calls.values()].find(call => call.links.some(link => link.shortCode === code)));
+  }
+  async activePaymentCall() {
+    await this.tail;
+    return structuredClone([...this.calls.values()].filter(call => call.status === 'active' && call.links.length)
+      .sort((a, b) => (b.links.at(-1)?.createdAt ?? 0) - (a.links.at(-1)?.createdAt ?? 0))[0]);
+  }
   async findPaymentCall(linkId: string): Promise<GatewayCall | undefined> {
     await this.tail;
     return structuredClone([...this.calls.values()].find(call => call.links.some(link => link.id === linkId)));
@@ -140,6 +167,10 @@ export class MemoryGatewayStore implements GatewayStore {
         ) {
           throw new GatewayError(409, "WEBHOOK_ID_REUSED");
         }
+      }
+      for (const link of copy.links) {
+        if (link.shortCode && [...this.calls.values()].some(other => other.links.some(row => row.id !== link.id && row.shortCode === link.shortCode)))
+          throw new GatewayError(409, 'PAYMENT_CODE_COLLISION');
       }
       // Prepare every potentially throwing clone/check before appending evidence.
       // The call rows retain their existing UUIDs; the shared chain uses those
