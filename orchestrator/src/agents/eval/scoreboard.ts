@@ -8,6 +8,7 @@ import { runFailoverPair } from './failover';
 import { CONVERSATIONS, runConversation } from './conversation';
 import { JUDGE_CASES, runJudgeCase, type JudgeCase } from './judge';
 import { PRECALL_STOPS, runPrecallStop } from './precall';
+import { runApprovalExpiry } from './approval-expiry';
 import { runInboxTeam } from './inbox-team';
 import { runCallButton } from './call-button';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
@@ -153,6 +154,8 @@ for (const row of legacy.reports) {
   }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
+const approvalExpiry = await runApprovalExpiry();
+if (!approvalExpiry.match) gaps.push({ id: 'approval-expiry', detail: `Approval expiry missed: ${Object.entries(approvalExpiry.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const precallStops = [];
 for (const id of PRECALL_STOPS) {
   const run = await runPrecallStop(id);
@@ -199,6 +202,7 @@ const rates = {
   precallStops: fraction(precallStops.filter(row => row.match).length, precallStops.length),
   callButton: fraction(callButton.passed, callButton.total),
   inboxTeam: fraction(Number(inboxTeam.match), 1),
+  approvalExpiry: fraction(Object.values(approvalExpiry.checks).filter(Boolean).length, Object.keys(approvalExpiry.checks).length),
   bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
@@ -207,7 +211,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -234,6 +238,7 @@ const report = {
     inboxTeam: inboxTeam.scope,
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
+    approvalExpiry: approvalExpiry.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
     unscored: 'The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy.' },
   coverage: { apRuntimeErrors: invoiceRuns.filter(row => row.actual === 'ERROR').map(row => row.id),
@@ -245,7 +250,26 @@ const report = {
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
     after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
-  failover: failoverRuns, conversations, judgeCalls: judgeRuns, precallStops, callButton, inboxTeam, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  failover: failoverRuns, conversations, judgeCalls: judgeRuns, precallStops, callButton, inboxTeam,
+  approvalExpiry: {
+    match: approvalExpiry.match, checks: approvalExpiry.checks, scope: approvalExpiry.scope,
+    windowMs: approvalExpiry.live.windowMs, storedCallId: approvalExpiry.live.storedCallId, storedWindow: approvalExpiry.live.storedWindow,
+    voice: approvalExpiry.live.voice,
+    atSixty: approvalExpiry.live.atSixty, expiredAuditsAtSixty: approvalExpiry.live.expiredAuditsAtSixty,
+    atWindowMinus: approvalExpiry.live.atWindowMinus, expiredAuditsBeforeWindow: approvalExpiry.live.expiredAuditsBeforeWindow,
+    atWindow: approvalExpiry.live.atWindow, serviceAtWindow: approvalExpiry.live.serviceAtWindow,
+    expiredAuditsAtWindow: approvalExpiry.live.expiredAuditsAtWindow,
+    latePasskeyError: approvalExpiry.live.latePasskeyError, afterDecide: approvalExpiry.live.afterDecide, decideAudits: approvalExpiry.live.decideAudits,
+    fresh: { kind: approvalExpiry.live.fresh.kind, can_confirm: approvalExpiry.live.fresh.can_confirm, rule_ids: approvalExpiry.live.fresh.rule_ids },
+    createdAfterFresh: approvalExpiry.live.createdAfterFresh,
+    open: { kind: approvalExpiry.live.open.kind, can_confirm: approvalExpiry.live.open.can_confirm, rule_ids: approvalExpiry.live.open.rule_ids },
+    createdAfterOpen: approvalExpiry.live.createdAfterOpen,
+    secondClosed: approvalExpiry.live.secondClosed,
+    retry: { kind: approvalExpiry.live.retry.kind, can_confirm: approvalExpiry.live.retry.can_confirm, rule_ids: approvalExpiry.live.retry.rule_ids },
+    createdAfterRetry: approvalExpiry.live.createdAfterRetry,
+    owner: approvalExpiry.owner,
+  },
+  legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;
@@ -277,6 +301,7 @@ const lines = [
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
   `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,
   `| C5 judge calls: unrecognized ends ESCALATE, tagged scenario_source judge | ${display(rates.judgeCalls)} |`,
+  `| Live-call approval expiry and one re-escalation per call (injected clock; no-callId row closes at 60s) | ${display(rates.approvalExpiry)} |`,
   `| P12 GX10 cut: same outcome with audited cloud_fallback (mock transport) | ${display(rates.gx10Failover)} |`,
   `| Existing eval answer-key checks (partial execution permitted) | ${display(rates.legacyKeyChecks)} |`,
   `| Existing eval scenarios with no unexecuted integration step | ${display(rates.legacyCompleteScenarios)} |`, '',
@@ -296,4 +321,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
