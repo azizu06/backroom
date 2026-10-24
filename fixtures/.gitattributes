@@ -1,0 +1,6 @@
+*.pdf binary
+*.json text eol=lf
+*.md text eol=lf
+*.eml text eol=lf
+*.py text eol=lf
+*.ts text eol=lf
