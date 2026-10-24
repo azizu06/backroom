@@ -1,62 +1,74 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { PlaneGeometry } from 'three';
 import { OFFICE_ANCHORS, type OfficeSnapshot } from '../../../lib/office/state';
-import { MONITOR_DESKS, monitorInteraction, monitorScreen, monitorScreenKey, type MonitorDesk, type MonitorScreen, type MonitorStatusKey } from '../../../lib/office/props/monitors';
-import { useCanvasTexture } from './useCanvasTexture';
+import { MONITOR_DESKS, MONITOR_FACE, MONITOR_TEXTURE, monitorInteraction, monitorOverview, monitorScreen, monitorScreenKey, type MonitorDesk, type MonitorScreen, type MonitorStatusKey } from '../../../lib/office/props/monitors';
+import { canvasTextLines } from '../../../lib/office/props/readability';
+import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 
-const MONO_FONT = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
-const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: '#a9bc8f', deny: '#ed6252', escalate: '#e0b365', recorded: '#8c9c87' };
-const LINE_COLORS = { agent: '#e8efe4', away: '#c9d4c3', folder: '#e0b365', idle: '#7f8c80', awaiting: '#e8efe4', escalation: '#c9d4c3' } as const;
-const TEX_W = 256, TEX_H = 144, FACE_W = 0.66, FACE_H = 0.36;
+const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: '#b9d59b', deny: '#ff998c', escalate: '#f3dfb9', recorded: '#d0d6c6' };
+const LINE_COLORS = { agent: '#f2f5ed', away: '#d0d6c6', folder: '#f3dfb9', idle: '#d0d6c6', awaiting: '#f2f5ed', escalation: '#d0d6c6' } as const;
+const { width: TEX_W, height: TEX_H, overviewFont } = MONITOR_TEXTURE;
+const { width: FACE_W, height: FACE_H } = MONITOR_FACE;
 const SCREEN_GEOMETRY = new PlaneGeometry(FACE_W, FACE_H);
-/** Desk-local screen spot: 1.5 mm in front of the face scene.tsx draws at z -0.18 (front at -0.1725). */
-const SCREEN_AT = [-0.35, 1.18, -0.171] as const;
 const MONITORS = Object.fromEntries(MONITOR_DESKS.map(room => [room, monitorInteraction(room)])) as Record<MonitorDesk, ReturnType<typeof monitorInteraction>>;
 
-function drawScreen(ctx: CanvasRenderingContext2D, screen: MonitorScreen, accent: string) {
+function drawScreen(ctx: CanvasRenderingContext2D, screen: MonitorScreen, accent: string, detailed: boolean) {
   ctx.fillStyle = '#1d2420';
   ctx.fillRect(0, 0, TEX_W, TEX_H);
   ctx.fillStyle = accent;
-  ctx.fillRect(0, 0, TEX_W, 6);
-  ctx.textBaseline = 'alphabetic';
+  ctx.fillRect(0, 0, TEX_W, 8);
+  ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
+  const measure = (text: string) => ctx.measureText(text).width;
+  if (!detailed) {
+    ctx.font = `700 ${overviewFont}px ${PROP_FONT}`;
+    monitorOverview(screen).forEach((text, i) => {
+      ctx.fillStyle = i === 1 && screen.status ? STATUS_COLORS[screen.status.key] : '#f2f5ed';
+      ctx.fillText(canvasTextLines(text, measure, TEX_W - 56, 1)[0] ?? '', 20, 86 + i * 144);
+    });
+    return;
+  }
   ctx.fillStyle = accent;
-  ctx.font = `700 16px ${MONO_FONT}`;
-  ctx.fillText(screen.heading, 10, 27);
-  ctx.font = `500 13px ${MONO_FONT}`;
+  ctx.font = `700 44px ${PROP_FONT}`;
+  ctx.fillText(canvasTextLines(screen.heading, measure, TEX_W - 56, 1)[0] ?? '', 20, 42);
+  ctx.font = `600 36px ${PROP_FONT}`;
   screen.lines.forEach((entry, i) => {
     ctx.fillStyle = LINE_COLORS[entry.kind];
-    ctx.fillText(entry.text, 10, 50 + i * 19, TEX_W - 20);
+    ctx.fillText(canvasTextLines(entry.text, measure, TEX_W - 56, 1)[0] ?? '', 20, 96 + i * 44);
   });
   if (!screen.status) return;
-  const label = screen.status.decision, color = STATUS_COLORS[screen.status.key];
-  ctx.font = `700 11px ${MONO_FONT}`;
-  const width = ctx.measureText(label).width + 16, x = TEX_W - 10 - width, y = 12;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, 18, 9);
-  ctx.fill();
-  ctx.fillStyle = '#1d2420';
-  ctx.textAlign = 'center';
-  ctx.fillText(label, x + width / 2, y + 13);
+  ctx.font = `700 40px ${PROP_FONT}`;
+  ctx.fillStyle = STATUS_COLORS[screen.status.key];
+  ctx.fillText(screen.status.decision, 20, TEX_H - 28);
 }
 
 function Screen({ snapshot, room }: { snapshot: OfficeSnapshot; room: MonitorDesk }) {
   const screen = useMemo(() => monitorScreen(snapshot, room), [snapshot, room]);
   const key = monitorScreenKey(screen);
+  const [detailed, setDetailed] = useState(false);
+  const detail = useRef(false);
+  // Observe frames the camera already requests; changing text never starts an animation loop.
+  useFrame(({ camera }) => {
+    const next = camera.type !== 'OrthographicCamera' || camera.zoom >= 60;
+    if (next !== detail.current) { detail.current = next; setDetailed(next); }
+  });
   const { center: [x, z], color } = OFFICE_ANCHORS[room];
-  const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawScreen(ctx, screen, color), [key, color]);
+  const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawScreen(ctx, screen, color, detailed), [key, color, detailed]);
+  const { x: sx, y: sy, z: sz } = MONITOR_FACE;
   return <group name={`prop:monitor:${room}`} position={[x, 0, z]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
-    <mesh position={SCREEN_AT}>
-      <primitive object={SCREEN_GEOMETRY} attach='geometry' />
-      <meshBasicMaterial map={texture} toneMapped={false} />
-    </mesh>
+    <group position={[sx, sy, sz]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
+      <mesh position={[0, 0, 0.059]}>
+        <primitive object={SCREEN_GEOMETRY} attach='geometry' />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+    </group>
   </group>;
 }
 
-/** Glowing desk screens showing each seat's current task; same transform as scene.tsx `Desk`. */
+/** Glowing desk screens showing each seat's current task; same transform as mounts/Desks.tsx. */
 export function DeskMonitors({ snapshot }: { snapshot: OfficeSnapshot }) {
   return <group name='prop:desk-monitors'>
     {MONITOR_DESKS.filter(room => MONITORS[room].visible(snapshot)).map(room => <Screen key={room} snapshot={snapshot} room={room} />)}
