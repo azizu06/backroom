@@ -152,8 +152,12 @@ async function supervise() {
     writeFileSync(join(dir, 'voice.env'), `VOICE_PUBLIC_URL=${env.VOICE_PUBLIC_URL}\n`, { mode: 0o600 });
     if (env.DEMO_VOICE === '1') {
       if (env.DEMO_TUNNEL === '0') throw new Error('DEMO_VOICE_REQUIRES_TUNNEL');
+      // Voice owns a separate file journal. Avoid opening an unused StateStore subscription
+      // on import (which otherwise keeps the one-shot setup process alive forever).
+      const webStateMode = env.STATE_STORE; env.STATE_STORE = 'memory';
       await children.run(process.execPath, ['--import', loader, 'orchestrator/src/voice/live.ts', 'setup'], join(dir, 'voice-setup.log'));
       children.start(process.execPath, ['--import', loader, 'orchestrator/src/voice/live.ts', 'serve'], join(dir, 'voice.log'));
+      env.STATE_STORE = webStateMode;
       await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${voicePort}/health`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
       env.DEMO_VOICE_RUNNING = '1';
     }
