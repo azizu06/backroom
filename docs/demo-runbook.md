@@ -239,13 +239,58 @@ cloud bill or benchmark. Supply both `--input-usd-per-million N` and
 is `null`. The receipt records the supplied rates. Actual cloud spend is zero
 because cloud transport is forbidden.
 
-Expected wall time: reserve **tens of minutes to hours** for all 925 items,
-depending on model/load; this is a planning allowance, not a measured completion
-claim. Use the first sample's observed items/s to budget `925 / itemsPerSecond`
-seconds, then rerun at the intended concurrency. Do the long take before judging
-and show its labeled receipt; use a small live sample for the optional moment.
-A laptop comparison has not been measured: show actual GX10 throughput and model
-identity rather than claiming a speedup or that no laptop could run it.
+Measured judge rehearsal (2026-10-24, `gpt-oss:20b`, concurrency **2**):
+
+```sh
+pnpm demo:burst -- --companies 10 --month 2026-09 --concurrency 2
+```
+
+The GX10 was already at **93% utilization** at the initial preflight, so this
+budgeted take used **10 companies / 370 items**, rather than the 25-company
+925-item default. See the [measured receipt](evidence/burst/ten-company/summary.json)
+and [all 370 item/audit records](evidence/burst/ten-company/items.jsonl).
+
+| Measured result | Value |
+| --- | --- |
+| Processing wall time | **18m 42.73s** (1,122.733676 s; excludes generation/GPU preflight) |
+| Throughput | **0.329553 items/s** |
+| Returned input + output tokens | **410,970 + 59,183** |
+| Input + output token throughput | **418.757369 tokens/s** |
+| Generated output throughput | **52.713303 tokens/s** |
+| Planted traps held | **120 / 120** |
+| Expected policy-rule matches | **79 / 80** |
+| Failed model tasks / affected items | **5 / 5** |
+| Completed local model tasks | **692 / 692 (100%)**; 697 tasks total, 698 local HTTP attempts |
+| Raw `falseHolds` label counter | **30 / 250** non-trap-labeled items; caveat below |
+| Simulated payments | **220**; no Nessie HTTP writes |
+| Usage omissions / pending HTTP attempts | **0 / 0** |
+| Cloud-equivalent dollars | **null** (comparison prices not supplied) |
+| Command exit status | **1**, correctly reporting failures and one expected-rule miss |
+
+Holds by rule (an item can cite multiple rules): `BANK_CHANGE_HOLD=30`,
+`OFAC_STOP=20`, `INVALID_INPUT=44`, `PAYEE_NOT_IN_MASTER=17`,
+`DUPLICATE_INVOICE=9`, `LOOKALIKE_DOMAIN=10`, `NO_PO=10`, `OVER_LIMIT=20`.
+
+This is a completed measured take, **not a clean model-quality pass**. Four
+model tasks failed confidence checks; one extraction failed schema validation.
+The attempted cloud fallback was rejected by the transport guard **before HTTP**.
+The duplicate trap `synthetic-0007:2026-09:4419` remained safely held under
+`INVALID_INPUT`, but missed its expected `DUPLICATE_INVOICE` citation. This is why
+120/120 safety holds must not be presented as 80/80 correct rule detection.
+
+The raw false-hold label counter is conservative and **not a calibrated error
+rate**: it counts the 30 ordinary-labeled invoices for Cedar's already-pending
+bank change (`5002` × 10), the sanctioned vendor (`5023` × 10), and the unverified
+vendor (`5024` × 10). These are code-required holds from trusted seed state;
+three unverified-vendor items used `INVALID_INPUT` instead of the master rule.
+All 220 other ordinary-labeled items reached a simulated payment. The committed
+receipt retains the original labels/counts and every result, rather than
+relabeling the take after seeing it.
+
+Use this **18m 42.73s measured take** as the wall-time reference for the documented
+10-company command; shared load varies. The 25-company default and a laptop
+comparison remain unmeasured. Show the labeled receipt and a small live sample
+during judging; do not claim a measured laptop speedup.
 
 The [one-item live smoke receipt](evidence/burst/smoke.json) measured 3.24 seconds,
 2 completed local tasks, 1,199 prompt + 164 output tokens, zero model failures,
