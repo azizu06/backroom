@@ -1,6 +1,7 @@
 import type { StateStore } from '@backroom/orchestrator';
 import type { GatewayCall, ToolResult } from '../gateway/store';
 import type { Invocation } from '../gateway/parser';
+import { noteEscalation } from './inbox';
 
 /** Both adapters are server-only. The voice handler can create/read requests, never decide them. */
 export function createApprovalBridge(store: StateStore, now = Date.now) {
@@ -29,6 +30,7 @@ export function createApprovalBridge(store: StateStore, now = Date.now) {
       amountCents: call.amountCents, principalCents: call.receivable.principalCents,
       lateFeeCents: call.receivable.lateFeeCents, currency: call.currency, requestedTerms: local.plan,
     }, now());
+    noteEscalation(row.id);
     local.createdAt = row.createdAt;
     local.expiresAt = row.expiresAt;
     result.approval_path = `/approve/${encodeURIComponent(row.id)}`;

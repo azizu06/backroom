@@ -31,6 +31,27 @@ The optional `BACKROOM_APPROVAL_DEMO=1` startup fixture seeds only a synthetic
 sends email, or calls a bank. This is off by default. Trusted live ingress must
 still install a populated `GatewayStore` via `installGatewayStore`.
 
+## Live controller inbox (no links on the call)
+
+After enrollment Dana taps **Sign in with passkey** on `/controller` and leaves the
+page open on her phone. It polls `GET /api/controller/inbox` every 1.5 s; when the
+gateway raises an escalation for her, the page chimes, vibrates where the browser
+supports it (not iOS Safari), and opens the approval card in place with the same
+evidence and decide path as `/approve/[id]`. Nobody relays a link. A newer request
+waits in an "Also waiting" queue instead of replacing a card Dana is reviewing.
+The page asks for a screen wake lock; iOS plays the chime only after a tap, which
+the sign-in tap provides (a "Tap to turn on the request chime" button covers reloads).
+
+The sign-in is a passkey assertion bound to a `session` challenge. It sets an
+`HttpOnly; SameSite=Strict` cookie (`Secure` on HTTPS) scoped to `/api/controller`,
+valid 12 hours, process-local like the credential. The session only lists pending
+requests: it cannot decide one, a sign-in assertion cannot be spent as a decision,
+and every Approve/Deny/Counter still needs its own decision-bound assertion. The inbox
+lists escalations created through `createApprovalBridge` (every gateway
+`propose_plan` ESCALATE, including the demo seed) in this server process; intake and
+payment-review escalations still need their link. Web Push is not wired: the page
+must stay open in the foreground.
+
 ## Contracts for state, voice and the office
 
 - `@backroom/orchestrator` exports `ControllerApprovals`, `ControllerDecision`,
@@ -77,6 +98,8 @@ still install a populated `GatewayStore` via `installGatewayStore`.
   today.” That records follow-up; it does not send email.
 
 The HTTP surface is `GET /api/approvals/:id/view`,
+`GET /api/controller/inbox` (signed-in session only), `POST /api/controller/session-options`
+(`{}`) and `/session` (`{ challengeId, response }`),
 `POST /api/approvals/:id/options` (`{ decision }`), and
 `POST /api/approvals/:id/decide` (`{ challengeId, response }`). Enrollment uses
 `POST /api/controller/register-options` and `/register`, both with the enrollment
