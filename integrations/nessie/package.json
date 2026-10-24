@@ -1,0 +1,19 @@
+{
+  "name": "@backroom/nessie",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "live": "tsx --env-file=../../.env.local src/live.ts"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.39",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}
