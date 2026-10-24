@@ -5,11 +5,13 @@ import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
-import { PLAY_HINT, PlayHud } from './PlayHud';
+import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, useTouch } from './PlayHud';
 import { REDUCED_MOTION_QUERY, isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, handoffLine, type Handoff, type HandoffAgentId } from '../../lib/office/handoffs';
 import { HandoffStage } from '../../lib/office/handoff-plan';
 import { createMockHandoffFeed, type HandoffFeed } from '../../lib/office/handoff-mock';
+import { HandoffVoice, playBlob, voiceCues } from '../../lib/office/handoff-voice';
+import { getHandoffAudio } from '@backroom/orchestrator/handoff-client';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
@@ -102,9 +104,35 @@ function useHandoffs(snapshot: OfficeSnapshot) {
   useEffect(() => { if (stage?.update(rows)) requestSceneFrame(); }, [stage, rows]);
   return { stage: rows.length || mock ? stage : null, rows };
 }
-function HandoffLog({ rows, reduced }: { rows: readonly Handoff[]; reduced: boolean }) {
+/**
+ * Optional voices for the handoff bubbles (#133). Off until the viewer turns them on in this visit;
+ * any proxy or playback error silences them and the visuals carry on.
+ */
+function useHandoffVoice(stage: HandoffStage | null, rows: readonly Handoff[]) {
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
+  const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), playBlob, rerender));
+  useEffect(() => () => voice.setEnabled(false), [voice]);
+  useEffect(() => {
+    if (!stage || !voice.enabled || voice.failed) return;
+    const now = Date.now();
+    const timers = voiceCues(stage.plan).flatMap(cue => {
+      if (cue.at < now - 1000) { voice.skip(cue.key); return []; }
+      return [setTimeout(() => voice.say(cue), Math.max(0, cue.at - now))];
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [stage, rows, voice, voice.enabled, voice.failed]);
+  return voice;
+}
+function SoundToggle({ voice }: { voice: HandoffVoice }) {
+  if (voice.failed) return <p className='handoff-sound' role='status'>Voices unavailable · visuals only</p>;
+  return <button type='button' className='handoff-sound' aria-pressed={voice.enabled} onClick={() => voice.setEnabled(!voice.enabled)}>
+    {voice.enabled ? 'Voices on' : 'Voices off'}
+  </button>;
+}
+function HandoffLog({ rows, reduced, sound }: { rows: readonly Handoff[]; reduced: boolean; sound?: ReactNode }) {
   return <section className='office-audit handoff-log' aria-label='Agent handoffs' data-office-mount='handoffs'>
     <h2>Agent handoffs <span>{reduced ? 'Reduced motion · listed instead of animated' : 'Folders passed between agent desks'}</span></h2>
+    {sound}
     {!rows.length ? <p>No handoffs yet.</p> : <ol role='log' aria-live='polite' aria-relevant='additions text'>
       {rows.slice(-8).map(row => <li key={row.id} data-handoff-id={row.id} data-status={row.status}>{handoffLine(row)}</li>)}
     </ol>}
@@ -160,6 +188,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
 }) {
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
+  const touch = useTouch();
   const { mode, lostContext, sceneAttempt } = viewport;
   const layers = viewportLayers(viewport);
   const [focus, setFocus] = useState<AnchorId | null>(null);
@@ -184,6 +213,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const handoffStage = handoffs.stage;
   const handoffElements = useRef(new Map<HandoffAgentId, HTMLDivElement>());
   const handoffTag = useCallback<HandoffTagLookup>(id => handoffElements.current.get(id), []);
+  const voice = useHandoffVoice(handoffStage, handoffs.rows);
   const handoffFor = useCallback((actor: string) => handoffStage?.handoffFor(actor, Date.now()), [handoffStage]);
   const reducedMotion = useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia(REDUCED_MOTION_QUERY).matches, () => false);
   // Play panels read handoff rows from the snapshot, whichever source produced them.
@@ -294,7 +324,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       </ViewBoundary>
       {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={playSnapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} handoffFor={handoffFor} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
@@ -316,7 +346,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         </ViewBoundary>
       </section>}
       {handoffStage && <ViewBoundary name='Handoff log' resetKey={handoffs.rows} fallback={<p role='status'>Handoff log unavailable.</p>}>
-        <HandoffLog rows={handoffs.rows} reduced={reducedMotion} />
+        <HandoffLog rows={handoffs.rows} reduced={reducedMotion} sound={<SoundToggle voice={voice} />} />
       </ViewBoundary>}
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>

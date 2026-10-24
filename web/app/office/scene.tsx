@@ -15,6 +15,7 @@ import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 import { ServerRoom } from './rooms/ServerRoom';
 import { HandoffLayer, type HandoffTagLookup } from './handoffs/HandoffLayer';
 import type { HandoffStage } from '../../lib/office/handoff-plan';
+import { OfficeProps } from './props/OfficeProps';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -281,6 +282,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     </Fragment>)}
     </Instances>
     <ServerRoom position={[7.1, 0, -0.8]} />
+    <OfficeProps snapshot={snapshot} />
     {handoffs && <HandoffLayer stage={handoffs} tag={handoffTag} />}
     {play ? <PlayRig {...play} handoffs={handoffs} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
