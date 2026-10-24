@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insideAny, interactCandidates, movePlayer, officeColliders, pickTarget, PLAYER_RADIUS, SPAWN, targetLabel } from './play';
+import { applyLook, applyTurnTap, insideAny, interactCandidates, movePlayer, officeColliders, pickTarget, PLAYER_RADIUS, PlayInput, SPAWN, targetLabel, TURN_SPEED } from './play';
 import { createMockOfficeState } from './preview';
 import { OFFICE_ANCHORS, visibleRooms } from './state';
 import { PHONE_INTERACTION } from './props/phone';
@@ -32,13 +32,41 @@ describe('desk phone Play targeting', () => {
     const snapshot = createMockOfficeState().source.getSnapshot();
     // PlayRig candidates use the motion positions. Preview motions begin at these snapshot positions.
     const playRigAgents = snapshot.agents.map(agent => ({ id: agent.id, position: agent.pos }));
-    const candidates = interactCandidates(playRigAgents, visibleRooms(snapshot));
-    // Match office-phone.spec.ts: walk through the doorway, strafe to x=-4.2, then approach the desk.
-    const colliders = officeColliders(['collections']);
+    const rooms = visibleRooms(snapshot);
+    const candidates = interactCandidates(playRigAgents, rooms);
+    // Match office-phone.spec.ts: walk into the desk, then strafe toward the handset.
+    // The aisle pedestal stops that strafe on the phone instead of letting it slide to the partition.
+    const colliders = officeColliders(rooms);
     let eye: readonly [number, number] = SPAWN.position;
-    while (eye[1] >= -1.0) eye = movePlayer(eye, [0, -0.03], colliders);
-    while (eye[0] < -4.2 - 0.08) eye = movePlayer(eye, [0.03, 0], colliders);
-    while (eye[1] >= -1.9) eye = movePlayer(eye, [0, -0.03], colliders);
+    for (let i = 0; i < 400 && eye[1] > -2.5; i++) {
+      const next = movePlayer(eye, [0, -0.03], colliders);
+      if (next[1] === eye[1]) break;
+      eye = next;
+    }
+    for (let i = 0; i < 200; i++) {
+      const next = movePlayer(eye, [0.03, 0], colliders);
+      if (next[0] === eye[0]) break;
+      eye = next;
+    }
+    expect(Math.abs(eye[0] - -4.2)).toBeLessThan(0.08);
+    expect(pickTarget(eye, 0, candidates)).toEqual({ kind: 'phone' });
+
+    // The browser spec releases W as soon as z < -1, then strafes. That pass is still in the aisle.
+    let aisle: readonly [number, number] = SPAWN.position;
+    for (let i = 0; i < 400 && aisle[1] > -1.5; i++) aisle = movePlayer(aisle, [0, -0.02], colliders);
+    expect(aisle[1]).toBeLessThan(-1);
+    expect(aisle[1]).toBeGreaterThan(-1.8);
+    for (let i = 0; i < 200; i++) {
+      const next = movePlayer(aisle, [0.05, 0], colliders);
+      if (next[0] === aisle[0]) break;
+      aisle = next;
+    }
+    expect(Math.abs(aisle[0] - -4.2)).toBeLessThan(0.08);
+    expect(pickTarget(aisle, 0, candidates)).toEqual({ kind: 'phone' });
+    // The rail stays east of the doorway, so the player can still leave collections going north.
+    let through: readonly [number, number] = [-5, -1.2];
+    for (let i = 0; i < 80; i++) through = movePlayer(through, [0, 0.05], colliders);
+    expect(through[1]).toBeGreaterThan(-0.5);
     const phone = PHONE_INTERACTION.position;
     const yaw = Math.atan2(-(phone[0] - eye[0]), -(phone[1] - eye[1]));
     for (const offset of [-0.2, 0, 0.2]) {
@@ -49,5 +77,25 @@ describe('desk phone Play targeting', () => {
 
     const deskEye: [number, number] = [-5, -1.9];
     expect(pickTarget(deskEye, 0, candidates)).toEqual({ kind: 'desk', room: 'collections' });
+  });
+
+  it('faces the handset from the desk face with turn-key taps', () => {
+    const playRigAgents = createMockOfficeState().source.getSnapshot().agents.map(agent => ({ id: agent.id, position: agent.pos }));
+    const candidates = interactCandidates(playRigAgents, ['lobby', 'collections', 'payables', 'vendor_onboarding', 'dana', 'treasury'] as const);
+    const phone = PHONE_INTERACTION.position;
+    // Where the browser walk stops: against the collections desk, still left of the handset, yaw 0 (the desk wins).
+    const stand: [number, number] = [-4.941, -2.195];
+    expect(pickTarget(stand, 0, candidates)).toEqual({ kind: 'desk', room: 'collections' });
+    const input = new PlayInput();
+    let yaw = 0;
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.atan2(-(phone[0] - stand[0]), -(phone[1] - stand[1]));
+      const diff = Math.atan2(Math.sin(angle - yaw), Math.cos(angle - yaw));
+      if (Math.abs(diff) <= 0.06) break;
+      applyTurnTap(input, diff > 0 ? 'turnLeft' : 'turnRight');
+      yaw = applyLook(yaw, 0, input.consumeTurnTap(), 0).yaw;
+    }
+    expect(Math.abs(yaw)).toBeGreaterThan(TURN_SPEED / 60);
+    expect(pickTarget(stand, yaw, candidates)).toEqual({ kind: 'phone' });
   });
 });

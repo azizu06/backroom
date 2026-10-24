@@ -171,7 +171,7 @@ describe('judge inbox production role narration', () => {
     const preset = inboxPresets.find(row => row.id === '4471')!;
     const form = new FormData();
     for (const [key, value] of Object.entries({ ...preset, presetId: preset.id })) form.set(key, value);
-    const response = await createInboxHTTP({ store: () => state })(new Request('http://localhost/api/inbox', {
+    const response = await createInboxHTTP({ store: () => state, origin: () => 'http://localhost' })(new Request('http://localhost/api/inbox', {
       method: 'POST', headers: { origin: 'http://localhost' }, body: form }));
     expect(response.status).toBe(200);
     expect((await response.json()).decision.ruleIds).toContain('LOOKALIKE_DOMAIN');

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type Keyboard
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { playOfficeCue } from '../../lib/office/sound-events';
-import { playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
+import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
   DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
 } from '../../lib/office/playSettings';
@@ -241,6 +241,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
     const held = control(event);
     if (!held) return;
     event.preventDefault();
+    // A tap (keydown then keyup before the next frame) still has to yaw. Repeats keep turning via turnIntent.
+    if (!event.repeat) applyTurnTap(input, held);
     input.press(held);
     requestSceneFrame();
   }
@@ -309,6 +311,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
     <InteractPrompt prompt={prompt} />
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
+    <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
         onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>

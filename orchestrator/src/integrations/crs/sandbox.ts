@@ -9,6 +9,7 @@
  */
 import { CrsClient, type CrsOptions, type CrsProductAdapter, type CrsSandboxIdentity, type CrsSummary } from './index';
 import { CRS_CALHACKS_PERSONAS } from './personas';
+import { FileCrsEvidenceCache } from './cache';
 
 export { CRS_CALHACKS_PERSONAS };
 export const CRS_SANDBOX_SOURCE = '@crscreditapi/crs-calhacks-mcp-server@1.1.2 test-data/personas.json';
@@ -95,10 +96,21 @@ export const crsSandboxFixtureFetch: typeof fetch = async (input, init) => {
   return fixtureJson({ codes: ['CRS200'], messages: ['Not a sandbox persona request'] }, 400);
 };
 
-/** Live sandbox client when CRS_USERNAME and CRS_PASSWORD are set; otherwise undefined, so callers fall back to fixtures. */
+/** Live sandbox client when CRS_USERNAME and CRS_PASSWORD are set; otherwise undefined, so callers fall back to fixtures. Never caches. */
 export function createCrsClientFromEnv(env: Record<string, string | undefined> = process.env, fetchImpl?: typeof fetch): CrsClient | undefined {
   if (!env.CRS_USERNAME?.trim() || !env.CRS_PASSWORD) return undefined;
   return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: env.CRS_USERNAME, password: env.CRS_PASSWORD, fetch: fetchImpl });
+}
+
+/**
+ * Explicit opt-in to the spec 6.3 outage fallback (CRS_CACHE_FILE): during a CRS outage, evidence comes back with
+ * cached: true and a "cached at HH:MM UTC" label. Only for consumers that carry both into their decision evidence
+ * and audit; existing consumers use createCrsClientFromEnv, which never returns cached evidence.
+ */
+export function createCachedCrsClientFromEnv(env: Record<string, string | undefined> = process.env, fetchImpl?: typeof fetch): CrsClient | undefined {
+  if (!env.CRS_USERNAME?.trim() || !env.CRS_PASSWORD || !env.CRS_CACHE_FILE?.trim()) return undefined;
+  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: env.CRS_USERNAME, password: env.CRS_PASSWORD, fetch: fetchImpl,
+    cache: new FileCrsEvidenceCache(env.CRS_CACHE_FILE.trim()) });
 }
 
 /** Offline client over crsSandboxFixtureFetch. Its evidence is source crs_fixture with a FAKE label. */

@@ -5,7 +5,8 @@ export function createMockCallFeed(emit: (event: CallEvent) => void, speed = 1):
   let timers: ReturnType<typeof setTimeout>[] = [];
   let stopped = false;
   let cycle = 0;
-  const schedule = (fn: () => void, ms: number, minimum = 600) => { timers.push(setTimeout(fn, Math.max(minimum, ms / speed))); };
+  // Speed scales the whole beat, including the floor, so callsSpeed=fast is actually fast.
+  const schedule = (fn: () => void, ms: number, minimum = 600) => { timers.push(setTimeout(fn, Math.max(minimum, ms) / speed)); };
   const run = () => {
     if (stopped) return;
     const id = `mock-call-${++cycle}`;

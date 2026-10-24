@@ -83,19 +83,38 @@ export async function requestCall(_input?: unknown): Promise<CallRequestResult> 
 export function soundEnabled(): boolean { try { return localStorage['backroom:sound'] === 'on'; } catch { return false; } }
 export function isMockCalls(search: string) { return new URLSearchParams(search).get('calls') === 'mock'; }
 
-/** Polls the host's read-only call projection; a failed poll keeps the last snapshot. */
+const FEED_IDLE_AFTER_FAILURES = 3;
+const FEED_BACKOFF_CAP = 8;
+/** Polls the host's read-only call projection. Pauses while the tab is hidden, the same way office ambience does. A failed poll backs off and drops the phone to idle after a few failures. */
 export function pollCallFeed(apply: (state: CallState) => void, intervalMs = 1500): () => void {
-  let stopped = false, timer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false, failures = 0, timer: ReturnType<typeof setTimeout> | undefined;
+  const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  const schedule = (delay: number) => { if (!stopped && !hidden()) timer = setTimeout(tick, delay); };
   const tick = async () => {
+    if (stopped || hidden()) return;
     try {
       const response = await fetch(CALL_FEED_ENDPOINT, { cache: 'no-store' });
-      const body = response.ok ? await response.json() as { call?: unknown } : undefined;
-      if (body && !stopped) apply(callFromProjection(body.call) ?? IDLE_CALL);
-    } catch { /* keep the last snapshot; the next poll retries */ }
-    if (!stopped) timer = setTimeout(tick, intervalMs);
+      if (!response.ok) throw new Error(String(response.status));
+      const body = await response.json() as { call?: unknown };
+      failures = 0;
+      if (!stopped) apply(callFromProjection(body.call) ?? IDLE_CALL);
+    } catch {
+      failures += 1;
+      if (!stopped && failures === FEED_IDLE_AFTER_FAILURES) apply(IDLE_CALL);
+    }
+    schedule(failures === 0 ? intervalMs : intervalMs * Math.min(2 ** failures, FEED_BACKOFF_CAP));
   };
+  const onVisibility = () => {
+    if (stopped) return;
+    clearTimeout(timer); timer = undefined;
+    if (!hidden()) void tick();
+  };
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
   void tick();
-  return () => { stopped = true; clearTimeout(timer); };
+  return () => {
+    stopped = true; clearTimeout(timer);
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+  };
 }
 
 let snapshot = IDLE_CALL;

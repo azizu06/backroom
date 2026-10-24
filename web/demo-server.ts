@@ -7,6 +7,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDemoRuntime } from './lib/demo/runtime';
 import { recordVoiceCallEvent } from './lib/calls/lifecycle';
+import { localOperatorRequest, operatorSession } from './lib/operator/session';
+import { operatorAudit } from './lib/operator/audit';
 
 async function main() {
   if (!['memory', 'spacetime'].includes(process.env.STATE_STORE || '')) throw new Error('DEMO_STATE_REQUIRED');
@@ -23,6 +25,19 @@ async function main() {
   const handler: RequestListener = async (req, res) => {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
     if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end(`demo ${runtime.status().bank}; ${process.env.STATE_STORE} state`); return; }
+    if (path === '/__operator/session') {
+      res.setHeader('Cache-Control', 'no-store');
+      // Public reverse proxies can have a loopback socket. Host+Origin must ALSO be the private numeric address.
+      if (req.method !== 'POST' || !localOperatorRequest(req.socket.remoteAddress, req.headers.host, req.headers.origin, port)) {
+        res.writeHead(403).end('Unlock on the host’s local operator page.'); return;
+      }
+      try {
+        const cookie = operatorSession(process.env, `http://127.0.0.1:${port}`);
+        await operatorAudit('session', 'operator:local-host', 'completed');
+        res.setHeader('Set-Cookie', cookie); res.end('{}');
+      } catch { res.writeHead(503).end('Operator session unavailable.'); }
+      return;
+    }
     if (path.startsWith('/__demo/')) {
       const actual = Buffer.from(req.headers.authorization || ''), expected = Buffer.from(`Bearer ${process.env.DEMO_CONTROL_SECRET}`);
       if (!process.env.DEMO_CONTROL_SECRET || actual.length !== expected.length || !timingSafeEqual(actual, expected)) { res.writeHead(401).end(); return; }
@@ -99,7 +114,10 @@ async function main() {
       req.pipe(upstream); return;
     }
     let finish!: () => void;
-    const done = new Promise<void>(resolve => { finish = resolve; }); active.add(done);
+    // Reset returns through the supervisor into /__demo/reset, which drains active requests.
+    // Counting the initiating request would make it wait for itself. The operator gate serializes its actions.
+    const done = new Promise<void>(resolve => { finish = resolve; });
+    if (path !== '/api/operator/reset') active.add(done);
     const settled = () => { active.delete(done); finish(); };
     res.once('finish', settled); res.once('close', settled);
     try { await handle(req, res); } catch { if (!res.headersSent) res.writeHead(500); res.end('Demo request failed'); }

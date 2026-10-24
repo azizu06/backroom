@@ -29,6 +29,7 @@ import { ViewBoundary } from './ViewBoundary';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
+import './lobby.css';
 import './tags.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
@@ -138,6 +139,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
+        <a href='/operator'>Operator</a>
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
@@ -216,6 +218,8 @@ export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
   return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Preview only</span>
+    <a href='/inbox'>Judge inbox</a>
+    <span>Receipts there are not synced into this static scene.</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>
   </div>} />;
