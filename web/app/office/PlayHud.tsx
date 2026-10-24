@@ -8,6 +8,7 @@ import type { OfficeSnapshot } from '../../lib/office/state';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
+export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
   w: 'forward', arrowup: 'forward', keyw: 'forward', s: 'back', arrowdown: 'back', keys: 'back',
@@ -21,7 +22,8 @@ function subscribeTouch(onChange: () => void) {
   query.addEventListener('change', onChange);
   return () => query.removeEventListener('change', onChange);
 }
-function useTouch() {
+/** Touch or narrow screen; `false` on the server and during hydration. */
+export function useTouch() {
   return useSyncExternalStore(subscribeTouch, () => window.matchMedia(TOUCH_QUERY).matches, () => false);
 }
 function locked(element: Element | null) {
@@ -200,7 +202,6 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     <p className='play-prompt' aria-live='polite'>{prompt && `E · ${prompt}`}</p>
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     {touch && <>
-      <p className='play-touch-hint'>Drag to look · stick to move</p>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
         onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
         <span ref={knob} />

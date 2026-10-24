@@ -19,7 +19,7 @@ test('judge submits traps, original scenarios and uploads on laptop and phone', 
   // The public submission is connected to the same audit chain read by the private wall.
   const auditLink = await receipt.getByRole('link', { name: /View audit entry/ }).getAttribute('href');
   // Add a newer receipt so this proves the link opens the requested entry, not merely the latest.
-  const newer = await page.request.post('/api/inbox', { headers: { origin: 'http://localhost:3033' },
+  const newer = await page.request.post('/api/inbox', { headers: { origin: new URL(page.url()).origin },
     multipart: { kind: 'email', text: 'A later judge scenario', senderDomain: '' } });
   expect(newer.ok()).toBe(true);
   await page.goto(auditLink!);
@@ -28,7 +28,7 @@ test('judge submits traps, original scenarios and uploads on laptop and phone', 
   const linkedId = new URL(auditLink!, 'http://localhost:3033').searchParams.get('entry');
   await expect(page.getByRole('heading', { name: `Replay ${linkedId}`, exact: true })).toBeVisible();
   await expect(page.getByLabel('Recorded rule evaluation')).toContainText('LOOKALIKE_DOMAIN');
-  const latest = await page.request.post('/api/inbox', { headers: { origin: 'http://localhost:3033' },
+  const latest = await page.request.post('/api/inbox', { headers: { origin: new URL(page.url()).origin },
     multipart: { kind: 'email', text: 'Another scenario while reading the wall', senderDomain: '' } });
   const latestReceipt = await latest.json();
   await expect(page.getByRole('button').filter({ hasText: latestReceipt.auditId }).first()).toBeVisible();
@@ -56,7 +56,7 @@ test('judge submits traps, original scenarios and uploads on laptop and phone', 
   await page.getByLabel('Attach a PDF or image').setInputFiles({ name: 'judge.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF judge scenario') });
   await submit.click();
   await expect(receipt.getByText('ESCALATE', { exact: true })).toBeVisible();
-  await expect(receipt.getByText(/File contents are not parsed or retained/)).toBeVisible();
+  await expect(receipt.getByText(/held for human review/)).toBeVisible();
   await page.screenshot({ path: '../docs/evidence/inbox/mobile-upload.png', fullPage: true });
   expect(errors).toEqual([]);
 });

@@ -1,0 +1,67 @@
+{
+  "validatedAt": "2026-10-24T13:41:25.215157+00:00",
+  "codeCommit": "10d1fa4f744fef28daafd0ad374a6fb0ddefa9bc",
+  "commands": [
+    {
+      "command": "pnpm -r test",
+      "exitCode": 0,
+      "tests": 657,
+      "counts": {
+        "policy": 101,
+        "nessie": 9,
+        "orchestrator": 376,
+        "spacetime": 14,
+        "web": 157
+      }
+    },
+    {
+      "command": "pnpm -r build",
+      "exitCode": 0
+    },
+    {
+      "command": "node orchestrator/scripts/verify-inbox-vision.mjs",
+      "exitCode": 0,
+      "scope": "Built production API + real two-page PDF worker + mocked model HTTP; expected lookalike and bank-change holds"
+    },
+    {
+      "command": "ANTHROPIC_API_KEY= OPENROUTER_API_KEY= pnpm --filter @backroom/web exec playwright test --config playwright.inbox.config.ts",
+      "exitCode": 0,
+      "tests": 1,
+      "scope": "Headless laptop/phone submission, presets, unknown text and corrupt-PDF hold; pre-existing screenshots restored byte-for-byte"
+    },
+    {
+      "command": "pnpm metrics --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/collections.audit.json --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/inbox.audit.json --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/off.audit.json",
+      "exitCode": 0,
+      "scope": "Offline generator; adds vision row, refreshes source metadata"
+    }
+  ],
+  "receiptIntegrity": {
+    "complete": true,
+    "samples": 12,
+    "sourceFileHashesMatch": true,
+    "validAuditChains": 12,
+    "localRequests": 12,
+    "blockedCloudRequests": 0
+  },
+  "addedTests": {
+    "router": {
+      "tests": 5,
+      "fileLines": 45
+    },
+    "renderer": {
+      "tests": 4,
+      "fileLines": 38
+    },
+    "metrics": {
+      "tests": 1,
+      "fileLines": 20
+    },
+    "intake": {
+      "tests": 1,
+      "addedLines": 17
+    },
+    "productionHttpSmoke": {
+      "scripts": 1
+    }
+  }
+}
