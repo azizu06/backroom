@@ -79,7 +79,9 @@ are updated. No claimed `verified` or `method` flag grants authority.
 StateStore rows are process-local and lost on restart. Run one server process
 for the rehearsal. They are shared across Next route chunks/dev reloads, not
 across machines or serverless instances. `installApprovalStateStore` must run at
-trusted bootstrap before starting the controller service. SpacetimeDB wiring
+trusted bootstrap before starting the controller service; it delegates to the
+shared `installStateStore` used by the router and OFF control. Approvals remain
+available with model work OFF. SpacetimeDB wiring
 must persist credentials/challenges and atomically consume verified decisions,
 expiry, evidence and audit writes; merely swapping the row adapter is insufficient.
 The gateway store and approval store also need a common transaction/outbox for

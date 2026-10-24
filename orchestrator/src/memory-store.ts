@@ -163,7 +163,7 @@ export class MemoryStateStore implements StateStore {
     escalation.status = verified.decision.kind === 'Approve' ? 'approved' : verified.decision.kind === 'Deny' ? 'denied' : 'counter';
     escalation.decision = copy(verified.decision); escalation.decidedAt = now;
     escalation.method = 'passkey'; escalation.credentialId = verified.credentialId;
-    this.append({ ts: now, actor: 'human', seat: this.agents.get(escalation.fromAgent)?.seatId ?? 'collections',
+    this.append({ ts: now, actor: 'human', seat: 'controller',
       action: 'decide_escalation', ruleIds: escalation.ruleIds, policyVersion: escalation.policyVersion,
       refs: [escalation.id, ...escalation.evidenceRefs], route: 'passkey',
       inputs: { decision: verified.decision, method: 'passkey' }, latencyMs: 0, costUsd: 0 });

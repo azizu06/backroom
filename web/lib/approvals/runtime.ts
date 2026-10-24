@@ -1,17 +1,21 @@
-import { ControllerApprovals, MemoryStateStore, type StateStore } from '@backroom/orchestrator';
+import { ControllerApprovals, getStateStore, installStateStore, type StateStore } from '@backroom/orchestrator';
 
 // One server process, including Next dev reloads and separate route bundles.
 const root = globalThis as typeof globalThis & { backroomApprovals?: {
-  store: StateStore; service?: ControllerApprovals;
+  service?: ControllerApprovals;
 } };
-const runtime = root.backroomApprovals ??= { store: new MemoryStateStore() };
+const runtime = root.backroomApprovals ??= {};
 export const approvalState: StateStore = new Proxy({} as StateStore, {
-  get(_target, key) { const member = runtime.store[key as keyof StateStore]; return member.bind(runtime.store); },
+  get(_target, key) {
+    const store = getStateStore();
+    const member = store[key as keyof StateStore];
+    return typeof member === "function" ? member.bind(store) : member;
+  },
 });
 /** Install only at trusted bootstrap, together with the gateway's durable adapter. */
-export function installApprovalStateStore(store: StateStore) {
+export async function installApprovalStateStore(store: StateStore) {
   if (runtime.service) throw new Error('APPROVAL_SERVICE_ALREADY_STARTED');
-  runtime.store = store;
+  await installStateStore(store);
 }
 export function controllerApprovals() {
   const origin = process.env.WEBAUTHN_ORIGIN;

@@ -10,6 +10,9 @@ test('Dana registers, reviews evidence and relays Deny / Approve / Counter with 
   await page.getByLabel('Controller enrollment code').fill('local-browser-test-only');
   await page.getByRole('button', { name: 'Create Dana’s passkey' }).click();
   await expect(page.getByRole('heading', { name: 'Dana’s passkey is ready.' })).toBeVisible();
+  // Human review remains available when the shared model control is OFF.
+  const off = await request.post('/api/llm', { headers: { authorization: 'Bearer local-tool-test-only' }, data: { llmEnabled: false } });
+  expect(await off.json()).toEqual({ llmEnabled: false });
   let seq = 0;
   async function tool(name: string, extra: Record<string, unknown>) {
     const res = await request.post(`/api/tools/${name}`, { headers: { authorization: 'Bearer local-tool-test-only' },
