@@ -94,6 +94,25 @@ describe('CRS outage fallback (spec 6.3)', () => {
     expect((await crs.getPublicRecords(7)).cached).toBeUndefined();
   });
 
+  it('a rejected refresh token logs in again once; a rejected login still latches AUTH', async () => {
+    let logins = 0, productCalls = 0, loginRejected = false;
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/users/refresh-token')) return new Response('{}', { status: 401 });
+      if (path.endsWith('/users/login')) { logins++; return loginRejected ? new Response('{}', { status: 401 }) : crsSandboxFixtureFetch(input, init); }
+      if (++productCalls === 2 || productCalls === 4) return new Response('{}', { status: 401 });
+      return crsSandboxFixtureFetch(input, init);
+    };
+    const crs = new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: 'u', password: 'p', fetch });
+    await crs.getPublicRecords(7);
+    await expect(crs.getPublicRecords(7)).resolves.toMatchObject({ source: 'crs_sandbox' });
+    expect(logins).toBe(2);
+    loginRejected = true;
+    await expect(crs.getPublicRecords(7)).rejects.toMatchObject({ code: 'AUTH' });
+    await expect(crs.getPublicRecords(7)).rejects.toMatchObject({ code: 'AUTH' });
+    expect(logins).toBe(3);
+  });
+
   it('never caches fixture evidence', async () => {
     const cache = new MemoryCrsEvidenceCache();
     const fixture = new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: 'f', password: 'f', fetch: crsSandboxFixtureFetch, fixture: true, cache });

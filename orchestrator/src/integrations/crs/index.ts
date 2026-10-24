@@ -147,21 +147,19 @@ export class CrsClient {
     if (this.#token !== staleToken) return;
     if (!this.#renewing) {
       this.#renewing = (async () => {
-        try {
-          if (this.#refreshToken) {
+        if (this.#refreshToken) {
+          try {
             this.#setTokens(await this.#json(await this.#post('/users/refresh-token', { refreshToken: this.#refreshToken })));
-          } else {
-            this.#token = undefined;
-            await this.login();
+            return;
+          } catch (error) {
+            // A refresh that hits an outage keeps the refresh token and can retry once CRS is back.
+            if (isCrsOutage(error)) throw error;
+            // A rejected refresh token is not a rejected credential: log in once; login() latches a real rejection.
           }
-        } catch (error) {
-          // A refresh that hits an outage keeps the refresh token and can retry once CRS is back.
-          if (isCrsOutage(error)) throw error;
-          this.#token = undefined;
-          this.#refreshToken = undefined;
-          this.#authFailed = true;
-          throw new CrsError('AUTH');
         }
+        this.#token = undefined;
+        this.#refreshToken = undefined;
+        await this.login();
       })().finally(() => { this.#renewing = undefined; });
     }
     return this.#renewing;
