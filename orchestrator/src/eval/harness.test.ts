@@ -6,7 +6,7 @@ describe('eval run', () => {
     const result = await runEval({ persona: scriptedPersona, limit: 30 });
     expect(result.reports).toHaveLength(30);
     expect(result.elapsedMs).toBeLessThan(10 * 60 * 1000);
-    expect(result.signoff).toBe('pending');
+    expect(result.signoff).toBe('approved');
     expect(result.gradedEval).toBe('not_run');
     for (const report of result.reports) {
       expect(formatReport(report)).toMatch(/outcome=.+ violations=.+ escalations=.+ answerKeyMatch=(true|false)/);

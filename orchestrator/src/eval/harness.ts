@@ -54,7 +54,7 @@ export interface EvalRun {
   reports: EvalReport[];
   elapsedMs: number;
   signoff: string;
-  gradedEval: 'not_run';
+  gradedEval: 'not_run' | 'run-1';
 }
 
 interface PolicyStep { verificationLayer: string; badge?: Badge; action?: string; actionRequest?: ActionRequest & { plan?: Record<string, unknown> };
