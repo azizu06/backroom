@@ -7,6 +7,7 @@ import { parsePreCallGate } from '../../voice/demo-bridge';
 import { createCallRequestHTTP, type CallRequestAudit } from '../../../../web/lib/calls/request';
 
 const ORIGIN = 'https://demo.example';
+const LOOPBACK = 'http://127.0.0.1:3000';
 const RELAY = { url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin-secret' };
 const PHONE_BODY = { line: 'collections', phoneNumber: '+15555550199' };
 const BLOCKED_REASON = 'Credit/OFAC check unavailable';
@@ -44,7 +45,8 @@ function fixtureDeps(ofacStatus: 'clear' | 'unknown') {
   };
 }
 
-async function office(published: ReturnType<typeof publishPreCall>, network: { calls: number }) {
+async function office(published: ReturnType<typeof publishPreCall>, network: { calls: number }, options: { requestOrigin?: string; loopbackOrigin?: string } = {}) {
+  const home = options.requestOrigin ?? ORIGIN;
   const counts = { providerAttempts: 0, relayCalls: 0 };
   const audits: CallRequestAudit[] = [];
   const adminAudits: { action: string; ruleIds: string[]; reason: string }[] = [];
@@ -66,6 +68,7 @@ async function office(published: ReturnType<typeof publishPreCall>, network: { c
   });
   const handle = createCallRequestHTTP({
     secret: () => 'operator-code', origin: () => ORIGIN, now: () => 1_762_000_000_000,
+    ...(options.loopbackOrigin ? { loopbackOrigin: () => options.loopbackOrigin } : {}),
     relay: () => RELAY, currentCall: async () => null,
     audit: async entry => { audits.push(entry); },
     fetch: async (input, init) => {
@@ -82,14 +85,15 @@ async function office(published: ReturnType<typeof publishPreCall>, network: { c
       return new Response(body, { status: result.status });
     },
   });
-  const post = (action: 'session' | 'request', body: unknown, headers: Record<string, string> = {}) => handle(action, new Request(`${ORIGIN}/api/calls/${action}`, {
-    method: 'POST', headers: { origin: ORIGIN, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers },
+  const post = (action: 'session' | 'request', body: unknown, headers: Record<string, string> = {}, requestOrigin = home) => handle(action, new Request(`${requestOrigin}/api/calls/${action}`, {
+    method: 'POST', headers: { origin: requestOrigin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   }));
   const session = await post('session', { code: 'operator-code' });
   const cookie = session.headers.get('set-cookie')?.split(';')[0];
   if (!cookie?.startsWith('backroom_calls=')) throw new Error('CALL_BUTTON_UNLOCK_FAILED');
-  return { counts, audits, adminAudits, adminResponses, click: (body: unknown = { line: 'collections' }) => post('request', body, { cookie }) };
+  return { counts, audits, adminAudits, adminResponses, click: (body: unknown = { line: 'collections' }) => post('request', body, { cookie }),
+    clickFrom: (requestOrigin: string, body: unknown = {}) => post('request', body, { cookie }, requestOrigin) };
 }
 
 export async function runCallButton() {
@@ -115,6 +119,11 @@ export async function runCallButton() {
     const readyResponse = await readyOffice.click({});
     const readyBody = await readyResponse.json() as { ok?: boolean; error?: string; message?: string };
     const readyAudit = readyOffice.audits.at(-1);
+    const foreignResponse = await readyOffice.clickFrom('https://evil.example');
+    const foreignBody = await foreignResponse.json() as { ok?: boolean; error?: string };
+    const loopbackOffice = await office(readyPublished, network, { requestOrigin: LOOPBACK, loopbackOrigin: LOOPBACK });
+    const loopbackResponse = await loopbackOffice.click({});
+    const loopbackBody = await loopbackResponse.json() as { ok?: boolean; error?: string; message?: string };
     const quiet = network.calls === 0;
     const checks = {
       blocked: quiet && blockedPre.status === 'blocked' && blockedPre.reason === BLOCKED_REASON
@@ -132,6 +141,11 @@ export async function runCallButton() {
         && readyBody.message === 'Ringing the allowlisted demo phone. Answer on speaker.'
         && readyOffice.counts.providerAttempts === 1 && readyOffice.counts.relayCalls === 1
         && readyAudit?.outcome === 'accepted' && readyAudit.code === 'DIAL_ACCEPTED' && readyOffice.adminAudits.length === 0,
+      foreign: quiet && foreignResponse.status === 403 && foreignBody.ok === false && foreignBody.error === 'ORIGIN_REJECTED'
+        && readyOffice.counts.providerAttempts === 1 && readyOffice.counts.relayCalls === 1,
+      loopback: quiet && loopbackResponse.status === 200 && loopbackBody.ok === true
+        && loopbackBody.message === 'Ringing the allowlisted demo phone. Answer on speaker.'
+        && loopbackOffice.counts.providerAttempts === 1 && loopbackOffice.counts.relayCalls === 1,
     };
     const passed = Object.values(checks).filter(Boolean).length;
     return {
@@ -141,7 +155,7 @@ export async function runCallButton() {
       invalid: { status: invalidResponse.status, error: invalidBody.error ?? null, providerAttempts: invalidAttempts, relayCalls: invalidRelayCalls },
       ready: { status: readyResponse.status, ok: readyBody.ok === true, error: readyBody.error ?? null, audit: readyAudit ?? null,
         providerAttempts: readyOffice.counts.providerAttempts },
-      scope: 'Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. No network and no Cartesia.',
+      scope: 'Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia.',
     };
   } finally { globalThis.fetch = prior; }
 }
