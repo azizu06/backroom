@@ -1,0 +1,5 @@
+/* Office palette tokens (app/office/lobby.css); the fallbacks are the same palette values for pages that do not load the office. */
+.demo-pill { position: fixed; z-index: 110; right: 12px; bottom: 12px; max-width: calc(100vw - 24px); box-sizing: border-box; margin: 0; padding: 4px 12px; border: 1px solid var(--office-lavender, #D9CCFF); border-radius: 999px; background: var(--office-cream, #FFF7EC); color: var(--office-navy, #4A5A7A); box-shadow: var(--office-plate-shadow, 0 2px 8px rgba(124, 136, 166, 0.35)); font: 600 12px/1.5 system-ui, sans-serif; overflow-wrap: anywhere; }
+.demo-pill a { color: inherit; text-underline-offset: 2px; }
+.demo-pill a:focus-visible { outline: 2px solid var(--office-navy, #4A5A7A); outline-offset: 2px; }
+.demo-pill-spacer { height: 48px; }

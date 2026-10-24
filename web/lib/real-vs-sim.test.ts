@@ -2,8 +2,9 @@ import * as React from 'react';
 // @ts-ignore -- react-dom ships no types and @types/react-dom is not a workspace dependency.
 import * as ReactDOMServer from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DisclosureRow, RealVsSim } from '../components/RealVsSim';
-import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, NOT_PROBED_LABEL, panelExpanded, probedServices, toggledPanel, unprobedServices, type DemoStatus, type ServiceId } from './real-vs-sim';
+import { DemoPill } from '../components/DemoPill';
+import { DisclosureRow } from '../components/RealVsSim';
+import { demoPillText, disclosureItems, getDisclosureStatus, NOT_PROBED_LABEL, probedServices, unprobedServices, type DemoStatus, type ServiceId } from './real-vs-sim';
 
 const { renderToString } = ReactDOMServer as { renderToString(node: React.ReactNode): string };
 vi.mock('next/navigation', () => ({ usePathname: () => '/office', useSearchParams: () => new URLSearchParams() }));
@@ -164,47 +165,33 @@ describe('disclosure rows', () => {
   });
 });
 
-describe('disclosure panel expansion', () => {
-  it('collapses by default in the office and at the narrow breakpoint', () => {
-    expect(NARROW_PANEL_QUERY).toBe('(max-width: 760px)');
-    expect(panelExpanded({ detailed: false, narrow: true, userExpanded: null })).toBe(false);
-    expect(panelExpanded({ detailed: false, narrow: false, userExpanded: null })).toBe(true);
-    expect(panelExpanded({ detailed: false, narrow: false, officeView: true, userExpanded: null })).toBe(false);
+describe('demo pill', () => {
+  const nessie = (state: 'simulated' | 'unverified' | 'verified') => snapshot({ services: { nessie: { state, source: 'config', evidence: 'host', at: null } } });
+
+  it('says sandbox money until the host reports its Nessie adapter', () => {
+    expect(demoPillText(null, NOW)).toBe('Demo · synthetic company · sandbox money');
+    expect(demoPillText(snapshot(), NOW)).toBe('Demo · synthetic company · sandbox money');
   });
 
-  it('keeps the details page expanded regardless of viewport or toggle', () => {
-    for (const narrow of [true, false]) for (const officeView of [true, false]) for (const userExpanded of [null, true, false]) {
-      expect(panelExpanded({ detailed: true, narrow, officeView, userExpanded })).toBe(true);
-    }
+  it('derives the money wording from the host Nessie status, not a build-time flag', () => {
+    expect(demoPillText(nessie('simulated'), NOW)).toBe('Demo · synthetic company · mock bank money');
+    expect(demoPillText(nessie('unverified'), NOW)).toBe('Demo · synthetic company · Nessie sandbox money');
+    expect(demoPillText(nessie('verified'), NOW)).toBe('Demo · synthetic company · Nessie sandbox money');
   });
 
-  it('flips on toggle and lets the user choice win over the viewport default', () => {
-    for (const narrow of [true, false]) for (const officeView of [true, false]) {
-      const initial = panelExpanded({ detailed: false, narrow, officeView, userExpanded: null });
-      const toggled = panelExpanded({ detailed: false, narrow, officeView, userExpanded: toggledPanel(initial) });
-      expect(toggled).toBe(!initial);
-      expect(panelExpanded({ detailed: false, narrow, officeView, userExpanded: toggledPanel(toggled) })).toBe(initial);
-      expect(panelExpanded({ detailed: false, narrow: !narrow, officeView, userExpanded: toggledPanel(initial) })).toBe(!initial);
-    }
+  it('flags LLM OFF and drops claims from a stale status', () => {
+    expect(demoPillText(snapshot({ llmEnabled: false }), NOW)).toBe('Demo · synthetic company · sandbox money · LLM OFF');
+    expect(demoPillText(nessie('unverified'), NOW + 60_000)).toBe('Demo · synthetic company · sandbox money');
   });
 
-  it('server-renders the toggle with aria-expanded and aria-controls bound to the panel body', () => {
+  it('server-renders one slim disclosure; the office nav carries the What’s real link', () => {
     // Vitest compiles the component's JSX with the classic runtime; harmless if that ever changes.
     vi.stubGlobal('React', React);
     let html: string;
-    try { html = renderToString(React.createElement(RealVsSim)); } finally { vi.unstubAllGlobals(); }
-    const button = html.match(/<button[^>]*class="real-sim-toggle"[^>]*>/)?.[0] ?? '';
-    const expanded = /aria-expanded="(true|false)"/.exec(button)?.[1];
-    const controls = /aria-controls="([^"]+)"/.exec(button)?.[1];
-    expect(expanded).toBe('false');
-    expect(controls).toBeTruthy();
-    expect(html).toMatch(new RegExp(`<aside[^>]*data-expanded="${expanded}"`));
-    const body = html.match(new RegExp(`<div id="${controls}"[^>]*>`))?.[0];
-    expect(body).toBeDefined();
-    expect(body).toContain('hidden');
-    expect(html).toContain('>Show<');
-    expect(html).not.toContain('>Hide<');
-    expect(html).not.toContain('Details ↗');
-    expect(html).toContain('Sandbox items never represent real money or identities.');
+    try { html = renderToString(React.createElement(DemoPill)); } finally { vi.unstubAllGlobals(); }
+    expect(html).toMatch(/<aside class="demo-pill" aria-label="Demo disclosure">/);
+    expect(html).toContain('Demo · synthetic company · sandbox money');
+    expect(html).not.toContain('href="/real-vs-sim"');
+    expect(html).not.toContain('real-sim-toggle');
   });
 });

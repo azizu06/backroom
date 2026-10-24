@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalSt
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
+import { SiteNav } from '../../components/SiteNav';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, useTouch } from './PlayHud';
 import { roomLabel, seatLabel } from '../../lib/office/a11y';
@@ -139,11 +140,11 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const plan = mode === 'plan' || lostContext;
   return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
+    <SiteNav placement='office' />
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
         <OfficeHelp />
-        <a href='/operator'>Operator</a>
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
