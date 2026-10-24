@@ -20,6 +20,33 @@ Consumers must hold/escalate `unknown` and block/escalate `hit`; this client doe
 not grant approval or make policy decisions. Business credit currently exposes
 only an optional numeric score. A missing score is not evidence of good credit.
 
+## Cal Hacks sandbox products (`sandbox.ts`)
+
+CRS's event package (`@crscreditapi/crs-calhacks-mcp-server@1.1.2`: OpenAPI, guides,
+20 fake personas P01-P20) confirms the Cal Hacks sandbox serves **no business credit
+and no standalone OFAC**. It serves consumer products only. Two of them map onto our
+flows without pretending to be business data, and are configured in `sandbox.ts`:
+
+| Client method | CRS route | Summary | Use |
+|---|---|---|---|
+| `getPublicRecords(id)` | `POST /pp/fcrablj/data` (PitchPoint) | `bankruptcies`, `judgments`, `liens` counts | §1.4 bankruptcy stop |
+| `getFraudRisk(id)` | `POST /fraud-finder/fraud-finder` (AtData) | `fraudRiskScore` 0-100 (risky ≥ `CRS_FRAUD_RISK_THRESHOLD` 70) | vendor bank-change verification |
+
+`personas.ts` is generated from the package's `test-data/personas.json`; test identity N
+is persona PN. Bodies are verbatim: per CRS, a request missing any persona field misses the
+free canned response and can reach a real, billed vendor. A partial PitchPoint report or an
+out-of-range score is a `RESPONSE` error, never "clear". Useful personas: P01/P19 clean,
+P06 Ch.7 discharged, P07 Ch.13 open, P08 lien + judgment, P13 synthetic identity (risk 88).
+`new CrsClient({ username, password, ...CRS_CALHACKS_SANDBOX })` enables both;
+business credit and OFAC stay unconfigured and fail before login.
+
+Live probe with only credentials (no module): `CRS_LIVE=1 CRS_USERNAME=… CRS_PASSWORD=…
+CRS_TEST_ID=6 pnpm --filter @backroom/orchestrator crs:live` runs public records then fraud
+risk and prints only evidence. Credentials come from the CRS email invite (a human signup);
+the probe also reads them from the repo-root `.env.local` (gitignored). Afterwards, CRS's
+`GET /users/logs` shows `billable: false` for persona matches. The account OpenAPI
+(checked 2026-10-24) lists the same routes and no business-credit or OFAC product.
+
 ## What is verified, and what remains unavailable
 
 Checked 2026-10-24 against first-party sources:

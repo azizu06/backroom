@@ -46,7 +46,7 @@ it('blocks missing adapters and unapproved identities before authentication', as
 it('latches failed login without leaking the provider error or retrying the account', async () => {
   const network = vi.fn<typeof fetch>().mockResolvedValue(json({ password: 'sensitive' }, 401));
   const client = new CrsClient({ username: 'u', password: 'sensitive', fetch: network });
-  await expect(client.login()).rejects.toThrow('CRS AUTH');
+  await expect(client.login()).rejects.toThrow('CRS AUTH (401)');
   await expect(client.login()).rejects.toThrow('CRS AUTH');
   expect(network).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(client)).not.toContain('sensitive');

@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 
 export const CRS_SANDBOX_URL = 'https://api-sandbox.stitchcredit.com/api';
 export class CrsError extends Error {
-  constructor(public readonly code: 'AUTH' | 'HTTP' | 'RESPONSE' | 'TRANSPORT' | 'CONFIGURATION', public readonly status?: number) {
-    super(`CRS ${code}${status === undefined ? '' : ` (${status})`}`);
+  constructor(public readonly code: 'AUTH' | 'HTTP' | 'RESPONSE' | 'TRANSPORT' | 'CONFIGURATION', public readonly status?: number, step?: string) {
+    super(`CRS ${code}${status === undefined ? '' : ` (${status})`}${step ? ` at ${step}` : ''}`);
     this.name = 'CrsError';
   }
 }
@@ -13,18 +13,29 @@ export interface CrsOptions {
   password: string;
   fetch?: typeof fetch;
   identities?: readonly CrsSandboxIdentity[];
-  products?: Partial<{ businessCredit: CrsProductAdapter; ofac: CrsProductAdapter }>;
+  products?: Partial<Record<CrsProduct, CrsProductAdapter>>;
 }
 
-export type CrsProduct = 'businessCredit' | 'ofac';
+/** publicRecords (PitchPoint) and fraudRisk (Fraud Finder) are the products the Cal Hacks sandbox serves; see ./sandbox.ts. */
+export type CrsProduct = 'businessCredit' | 'ofac' | 'publicRecords' | 'fraudRisk';
 export type OfacStatus = 'clear' | 'hit' | 'unknown';
-export interface CrsSummary { creditScore?: number; ofacStatus?: OfacStatus }
+export interface CrsSummary {
+  creditScore?: number;
+  ofacStatus?: OfacStatus;
+  bankruptcies?: number;
+  judgments?: number;
+  liens?: number;
+  /** AtData risk.score, 0-100, higher is riskier. */
+  fraudRiskScore?: number;
+}
 /** Trusted server configuration copied verbatim from sponsor-confirmed sandbox data. */
 export interface CrsSandboxIdentity {
   testIdentityId: number;
   source: string;
   businessCredit?: Record<string, unknown>;
   ofac?: Record<string, unknown>;
+  publicRecords?: Record<string, unknown>;
+  fraudRisk?: Record<string, unknown>;
 }
 export interface CrsProductAdapter {
   path: string;
@@ -86,10 +97,10 @@ export class CrsClient {
         try {
           const body = await this.#json(await this.#post('/users/login', this.#credentials));
           this.#setTokens(body);
-        } catch {
+        } catch (error) {
           // CRS warns repeated failed logins disable the account. New client required after correction.
           this.#authFailed = true;
-          throw new CrsError('AUTH');
+          throw new CrsError('AUTH', error instanceof CrsError ? error.status : undefined);
         }
       })().finally(() => { this.#authentication = undefined; });
     }
@@ -127,6 +138,16 @@ export class CrsClient {
     return this.#run('ofac', testIdentityId);
   }
 
+  /** PitchPoint bankruptcies, liens and judgments for the approved test identity. */
+  getPublicRecords(testIdentityId: number): Promise<CrsEvidence> {
+    return this.#run('publicRecords', testIdentityId);
+  }
+
+  /** Fraud Finder (AtData) email risk for the approved test identity. */
+  getFraudRisk(testIdentityId: number): Promise<CrsEvidence> {
+    return this.#run('fraudRisk', testIdentityId);
+  }
+
   async #run(product: CrsProduct, testIdentityId: number): Promise<CrsEvidence> {
     const identity = this.#identities.find(item => item.testIdentityId === testIdentityId);
     const adapter = this.#products?.[product];
@@ -149,10 +170,7 @@ export class CrsClient {
     let parsed: CrsSummary;
     try { parsed = adapter.summarize(body); } catch { throw new CrsError('RESPONSE'); }
     // Project only numeric/enum values; raw names, addresses and other response fields cannot escape.
-    const summary: CrsSummary = product === 'ofac'
-      ? { ofacStatus: parsed.ofacStatus === 'hit' || parsed.ofacStatus === 'clear' ? parsed.ofacStatus : 'unknown' }
-      : typeof parsed.creditScore === 'number' && Number.isFinite(parsed.creditScore)
-        ? { creditScore: parsed.creditScore } : {};
+    const summary = project(product, parsed);
     return {
       source: 'crs_sandbox', product, testIdentityId,
       label: `SANDBOX: test identity #${testIdentityId}`, checkedAt: new Date().toISOString(),
@@ -164,5 +182,27 @@ export class CrsClient {
     if (typeof body.token !== 'string' || !body.token) throw new CrsError('AUTH');
     this.#token = body.token;
     this.#refreshToken = typeof body.refreshToken === 'string' ? body.refreshToken : undefined;
+  }
+}
+
+const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+
+function project(product: CrsProduct, parsed: CrsSummary): CrsSummary {
+  switch (product) {
+    case 'ofac':
+      return { ofacStatus: parsed.ofacStatus === 'hit' || parsed.ofacStatus === 'clear' ? parsed.ofacStatus : 'unknown' };
+    case 'businessCredit':
+      return typeof parsed.creditScore === 'number' && Number.isFinite(parsed.creditScore) ? { creditScore: parsed.creditScore } : {};
+    case 'publicRecords': {
+      const bankruptcies = count(parsed.bankruptcies), judgments = count(parsed.judgments), liens = count(parsed.liens);
+      // A partial count could read as "no bankruptcy"; the bankruptcy stop needs all three or none.
+      if (bankruptcies === undefined || judgments === undefined || liens === undefined) throw new CrsError('RESPONSE');
+      return { bankruptcies, judgments, liens };
+    }
+    case 'fraudRisk': {
+      const score = parsed.fraudRiskScore;
+      if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 100) throw new CrsError('RESPONSE');
+      return { fraudRiskScore: score };
+    }
   }
 }
