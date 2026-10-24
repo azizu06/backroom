@@ -6,6 +6,9 @@ export const MONITOR_DESKS = ['collections', 'payables', 'vendor_onboarding', 'd
 export type MonitorDesk = typeof MONITOR_DESKS[number];
 export const MONITOR_LINE_MAX = 26;
 export const MONITOR_MAX_LINES = 4;
+/** Fits inside the desk width; both the housing and texture use this transform. */
+export const MONITOR_FACE = { width: 1.8, height: 1.08, x: -0.15, y: 1.54, z: -0.23 } as const;
+export const MONITOR_TEXTURE = { width: 512, height: 320, overviewFont: 132 } as const;
 /** In front of the screen (desk-local +z), just outside the desk footprint (half depth 0.525). */
 const MONITOR_STAND: readonly [x: number, z: number] = [-0.35, 0.85];
 
@@ -53,6 +56,17 @@ export function monitorScreen(snapshot: OfficeSnapshot, room: MonitorDesk): Moni
 /** Stable key for redrawing a screen only when its display data changes. */
 export function monitorScreenKey(screen: MonitorScreen): string {
   return JSON.stringify(screen);
+}
+
+/** Two short readouts at overview; full task lines remain on the focused screen and in its panel. */
+export function monitorOverview(screen: MonitorScreen): readonly [string, string] {
+  const agent = screen.lines.find(entry => entry.kind === 'agent');
+  const [name, state] = agent?.text.split(' · ') ?? [];
+  const waiting = screen.lines.find(entry => entry.kind === 'awaiting');
+  const heading = name || (waiting ? 'Dana' : 'Idle');
+  const decision = screen.status?.decision;
+  const detail = decision === 'ESCALATE' ? 'HOLD' : decision === 'RECORDED' ? 'LOGGED' : decision;
+  return [heading, detail || (waiting ? `Wait: ${waiting.text.split(': ').at(-1)}` : screen.lines.some(entry => entry.kind === 'folder') ? 'Folder' : screen.lines.some(entry => entry.kind === 'away') ? 'Away' : state || 'Idle')];
 }
 
 /** Floor (x, z) in front of a desk screen, following the desk's rotation (PI for Dana's desk). */
