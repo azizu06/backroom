@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type Keyboard
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { playOfficeCue } from '../../lib/office/sound-events';
-import { playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
+import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
   DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
 } from '../../lib/office/playSettings';
@@ -221,6 +221,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
     const held = control(event);
     if (!held) return;
     event.preventDefault();
+    // A tap (keydown then keyup before the next frame) still has to yaw. Repeats keep turning via turnIntent.
+    if (!event.repeat) applyTurnTap(input, held);
     input.press(held);
     requestSceneFrame();
   }
