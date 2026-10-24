@@ -117,3 +117,48 @@ describe('HandoffVoice', () => {
     expect(voice.failed).toBe(true);
   });
 });
+
+describe('HandoffVoice review fixes', () => {
+  const cue = (key: string): VoiceCue => ({ key, at: 0, line: { role: 'auditor', text: key } });
+  const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+  it('does not play a line that finished synthesizing after sound was turned off', async () => {
+    let release!: (blob: Blob) => void;
+    const play = vi.fn(async () => {});
+    const voice = new HandoffVoice(() => new Promise<Blob>(resolve => { release = resolve; }), play);
+    voice.setEnabled(true);
+    voice.say(cue('slow'));
+    await flush();
+    voice.setEnabled(false);
+    release(new Blob(['x']));
+    await flush(); await flush();
+    expect(play).not.toHaveBeenCalled();
+    expect(voice.failed).toBe(false);
+  });
+  it('aborts the clip that is playing when sound is turned off', async () => {
+    let signal!: AbortSignal;
+    const voice = new HandoffVoice(async () => new Blob(['x']), (_blob, abort) => { signal = abort; return new Promise(resolve => abort.addEventListener('abort', () => resolve())); });
+    voice.setEnabled(true);
+    voice.say(cue('a'));
+    await flush(); await flush();
+    voice.setEnabled(false);
+    expect(signal.aborted).toBe(true);
+  });
+  it('drops only the line on a slow or unreachable voice server (502/504)', async () => {
+    const voice = new HandoffVoice(async () => { throw new Error('HANDOFF_AUDIO_HTTP_502'); }, vi.fn(async () => {}));
+    voice.setEnabled(true);
+    voice.say(cue('a'));
+    await flush(); await flush();
+    expect(voice.failed).toBe(false);
+  });
+});
+
+describe('handoff proxy body cap', () => {
+  it('rejects an oversized body that has no Content-Length without buffering it all', async () => {
+    const big = new TextEncoder().encode(JSON.stringify({ role: 'auditor', text: 'x'.repeat(10_000) }));
+    const stream = new ReadableStream({ start(controller) { controller.enqueue(big.slice(0, 3000)); controller.enqueue(big.slice(3000)); controller.close(); } });
+    const request = new Request(`${ORIGIN}/api/handoff`, { method: 'POST', body: stream, duplex: 'half', headers: { 'content-type': 'application/json', origin: ORIGIN } } as RequestInit);
+    const transport = vi.fn();
+    expect((await proxy(transport as unknown as typeof fetch)(request)).status).toBe(413);
+    expect(transport).not.toHaveBeenCalled();
+  });
+});

@@ -121,12 +121,19 @@ function epochMs(value: unknown): number | undefined {
  * Returns null for rows that cannot be drawn (missing id or endpoints). Unknown agent ids are kept
  * (they appear in the text log) but the planner does not animate them.
  */
+const firstSeen = new Map<string, number>();
 export function handoffFromRow(row: Readonly<Record<string, unknown>>, received = Date.now()): Handoff | null {
   const id = row.id ?? row.handoffId ?? row.handoff_id;
   const from = normalizeAgent(row.from ?? row.fromAgent ?? row.from_agent);
   const to = normalizeAgent(row.to ?? row.toAgent ?? row.to_agent);
   if (id === undefined || id === null || !from || !to) return null;
-  const at = epochMs(row.at ?? row.createdAt ?? row.created_at) ?? received;
+  let at = epochMs(row.at ?? row.createdAt ?? row.created_at);
+  if (at === undefined) {
+    // No timestamp column: keep the first time this id was seen, so re-projecting the rows does not replay them.
+    at = firstSeen.get(String(id)) ?? received;
+    firstSeen.set(String(id), at);
+    if (firstSeen.size > 1000) firstSeen.delete(firstSeen.keys().next().value!);
+  }
   const updatedAt = epochMs(row.updatedAt ?? row.updated_at);
   return {
     id: String(id), from, to,

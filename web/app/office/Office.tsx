@@ -10,7 +10,7 @@ import { REDUCED_MOTION_QUERY, isCloseKey, roomLabel, seatLabel } from '../../li
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, handoffLine, type Handoff, type HandoffAgentId } from '../../lib/office/handoffs';
 import { HandoffStage } from '../../lib/office/handoff-plan';
 import { createMockHandoffFeed, type HandoffFeed } from '../../lib/office/handoff-mock';
-import { HandoffVoice, playBlob, voiceCues } from '../../lib/office/handoff-voice';
+import { HandoffVoice, createAudioPlayer, voiceCues } from '../../lib/office/handoff-voice';
 import { getHandoffAudio } from '@backroom/orchestrator/handoff-client';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
@@ -110,7 +110,8 @@ function useHandoffs(snapshot: OfficeSnapshot) {
  */
 function useHandoffVoice(stage: HandoffStage | null, rows: readonly Handoff[]) {
   const [, rerender] = useReducer((count: number) => count + 1, 0);
-  const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), playBlob, rerender));
+  const [player] = useState(createAudioPlayer);
+  const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), player.play, rerender));
   useEffect(() => () => voice.setEnabled(false), [voice]);
   useEffect(() => {
     if (!stage || !voice.enabled || voice.failed) return;
@@ -121,11 +122,11 @@ function useHandoffVoice(stage: HandoffStage | null, rows: readonly Handoff[]) {
     });
     return () => timers.forEach(clearTimeout);
   }, [stage, rows, voice, voice.enabled, voice.failed]);
-  return voice;
+  return { voice, unlock: player.unlock };
 }
-function SoundToggle({ voice }: { voice: HandoffVoice }) {
+function SoundToggle({ voice, unlock }: { voice: HandoffVoice; unlock: () => void }) {
   if (voice.failed) return <p className='handoff-sound' role='status'>Voices unavailable · visuals only</p>;
-  return <button type='button' className='handoff-sound' aria-pressed={voice.enabled} onClick={() => voice.setEnabled(!voice.enabled)}>
+  return <button type='button' className='handoff-sound' aria-pressed={voice.enabled} onClick={() => { if (!voice.enabled) unlock(); voice.setEnabled(!voice.enabled); }}>
     {voice.enabled ? 'Voices on' : 'Voices off'}
   </button>;
 }
@@ -133,9 +134,11 @@ function HandoffLog({ rows, reduced, sound }: { rows: readonly Handoff[]; reduce
   return <section className='office-audit handoff-log' aria-label='Agent handoffs' data-office-mount='handoffs'>
     <h2>Agent handoffs <span>{reduced ? 'Reduced motion · listed instead of animated' : 'Folders passed between agent desks'}</span></h2>
     {sound}
-    {!rows.length ? <p>No handoffs yet.</p> : <ol role='log' aria-live='polite' aria-relevant='additions text'>
+    {/* The log stays mounted while empty so the first handoff is announced. */}
+    {!rows.length && <p>No handoffs yet.</p>}
+    <ol role='log' aria-live='polite' aria-relevant='additions text'>
       {rows.slice(-8).map(row => <li key={row.id} data-handoff-id={row.id} data-status={row.status}>{handoffLine(row)}</li>)}
-    </ol>}
+    </ol>
   </section>;
 }
 /** Contains a render failure to its own region; a changed `resetKey` retries the children. */
@@ -346,7 +349,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         </ViewBoundary>
       </section>}
       {handoffStage && <ViewBoundary name='Handoff log' resetKey={handoffs.rows} fallback={<p role='status'>Handoff log unavailable.</p>}>
-        <HandoffLog rows={handoffs.rows} reduced={reducedMotion} sound={<SoundToggle voice={voice} />} />
+        <HandoffLog rows={handoffs.rows} reduced={reducedMotion} sound={<SoundToggle voice={voice.voice} unlock={voice.unlock} />} />
       </ViewBoundary>}
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
