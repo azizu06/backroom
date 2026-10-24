@@ -30,14 +30,46 @@ it('creates a short-lived code only from the ALLOW plan and binds resolution to 
 it('never publishes a loopback or non-HTTPS payment origin', async () => {
   const { paymentPublicOrigin } = await import('./delivery');
   const old = process.env.DEMO_PUBLIC_URL;
+  const oldTunnel = process.env.DEMO_TUNNEL;
   try {
+    delete process.env.DEMO_TUNNEL;
     for (const url of ['http://demo.example', 'https://localhost:3000', 'https://demo.example/_cartesia', 'https://u:p@demo.example']) {
       process.env.DEMO_PUBLIC_URL = url;
       expect(paymentPublicOrigin).toThrow();
     }
     process.env.DEMO_PUBLIC_URL = 'https://demo.example';
-    expect(paymentPublicOrigin()).toBe('https://demo.example');
-  } finally { if (old === undefined) delete process.env.DEMO_PUBLIC_URL; else process.env.DEMO_PUBLIC_URL = old; }
+    expect(paymentPublicOrigin()).toEqual({ origin: 'https://demo.example', localOnly: false });
+  } finally {
+    if (old === undefined) delete process.env.DEMO_PUBLIC_URL; else process.env.DEMO_PUBLIC_URL = old;
+    if (oldTunnel === undefined) delete process.env.DEMO_TUNNEL; else process.env.DEMO_TUNNEL = oldTunnel;
+  }
+});
+
+it('publishes a loopback origin only when the supervisor marks the host offline', async () => {
+  const { paymentPublicOrigin } = await import('./delivery');
+  const oldUrl = process.env.DEMO_PUBLIC_URL;
+  const oldTunnel = process.env.DEMO_TUNNEL;
+  try {
+    process.env.DEMO_TUNNEL = '0';
+    for (const url of ['http://127.0.0.1:3300', 'http://localhost:3000', 'https://[::1]:3000']) {
+      process.env.DEMO_PUBLIC_URL = url;
+      expect(paymentPublicOrigin()).toEqual({ origin: url, localOnly: true });
+    }
+    process.env.DEMO_PUBLIC_URL = 'https://demo.example';
+    expect(paymentPublicOrigin()).toEqual({ origin: 'https://demo.example', localOnly: false });
+    for (const url of ['http://demo.example', 'http://127.0.0.1:3300/pay', 'http://127.0.0.1:3300?x=1', 'http://u:p@127.0.0.1:3300', 'http://0.0.0.0:3300']) {
+      process.env.DEMO_PUBLIC_URL = url;
+      expect(paymentPublicOrigin).toThrow();
+    }
+    for (const tunnel of ['1', '', 'false', '00']) {
+      process.env.DEMO_TUNNEL = tunnel;
+      process.env.DEMO_PUBLIC_URL = 'http://127.0.0.1:3300';
+      expect(paymentPublicOrigin).toThrow();
+    }
+  } finally {
+    if (oldUrl === undefined) delete process.env.DEMO_PUBLIC_URL; else process.env.DEMO_PUBLIC_URL = oldUrl;
+    if (oldTunnel === undefined) delete process.env.DEMO_TUNNEL; else process.env.DEMO_TUNNEL = oldTunnel;
+  }
 });
 
 it('refuses to reannounce an expired code as a fresh payment page', async () => {

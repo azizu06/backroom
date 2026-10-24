@@ -7,7 +7,8 @@ export async function GET() {
   try {
     const link = await activePaymentDelivery(getGatewayStore());
     if (!link) return Response.json({ active: null }, { headers });
-    const url = `${paymentPublicOrigin()}/p/${link.code}`;
-    return Response.json({ active: { ...link, url, qr: await QRCode.toDataURL(url, { width: 256, margin: 4, errorCorrectionLevel: 'M' }) } }, { headers });
+    const published = paymentPublicOrigin();
+    const url = `${published.origin}/p/${link.code}`;
+    return Response.json({ active: { ...link, url, ...(published.localOnly ? { localOnly: true } : {}), qr: await QRCode.toDataURL(url, { width: 256, margin: 4, errorCorrectionLevel: 'M' }) } }, { headers });
   } catch { return Response.json({ error: 'PAYMENT_DELIVERY_UNAVAILABLE' }, { status: 503, headers }); }
 }
