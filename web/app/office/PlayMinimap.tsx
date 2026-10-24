@@ -46,12 +46,11 @@ export function PlayMinimap({ snapshot, hud }: { snapshot: OfficeSnapshot; hud: 
     return () => clearInterval(timer);
   }, [shown, hud, transform.scale, transform.offsetX, transform.offsetY]);
 
-  if (!shown) return null;
   const x = Number(hud.current?.dataset.playerX ?? SPAWN.position[0]);
   const z = Number(hud.current?.dataset.playerZ ?? SPAWN.position[1]);
   const room = roomAt([x, z], rooms);
   return <div className='play-minimap-wrap'>
-    <svg className='play-minimap' viewBox={`0 0 ${size} ${size}`} role='img' aria-label={room ? `Office map. You are in ${room}.` : 'Office map'}>
+    {shown && <svg className='play-minimap' viewBox={`0 0 ${size} ${size}`} role='img' aria-label={room ? `Office map. You are in ${room}.` : 'Office map'}>
       <rect className='minimap-bg' x='0' y='0' width={size} height={size} rx='8' />
       {items.filter(item => item.kind === 'room').map(item => {
         const point = worldToMap(item.position, transform);
@@ -72,7 +71,7 @@ export function PlayMinimap({ snapshot, hud }: { snapshot: OfficeSnapshot; hud: 
         </g>;
       })}
       <g ref={marker} className='minimap-player' transform={`translate(${worldToMap(SPAWN.position, transform).x} ${worldToMap(SPAWN.position, transform).y})`} aria-hidden='true'><path d='M 0 -6 L 4.5 5 L 0 2.7 L -4.5 5 Z' /></g>
-    </svg>
-    <button className='play-minimap-toggle' type='button' aria-label='Hide minimap' onClick={() => { savePreference(false); setShown(false); }}>M · Map</button>
+    </svg>}
+    <button className='play-minimap-toggle' type='button' aria-pressed={shown} aria-label={shown ? 'Hide map' : 'Show map'} onClick={() => { savePreference(!shown); setShown(value => !value); }}>M · Map</button>
   </div>;
 }
