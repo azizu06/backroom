@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "349e46f577ec4f9daea102a2311a30c17eeb8814",
+    "baseCommit": "802cbdfa618175ebcbd6e188fef97e8d96759d6b",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
