@@ -13,6 +13,8 @@ import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 import { ServerRoom } from './rooms/ServerRoom';
+import { HandoffLayer, type HandoffTagLookup } from './handoffs/HandoffLayer';
+import type { HandoffStage } from '../../lib/office/handoff-plan';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -217,9 +219,10 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play }: {
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, handoffs, handoffTag }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
   agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge;
+  handoffs?: HandoffStage; handoffTag?: HandoffTagLookup;
 }) {
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
@@ -278,6 +281,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     </Fragment>)}
     </Instances>
     <ServerRoom position={[7.1, 0, -0.8]} />
-    {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
+    {handoffs && <HandoffLayer stage={handoffs} tag={handoffTag} />}
+    {play ? <PlayRig {...play} handoffs={handoffs} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }

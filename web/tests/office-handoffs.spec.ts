@@ -1,0 +1,118 @@
+import { test, expect, type Page } from '@playwright/test';
+
+// Mock handoff stream (`?handoffs=mock`). Run via test:office:browser after building; needs WebGL.
+// Set HANDOFF_SHOTS=/some/dir to also save demo screenshots there.
+const SHOTS = process.env.HANDOFF_SHOTS;
+async function shot(page: Page, name: string) {
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/handoff-${name}.png` });
+}
+async function requireWebGL(page: Page) {
+  const available = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    return !!(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
+  });
+  if (!available) throw new Error('WebGL is unavailable in this headless Chromium, so the 3D handoffs cannot render.');
+}
+function log(page: Page) {
+  return page.getByRole('log');
+}
+function tag(page: Page, actor: string) {
+  return page.locator(`[data-handoff-actor='${actor}']`);
+}
+
+test('mock handoffs walk folders between desks, return a failed check and call Dana only for the passkey', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await requireWebGL(page);
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Agent handoffs' })).toBeVisible();
+  await expect(log(page)).toContainText('Intake → Extractor · INV-1042');
+  // Overlap: collections → auditor is logged alongside the first intake handoff.
+  await expect(log(page)).toContainText('Collections → Auditor · INV-0977');
+  await expect(tag(page, 'intake')).toBeVisible();
+  // Dana is not on the floor before the passkey step.
+  await expect(tag(page, 'human')).toBeHidden();
+  await expect(page.locator('.handoff-bubble:not([hidden])').first()).toBeVisible({ timeout: 10_000 });
+  await shot(page, 'pass');
+
+  const failure = page.locator(".handoff-bubble[data-tone='fail']:not([hidden])");
+  await expect(failure).toBeVisible({ timeout: 20_000 });
+  await expect(failure).toContainText('Remit-to ••4821');
+  await expect(tag(page, 'vendor_verifier')).toHaveAttribute('data-returning', 'true', { timeout: 10_000 });
+  await expect(log(page).locator("li[data-status='failed']")).toContainText('check failed, returned');
+  await shot(page, 'fail-return');
+
+  await expect(tag(page, 'human')).toBeVisible({ timeout: 30_000 });
+  await expect(tag(page, 'human').locator(".handoff-bubble[data-tone='passkey']")).toBeVisible({ timeout: 5_000 });
+  await expect(log(page)).toContainText('waiting for Dana’s passkey');
+  await shot(page, 'passkey');
+  expect(errors).toEqual([]);
+});
+
+test('reduced motion lists handoffs instead of animating them', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await requireWebGL(page);
+  const region = page.getByRole('region', { name: 'Agent handoffs' });
+  await expect(region).toContainText('Reduced motion · listed instead of animated');
+  await expect(log(page)).toHaveAttribute('aria-live', 'polite');
+  await expect(log(page)).toContainText('Intake → Extractor');
+  await expect(log(page).locator("li[data-status='failed']")).toBeVisible({ timeout: 20_000 });
+  // Nobody walks: no tag is ever marked as returning.
+  await expect(page.locator(".handoff-tag[data-returning='true']")).toHaveCount(0);
+  await region.scrollIntoViewIfNeeded();
+  await shot(page, 'reduced-log');
+});
+
+// --- Play helpers (same conventions as office-play.spec.ts) ---
+function surface(page: Page) {
+  return page.getByRole('application', { name: /First-person office/ });
+}
+async function player(page: Page) {
+  return surface(page).evaluate(element => {
+    const { playerX, playerZ, playerYaw } = (element as HTMLElement).dataset;
+    if (playerX === undefined || playerZ === undefined || playerYaw === undefined) throw new Error('Play rig has not reported a position');
+    return { x: Number(playerX), z: Number(playerZ), yaw: Number(playerYaw) };
+  });
+}
+async function holdUntil(page: Page, key: string, done: () => Promise<boolean>, timeout = 15_000) {
+  const started = Date.now();
+  await page.keyboard.down(key);
+  try {
+    while (!(await done())) {
+      if (Date.now() - started > timeout) throw new Error(`Holding ${key} timed out`);
+      await page.waitForTimeout(10);
+    }
+  } finally {
+    await page.keyboard.up(key);
+  }
+}
+const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
+async function bearing(page: Page, x: number, z: number) {
+  const p = await player(page);
+  return wrap(Math.atan2(-(x - p.x), -(z - p.z)) - p.yaw);
+}
+
+test('play mode: facing a handoff agent and pressing E shows the handoff details', async ({ page }) => {
+  await page.goto('/office?handoffs=mock');
+  await requireWebGL(page);
+  // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
+  await expect(log(page)).toContainText('INV-1043', { timeout: 10_000 });
+  await page.waitForTimeout(6_000);
+  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeFocused();
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  // Intake stands at (-6.0, 2.5), behind and to the left of the spawn.
+  const prompt = page.getByText('E · Ask Intake about the handoff');
+  await holdUntil(page, 'ArrowLeft', async () => (await prompt.isVisible()) || Math.abs(await bearing(page, -6, 2.5)) < 0.05);
+  await expect(prompt).toBeVisible();
+  await page.keyboard.press('e');
+  const dialog = page.getByRole('dialog', { name: /Intake · handoff/ });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('dl[data-handoff-id]')).toContainText('Extractor');
+  await expect(dialog).toContainText('INV-1043');
+  await shot(page, 'play-details');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
