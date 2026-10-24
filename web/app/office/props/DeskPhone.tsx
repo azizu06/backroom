@@ -4,6 +4,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Mesh, MeshStandardMaterial } from 'three';
 import { callStore, soundEnabled } from '../../../lib/office/calls';
+import { PHONE_STAND } from '../../../lib/office/props/phone';
 import { REDUCED_MOTION_QUERY } from '../../../lib/office/a11y';
 import { OFFICE_ANCHORS, visibleRooms, type OfficeSnapshot } from '../../../lib/office/state';
 import { useCanvasTexture } from './useCanvasTexture';
@@ -80,6 +81,10 @@ export function DeskPhone({ snapshot }: { snapshot: OfficeSnapshot }) {
   const liveLabel = call.status === 'live' ? call.agentName ?? 'Collections' : '';
   if (!visible) return null;
   return <group name='prop:desk-phone' position={[0, 0, 0]}>
+    <mesh position={[PHONE_STAND.x, 0.36, PHONE_STAND.z]}>
+      <boxGeometry args={[PHONE_STAND.width, 0.72, PHONE_STAND.depth]} />
+      <meshStandardMaterial color='#4a3b32' roughness={0.8} />
+    </mesh>
     <group position={[PHONE_X, 0, PHONE_Z]}>
       <mesh position={[0, 0.96, 0]}><boxGeometry args={[0.34, 0.09, 0.25]} /><meshStandardMaterial color='#26332b' roughness={0.62} /></mesh>
       <mesh position={[0, 1.014, 0]}><boxGeometry args={[0.31, 0.025, 0.22]} /><meshStandardMaterial color='#4b5b50' roughness={0.4} /></mesh>
