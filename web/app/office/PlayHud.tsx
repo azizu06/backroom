@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
+import { playOfficeCue } from '../../lib/office/sound-events';
 import { serverRoomReadout, type Gx10Status } from '../../lib/gx10/server-room';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
@@ -148,6 +149,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     releasePointer();
     requestSceneFrame();
     setPanel(current);
+    playOfficeCue('interact');
   }
   function closePanel() {
     setPanel(null);
