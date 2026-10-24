@@ -31,7 +31,7 @@ function expectLobby(html: string) {
   expect(section).toContain('class="audit-wall"');
   expect(section).toContain('<h3 id="audit-title">Audit wall</h3>');
   // No `recording`: the wall polls /api/audit/entries instead of showing a replay.
-  expect(section).toContain('Every action leaves a record.');
+  expect(section).toContain('Every decision in this demo run');
   expect(section).toContain('Loading audit records');
   expect(section).not.toContain('REPLAY');
   expect(section).toContain('data-office-mount="ask-why"');
