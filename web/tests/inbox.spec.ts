@@ -76,7 +76,13 @@ test('attachment flow with the vision API mocked', async ({ page }) => {
     decision: { kind: 'ESCALATE', ruleIds: ['BANK_CHANGE_HOLD'], policyVersion: 1, reason: 'Mocked bank change needs Dana.',
       quote: { text: 'Bank changes wait for a human.', sentenceId: 'S1' }, toHuman: 'Dana' }, evidenceRefs: [],
     attachment: { name: 'invoice.pdf', size: 13, type: 'application/pdf', sha256: '0'.repeat(64) },
-    attachmentParsed: false, documentRoute: 'cloud_fallback', notice: 'Mocked hold.', auditId: 'a2', auditHref: '/audit?entry=a2#audit-replay',
+    attachmentParsed: false, documentRoute: null, notice: 'Mocked hold.', auditId: 'a2', auditHref: '/audit?entry=a2#audit-replay',
+  }, {
+    id: 'r3', scenario_source: 'judge', seat: 'payables', extractionSource: 'model', status: 'paid',
+    fields: { kind: 'invoice', vendorId: 'acme', invoiceId: 'INV-78', amountCents: 98000, currency: 'USD', poId: 'PO-9', bankAccountId: 'acct-acme', lineItems: [] },
+    decision: { kind: 'ALLOW', ruleIds: [], policyVersion: 1 }, evidenceRefs: [],
+    attachment: { name: 'invoice.pdf', size: 13, type: 'application/pdf', sha256: '0'.repeat(64) },
+    attachmentParsed: true, documentRoute: 'cloud_fallback', notice: 'Mocked cloud read.', auditId: 'a3', auditHref: '/audit?entry=a3#audit-replay',
   }];
   await page.route('**/api/inbox', async route => {
     bodies.push(route.request().postDataBuffer()?.toString('latin1') ?? '');
@@ -135,13 +141,19 @@ test('attachment flow with the vision API mocked', async ({ page }) => {
   expect(bodies[0]).toContain('%PDF-1.4 mock');
 
   await submit.click();
-  await expect(receipt.getByText('Cloud fallback', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('No accepted extraction', { exact: true })).toBeVisible();
   await expect(receipt.getByText('Not parsed · held', { exact: true })).toBeVisible();
   await expect(receipt.getByRole('heading', { name: 'Hold reasons' })).toBeVisible();
   const reasons = receipt.locator('.inbox-reasons');
   await expect(reasons.getByText('Mocked bank change needs Dana.', { exact: true })).toBeVisible();
   await expect(reasons).toContainText('could not be read into validated fields');
-  expect(bodies).toHaveLength(2);
+
+  await submit.click();
+  await expect(receipt.getByText('Cloud fallback', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('Fields extracted', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('#INV-78', { exact: true })).toBeVisible();
+  await expect(receipt).toContainText('a cloud model read this document instead');
+  expect(bodies).toHaveLength(3);
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

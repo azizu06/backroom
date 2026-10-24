@@ -194,7 +194,7 @@ export function InboxTray({ presets = [] }: { presets?: InboxPreset[] }) {
               <div><dt>Attachment</dt><dd>{receipt.attachment.name} · {formatSize(receipt.attachment.size)}</dd></div>
               <div><dt>Read by</dt><dd>{receipt.documentRoute === 'local' ? 'Read locally on GX10'
                 : receipt.documentRoute === 'cloud_fallback' ? 'Cloud fallback'
-                : receipt.documentRoute === null ? 'Not read' : 'Not reported'}</dd></div>
+                : receipt.documentRoute === null ? 'No accepted extraction' : 'Not reported'}</dd></div>
               <div><dt>Parsed</dt><dd>{receipt.attachmentParsed === true ? 'Fields extracted'
                 : receipt.attachmentParsed === false ? held ? 'Not parsed · held' : 'Not parsed' : 'Not reported'}</dd></div>
             </dl>
