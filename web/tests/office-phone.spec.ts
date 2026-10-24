@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+import { PHONE_INTERACTION } from '../lib/office/props/phone';
 
 const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
 async function pos(page: Page) {
@@ -16,7 +17,7 @@ async function walkX(page: Page, goal: number) {
   }
 }
 async function aimAtPhone(page: Page) {
-  const phone: [number, number] = [-4.15, -2.7];
+  const phone = PHONE_INTERACTION.position;
   let p = await pos(page);
   let angle = Math.atan2(-(phone[0] - p.x), -(phone[1] - p.z));
   let diff = Math.atan2(Math.sin(angle - p.yaw), Math.cos(angle - p.yaw));
