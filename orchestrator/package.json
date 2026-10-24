@@ -19,7 +19,9 @@
     "x402:live": "tsx src/x402/live.ts",
     "handoff:serve": "tsx src/voice/handoff-server.ts",
     "handoff:live": "tsx src/voice/handoff-smoke.ts",
-    "demo:agents": "tsx src/agents/demo.ts"
+    "demo:agents": "tsx src/agents/demo.ts",
+    "attack-demo:serve": "tsx src/attack-demo/server.ts",
+    "attack-demo:smoke": "tsx src/attack-demo/smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.306",
