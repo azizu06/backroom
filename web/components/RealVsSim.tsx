@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { disclosureItems, getDisclosureStatus, type DemoStatus } from '../lib/real-vs-sim';
+import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, panelExpanded, toggledPanel, type DemoStatus } from '../lib/real-vs-sim';
 import './RealVsSim.css';
 
 function useMediaQuery(query: string, serverValue: boolean) {
@@ -27,9 +27,9 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
   const officeView = pathname === '/' || pathname.startsWith('/office');
   // Server renders docked so phones never paint the panel over office controls before hydration.
   const officeFlows = useMediaQuery('(max-width: 1100px)', true);
-  const narrow = useMediaQuery('(max-width: 760px)', false);
+  const narrow = useMediaQuery(NARROW_PANEL_QUERY, false);
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
-  const expanded = detailed || (userExpanded ?? !narrow);
+  const expanded = panelExpanded({ detailed, narrow, userExpanded });
   const bodyId = useId();
 
   useEffect(() => {
@@ -78,7 +78,7 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
         {detailed ? <h1>Real vs. simulated</h1> : <h2>Real vs. simulated</h2>}
         {!detailed && <div className="real-sim-actions">
           <a href="/real-vs-sim">Details ↗</a>
-          <button type="button" className="real-sim-toggle" aria-expanded={expanded} aria-controls={bodyId} onClick={() => setUserExpanded(!expanded)}>
+          <button type="button" className="real-sim-toggle" aria-expanded={expanded} aria-controls={bodyId} onClick={() => setUserExpanded(toggledPanel(expanded))}>
             {expanded ? 'Hide' : 'Show'}<span className="real-sim-visually-hidden"> real versus simulated status</span>
           </button>
         </div>}
