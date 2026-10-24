@@ -101,6 +101,7 @@ test('the audit wall hangs in the lobby and shows the latest receipt ids when yo
   const denialId = await page.locator('[data-audit-id]').first().getAttribute('data-audit-id');
   expect(denialId).not.toBeNull();
   expect(wall).toContain(denialId!);
+  expect(await canvas.getAttribute('aria-description')).toContain(denialId!);
   await expect(page.locator('.play-prompt')).toHaveText(''); // reading needs no interaction
   expect(errors).toEqual([]);
 });
@@ -128,6 +129,7 @@ test('the inbox tray sits on the Payables desk: walk up, see E: open, open the i
   const dialog = page.getByRole('dialog', { name: 'Inbox tray' });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('3 unread');
+  await expect(dialog).toContainText('3 intake items are counted'); // preview carries no receipts; not shown as an empty inbox
   await expect(dialog.getByRole('button', { name: /^Close/ })).toBeFocused();
   expect(errors).toEqual([]);
 

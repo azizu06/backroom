@@ -12,6 +12,8 @@ export const inboxTarget = defineTarget<{ kind: "inbox" }>({
   label: snapshot => `Open inbox tray · ${snapshot.inboxCount} unread`,
   panel: snapshot => ({
     kind: "inbox", title: "Inbox tray", state: `${snapshot.inboxCount} unread`,
+    // Preview and replay count items without carrying their receipts; say so instead of showing an empty list as "none".
+    ...(snapshot.inboxCount > 0 && !snapshot.inboxReceipts?.length ? { task: `${snapshot.inboxCount} intake items are counted, but this feed carries no receipts for them.` } : {}),
     entries: (snapshot.inboxReceipts ?? []).slice(-MAX_ENTRIES).reverse().map((row): PlayPanelEntry =>
       ({ id: row.id, decision: row.decision, summary: row.summary, ruleIds: row.ruleIds })),
   }),

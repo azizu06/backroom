@@ -53,10 +53,11 @@ function Wall({ snapshot }: SceneMountProps) {
   const key = `${view.total}|${view.connection}|${text}`;
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawWall(ctx, view), [key]);
   const canvas = useThree(state => state.gl.domElement);
-  // The wall is pixels, so mirror its text onto the canvas element for assistive tech and tests.
+  // The wall is pixels, so mirror its text onto the canvas element: aria-description for assistive tech, data attribute for tests.
   useEffect(() => {
     canvas.dataset.auditWall = text;
-    return () => { delete canvas.dataset.auditWall; };
+    canvas.setAttribute('aria-description', `Lobby audit wall, newest first:\n${text || 'no receipts yet'}`);
+    return () => { delete canvas.dataset.auditWall; canvas.removeAttribute('aria-description'); };
   }, [canvas, text]);
   const { width, height, faceWidth, faceHeight, bottom } = AUDIT_WALL;
   return <group name='mount:audit-wall' position={[AUDIT_WALL.x, 0, AUDIT_WALL.z]} rotation={[0, Math.PI / 2, 0]}>
