@@ -15,6 +15,6 @@ export function serverRoomReadout(status: Gx10Status | null, now = Date.now()) {
     speed: recent?.tokensPerSecond == null ? '—' : `${recent.tokensPerSecond.toFixed(1)} tok/s`,
     latency: recent ? `${(recent.latencyMs / 1000).toFixed(2)} s` : '—',
     savings: telemetry?.estimatedSavingsUsd == null ? '—' : `~$${telemetry.estimatedSavingsUsd.toFixed(6)}`,
-    estimate: telemetry ? `${telemetry.pricedLocalCalls}/${telemetry.localCalls} local attempts metered vs ${telemetry.comparisonModel}` : 'Savings require measured token counts',
+    estimate: telemetry ? `${telemetry.pricedLocalCalls}/${telemetry.localCalls} accepted local results priced vs ${telemetry.comparisonModel}` : 'Savings require measured token counts',
   };
 }

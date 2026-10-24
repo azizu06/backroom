@@ -10,7 +10,7 @@ it('records local and fallback HTTP attempts without retaining finance data', as
   const router = createRouter({ fetch: http, now: () => time, cloudProvider: 'openrouter', cloudApiKey: 'secret', anthropicModel: 'claude-sonnet-5-5' });
   await expect(router.route('field_extraction', { privateInvoice: 'sensitive' })).rejects.toThrow();
   expect(router.telemetry()).toMatchObject({ totalCalls: 2, localCalls: 1, localShare: 0.5,
-    estimatedSavingsUsd: 0.003, pricedLocalCalls: 1, recent: { latencyMs: 1000, tokensPerSecond: 100 } });
+    estimatedSavingsUsd: 0, pricedLocalCalls: 0, recent: { latencyMs: 1000, tokensPerSecond: 100 } });
   expect(JSON.stringify(router.telemetry())).not.toMatch(/sensitive|privateInvoice|secret/);
 });
 
@@ -35,4 +35,25 @@ it('does not count health checks, OFF, or missing credentials as model HTTP atte
   const disabled = createRouter({ fetch: http, stateStore: { llmEnabled: false, llmSignal: new AbortController().signal } });
   await disabled.route('field_extraction', {});
   expect(disabled.telemetry().totalCalls).toBe(0);
+});
+
+
+it.each([
+  { name: 'accepted local result', replies: ['valid'], savings: 0.003, priced: 1, total: 1, local: 1 },
+  { name: 'low confidence followed by cloud', replies: ['confidence', 'valid'], savings: 0, priced: 0, total: 2, local: 1 },
+  { name: 'invalid envelope followed by cloud', replies: ['invalid', 'invalid', 'valid'], savings: 0, priced: 0, total: 3, local: 2 },
+  { name: 'schema failures followed by cloud', replies: ['schema', 'schema', 'valid'], savings: 0, priced: 0, total: 3, local: 2 },
+  { name: 'schema retry accepted locally', replies: ['schema', 'valid'], savings: 0.003, priced: 1, total: 2, local: 2 },
+])('credits only accepted local usage: $name', async ({ replies, savings, priced, total, local }) => {
+  const http = vi.fn<typeof fetch>().mockImplementation(async () => {
+    const reply = replies.shift();
+    return Response.json({ choices: [{ message: { content: reply === 'invalid' ? 'broken' : JSON.stringify({ output: reply === 'schema' ? {} : { valid: true }, confidence: reply === 'confidence' ? 0.2 : 1 }) } }],
+      usage: { prompt_tokens: 1000, completion_tokens: 100 } });
+  });
+  const router = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test', anthropicModel: 'claude-sonnet-5-5' });
+  await router.route('field_extraction', {}, { parse(value) {
+    if (!value || typeof value !== 'object' || !('valid' in value)) throw new Error('schema');
+    return value;
+  } });
+  expect(router.telemetry()).toMatchObject({ totalCalls: total, localCalls: local, estimatedSavingsUsd: savings, pricedLocalCalls: priced });
 });

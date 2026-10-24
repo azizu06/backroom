@@ -151,12 +151,13 @@ export function createRouter(options: RouterOptions = {}) {
     const started = now();
     let response: Completion | undefined;
     let attempted = false;
+    let credit = () => {};
     try {
       response = await requestCompletion(args[0], args[1], args[2], args[3], args[4], args[5], () => { attempted = true; });
-      return response;
     } finally {
-      if (attempted) telemetry.record(args[0], now() - started, response?.usage, response !== undefined);
+      if (attempted) credit = telemetry.record(args[0], now() - started, response?.usage, response !== undefined);
     }
+    return { response, credit };
   }
   function decode<T>(response: Completion, schema?: OutputSchema<T>): { output: T; confidence: number } {
     let envelope: unknown;
@@ -178,8 +179,9 @@ export function createRouter(options: RouterOptions = {}) {
       let previousFailure: RouterFailureKind | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         let response: Completion;
+        let credit = () => {};
         const requestStart = now();
-        try { response = await complete(true, taskType, input, schema, signal, previousFailure); }
+        try { ({ response, credit } = await complete(true, taskType, input, schema, signal, previousFailure)); }
         catch (error) { if (signal.aborted || !state().llmEnabled) return llmOff(); reportFailure(taskType, 'local', error); offline(); break; }
         if (signal.aborted || !state().llmEnabled) return llmOff();
         samples.push(now() - requestStart);
@@ -189,13 +191,14 @@ export function createRouter(options: RouterOptions = {}) {
           const result = decode(response, schema);
           if (result.confidence < (options.confidenceThreshold ?? 0.7)) { reportFailure(taskType, 'local', new ModelFailure('confidence', 'Low confidence')); break; }
           if (signal.aborted || !state().llmEnabled) return llmOff();
+          credit();
           return {output: result.output, route:'local', model:localModel, latencyMs:now()-start, costUsd:0};
         } catch (error) { previousFailure = reportFailure(taskType, 'local', error); if (!available) break; /* Two schema failures escalate; never trust invalid output. */ }
       }
     }
     if (signal.aborted || !state().llmEnabled) return llmOff();
     let response: Completion;
-    try { response = await complete(false, taskType, input, schema, signal); }
+    try { ({ response } = await complete(false, taskType, input, schema, signal)); }
     catch (error) { if (signal.aborted || !state().llmEnabled) return llmOff(); reportFailure(taskType, preferredLocal ? 'cloud_fallback' : 'cloud', error); throw error; }
     if (signal.aborted || !state().llmEnabled) return llmOff();
     let result: ReturnType<typeof decode<T>>;

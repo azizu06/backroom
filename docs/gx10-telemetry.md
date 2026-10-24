@@ -28,11 +28,13 @@ Recent latency and output tokens/s come from the latest local response within
 queue and prefill; it is not GPU decode speed. Missing token counts display —.
 
 Savings are an **estimate**: observed local input/output token counts priced
-with the router's existing `anthropicCostUsd()` table and configured
+only for accepted local results, with the router's existing `anthropicCostUsd()` table and configured
 `ANTHROPIC_MODEL` (default Sonnet). Different tokenizers may produce different
 cloud usage; hardware/electricity and prompt caching are excluded. The readout
-shows the count of metered local attempts and the comparison model. Unknown
-prices/usage display —. No independent price table is maintained here.
+shows the count of accepted, priced local results and the comparison model. Unknown
+prices/usage display —. Rejected local attempts earn zero savings, including
+schema/confidence failures followed by paid cloud fallback; retries remain in
+attempt share and throughput. No independent price table is maintained here.
 
 **Scope:** observations are local to this web server's routing process and reset
 on restart. A separately running orchestrator's receipts are not aggregated;
