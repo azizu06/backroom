@@ -32,7 +32,15 @@ function policyQuote(entry: AuditEntry, entries: AuditEntry[]) {
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 /** A DOM panel: mount alongside the lobby canvas, or in a drei Html surface. */
-export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
+export function AuditWall({ recording, onChainChange, showAsk = true, headingLevel = 1 }: {
+  recording?: AuditSnapshot;
+  onChainChange?: (valid: boolean) => void;
+  showAsk?: boolean;
+  headingLevel?: 1 | 2 | 3;
+} = {}) {
+  const Heading = `h${headingLevel}` as 'h1' | 'h2' | 'h3';
+  const PanelHeading = `h${headingLevel + 1}` as 'h2' | 'h3' | 'h4';
+  const DetailHeading = `h${headingLevel + 2}` as 'h3' | 'h4' | 'h5';
   const [liveSnapshot, setSnapshot] = useState<AuditSnapshot>();
   const snapshot = recording ?? liveSnapshot;
   const [locked, setLocked] = useState(false);
@@ -70,6 +78,10 @@ export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
     return () => { controller.abort(); clearTimeout(timer); };
   }, [revision, recording]);
 
+  useEffect(() => {
+    if (snapshot) onChainChange?.(snapshot.chain.valid);
+  }, [snapshot?.chain.valid, onChainChange]);
+
   async function unlock(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try { await api('session', { code }); setCode(''); setLocked(false); setRevision(n => n + 1); }
@@ -98,7 +110,7 @@ export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
 
   return <section className="audit-wall" aria-labelledby="audit-title">
     <header className="audit-heading">
-      <div><p className="audit-eyebrow">Northfield Studio / Decision record</p><h1 id="audit-title">Audit wall</h1>
+      <div><p className="audit-eyebrow">Northfield Studio / Decision record</p><Heading id="audit-title">Audit wall</Heading>
         <p>{recording ? 'REPLAY · original recorded entries. No actions run.' : 'Every action leaves a record. Follow the evidence.'}</p></div>
       {snapshot && <div className={`audit-chain ${!snapshot.chain.valid ? 'audit-broken' : error ? 'audit-stale' : 'audit-verified'}`} role="status">
         {!snapshot.chain.valid ? `Chain broken · first broken seq ${snapshot.chain.firstBrokenSeq}` : error ? 'Chain status stale' : `${recording ? 'Recorded chain verified' : 'Chain verified'} · ${snapshot.chain.length} entries`}
@@ -106,7 +118,7 @@ export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
     </header>
     {error && <p className="audit-error" role="alert">{error} <button type="button" onClick={() => setRevision(n => n + 1)}>Retry</button></p>}
     {locked ? <form className="audit-panel audit-unlock" onSubmit={unlock}>
-      <h2>Open the decision record</h2><p>Use the private operator code provided with this demo.</p>
+      <PanelHeading>Open the decision record</PanelHeading><p>Use the private operator code provided with this demo.</p>
       <label>Operator code<input autoComplete="off" type="password" required value={code} onChange={e => setCode(e.target.value)} /></label>
       <button disabled={busy || !code}>{busy ? 'Opening…' : 'Open audit wall'}</button>
       <p className="audit-muted">Read access only. Approval decisions still require a passkey.</p>
@@ -114,7 +126,7 @@ export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
       {!snapshot.chain.valid && <p className="audit-error" role="alert">The record has changed or a link is missing ({snapshot.chain.reason}). Treat these entries as untrusted. Ask why is paused.</p>}
       <div className="audit-workspace">
         <section className="audit-panel audit-records" aria-labelledby="audit-records-title">
-          <div className="audit-section-heading"><h2 id="audit-records-title">Recorded actions</h2><span>{entries.length} total</span></div>
+          <div className="audit-section-heading"><PanelHeading id="audit-records-title">Recorded actions</PanelHeading><span>{entries.length} total</span></div>
           <p className="audit-muted">{recording ? 'REPLAY position' : 'Updates every 2 seconds'} · {new Date(snapshot.measuredAt).toLocaleTimeString()}</p>
           {!entries.length && <p>No actions recorded yet. Run the core loop in the connected server to see its decisions here.</p>}
           <ol className="audit-entries">{[...entries].reverse().map(row => {
@@ -131,22 +143,22 @@ export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
         </section>
         <div className="audit-detail-column">
           <section className="audit-panel audit-replay" id="audit-replay" ref={replay} tabIndex={-1} aria-labelledby="audit-replay-title">
-            <div className="audit-section-heading"><h2 id="audit-replay-title">{entry ? `Replay ${entry.id}` : 'Entry replay'}</h2><span>Read only</span></div>
+            <div className="audit-section-heading"><PanelHeading id="audit-replay-title">{entry ? `Replay ${entry.id}` : 'Entry replay'}</PanelHeading><span>Read only</span></div>
             {entry ? <>
               <p className="audit-muted">Recorded inputs and evaluation. Replaying this view runs no actions.</p>
               <dl className="audit-facts"><div><dt>Actor / seat</dt><dd>{entry.actor} / {entry.seat}</dd></div>
                 <div><dt>Action / outcome</dt><dd>{entry.action} / {entry.decision ?? 'No policy outcome recorded'}</dd></div>
                 <div><dt>Route / model</dt><dd>{entry.route} / {typeof entry.inputs?.model === 'string' ? entry.inputs.model : 'No model recorded'}</dd></div>
                 <div><dt>Latency / cost</dt><dd>{entry.latencyMs} ms / ${entry.costUsd.toFixed(6)}</dd></div></dl>
-              <h3>Rule evaluation · policy v{entry.policyVersion}</h3><p className="audit-rules">{entry.ruleIds.join(', ') || 'No rules recorded'}</p>
+              <DetailHeading>Rule evaluation · policy v{entry.policyVersion}</DetailHeading><p className="audit-rules">{entry.ruleIds.join(', ') || 'No rules recorded'}</p>
               {quote && <blockquote>{quote.text}<cite>{quote.sentenceId}{quote.source !== entry.id && <> · recorded in {citation(quote.source, 'quote-source')}</>}</cite></blockquote>}
               <pre aria-label="Recorded rule evaluation">{pretty(entry.inputs?.decision ?? { outcome: entry.decision ?? null, ruleIds: entry.ruleIds })}</pre>
               <details open><summary>Recorded inputs</summary><pre>{pretty(entry.inputs ?? {})}</pre></details>
               <details><summary>Evidence and chain hashes</summary><pre>{pretty({ refs: entry.refs, seq: entry.seq, hash: entry.hash, prevHash: entry.prevHash })}</pre></details>
             </> : <p>Select an action to inspect its inputs, rules and outcome.</p>}
           </section>
-          {!recording && <section className="audit-panel audit-why" aria-labelledby="audit-why-title">
-            <h2 id="audit-why-title">Ask why</h2><p className="audit-muted">Answers cite the recorded evidence. They cannot approve or pay.</p>
+          {!recording && showAsk && <section className="audit-panel audit-why" aria-labelledby="audit-why-title">
+            <PanelHeading id="audit-why-title">Ask why</PanelHeading><p className="audit-muted">Answers cite the recorded evidence. They cannot approve or pay.</p>
             <form onSubmit={ask}><label htmlFor="audit-question">Question about a decision</label>
               <textarea id="audit-question" rows={3} maxLength={1000} required placeholder="Why didn’t you pay invoice #4419?" value={question} onChange={e => setQuestion(e.target.value)} />
               <button disabled={asking || !question.trim() || !trusted}>{asking ? 'Reading the evidence…' : 'Explain decision'}</button>

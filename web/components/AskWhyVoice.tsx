@@ -3,12 +3,26 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { AskWhyVoiceResult } from '../lib/why-voice/types';
 
+export function askWhyErrorMessage(status?: number, voice = false, code?: string): string {
+  if (status === 409 && code === 'AUDIT_CHAIN_BROKEN') {
+    return 'The audit chain is broken, so ask-why is paused (AUDIT_CHAIN_BROKEN).';
+  }
+  return voice ? 'Voice is unavailable. Type your question below.' : 'Could not answer. Try again.';
+}
+
 /** The wall/office owns placement and optional citation selection. */
-export function AskWhyVoice({ onAnswer, label = 'Ask why' }: { onAnswer?: (answer: AskWhyVoiceResult) => void; label?: string }) {
+export function AskWhyVoice({ onAnswer, label = 'Ask why', disabled = false, disabledReason = 'Ask why is paused.' }: {
+  onAnswer?: (answer: AskWhyVoiceResult) => void;
+  label?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
   const [phase, setPhase] = useState<'idle' | 'arming' | 'recording' | 'thinking'>('idle');
   const [question, setQuestion] = useState('');
   const [result, setResult] = useState<AskWhyVoiceResult>();
   const [error, setError] = useState<string>();
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
   const held = useRef(false);
   const busy = useRef(false);
   const mounted = useRef(true);
@@ -43,7 +57,20 @@ export function AskWhyVoice({ onAnswer, label = 'Ask why' }: { onAnswer?: (answe
     if (result?.audio) void playback.current?.play().catch(() => { /* Native controls allow a user gesture. */ });
   }, [result]);
 
+  useEffect(() => {
+    if (!disabled) return;
+    if (recorder.current) recorder.current.onstop = null;
+    release();
+    request.current?.abort();
+    playback.current?.pause();
+    busy.current = false;
+    setPhase('idle');
+    setResult(undefined);
+    setError(undefined);
+  }, [disabled]);
+
   async function send(body: BodyInit, voice: boolean) {
+    if (disabledRef.current) return;
     setPhase('thinking');
     setError(undefined);
     setResult(undefined);
@@ -53,21 +80,25 @@ export function AskWhyVoice({ onAnswer, label = 'Ask why' }: { onAnswer?: (answe
         method: 'POST', body, headers: voice ? undefined : { 'Content-Type': 'application/json' },
         signal: request.current.signal,
       });
-      if (!response.ok) throw new Error('REQUEST_FAILED');
+      if (!response.ok) {
+        const data = response.status === 409 ? await response.json().catch(() => null) : null;
+        throw Object.assign(new Error('REQUEST_FAILED'), { status: response.status, code: data?.error });
+      }
       const answer: AskWhyVoiceResult = await response.json();
-      if (!mounted.current) return;
+      if (!mounted.current || disabledRef.current) return;
       setResult(answer);
       setQuestion(answer.question);
       onAnswer?.(answer);
-    } catch {
-      if (mounted.current) setError(voice ? 'Voice is unavailable. Type your question below.' : 'Could not answer. Try again.');
+    } catch (e) {
+      const failure = e as { status?: number; code?: string };
+      if (mounted.current && !disabledRef.current) setError(askWhyErrorMessage(failure?.status, voice, failure?.code));
     } finally {
       busy.current = false;
       if (mounted.current) setPhase('idle');
     }
   }
   async function start() {
-    if (busy.current) return;
+    if (disabledRef.current || busy.current) return;
     busy.current = true;
     held.current = true;
     setError(undefined);
@@ -128,7 +159,7 @@ export function AskWhyVoice({ onAnswer, label = 'Ask why' }: { onAnswer?: (answe
   }
   return <section aria-label={label}>
     <p>AI answers from the audit log. Voice audio is sent to Cartesia.</p>
-    <button type="button" disabled={phase === 'thinking'} aria-pressed={phase === 'recording'}
+    <button type="button" disabled={disabled || phase === 'thinking'} aria-pressed={phase === 'recording'}
       style={{ touchAction: 'none' }}
       onPointerDown={event => {
         if (event.button !== 0) return;
@@ -140,16 +171,17 @@ export function AskWhyVoice({ onAnswer, label = 'Ask why' }: { onAnswer?: (answe
     </button>
     <form onSubmit={event => {
       event.preventDefault();
-      if (busy.current || !question.trim()) return;
+      if (disabledRef.current || busy.current || !question.trim()) return;
       busy.current = true;
       playback.current?.pause();
       void send(JSON.stringify({ question: question.trim() }), false);
     }}>
-      <label>Question <input value={question} maxLength={1000} disabled={phase !== 'idle'}
+      <label>Question <input value={question} maxLength={1000} disabled={disabled || phase !== 'idle'}
         onChange={event => setQuestion(event.target.value)} /></label>
-      <button type="submit" disabled={phase !== 'idle' || !question.trim()}>Ask why</button>
+      <button type="submit" disabled={disabled || phase !== 'idle' || !question.trim()}>Ask why</button>
     </form>
     <span role="status">{phase === 'thinking' ? 'Checking the audit log…' : phase === 'recording' ? 'Recording (15 seconds maximum)' : ''}</span>
+    {disabled && <p role="status">{disabledReason}</p>}
     {error && <p role="alert">{error}</p>}
     {result && <div>
       <p>{result.answer}</p>
