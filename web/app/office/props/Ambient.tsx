@@ -13,6 +13,7 @@ import {
 } from '../../../lib/office/props/ambient';
 import { monitorScreen } from '../../../lib/office/props/monitors';
 import { useCanvasTexture } from './useCanvasTexture';
+import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 /** Peak additive opacity of a busy desk's monitor halo, and of the lobby board rim. */
 const GLOW_BASE = 0.25, BOARD_GLOW_BASE = 0.14, BOARD_SEED = 4;
@@ -47,19 +48,19 @@ function createShared() {
     monitorHalo: new PlaneGeometry(0.78 / GLOW_CORE, 0.5 / GLOW_CORE),
     boardGlow: new PlaneGeometry(2 / GLOW_CORE, 1.45 / GLOW_CORE),
     cursor: new BoxGeometry(CURSOR_SIZE[0], CURSOR_SIZE[1], 0.002),
-    cursorMaterial: new MeshBasicMaterial({ color: '#e8efe4', toneMapped: false }),
+    cursorMaterial: new MeshBasicMaterial({ color: ROLES.text, toneMapped: false }),
     pot: new CylinderGeometry(0.05, 0.038, 0.08, 10),
-    potMaterial: new MeshStandardMaterial({ color: '#b98667', roughness: 0.9 }),
+    potMaterial: new MeshStandardMaterial({ color: PALETTE.blush, roughness: 0.9 }),
     leaf: new IcosahedronGeometry(1, 0),
-    leafMaterial: new MeshStandardMaterial({ color: '#81936b', roughness: 0.9, flatShading: true }),
+    leafMaterial: new MeshStandardMaterial({ color: ROLES.plant, roughness: 0.9, flatShading: true }),
   };
 }
 type Shared = ReturnType<typeof createShared>;
 
 /** Soft white rectangle on transparent: the glow quad's falloff. */
 function drawGlow(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = '#ffffff';
+  ctx.fillStyle = ROLES.wall;
+  ctx.shadowColor = ROLES.wall;
   ctx.shadowBlur = GLOW_INSET;
   ctx.fillRect(GLOW_INSET, GLOW_INSET, GLOW_TEX - 2 * GLOW_INSET, GLOW_TEX - 2 * GLOW_INSET);
 }
