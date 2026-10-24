@@ -24,3 +24,6 @@ export * from './collections';
 export { createCrsClientFromEnv, createCrsFixtureClient } from './integrations/crs/sandbox';
 export { x402Payables, X402_LABEL, X402_NETWORK, X402_USDC } from './x402';
 export type { X402Options } from './x402';
+export { createCostSummaryHandler, createRecordedCostReader } from './agents/cost-api';
+export { summarizeUsage, readActivationUsage, readAuditUsage, readCaseUsage } from './agents/usage-reader';
+export type { CostRecord, ActivationUsage } from './agents/usage-reader';
