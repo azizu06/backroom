@@ -14,6 +14,9 @@ export const X402_NETWORK = 'eip155:84532' as const;
 export const X402_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 export const X402_FACILITATOR = 'https://www.x402.org/facilitator';
 export const X402_LABEL = 'x402 testnet';
+/** In-process mock vendor/facilitator rail: no keys, chain or internet. */
+export const X402_SIMULATED_LABEL = 'x402 simulated';
+export type X402Label = typeof X402_LABEL | typeof X402_SIMULATED_LABEL;
 type Signer = Pick<PrivateKeyAccount, 'address' | 'signTypedData'>;
 export interface Transfer { transaction: `0x${string}`; payer: string; payTo: string; amount: bigint; authorizationNonce: `0x${string}` }
 export interface X402Options {
@@ -21,6 +24,8 @@ export interface X402Options {
   /** Trusted bootstrap config, never a field extracted from an invoice. */
   vendorOrigin?: string; fetch?: typeof fetch; signer?: () => Signer;
   confirm?: (transfer: Transfer) => Promise<void>;
+  /** Simulated runs must also inject signer and confirm; the label never selects a network. */
+  label?: X402Label;
 }
 const authorizationAbi = [{ type: 'event', name: 'AuthorizationUsed', inputs: [
   { name: 'authorizer', type: 'address', indexed: true }, { name: 'nonce', type: 'bytes32', indexed: true },
@@ -60,13 +65,15 @@ export function x402Payables(options: X402Options): PayablesClient {
       (origin.protocol !== 'https:' && !(origin.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)))) {
     throw new Error('X402_UNTRUSTED_VENDOR_ORIGIN');
   }
+  const label = options.label ?? X402_LABEL, prefix = label.replace(' ', '_');
+  if (label !== X402_LABEL && (!options.signer || !options.confirm)) throw new Error('X402_SIMULATION_NEEDS_MOCKS');
   return {
     async payInvoice(input) {
       let policyVersion = 1;
       const log = async (action: string, decision: 'ALLOW' | 'DENY' | 'ESCALATE', inputs: Record<string, unknown>, ruleIds: string[] = []) => {
-        await options.state.appendAudit({ ts: Date.now(), actor: 'code', seat: 'payables', action, decision, ruleIds,
+        await options.state.appendAudit({ ts: Date.now(), actor: 'code', seat: 'payables', action: `${prefix}_${action}`, decision, ruleIds,
           policyVersion, refs: [input.invoiceId, input.vendorId], route: 'code', latencyMs: 0, costUsd: 0,
-          inputs: { paymentRail: X402_LABEL, network: X402_NETWORK, ...inputs } });
+          inputs: { paymentRail: label, network: X402_NETWORK, ...inputs } });
       };
       const gate = async () => {
         const row = await options.repository.getInvoice(input.vendorId, input.invoiceId);
@@ -83,7 +90,7 @@ export function x402Payables(options: X402Options): PayablesClient {
           knownDomain: vendor.domain, sourceDomain: row.source.senderDomain, pendingBankChange: await options.repository.hasPendingBankChange(vendor.id) },
           signals: { ofacHit: vendor.ofacHit }, priorInvoices: history.map(item => item.policyInvoice) });
         policyVersion = decision.policyVersion;
-        await log('x402_testnet_policy', decision.kind, { decision }, decision.ruleIds);
+        await log('policy', decision.kind, { decision }, decision.ruleIds);
         if (decision.kind !== 'ALLOW' || domain(row.source.senderDomain) !== domain(vendor.domain)) throw new Error('X402_POLICY_BLOCKED');
         await masterPayment({ ...input }, options.repository);
         const match = /^x402:eip155:84532:(0x[0-9a-fA-F]{40})$/.exec(vendor.accountId);
@@ -96,7 +103,7 @@ export function x402Payables(options: X402Options): PayablesClient {
         const request = (headers?: Record<string, string>) => (options.fetch ?? fetch)(url, {
           method: 'GET', redirect: 'error', cache: 'no-store', headers, signal: AbortSignal.timeout(90_000),
         });
-        await log('x402_testnet_attempt', 'ALLOW', { amountCents: input.amountCents, payTo });
+        await log('attempt', 'ALLOW', { amountCents: input.amountCents, payTo });
         const response = await request();
         if (response.status !== 402) throw new Error('X402_CHALLENGE_REQUIRED');
         const decoder = new x402HTTPClient(new x402Client());
@@ -123,7 +130,7 @@ export function x402Payables(options: X402Options): PayablesClient {
         const paid = await request(protocol.encodePaymentSignatureHeader(payload));
         const settlement = protocol.getPaymentSettleResponse(name => paid.headers.get(name));
         // Preserve facilitator hash even when later HTTP/chain confirmation fails.
-        await log('x402_testnet_settlement', settlement.success ? 'ALLOW' : 'ESCALATE', {
+        await log('settlement', settlement.success ? 'ALLOW' : 'ESCALATE', {
           transaction: settlement.transaction, authorizationNonce: authorization.nonce, success: settlement.success, settlementNetwork: settlement.network,
         });
         if (!paid.ok || !settlement.success || settlement.network !== X402_NETWORK ||
@@ -134,7 +141,7 @@ export function x402Payables(options: X402Options): PayablesClient {
         return { id: settlement.transaction, status: 'completed' };
       } catch {
         // Never log provider bodies, signatures, authorization payloads or key material.
-        await log('x402_testnet_rejected', 'ESCALATE', { reason: 'Payment held; reconcile before retrying.' });
+        await log('rejected', 'ESCALATE', { reason: 'Payment held; reconcile before retrying.' });
         throw new Error('X402_PAYMENT_HELD');
       }
     },

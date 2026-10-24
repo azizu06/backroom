@@ -14,7 +14,7 @@
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "6d113616ff096e94961dc63be0b691e97bbdaca6dc5cd2d6e37165a6febf1671",
       "orchestrator/src/agents/eval/call-button.ts": "b4c4b7df803fac52fb740d105c680e6fb012d5512c932d3556385c1a886cac58",
-      "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
+      "orchestrator/src/agents/eval/failover.ts": "9506d421ed7f91396eeed59c0752743a93c7ea887352a3159382d15dc607f36c",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
@@ -13388,7 +13388,7 @@
   },
   "failover": [
     {
-      "id": "P01:4401",
+      "id": "P01:0",
       "scenarioId": "P01",
       "invoiceId": "4401",
       "match": true,
@@ -13425,7 +13425,7 @@
       ]
     },
     {
-      "id": "P02:4419",
+      "id": "P02:0",
       "scenarioId": "P02",
       "invoiceId": "4419",
       "match": true,
@@ -13462,7 +13462,7 @@
       ]
     },
     {
-      "id": "P03:4471",
+      "id": "P03:0",
       "scenarioId": "P03",
       "invoiceId": "4471",
       "match": true,
@@ -13497,7 +13497,7 @@
       ]
     },
     {
-      "id": "P03:4471",
+      "id": "P03:1",
       "scenarioId": "P03",
       "invoiceId": "4471",
       "match": true,
@@ -13532,7 +13532,7 @@
       ]
     },
     {
-      "id": "P04:4480",
+      "id": "P04:0",
       "scenarioId": "P04",
       "invoiceId": "4480",
       "match": true,
@@ -13567,7 +13567,7 @@
       ]
     },
     {
-      "id": "P05:4481",
+      "id": "P05:0",
       "scenarioId": "P05",
       "invoiceId": "4481",
       "match": true,
@@ -13604,7 +13604,7 @@
       ]
     },
     {
-      "id": "P06:4482",
+      "id": "P06:0",
       "scenarioId": "P06",
       "invoiceId": "4482",
       "match": true,
@@ -13641,7 +13641,7 @@
       ]
     },
     {
-      "id": "P07:4483",
+      "id": "P07:0",
       "scenarioId": "P07",
       "invoiceId": "4483",
       "match": true,
@@ -13676,7 +13676,7 @@
       ]
     },
     {
-      "id": "P08:4484",
+      "id": "P08:0",
       "scenarioId": "P08",
       "invoiceId": "4484",
       "match": true,
@@ -13711,7 +13711,7 @@
       ]
     },
     {
-      "id": "P09:4485",
+      "id": "P09:0",
       "scenarioId": "P09",
       "invoiceId": "4485",
       "match": true,

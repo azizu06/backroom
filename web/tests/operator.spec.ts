@@ -26,3 +26,30 @@ test('OFF cannot clear a pending proof action and failed proof output stays visi
   await expect(receipt).toContainText('Exit status: 1 · failed');
   await expect(receipt.getByRole('link', { name: 'Open action audit' })).toHaveAttribute('href', '/audit?entry=proof-1');
 });
+
+test('x402 buttons label each rail, explain an unavailable testnet and show the hold proof', async ({ page }) => {
+  await page.route('**/api/operator/session', route => route.fulfill({ json: { authorized: true,
+    x402Testnet: { available: false, reason: 'Testnet is off. Restart the demo host with X402_LIVE=1 to opt in. Simulated is available.' } } }));
+  await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
+  await page.route('**/api/operator/x402_simulated', route => route.fulfill({ json: { auditHref: '/audit?entry=op-1', result: {
+    rail: 'x402 simulated', note: 'Simulated money', scenario: 'simulated', status: 'paid', amount: '$1,250.00', asset: 'simulated USDC',
+    vendor: 'Acme Supply (demo)', invoiceId: 'acme-x402-simulated-1', recipient: '0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180',
+    policy: { decision: 'ALLOW', ruleIds: [] }, transaction: `0x${'ab'.repeat(32)}`, proof: { vendorRequests: 2, signatures: 1 },
+    paymentAuditHref: '/audit?entry=pay-1' } } }));
+  await page.route('**/api/operator/x402_blocked', route => route.fulfill({ json: { result: {
+    rail: 'x402 simulated', scenario: 'blocked', status: 'held', amount: '$2,450.00', policy: { decision: 'ESCALATE', ruleIds: ['OVER_LIMIT'] },
+    holdId: 'x402-console-hold:1', proof: { vendorRequests: 0, signatures: 0 }, paymentAuditHref: '/audit?entry=hold-1' } } }));
+  await page.goto('/operator');
+  await expect(page.getByRole('button', { name: 'Pay vendor with x402 · TESTNET', exact: true })).toBeDisabled();
+  await expect(page.getByText('Unavailable: Testnet is off.')).toBeVisible();
+  await page.getByRole('button', { name: 'Pay vendor with x402 · SIMULATED', exact: true }).click();
+  const result = page.getByRole('definition').filter({ hasText: 'X402 SIMULATED' });
+  await expect(result).toBeVisible();
+  const facts = page.getByLabel('x402 payment result');
+  await expect(facts).toContainText('$1,250.00');
+  await expect(facts).toContainText('simulated hash, not on any chain');
+  await expect(facts.getByRole('link', { name: 'Open payment audit' })).toHaveAttribute('href', '/audit?entry=pay-1');
+  await page.getByRole('button', { name: 'Try blocked x402 invoice · SIMULATED', exact: true }).click();
+  await expect(facts).toContainText('ESCALATE · OVER_LIMIT');
+  await expect(facts).toContainText('0 signatures · 0 vendor requests');
+});
