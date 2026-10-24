@@ -24,11 +24,10 @@ export async function activeCall(now = Date.now()): Promise<CallProjectionRow | 
 
 // One per server process, so the single-flight and cooldown hold across route chunks.
 const root = globalThis as typeof globalThis & { backroomCallRequests?: ReturnType<typeof createCallRequestHTTP> };
-export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = (action, request) => (root.backroomCallRequests ??= createCallRequestHTTP({
+export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = request => (root.backroomCallRequests ??= createCallRequestHTTP({
   secret: () => process.env.CONTROLLER_ENROLLMENT_SECRET,
   origin: () => process.env.WEBAUTHN_ORIGIN,
-  // The tunnel office cannot open ws://127.0.0.1. The host office can, so the dial route
-  // accepts that exact loopback origin and no other. Public origins stay on WEBAUTHN_ORIGIN.
+  // The public office and this host's own loopback office, and no other origin.
   loopbackOrigin: () => declaredLoopbackOfficeOrigin(),
   // demo:up starts the relay on loopback and shares its admin secret with this host only.
   relay: () => process.env.DEMO_VOICE_RUNNING === '1' && process.env.VOICE_ADMIN_SECRET
@@ -41,4 +40,4 @@ export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = (acti
       ...(entry.outcome !== 'requested' && { decision: entry.outcome === 'accepted' ? 'ALLOW' as const : 'DENY' as const }),
       inputs: { ...entry, source: 'office_button', destination: 'server_allowlisted_demo_phone' }, latencyMs: 0, costUsd: 0 });
   },
-}))(action, request);
+}))(request);

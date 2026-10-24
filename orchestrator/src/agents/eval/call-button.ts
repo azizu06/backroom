@@ -5,6 +5,7 @@ import { MemoryStateStore } from '../../store';
 import { createAdminDial, type AdminDialResponse } from '../../voice/admin-dial';
 import { parsePreCallGate } from '../../voice/demo-bridge';
 import { createCallRequestHTTP, type CallRequestAudit } from '../../../../web/lib/calls/request';
+import { createOperatorSignIn } from '../../../../web/lib/operator/sign-in';
 
 const ORIGIN = 'https://demo.example';
 const LOOPBACK = 'http://127.0.0.1:3000';
@@ -85,15 +86,17 @@ async function office(published: ReturnType<typeof publishPreCall>, network: { c
       return new Response(body, { status: result.status });
     },
   });
-  const post = (action: 'session' | 'request', body: unknown, headers: Record<string, string> = {}, requestOrigin = home) => handle(action, new Request(`${requestOrigin}/api/calls/${action}`, {
+  const request = (path: string, body: unknown, headers: Record<string, string> = {}, requestOrigin = home) => new Request(`${requestOrigin}${path}`, {
     method: 'POST', headers: { origin: requestOrigin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
-  }));
-  const session = await post('session', { code: 'operator-code' });
-  const cookie = session.headers.get('set-cookie')?.split(';')[0];
-  if (!cookie?.startsWith('backroom_calls=')) throw new Error('CALL_BUTTON_UNLOCK_FAILED');
-  return { counts, audits, adminAudits, adminResponses, click: (body: unknown = { line: 'collections' }) => post('request', body, { cookie }),
-    clickFrom: (requestOrigin: string, body: unknown = {}) => post('request', body, { cookie }, requestOrigin) };
+  });
+  const post = (body: unknown, headers: Record<string, string> = {}, requestOrigin = home) => handle(request('/api/calls/request', body, headers, requestOrigin));
+  // The desk phone unlocks through the shared operator sign-in (/api/session).
+  const session = await createOperatorSignIn({ code: () => 'operator-code', origins: () => [home], now: () => 1_762_000_000_000 })(request('/api/session', { code: 'operator-code' }));
+  const cookie = session.ok ? session.cookie.split(';')[0] : undefined;
+  if (!cookie?.startsWith('backroom_session=')) throw new Error('CALL_BUTTON_UNLOCK_FAILED');
+  return { counts, audits, adminAudits, adminResponses, click: (body: unknown = { line: 'collections' }) => post(body, { cookie }),
+    clickFrom: (requestOrigin: string, body: unknown = {}) => post(body, { cookie }, requestOrigin) };
 }
 
 export async function runCallButton() {
