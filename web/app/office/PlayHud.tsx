@@ -3,15 +3,18 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
+import { playOfficeCue } from '../../lib/office/sound-events';
 import { playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
   DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
+import { RoomEntryLabel } from './RoomEntryLabel';
 import './play.css';
 
-export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
+export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
 export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
@@ -142,6 +145,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     releasePointer();
     requestSceneFrame();
     setPanel(current);
+    playOfficeCue('interact');
   }
   function openSettings() {
     releaseStick();
@@ -235,6 +239,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
 
   const prompt = target && !panel ? targetLabel(snapshot, target) : '';
   return <div className='play-hud'>
+    <PlayMinimap snapshot={snapshot} hud={hud} />
     <div ref={hud} className='play-surface' tabIndex={0} role='application' data-touch={touch || undefined}
       aria-label='First-person office. W A S D or arrow keys to move, left and right arrows turn, E to interact, Escape to exit Play.'
       onKeyDown={onKeyDown} onKeyUp={onKeyUp} onBlur={() => { input.clear(); requestSceneFrame(); }}
@@ -246,6 +251,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
       }}
       onPointerDown={onSurfacePointerDown} onPointerMove={onSurfacePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} />
     <div className='play-crosshair' aria-hidden='true' />
+    <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <p className='play-prompt' aria-live='polite'>{prompt && `E · ${prompt}`}</p>
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>

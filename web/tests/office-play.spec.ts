@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
-const HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
+const HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });

@@ -1,14 +1,20 @@
 'use client';
 
 import { useMemo } from 'react';
+import { MeshStandardMaterial } from 'three';
+import type { FurniturePiece } from '../../../lib/office/furniture';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { WHITEBOARD_INTERACTION, whiteboardStats, type WhiteboardStats } from '../../../lib/office/props/whiteboard';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
+import { StaticBoxes } from '../mounts/StaticGeometry';
 
 const DECISION_COLORS = { ALLOW: '#a9bc8f', DENY: '#ed6252', ESCALATE: '#e0b365', RECORDED: '#8c9c87' } as const;
 const DECISION_LABELS = { ALLOW: 'ALLOW', DENY: 'DENY', ESCALATE: 'HOLD', RECORDED: 'REC' } as const;
 const WIDTH = 2.4, HEIGHT = 1.4, BOTTOM = 1.15, FACE_W = 2.26, FACE_H = 1.26;
 const TEX_W = 512, TEX_H = Math.round(TEX_W * FACE_H / FACE_W);
+const MARKER_MATERIAL = new MeshStandardMaterial({ vertexColors: true });
+const MARKERS: FurniturePiece[] = [-0.2, 0, 0.2].map((x, i) => ({ at: [x, BOTTOM + 0.02, 0.08],
+  size: [0.035, 0.16, 0.035], rotation: [0, 0, Math.PI / 2], color: [DECISION_COLORS.ALLOW, DECISION_COLORS.DENY, DECISION_COLORS.ESCALATE][i]! }));
 
 function drawBoard(ctx: CanvasRenderingContext2D, stats: WhiteboardStats) {
   ctx.fillStyle = '#f1ede2';
@@ -64,9 +70,7 @@ function Board({ snapshot }: { snapshot: OfficeSnapshot }) {
     <mesh position={[0, BOTTOM - 0.02, 0.07]} receiveShadow>
       <boxGeometry args={[1.1, 0.05, 0.14]} /><meshStandardMaterial color='#7d8874' roughness={0.9} />
     </mesh>
-    {[-0.2, 0, 0.2].map((x, i) => <mesh key={x} position={[x, BOTTOM + 0.02, 0.08]} rotation={[0, 0, Math.PI / 2]} receiveShadow>
-      <boxGeometry args={[0.035, 0.16, 0.035]} /><meshStandardMaterial color={[DECISION_COLORS.ALLOW, DECISION_COLORS.DENY, DECISION_COLORS.ESCALATE][i]} />
-    </mesh>)}
+    <StaticBoxes pieces={MARKERS} material={MARKER_MATERIAL} castShadow={false} />
   </group>;
 }
 

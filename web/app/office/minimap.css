@@ -1,0 +1,16 @@
+.play-minimap-wrap { position: absolute; z-index: 4; top: 12px; left: 12px; width: 184px; pointer-events: none; }
+.play-minimap { display: block; width: 100%; aspect-ratio: 1; overflow: visible; background: #272f25; border: 1px solid #8b987b; border-radius: 8px; box-shadow: 0 3px 10px #0006; }
+.minimap-bg { fill: #272f25; }
+.minimap-room rect { fill: #394435; stroke: #8b987b; stroke-width: 1; }
+.minimap-room text { fill: #d0d6c6; font: 5.5px system-ui, sans-serif; text-anchor: middle; pointer-events: none; }
+.minimap-door circle { fill: #f3dfb9; stroke: #272f25; stroke-width: 1.5; }
+.minimap-server circle { fill: #a9bc8f; stroke: #272f25; stroke-width: 1.5; }
+.minimap-kiosk circle { fill: #bdac89; stroke: #272f25; stroke-width: 1.5; }
+.minimap-agent circle { fill: var(--agent-color); stroke: #182018; stroke-width: 1; }
+.minimap-agent.is-alert circle { animation: minimap-pulse 1.2s ease-in-out infinite alternate; }
+.minimap-player path { fill: #f3dfb9; stroke: #202620; stroke-width: 1; }
+.play-minimap-toggle { position: absolute; top: 5px; right: 5px; padding: 2px 5px; color: #d0d6c6; background: #272f25e8; border: 1px solid #8b987b; font-size: 10px; pointer-events: auto; }
+.play-minimap-toggle:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 2px; }
+@keyframes minimap-pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .minimap-agent.is-alert circle { animation: none; } }
+@media (max-width: 760px) { .play-minimap-wrap { top: 8px; left: 8px; width: 140px; } }
