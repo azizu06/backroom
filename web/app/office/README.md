@@ -8,7 +8,7 @@ Add one new file, then add one line to a registry. Leave `Office.tsx`, `scene.ts
 | --- | --- | --- |
 | A 3D piece (furniture, room, sign, kiosk) | `web/app/office/mounts/MyThing.tsx` exporting a component that takes `SceneMountProps` (`{ snapshot }`) | `web/app/office/mounts/index.ts`: `{ id: 'my-thing', instanced: false, Component: MyThing }` in `SCENE_MOUNTS` |
 | Something you can walk up to and press E on in Play | `web/lib/office/targets/myThing.ts` exporting `defineTarget<{ kind: 'myThing' }>({ id, candidates, label, panel })` (pure, no React) | `web/lib/office/targets/index.ts`: add it to `PLAY_TARGETS` |
-| Custom dialog UI for that target (optional) | `web/app/office/panels/MyThingPanel.tsx` exporting a `PlayPanelView` (`Body`, `ownHeading`, `hideAudit`, `hideAskWhy`) | `web/app/office/panels/index.ts`: `myThing: myThingPanel` in `PLAY_PANEL_VIEWS` |
+| Custom dialog UI for that target (optional) | `web/app/office/panels/MyThingPanel.tsx` exporting a `PlayPanelView` (`Body` gets `panel` and `askWhy(question?)`, which hands off to the lobby ask-why; `ownHeading`, `hideAudit`, `hideAskWhy`) | `web/app/office/panels/index.ts`: `myThing: myThingPanel` in `PLAY_PANEL_VIEWS` |
 | A view-only prop that reads the snapshot | `web/app/office/props/MyProp.tsx` | `web/app/office/props/OfficeProps.tsx` |
 | A view menu entry | — | `web/lib/office/view.ts`: the `ViewMode` member plus one `VIEW_OPTIONS` entry |
 
