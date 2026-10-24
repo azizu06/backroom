@@ -7,7 +7,9 @@ import './InboxTray.css';
 const seatName = { payables: 'Payables', vendor_onboarding: 'Vendor onboarding' };
 
 /** DOM panel for the lobby; presets are serializable server-owned fixture text. */
-export function InboxTray({ presets = [] }: { presets?: InboxPreset[] }) {
+/** headingLevel 3 when embedded under another page heading (the office lobby); 1 on /inbox. */
+export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxPreset[]; headingLevel?: 1 | 3 }) {
+  const Title = headingLevel === 3 ? "h3" : "h1";
   const uid = useId();
   const [presetId, setPresetId] = useState('');
   const [kind, setKind] = useState('email');
@@ -45,7 +47,7 @@ export function InboxTray({ presets = [] }: { presets?: InboxPreset[] }) {
   const quote = receipt && 'quote' in receipt.decision ? receipt.decision.quote : undefined;
   return <section className="inbox-tray" aria-labelledby={`${uid}-title`}>
     <header className="inbox-heading">
-      <div><h1 id={`${uid}-title`}>Inbox tray</h1><p>Give Northfield an email or invoice. See which seat handles it and why.</p></div>
+      <div><Title id={`${uid}-title`} className="inbox-title">Inbox tray</Title><p>Give Northfield an email or invoice. See which seat handles it and why.</p></div>
       <a href="/audit">Audit wall →</a>
     </header>
     <div className="inbox-workspace">

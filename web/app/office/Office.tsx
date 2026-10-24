@@ -142,6 +142,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   }
   const plan = mode === 'plan' || lostContext;
   return <section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
+    {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
