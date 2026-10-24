@@ -4,7 +4,7 @@ Prepared October 24, 2026 for Stream D. This is an evidence index, not a complet
 certificate or a new live run. Read the receipt's commit, timestamp, route and
 limitations before using a claim. Main moves rapidly. The Windows recheck linked
 below covers f289054 only and stays a historical command log. The offline
-scoreboard file is unchanged from #228 (`3368339`) through main `7830261`. No
+scoreboard file is unchanged from #228 (`3368339`) through main `5dd2339`. No
 issue checkbox was changed by this documentation work.
 
 | Required deliverable | Location | Remaining verification |
@@ -20,7 +20,7 @@ issue checkbox was changed by this documentation work.
 ## Offline scoreboard cited here
 
 These figures are the committed scoreboard at `3368339`, still the file on main
-`7830261`. They are code-path results. They are not a phone call, a human passkey
+`5dd2339`. They are code-path results. They are not a phone call, a human passkey
 tap, a live CRS/OFAC probe, or a Nessie settlement.
 
 | Scoreboard row | Result | What it does not prove |
