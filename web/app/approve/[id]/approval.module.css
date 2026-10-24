@@ -40,3 +40,5 @@
 .fields + .note { margin-bottom: 18px; }
 .footer { color: var(--muted); font-size: 12px; padding-top: 26px; }
 @media (max-width: 360px) { .page { padding: 0 16px; } .terms dd { font-size: 19px; } }
+.card .status { margin-top: 18px; }
+.page .cardTitle { font: 500 30px/1.1 Georgia, serif; letter-spacing: -.02em; margin: 0 0 10px; }

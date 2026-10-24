@@ -8,15 +8,16 @@ import {
   dressingBoxes, dressingFor, type Dressing, type DressingBox, type DressingPlant, type DressingSign,
 } from '../../../lib/office/props/dressing';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
+import { ROLES } from '../../../lib/office/palette';
 
 const SIGN_TEX_W = 256, SIGN_TEX_H = 64;
 
 function drawSign(ctx: CanvasRenderingContext2D, text: string, accent: string) {
-  ctx.fillStyle = '#303d34';
+  ctx.fillStyle = ROLES.frame;
   ctx.fillRect(0, 0, SIGN_TEX_W, SIGN_TEX_H);
   ctx.fillStyle = accent;
   ctx.fillRect(14, 18, 6, SIGN_TEX_H - 36);
-  ctx.fillStyle = '#e7ddc5';
+  ctx.fillStyle = ROLES.wall;
   ctx.font = `600 30px ${PROP_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -29,13 +30,13 @@ function Sign({ sign }: { sign: DressingSign }) {
   const out = SIGN_DEPTH / 2 + 0.002;
   return <mesh position={[sign.x + out * Math.sin(sign.rotationY), sign.y, sign.z + out * Math.cos(sign.rotationY)]} rotation={[0, sign.rotationY, 0]} receiveShadow>
     <planeGeometry args={[SIGN_FACE_WIDTH, SIGN_FACE_HEIGHT]} />
-    <meshStandardMaterial map={texture} emissiveMap={texture} emissive='#ffffff' emissiveIntensity={0.3} roughness={1} />
+    <meshStandardMaterial map={texture} emissiveMap={texture} emissive={ROLES.wall} emissiveIntensity={0.3} roughness={1} />
   </mesh>;
 }
 
 function Foliage({ plant }: { plant: DressingPlant }) {
   return <mesh position={[plant.x, PLANT_FOLIAGE_Y * plant.size, plant.z]} receiveShadow>
-    <dodecahedronGeometry args={[PLANT_RADIUS * plant.size, 0]} /><meshStandardMaterial color='#81936b' />
+    <dodecahedronGeometry args={[PLANT_RADIUS * plant.size, 0]} /><meshStandardMaterial color={ROLES.plant} />
   </mesh>;
 }
 

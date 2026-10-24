@@ -1,20 +1,21 @@
 import type { StateStore } from '@backroom/orchestrator';
 import type { GatewayCall, ToolResult } from '../gateway/store';
 import type { Invocation } from '../gateway/parser';
+import { noteEscalation } from './inbox';
 
 /** Both adapters are server-only. The voice handler can create/read requests, never decide them. */
 export function createApprovalBridge(store: StateStore, now = Date.now) {
   return async (call: GatewayCall, input: Invocation, result?: ToolResult) => {
     await store.expireEscalations(now());
-    if (input.tool === 'check_approval') {
-      const local = call.escalations.find(e => e.id === input.escalationId);
-      if (!local) return;
+    // Refresh before the tool runs so an expired row is not still "pending" on a re-ask.
+    for (const local of call.escalations) {
       const row = await store.getEscalation(local.id);
-      if (!row || row.callId !== call.callId) return;
+      if (!row || row.callId !== call.callId) continue;
       local.status = row.status;
       local.method = row.method;
       local.decision = row.decision;
       local.decidedAt = row.decidedAt;
+      local.createdAt = row.createdAt;
       local.expiresAt = row.expiresAt;
     }
     if (result?.kind !== 'ESCALATE' || typeof result.escalation_id !== 'string') return;
@@ -29,6 +30,7 @@ export function createApprovalBridge(store: StateStore, now = Date.now) {
       amountCents: call.amountCents, principalCents: call.receivable.principalCents,
       lateFeeCents: call.receivable.lateFeeCents, currency: call.currency, requestedTerms: local.plan,
     }, now());
+    noteEscalation(row.id);
     local.createdAt = row.createdAt;
     local.expiresAt = row.expiresAt;
     result.approval_path = `/approve/${encodeURIComponent(row.id)}`;

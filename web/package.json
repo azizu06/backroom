@@ -7,14 +7,16 @@
     "build": "next build",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --globals",
+    "test:agents:state": "vitest run --config vitest.agents.config.ts",
     "test:approvals:browser": "playwright test --config playwright.approvals.config.ts",
+    "test:controller:browser": "playwright test --config playwright.controller.config.ts",
     "test:office:browser": "playwright test --config playwright.office.config.ts",
     "test:audit:browser": "playwright test --config playwright.audit.config.ts",
     "test:inbox:browser": "playwright test --config playwright.inbox.config.ts",
     "test:payments:browser": "playwright test --config playwright.payments.config.ts",
     "test:policy:browser": "playwright test --config playwright.policy.config.ts",
     "test:replay:browser": "playwright test --config playwright.replay.config.ts",
-    "test:browser": "pnpm run test:approvals:browser && pnpm run test:audit:browser && pnpm run test:inbox:browser && pnpm run test:office:browser && pnpm run test:payments:browser && pnpm run test:policy:browser && pnpm run test:replay:browser"
+    "test:browser": "pnpm run test:approvals:browser && pnpm run test:controller:browser && pnpm run test:audit:browser && pnpm run test:inbox:browser && pnpm run test:office:browser && pnpm run test:payments:browser && pnpm run test:policy:browser && pnpm run test:replay:browser"
   },
   "dependencies": {
     "@backroom/nessie": "workspace:*",

@@ -26,7 +26,7 @@ async function aimAtPhone(page: Page) {
     p = await pos(page); angle = Math.atan2(-(phone[0] - p.x), -(phone[1] - p.z)); diff = Math.atan2(Math.sin(angle - p.yaw), Math.cos(angle - p.yaw));
   }
 }
-test('collections desk phone plays a mock callback and keeps call requests unavailable', async ({ page }) => {
+test('collections desk phone plays a mock callback and keeps the preview from requesting calls', async ({ page }) => {
   const shots = process.env.BR_SHOTS === '1';
   if (shots) await mkdir('/tmp/br-3d', { recursive: true });
   const calls: { url: string; type: string }[] = [];
@@ -65,7 +65,7 @@ test('collections desk phone plays a mock callback and keeps call requests unava
   await expect.poll(() => dialog.getByTestId('phone-status').innerText(), { timeout: 15_000, intervals: [100] }).toContain('Ended');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-ended.png' });
   await dialog.getByTestId('phone-request').click();
-  await expect(dialog.getByTestId('phone-request-result')).toHaveText('Call requests not available yet');
+  await expect(dialog.getByTestId('phone-request-result')).toHaveText('Mock preview: no call placed');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-request.png' });
   expect(calls.filter(({ url, type }) => /call/i.test(url) && !['document', 'script', 'stylesheet', 'font', 'image'].includes(type))).toEqual([]);
 });

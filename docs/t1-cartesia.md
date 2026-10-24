@@ -1,6 +1,6 @@
 # T1 Cartesia smoke test
 
-Status: **PARTIAL M4 acceptance** (2026-10-24, updated 13:36 UTC). The second coordinated phone retest completed the exact disclosure, caller identity, invoice context, fee-waiver DENY, two-payment ALLOW, and a queued payment link through five successful real gateway webhooks. Four-payment escalation/passkey and actual link delivery were **not demonstrated**. Six tool-only lifecycle events returned 400; the receiver stayed healthy. Post-call fixes and evidence are below. The earlier observer crash is historical, not the outcome of this call. No automatic redial.
+Status: **PARTIAL M4/M6 acceptance** (2026-10-24, updated after the 19:03–19:07 UTC third coordinated phone retest). The third call demonstrated policy audit before the spoken escalation and a real four-payment `ESCALATE` with an approval link. The request expired as `pending_owner`; no passkey decision or approval relay was recorded. The earlier second call demonstrated fee-waiver DENY, two-payment ALLOW and a queued payment link. Automatic approval delivery and a completed phone approval remain unproven. No automatic redial.
 
 ## Original T1 measurements — 07:42–08:06 UTC
 
@@ -136,13 +136,13 @@ Relevant provider transcript, kept verbatim for the ambiguous installment wordin
 - **61.633–70.904 s, caller:** “Yes, I'll pay at least half and expect uh accept the 2 payment option, but before that you said it's not possible. Can I try waving the fee and paying for?”
 - The next tool submitted **two**, not four, with `waive_fee=true`; the gateway denied the waiver. The agent then offered two without the waiver, got caller agreement, submitted it, and received ALLOW.
 
-The transcript does not establish an unambiguous request for **four**; it renders the ending as “paying for?”. It does establish a verbal policy decision and negotiation before the required tool. The managed prompt now explicitly requires `propose_plan` before offering, refusing or negotiating terms, submits requested terms even outside the envelope (including four installments and waivers), forbids silently replacing them with two, and asks for clarification of “for”/“four” or missing fields. Stop requests still take priority. A configuration regression locks down these instructions. This is prompt guidance; code continues to enforce financial authority, and no prompt test proves future live speech. Setup updated the managed agent after the call, and API readback confirmed the revised instructions. The revised prompt has **not been phone-retested**; four-payment escalation/passkey remain unproven.
+The transcript does not establish an unambiguous request for **four**; it renders the ending as “paying for?”. It does establish a verbal policy decision and negotiation before the required tool. The managed prompt now explicitly requires `propose_plan` before offering, refusing or negotiating terms, submits requested terms even outside the envelope (including four installments and waivers), forbids silently replacing them with two, and asks for clarification of “for”/“four” or missing fields. Stop requests still take priority. A configuration regression locks down these instructions. This is prompt guidance; code continues to enforce financial authority, and no prompt test proves future live speech. Setup updated the managed agent after the call, and API readback confirmed the revised instructions. At that checkpoint the revised prompt had **not been phone-retested**; the third coordinated retest below subsequently demonstrated four-payment escalation, with passkey approval still incomplete.
 
 ### Lifecycle failure and correction
 
 Tool-only assistant `call_turn` ids **3, 4, 12, 15, 20, 24** contained `tool_calls` and no `text`. The event parser required every turn to have string text and returned **400 `INVALID_TURN`** for all six, including `end_call`. These are separate lifecycle acknowledgments, not failed gateway tools: their associated financial tool requests all returned 200 and committed. The receiver did not crash; normal speech turns and completion persisted.
 
-The parser now acknowledges/deduplicates assistant tool-only turns without deriving disclosure or identity from tool claims. Missing caller text and assistant turns lacking both text and tool calls still fail. A regression reproduced HTTP 400 before the fix, then verified 200/dedupe and that disclosure/identity gates stay closed. This fix was applied **after** the phone call, so its live correction is not claimed. Final validation: **29 voice tests** and orchestrator typecheck pass (three added regressions: reused T1 setup, tool-only lifecycle turn, negotiation prompt).
+The parser now acknowledges/deduplicates assistant tool-only turns without deriving disclosure or identity from tool claims. Missing caller text and assistant turns lacking both text and tool calls still fail. A regression reproduced HTTP 400 before the fix, then verified 200/dedupe and that disclosure/identity gates stay closed. This fix was applied **after** the second phone call; the third retest below subsequently observed HTTP 200 for its tool-only turns. Final validation: **29 voice tests** and orchestrator typecheck pass (three added regressions: reused T1 setup, tool-only lifecycle turn, negotiation prompt).
 
 ### Delivery gap observed during this retest
 
@@ -153,6 +153,54 @@ At the time of this retest, the local M4 runtime (`orchestrator/src/voice/live.t
 The repo has a Next `/pay/[linkId]` page and payment authorization lookup, but that runtime reads `getGatewayStore()` in the web process. It does **not automatically read this voice-local file store**. A usable demo handoff first needs a public HTTPS pay origin backed by the same authorized link state. A QR on the demo screen or a spoken short URL can then take the caller there without an SMS provider; neither is wired for this call. Automatic phone delivery would additionally need an outbox worker, a verified contact and consent, an SMS provider/channel, and a persisted delivery result. No provider was added or paid message sent in this task. Payment/reconciliation was not tested.
 
 Private evidence: `.env.voice/provider-call.json`, `http-evidence.jsonl`, `gateway.json`, `journal.json`, `audit.jsonl`, consent file; `.env.t1/retest2-ws-stale-endpoint.json` and successful `websocket-evidence.json`. Raw transcript/provider metadata, destination, callback, credentials and consent remain uncommitted. Task receiver/tunnel are shut down after evidence collection. Fresh firstmate go is required for any additional dial.
+
+## Third coordinated phone retest — 19:03–19:07 UTC
+
+Firstmate relayed fresh go at 12:02 PT with Aziz holding his phone. Exactly one dial was placed; no retry or redial. The worker did not listen to the handset: the speech account comes from the full provider transcript, matched to authenticated receiver/gateway receipts. See the [redacted machine-readable receipt](evidence/phone-retest3/receipt.json) for all 85 transcript records, every tool input/result, the actual escalation view and call-related audit rows.
+
+The tested code was main commit `7f8ff937bdc2c951f93fa579308c01e562404aac`. Setup followed `demo:up`, `demo:reset` and `demo:preflight`, with an owned HTTPS host, memory StateStore and mock bank. Orchestrator, web, Cartesia and GX10 checks were GREEN; Spacetime was RED/unused and Nessie RED/unconfigured. This was a phone/approval rehearsal, not an all-dependency readiness claim. The phone-free WebSocket prerequisite `ac_Q5GNmeguX4dAhnKAN7RF4Z` returned actual `t1_echo` success. API readback confirmed Haiku 5.5, nine tools and the policy-before-speech prompt. This call used Cartesia Managed Agent; it did not exercise the separate Claude Agent SDK dispatcher.
+
+Before dialing, Aziz reported enrolling with Face ID on his iPhone; the public controller endpoint independently returned HTTP 200, `registered=true`. Registration alone does not establish an approval decision.
+
+Call **`ac_aAozkPAUE8RwpuegP2ymjf`**, gateway session `ea5f9fdd-ee4e-4e37-a072-6adb7606844e`. Provider start **19:03:00.932282Z**, end **19:07:36.614343Z**, duration **275.682061 s**, `completed`, `client_hangup`. There is no separately measured phone-ring timestamp.
+
+| Check | Actual observation | Result |
+| --- | --- | --- |
+| Disclosure | Exact AI/business/recording/Jordan welcome, uninterrupted, relative 0.215–8.536 s; lifecycle HTTP 200 | PASS |
+| Identity before amount | “Yeah, this is Jordan.” was not accepted by the exact phrase allowlist; context remained DENY. A second “Yes.” succeeded; amount speech began at 27.827 s | Gate held; natural-language parsing gap |
+| Policy before spoken outcome | `propose_plan` at relative 55.453 s; policy audit `7957532f-c8b6-497a-a0a3-8adaff08ef44`, seq 112, persisted at 19:03:57.169Z. Spoken escalation starts at 56.443 s | PASS; neutral clarification preceded the tool |
+| Four payments | Actual arguments: 4 installments, 50% first, 30 days, fee retained, no discount. Response ESCALATE/MAX_INSTALLMENTS, `can_confirm=false` | PASS |
+| Escalation/link | `3c5a4bde-adc3-4e08-8e76-c52b4a830795`, created 19:03:57.168Z, `/approve/3c5a4bde-adc3-4e08-8e76-c52b4a830795`; operator monitor relayed the full HTTPS URL | Created; automatic phone delivery unproven |
+| Passkey result | Expired 19:04:57.168Z; final view `pending_owner`, no decision/method/decidedAt; no human `decide_escalation` audit | NOT ACHIEVED |
+| Same-call resend | Caller asked twice. Agent checked the old id once, received `pending_owner`, then said it could not resend. No second `propose_plan` or new escalation | Recovery gap |
+| Shared audit | Five relevant rows, including escalation creation and timeout; complete running-server snapshot verified valid at length 113 | PASS; receipt contains only relevant rows |
+| Tool-only lifecycle | All 45 `call_turn` receipts returned HTTP 200, including seven tool-only turns; start/completed/analysis also 200 | Prior tool-only 400 regression not observed |
+
+Every tool request returned HTTP 200. These receiver durations include the local bridge/gateway path, not the full provider round trip:
+
+| UTC receipt | Tool | Gateway result | Receiver ms |
+| --- | --- | --- | ---: |
+| 19:03:13.801 | `verify_identity_result` | RECORDED; actual phrase classified uncertain | 14.426 |
+| 19:03:15.317 | `get_invoice_context` | DENY / IDENTITY_REQUIRED | 3.658 |
+| 19:03:28.445 | `verify_identity_result` | RECORDED; affirmative accepted | 11.104 |
+| 19:03:28.567 | `get_invoice_context` | CONTEXT / 495000 cents | 5.549 |
+| 19:03:57.165 | `propose_plan` | ESCALATE / MAX_INSTALLMENTS / approval_path | 5.442 |
+| 19:03:58.399 | `check_approval` | PENDING | 3.554 |
+| 19:06:37.016 | `check_approval` | RECORDED / pending_owner / “Dana will confirm by email today.” | 8.289 |
+
+The agent told the caller the four-payment request needed controller approval. When asked whether it was sending a phone link, it said it was not sending anything and could not approve itself. After expiry, caller turn 39 asked “Can you uh send the 4 payment plan approval again?” The agent checked the expired id and then said it could not resend. Turn 43 repeated the request; the next reply again refused without a tool call. Those are recorded speech, not a gateway rejection of a new proposal. No payment plan was committed, payment link requested, bank operation performed, or email-delivery receipt recorded.
+
+### Why the expired approval was not resent
+
+At the tested commit, `check_approval` only reads the existing request. The approval bridge expires it and copies its status into the gateway; the gateway's `pending_owner` speech template says “Dana will confirm by email today.” The managed prompt tells the agent to check approval, but defines no expired-request recovery or approval-notification workflow. The model's “cannot resend” claim was not returned by a new-proposal tool.
+
+A phone-free, in-memory replay through the real HTTP gateway/approval bridge confirmed: submit four payments → ESCALATE; advance 60 s → old `pending_owner`; submit the same terms with a fresh webhook request id → **new ESCALATE, different id and approval path**. No idempotency or stale-nonce error occurred in the live call. This establishes existing mechanics, not a product decision to restart timed-out reviews automatically.
+
+Approval creation returned a **relative path**. This rehearsal's monitor prefixed the public HTTPS origin and passed the link to firstmate for manual relay. The controller setup page enrolled the passkey but did not list pending requests. The tested office rendered escalation folder/status, with no automatic approval-link handoff; memory-mode office remained a labeled preview. No automatic approval push/SMS/email delivery was wired along this path. The separately seeded URL printed by `demo:reset` was not this live-call request. Reliable approval discovery and expiry/re-request behavior require their own fixes; this receipt changes no runtime code.
+
+The approval view and full audit snapshot were saved before the required shutdown. The raw process-local GatewayCall was not exported, so there is no preserved raw gateway-store snapshot; the receipt retains all seven actual tool inputs/results and the actual escalation row. No phone-browser POST trace was captured, so this evidence cannot identify a particular WebAuthn error or prove that an assertion was submitted. The owned server and tunnel were stopped. Another phone call requires fresh go in a new task.
+
+At [Cartesia's published rates](https://www.cartesia.ai/pricing), checked Oct 24, 2026, 275.682061 seconds × ($0.06 agent + $0.014 telephony)/minute estimates **$0.340008** for this call, plus approximately **$0.055** for the 55-second WebSocket prerequisite. GET call exposes no billed-cost field; API-created-agent LLM charges and rounding are not included, so the complete billed total and full <$1 ceiling are not independently verified. No direct Anthropic SDK inference ran, and no billing change was made.
 
 ## Sources checked
 

@@ -3,7 +3,9 @@
  * below. Order matters: it is the candidate order pickTarget breaks exact ties with (agents always win).
  */
 import { agentTarget } from "./agent";
+import { coworkerTarget } from "./coworker";
 import { deskTarget } from "./desk";
+import { inboxTarget } from "./inbox";
 import { paylinkTarget } from "./paylink";
 import { phoneTarget } from "./phone";
 import { serverTarget } from "./server";
@@ -17,6 +19,8 @@ export const PLAY_TARGETS = [
   paylinkTarget,
   phoneTarget,
   serverTarget,
+  coworkerTarget,
+  inboxTarget,
 ] as const;
 
 type TargetOf<M> = M extends PlayTargetModule<infer T> ? T : never;

@@ -12,10 +12,13 @@ import { OFFICE_ANCHORS, isAnchorId, visibleRooms, type AnchorId, type OfficeAge
 import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
+import { ROLES } from '../../lib/office/palette';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
 import { PresenceGhosts } from './PresenceGhosts';
+import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
+import type { ChatBubble } from '../../lib/office/proximity-chat';
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
@@ -152,13 +155,13 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [] }: {
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [], chatBubbles }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
-  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[];
+  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[]; chatBubbles?: ChatBubble[];
 }) {
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
-    <color attach='background' args={['#202620']} />
+    <color attach='background' args={[ROLES.background]} />
     <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
     <directionalLight position={keyLight.position} color={keyLight.color} intensity={keyLight.intensity} castShadow={keyLight.castShadow}
       shadow-mapSize={[keyLight.shadow.mapSize, keyLight.shadow.mapSize]} shadow-bias={keyLight.shadow.bias}
@@ -175,18 +178,19 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
       blur={contactShadows.blur} opacity={contactShadows.opacity} far={contactShadows.far} color={contactShadows.color} />
     <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
-    <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color='#535c4e' />
-    <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color='#828976' />
-    <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color='#747e6a' />
-    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color='#687361' />
+    {/* Room shell: peach floor, cream walls, lavender partitions, cream room pads and a blush aisle runner. */}
+    <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color={ROLES.floor} />
+    <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color={ROLES.wall} />
+    <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color={ROLES.wall} />
+    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color={ROLES.aisle} />
     {[-2.5, 2.5].map(x => <group key={x}>
-      <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color='#828976' />
-      <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color='#828976' />
+      <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
+      <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color={ROLES.partition} />
     </group>)}
     {visibleRooms(snapshot).map(room => {
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
-        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : '#626e5b'} />
+        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : ROLES.roomPad} />
         <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
       </group>;
     })}
@@ -198,7 +202,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     </Fragment>)}
     </Instances>
     {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
-    <PresenceGhosts peers={presence} />
+    {play ? <CoworkerAvatars peers={presence} bubbles={chatBubbles} /> : <PresenceGhosts peers={presence} />}
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }

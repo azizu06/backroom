@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { demoBindHost, externalState } from './host';
 import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
-import { probeDependencies, type DemoStatus, type HealthRow } from './health';
+import { probeAttackDemo, probeDependencies, type DemoStatus, type HealthRow } from './health';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
@@ -31,6 +31,7 @@ async function control<T = DemoStatus & { publicUrl: string; localUrl: string }>
 function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string }) {
   console.log(`Local office: ${status.localUrl}/office`);
   for (const [label, path] of Object.entries({ Office: '/office', 'Audit wall': '/audit', 'Inbox tray': '/inbox',
+    'Attack demo': '/attack',
     'Policy editor': '/policy', Controller: '/controller', Approve: status.approvePath, Pay: status.payPath, 'Real vs simulated': '/real-vs-sim' })) {
     console.log(`${label}: ${status.publicUrl}${path || '/ (not seeded)'}`);
   }
@@ -89,7 +90,8 @@ async function supervise() {
         let status: DemoStatus;
         try { status = await queryWeb(req.url === '/reset' ? 'reset' : 'status'); }
         finally { if (req.url === '/reset') resetting = false; }
-        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
+        const attackDemo = await probeAttackDemo(env);
+        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, attackDemo, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
       }
       res.writeHead(404).end();
     } catch { res.writeHead(503).end(); }
@@ -105,10 +107,14 @@ async function supervise() {
     remote = externalState(env); bindHost = demoBindHost(env);
     if (!['memory', 'spacetime'].includes(env.STATE_STORE)) throw new Error('DEMO_INVALID_STATE_STORE');
     const port = Number(env.DEMO_PORT || 3000), voicePort = Number(env.VOICE_PORT || 8788);
+    const attackPort = Number(env.ATTACK_DEMO_PORT || 8790);
     await available(port, bindHost);
     if (bindHost !== '127.0.0.1') await available(port);
     base = `http://${bindHost.includes(':') ? `[${bindHost}]` : bindHost}:${port}`;
     if (env.DEMO_VOICE === '1') await available(voicePort);
+    await available(attackPort);
+    env.ATTACK_DEMO_PORT = String(attackPort);
+    env.ATTACK_DEMO_BASE_URL = `http://127.0.0.1:${attackPort}`;
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('DEMO_CONTROL_BIND');
@@ -126,7 +132,8 @@ async function supervise() {
     const stateMode = env.STATE_STORE; env.STATE_STORE = 'memory';
     if (env.DEMO_PREBUILT !== '1') await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
     env.STATE_STORE = stateMode;
-    publicUrl = base;
+    // WebAuthn allows a non-HTTPS origin only for hostname localhost. The listen socket stays on the bind address.
+    publicUrl = env.DEMO_TUNNEL === '0' ? `http://localhost:${port}` : base;
     if (env.DEMO_TUNNEL !== '0') {
       const log = join(dir, 'tunnel.log'); writeFileSync(log, '', { mode: 0o600 });
       children.start('cloudflared', ['tunnel', '--url', base, '--no-autoupdate'], log);
@@ -144,6 +151,13 @@ async function supervise() {
       .map(name => `${name}=${randomBytes(24).toString('hex')}`).join('\n') + '\n', { mode: 0o600 });
     const existing = { ...process.env }; process.loadEnvFile(privateEnv);
     for (const name of ['TOOL_GATEWAY_SECRET', 'CONTROLLER_ENROLLMENT_SECRET', 'POLICY_DEMO_PIN']) env[name] = existing[name] || process.env[name];
+    // Same private bearer as the web proxy. Live analysis remains explicitly opt-in.
+    // Mock imports must not open a second writer on a database that reset rotates.
+    const attackStateMode = env.STATE_STORE;
+    if (env.ATTACK_DEMO_LIVE !== '1') env.STATE_STORE = 'memory';
+    children.start(process.execPath, ['--import', loader, 'orchestrator/src/attack-demo/server.ts'], join(dir, 'attack.log'));
+    env.STATE_STORE = attackStateMode;
+    await waitFor(async () => (await probeAttackDemo(env)).ok, 20000);
     if (env.DEMO_VOICE === '1') {
       const voicePrivate = join(dir, 'voice-private.env');
       const names = ['VOICE_TOOL_SECRET', 'VOICE_ADMIN_SECRET', 'CARTESIA_WEBHOOK_SECRET'];

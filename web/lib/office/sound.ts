@@ -14,6 +14,9 @@ export type OneShotCue = Exclude<SoundCue, 'roomTone'>;
 export type CueTimes = Partial<Record<OneShotCue, number>>;
 export const SOUND_PREFERENCE_KEY = 'office.sound';
 export const SOUND_COOLDOWN_MS = 800;
+/** Footsteps are already spaced by distance (>= 150 ms apart at 2x speed); this only stops overlapping cues. Every other cue keeps the default. */
+export const CUE_COOLDOWN_MS: Partial<Record<OneShotCue, number>> = { step: 60 };
+export function cooldownFor(kind: OneShotCue): number { return CUE_COOLDOWN_MS[kind] ?? SOUND_COOLDOWN_MS; }
 
 export function soundPreference(storage?: Pick<Storage, 'getItem'>): 'on' | 'off' {
   try { return (storage ?? (typeof localStorage === 'undefined' ? undefined : localStorage))?.getItem(SOUND_PREFERENCE_KEY) === 'on' ? 'on' : 'off'; }
@@ -36,5 +39,5 @@ export function cuesFor(prev: OfficeSnapshot, next: OfficeSnapshot, now = 0, las
   if (newDeny || newDenial) cues.push('deny');
   if (next.audit.some(row => row.decision === 'ESCALATE' && !auditIds.has(row.id)) ||
     next.agents.some(agent => !!agent.escalationId && agent.escalationId !== agents.get(agent.id)?.escalationId)) cues.push('passkey');
-  return cues.filter(kind => now - (lastPlayed[kind] ?? -Infinity) >= SOUND_COOLDOWN_MS).slice(0, 3);
+  return cues.filter(kind => now - (lastPlayed[kind] ?? -Infinity) >= cooldownFor(kind)).slice(0, 3);
 }

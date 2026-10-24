@@ -4,8 +4,13 @@
  */
 import { OfficeProps } from '../props/OfficeProps';
 import { BakedArt } from './BakedArt';
+import { LobbyInbox } from '../props/LobbyInbox';
+import { ReceiptPrinter } from '../props/ReceiptPrinter';
+import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
+import { AuditWallMount } from './AuditWallMount';
 import { Desks } from './Desks';
 import { Doors } from './Doors';
+import { InboxTrayMount } from './InboxTrayMount';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
 import { Performance } from './Performance';
@@ -22,6 +27,11 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'baked-art', instanced: false, Component: BakedArt },
+  { id: 'audit-wall', instanced: false, Component: AuditWallMount },
+  { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },
   { id: 'props', instanced: false, Component: OfficeProps },
+  { id: 'lobby-inbox', instanced: false, Component: LobbyInbox },
+  { id: 'receipt-printer', instanced: false, Component: ReceiptPrinter },
+  { id: 'lobby-deny-stamp', instanced: false, Component: LobbyDenyStamp },
   { id: 'performance', instanced: false, Component: Performance },
 ];

@@ -2,6 +2,7 @@
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
+import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -9,11 +10,12 @@ import { DESKS, DESK_RADIUS, DESK_SIZE } from "./targets/desk";
 import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
-import type { PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+import { PHONE_STAND } from "./props/phone";
+import type { CoworkerSpot, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
 export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
-export type { PlayPanelEntry, PlayTarget, Vec2 };
+export type { CoworkerSpot, PlayPanelEntry, PlayTarget, Vec2 };
 
 export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
@@ -63,6 +65,7 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
     // Dana's desk group is rotated by PI, which mirrors the chair offset.
     const facing = room === "dana" ? -1 : 1;
     boxes.push(box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * facing, z - 0.9 * facing, 0.65, 0.6));
+    if (room === "collections") boxes.push(box(PHONE_STAND.x, PHONE_STAND.z, PHONE_STAND.width, PHONE_STAND.depth));
   }
   for (const room of DOORS) {
     if (!visible.has(room)) continue;
@@ -118,8 +121,12 @@ export class PlayInput {
   readonly joystick: [number, number] = [0, 0];
   lookYaw = 0;
   lookPitch = 0;
+  /** Yaw queued by a turn-key tap. Applied on the next frame only if that key is no longer held. */
+  turnTap = 0;
   /** Walking speed multiplier from the viewer's Play settings. */
   speed = 1;
+  /** Game-feel switches from the viewer's Play settings; the rig also applies reduced motion. */
+  feel: FeelFlags = DEFAULT_FEEL;
   press(control: PlayControl) { this.held.add(control); }
   release(control: PlayControl) { this.held.delete(control); }
   setJoystick(x: number, y: number) {
@@ -135,8 +142,13 @@ export class PlayInput {
     this.lookPitch = 0;
     return look;
   }
-  clear() { this.held.clear(); this.setJoystick(0, 0); this.consumeLook(); }
-  active() { return this.held.size > 0 || this.joystick[0] !== 0 || this.joystick[1] !== 0 || this.lookYaw !== 0 || this.lookPitch !== 0; }
+  clear() { this.held.clear(); this.setJoystick(0, 0); this.consumeLook(); this.turnTap = 0; }
+  consumeTurnTap(): number {
+    const tap = this.turnTap;
+    this.turnTap = 0;
+    return tap;
+  }
+  active() { return this.held.size > 0 || this.joystick[0] !== 0 || this.joystick[1] !== 0 || this.lookYaw !== 0 || this.lookPitch !== 0 || this.turnTap !== 0; }
 }
 
 /** World-space step for this frame from held keys and the joystick. */
@@ -153,6 +165,18 @@ export function moveIntent(input: PlayInput, yaw: number, dt: number): [number, 
 export function turnIntent(input: PlayInput, dt: number): number {
   return ((input.held.has("turnLeft") ? 1 : 0) - (input.held.has("turnRight") ? 1 : 0)) * TURN_SPEED * Math.max(dt, 0);
 }
+/**
+ * Queue one display frame of yaw for a turn-key tap (left positive, matching turnIntent).
+ * useFrame only samples keys that are still held, so a tap released before that frame would not turn.
+ */
+export function applyTurnTap(input: PlayInput, control: PlayControl): void {
+  if (control === "turnLeft") input.turnTap += TURN_SPEED / 60;
+  else if (control === "turnRight") input.turnTap -= TURN_SPEED / 60;
+}
+/** Mouse look plus either the held turn keys or a queued tap, never both (a keydown queues a tap and also holds the key). */
+export function frameLookYaw(lookYaw: number, keyed: number, tap: number): number {
+  return lookYaw + (keyed !== 0 ? keyed : tap);
+}
 export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: number): { yaw: number; pitch: number } {
   const next = Math.atan2(Math.sin(yaw + dYaw), Math.cos(yaw + dYaw));
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
@@ -166,10 +190,10 @@ export function targetKey(target: PlayTarget | null): string {
 
 /**
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
- * each visible desk at its room centre, the Treasury door, the lobby payment kiosk and the GX10 server.
+ * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
  */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[]): PlayCandidate[] {
-  const context = { agents, visible: new Set(rooms) };
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = []): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), coworkers };
   return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 
@@ -198,7 +222,7 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
 }
 
 export function headBob(distance: number, moving: boolean, reduced: boolean): number {
-  return reduced || !moving ? 0 : Math.sin(distance * 7) * 0.035;
+  return reduced || !moving ? 0 : bobHeight(distance, 1);
 }
 
 export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;
@@ -217,4 +241,6 @@ export interface PlayBridge {
   readonly input: PlayInput;
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };
+  /** Other viewers in Play (soft targets), read on each rig frame. */
+  readonly coworkers?: { readonly current: readonly CoworkerSpot[] };
 }

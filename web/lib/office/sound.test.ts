@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INITIAL_OFFICE, type OfficeAgent, type OfficeSnapshot } from './state';
-import { SOUND_CUES, SOUND_PREFERENCE_KEY, cuesFor, soundPreference, writeSoundPreference, type CueTimes } from './sound';
+import { SOUND_COOLDOWN_MS, SOUND_CUES, SOUND_PREFERENCE_KEY, cooldownFor, cuesFor, soundPreference, writeSoundPreference, type CueTimes } from './sound';
 import { isOfficeCue, playOfficeCue } from './sound-events';
 
 const snap = (patch: Partial<OfficeSnapshot> = {}): OfficeSnapshot => ({ ...INITIAL_OFFICE, ...patch });
@@ -71,6 +71,11 @@ describe('office sound cues', () => {
     }
     for (const kind of [null, undefined, {}, 'constructor', '__proto__', 'unknown']) expect(isOfficeCue(kind)).toBe(false);
     expect(() => playOfficeCue('interact')).not.toThrow(); // no window on the server
+  });
+  it('lets footsteps repeat several times a second while other cues keep the default cooldown', () => {
+    expect(cooldownFor('step')).toBeLessThan(300);
+    expect(cooldownFor('step')).toBeGreaterThan(0);
+    for (const kind of ['handoff', 'deny', 'passkey', 'interact'] as const) expect(cooldownFor(kind)).toBe(SOUND_COOLDOWN_MS);
   });
   it('reads and writes preference safely', () => {
     const values = new Map<string, string>();
