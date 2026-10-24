@@ -1,15 +1,28 @@
 'use client';
 
 import { Component, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { invalidate } from '@react-three/fiber';
+import dynamic from 'next/dynamic';
+import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
 import { INITIAL_VIEWPORT, boundaryStateForProps, reportViewFailure, viewportLayers, viewportReducer, type BoundaryState, type ViewMode } from '../../lib/office/view';
 import { OfficeLobby } from './OfficeLobby';
-import { OfficeScene, type RoomLabels } from './scene';
+import type { RoomLabels } from './scene';
 import '../office.css';
+
+function SceneLoading({ error }: { error?: Error | null }) {
+  // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
+  if (error) throw error;
+  return <div role='status' style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#202620', color: '#d8d8e0' }}>
+    Loading 3D office…
+  </div>;
+}
+const OfficeScene = dynamic(() => import('./scene').then(module => module.OfficeScene), {
+  ssr: false,
+  loading: SceneLoading,
+});
 
 function planLeft(position: readonly number[]) { return `${50 + position[0]! / 16 * 100}%`; }
 function planTop(position: readonly number[]) { return `${50 + position[1]! / 11 * 100}%`; }
@@ -96,7 +109,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const [motions] = useState(() => new MotionRegistry());
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
-  useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) invalidate(); }, [motions, snapshot.agents, recorded]);
+  useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
   const labels: RoomLabels = { lobby: useRef(null), collections: useRef(null), payables: useRef(null), vendor_onboarding: useRef(null), dana: useRef(null), treasury: useRef(null) };
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
