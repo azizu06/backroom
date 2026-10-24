@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { AskWhyVoiceResult } from '../lib/why-voice/types';
 
-/** Unmounted: the wall/office owns placement and optional citation selection. */
-export function AskWhyVoice({ onAnswer }: { onAnswer?: (answer: AskWhyVoiceResult) => void }) {
+/** The wall/office owns placement and optional citation selection. */
+export function AskWhyVoice({ onAnswer, label = 'Ask why' }: { onAnswer?: (answer: AskWhyVoiceResult) => void; label?: string }) {
   const [phase, setPhase] = useState<'idle' | 'arming' | 'recording' | 'thinking'>('idle');
   const [question, setQuestion] = useState('');
   const [result, setResult] = useState<AskWhyVoiceResult>();
@@ -126,7 +126,7 @@ export function AskWhyVoice({ onAnswer }: { onAnswer?: (answer: AskWhyVoiceResul
   function keyUp(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); release(); }
   }
-  return <section aria-label="Ask why">
+  return <section aria-label={label}>
     <p>AI answers from the audit log. Voice audio is sent to Cartesia.</p>
     <button type="button" disabled={phase === 'thinking'} aria-pressed={phase === 'recording'}
       style={{ touchAction: 'none' }}

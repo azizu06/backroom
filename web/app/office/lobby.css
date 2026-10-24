@@ -1,0 +1,28 @@
+/* Lobby audit wall + ask-why, constrained inside the office footer. */
+.office-shell:has(.office-lobby) { height: auto; min-height: 100dvh; }
+.office-shell:has(.office-lobby) .office-viewport { height: 58dvh; flex: none; }
+.office-lobby { margin-top: 12px; min-width: 0; }
+.office-lobby-title { font-size: 14px; margin: 4px 0 10px; }
+.office-lobby-title span { margin-left: 8px; color: #c6b28e; font-size: 11px; font-weight: 400; }
+.office-lobby-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
+.office-lobby-wall { flex: 1 1 420px; min-width: 0; }
+.office-lobby-ask { flex: 1 1 220px; min-width: 0; max-width: 100%; padding: 12px; border: 1px solid #4b5546; border-radius: 6px; background: #20261e; }
+.office-lobby-ask p { margin: 6px 0; color: #b8c1ac; overflow-wrap: anywhere; }
+.office-lobby-ask form { margin-top: 10px; display: grid; gap: 8px; }
+.office-lobby-ask label { display: grid; gap: 4px; }
+.office-lobby-ask input { font: inherit; width: 100%; padding: 7px 9px; border-radius: 4px; border: 1px solid #636e58; background: #1b2019; color: #edf0e7; }
+.office-lobby-ask [role=status] { display: block; min-height: 1em; color: #d9bd94; }
+.office-lobby-ask audio { width: 100%; }
+/* AuditWall is a full-page panel; shrink it to a scrollable card here. */
+.office-lobby .audit-wall { min-height: 0; max-height: min(80dvh, 900px); overflow: auto; padding: 14px; border: 1px solid #45454a; border-radius: 6px; font-size: 13px; }
+.office-lobby .audit-wall h1 { font-size: 18px; letter-spacing: -.01em; }
+.office-lobby .audit-wall h2 { font-size: 15px; }
+.office-lobby .audit-heading { flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.office-lobby .audit-workspace { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.office-lobby .audit-panel { padding: 14px; }
+.office-lobby .audit-records { max-height: 420px; overflow: auto; }
+.office-lobby .audit-wall pre { max-height: 200px; }
+.office-lobby .audit-facts > div { grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }
+.office-lobby .audit-unlock { margin: 12px 0; }
+.office-lobby .audit-wall button:not(.audit-entry) { color: #f2f2f7; background: #303035; border: 1px solid #676772; border-radius: 6px; padding: 8px 12px; min-height: 36px; }
+.office-lobby .audit-footer { margin-top: 12px; }
