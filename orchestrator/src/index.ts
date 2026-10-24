@@ -22,3 +22,5 @@ export { renderInvoiceDocument, type InvoiceAttachment } from './payables/docume
 // Public server adapters consumed by the trusted demo web host.
 export * from './collections';
 export { createCrsClientFromEnv, createCrsFixtureClient } from './integrations/crs/sandbox';
+export { x402Payables, X402_LABEL, X402_NETWORK, X402_USDC } from './x402';
+export type { X402Options } from './x402';

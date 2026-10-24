@@ -19,9 +19,10 @@ export interface ApprovedVendor {
 export interface PurchaseOrder { id: string; vendorId: string; amountCents: number; lineItems: LineItem[] }
 export interface SeatResult {
   status: 'paid' | 'held' | 'rejected' | 'awaiting_controller' | 'approved';
+  paymentRail?: 'nessie' | 'x402 testnet';
   decision: Decision; escalationId?: string; receiptId?: string; evidenceRefs: string[];
 }
-export interface InvoiceRecord { fields: InvoiceFields; policyInvoice: APInvoice; result: SeatResult; fingerprint: string; vendorRevision: number | null; paymentAttempted: boolean }
+export interface InvoiceRecord { source?: InboxSource; fields: InvoiceFields; policyInvoice: APInvoice; result: SeatResult; fingerprint: string; vendorRevision: number | null; paymentAttempted: boolean }
 export interface BankChange {
   id: string; fields: VendorFields; source: InboxSource; baselineRevision: number | null;
   verified: boolean; result: SeatResult;
@@ -56,7 +57,7 @@ export interface ControllerPort {
   request(decision: Extract<Decision, { kind: 'ESCALATE' }>, evidenceRefs: string[]): Promise<string>;
 }
 export interface SeatOptions {
-  repository: FinanceRepository; state: Pick<StateStore, 'appendAudit' | 'getEscalation' | 'expireEscalations'>;
+  repository: FinanceRepository; state: Pick<StateStore, 'appendAudit' | 'getEscalation' | 'expireEscalations'> & Partial<Pick<StateStore, 'getPolicy'>>;
   bankChangeRisk?: BankChangeRisk;
   controller: ControllerPort; now?: () => number;
 }
