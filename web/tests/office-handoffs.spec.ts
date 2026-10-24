@@ -66,6 +66,19 @@ test('reduced motion lists handoffs instead of animating them', async ({ page })
   await shot(page, 'reduced-log');
 });
 
+test('renders the first four handoffs from the mocked feed', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office?handoffs=mock&handoffSpeed=8');
+  await requireWebGL(page);
+  const entries = log(page).locator('li[data-status]');
+  // The first four fixture handoffs include the first five-role chain and arrive before later fixtures.
+  await expect(entries).toHaveCount(4, { timeout: 10_000 });
+  await expect(entries.nth(0)).toContainText('Intake → Extractor · INV-1042');
+  await expect(entries.nth(1)).toContainText('Collections → Auditor · INV-0977');
+  await expect(entries.nth(2)).toContainText('Intake → Extractor · INV-1043');
+  await expect(entries.nth(3)).toContainText('Extractor → Vendor verifier · INV-1043');
+});
+
 // --- Play helpers (same conventions as office-play.spec.ts) ---
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
