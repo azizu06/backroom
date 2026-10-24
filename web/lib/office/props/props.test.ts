@@ -103,11 +103,13 @@ describe('office prop interactions', () => {
   });
 
   it('hide the whiteboard without payables and the clock without lobby or collections', () => {
-    expect(propInteractions(snapshot({ rooms: undefined })).map(prop => prop.id)).toEqual(['whiteboard', 'clock']);
-    expect(propInteractions(withRooms()).map(prop => prop.id)).toEqual([]);
-    expect(propInteractions(withRooms('payables')).map(prop => prop.id)).toEqual(['whiteboard']);
-    expect(propInteractions(withRooms('lobby')).map(prop => prop.id)).toEqual(['clock']);
-    expect(propInteractions(withRooms('collections', 'treasury')).map(prop => prop.id)).toEqual(['clock']);
-    expect(propInteractions(withRooms('dana', 'treasury', 'vendor_onboarding')).map(prop => prop.id)).toEqual([]);
+    // Desk monitors are covered in monitors.test.ts.
+    const ids = (value: OfficeSnapshot) => propInteractions(value).map(prop => prop.id).filter(id => !id.startsWith('monitor:'));
+    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'clock']);
+    expect(ids(withRooms())).toEqual([]);
+    expect(ids(withRooms('payables'))).toEqual(['whiteboard']);
+    expect(ids(withRooms('lobby'))).toEqual(['clock']);
+    expect(ids(withRooms('collections', 'treasury'))).toEqual(['clock']);
+    expect(ids(withRooms('dana', 'treasury', 'vendor_onboarding'))).toEqual([]);
   });
 });
