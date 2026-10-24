@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `9a191ffd234c01281112e5d11ddc8b71abb5b547`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `1e05ee7faa9773ab47214b10ca7a33a1325a024e`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -30,6 +30,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | P04 dispatcher bank-change application (software passkey, fixture providers) | 1/1 (100%) |
 | P04 missing/denied/spoken approval guards | 3/3 (100%) |
 | C5 judge calls: unrecognized ends ESCALATE, tagged scenario_source judge | 6/6 (100%) |
+| P12 GX10 cut: same outcome with audited cloud_fallback (mock transport) | 10/10 (100%) |
 | Existing eval answer-key checks (partial execution permitted) | 34/34 (100%) |
 | Existing eval scenarios with no unexecuted integration step | 22/34 (64.71%) |
 
@@ -43,10 +44,11 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **extraction**: Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.
 - **providers**: Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.
 - **fraudDefinition**: Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.
-- **payablesDefinition**: Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 failover remains a legacy gap.
+- **payablesDefinition**: Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.
 - **recovery**: Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.
 - **arConversations**: Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.
 - **judgeCalls**: Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, paid_then_invented, opt_out. The opt-out control must not escalate.
+- **gx10Failover**: Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.
 - **badgeAttack**: Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.
 - **bankChange**: Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.
 - **falseHoldDefinition**: Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.
@@ -64,7 +66,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **P01**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P07**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P11**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
-- **P12**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
+- **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
 - **C05**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C08**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C09**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
