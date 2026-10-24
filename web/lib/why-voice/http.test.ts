@@ -21,7 +21,10 @@ function voice() {
 }
 
 describe('ask-why HTTP', () => {
-  beforeEach(() => vi.stubEnv('OPENROUTER_API_KEY', ''));
+  beforeEach(() => {
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+  });
   afterEach(() => vi.unstubAllEnvs());
   it('uses verified server entries and preserves cited text while models are OFF', async () => {
     const { handle, fetcher } = await setup();

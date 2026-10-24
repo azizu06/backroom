@@ -12,7 +12,7 @@ afterEach(() => vi.restoreAllMocks());
 it('refuses every local/cloud task while OFF without touching the network, then resumes', async () => {
   const store = new MemoryStateStore();
   const network = vi.fn<typeof fetch>(async () => completion());
-  const router = createRouter({ stateStore: store, fetch: network, cloudApiKey: 'test' });
+  const router = createRouter({ stateStore: store, fetch: network, cloudProvider: 'openrouter', cloudApiKey: 'test' });
   await store.setLlmEnabled(false);
   for (const task of Object.keys(TASK_ROUTES) as (keyof typeof TASK_ROUTES)[]) {
     expect(await router.route(task, {})).toMatchObject({ kind: 'LLM_OFF', route: 'code', costUsd: 0 });
@@ -31,7 +31,7 @@ it('aborts an in-flight local call and suppresses cloud fallback and stale outpu
     requestSignal = init?.signal as AbortSignal;
     return new Promise(resolve => { finish = resolve; }); // provider may ignore abort
   });
-  const router = createRouter({ stateStore: store, fetch: network, cloudApiKey: 'test' });
+  const router = createRouter({ stateStore: store, fetch: network, cloudProvider: 'openrouter', cloudApiKey: 'test' });
   const pending = router.route('field_extraction', {});
   await store.setLlmEnabled(false);
   expect(requestSignal?.aborted).toBe(true);

@@ -3,13 +3,14 @@ import { MemoryStateStore } from '../store';
 import { controllerForLease } from '../payables';
 import { ControllerApprovals, type ControllerDecision } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
+import { createBankChangeRiskCheck, type BankChangeRisk } from './crs';
 import { VendorSeat } from './index';
 
 import { createNorthfieldRepository, northfieldChange, northfieldInvoice, northfieldVendor } from '../payables/northfield';
 
 const vendor = northfieldVendor('cedar');
 const { fields: change, source } = northfieldChange('bc-legitimate');
-async function setup() {
+async function setup(bankChangeRisk?: BankChangeRisk) {
   let now = 1000;
   const state = new MemoryStateStore();
   const approvals = new ControllerApprovals(state, { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'test-enrollment' }, () => now);
@@ -21,7 +22,7 @@ async function setup() {
     return approvals.decide(id, challenge.challengeId, auth.assertion(challenge.options.challenge));
   };
   await state.registerAgent('vendor-seat', 'vendor_onboarding', 1000);
-  await state.enqueueTask({ id: 'task-1', seatId: 'vendor_onboarding', refs: [source.id], steps: [] });
+  await state.enqueueTask({ id: 'task-1', seatId: 'vendor_onboarding', refs: [source.id, 'resent-invoice-4480'], steps: [] });
   const lease = (await state.claimTask('vendor-seat', 1000, 12000))!;
   const checks = {
     business: vi.fn(async () => ({ verified: true, evidenceRef: 'crs-business-1' })),
@@ -29,7 +30,7 @@ async function setup() {
     footprint: vi.fn(async () => ({ websiteReachable: true, listingOperating: true, domain: vendor.domain, evidenceRef: 'apify-1' })),
   };
   const repository = await createNorthfieldRepository();
-  const seat = new VendorSeat({ state, repository, checks, controller: controllerForLease(state, lease, () => now), now: () => now });
+  const seat = new VendorSeat({ bankChangeRisk, state, repository, checks, controller: controllerForLease(state, lease, () => now), now: () => now });
   return { seat, state, repository, checks, decide, advance: (ms: number) => { now += ms; } };
 }
 describe('Vendor verification and controller gate', () => {
@@ -138,4 +139,52 @@ it.each(['Counter', 'timeout'] as const)('holds the bank change on the shared co
   expect((await seat.apply(source.id)).status).toBe('held');
   expect((await state.getEscalation(proposal.escalationId!))?.status).toBe(outcome === 'Counter' ? 'counter' : 'pending_owner');
   expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
+});
+
+it('recognizes the applied bank account on a resent inbox message without reopening approval', async () => {
+  const { seat, repository, decide, state, checks } = await setup();
+  const proposal = await seat.propose(change, source);
+  // A different source ID before approval is still a hold, never a no-op approval.
+  expect((await repository.getVendor(vendor.id))?.accountId).not.toBe(change.bankAccountId);
+  await decide(proposal.escalationId!);
+  await seat.apply(source.id);
+  const priorChecks = checks.business.mock.calls.length;
+  const result = await seat.propose(change, { ...source, id: 'resent-invoice-4480' });
+  expect(result.status).toBe('approved');
+  expect(result.decision.kind).toBe('ALLOW');
+  expect(await repository.hasPendingBankChange(vendor.id)).toBe(false);
+  expect((await repository.getVendor(vendor.id))?.revision).toBe(2);
+  expect(checks.business).toHaveBeenCalledTimes(priorChecks);
+  expect((await state.listAudit()).at(-1)?.action).toBe('bank_change_already_applied');
+});
+
+it.each(['sender', 'field-domain', 'pending', 'sanctioned'] as const)('does not recognize an applied account as approved when %s evidence differs', async mismatch => {
+  const { seat, repository, decide } = await setup();
+  const proposal = await seat.propose(change, source);
+  await decide(proposal.escalationId!); await seat.apply(source.id);
+  const current = (await repository.getVendor(vendor.id))!;
+  if (mismatch === 'pending') await repository.saveVendor({ ...current, pendingBankChange: true });
+  if (mismatch === 'sanctioned') await repository.saveVendor({ ...current, ofacHit: true });
+  const fields = mismatch === 'field-domain' ? { ...change, domain: 'cedarfre1ght.example' } : change;
+  const envelope = { ...source, id: 'resent-invoice-4480', ...(mismatch === 'sender' && { senderDomain: 'cedarfre1ght.example' }) };
+  expect((await seat.propose(fields, envelope)).decision.kind).not.toBe('ALLOW');
+  expect((await repository.getVendor(vendor.id))?.revision).toBe(2);
+});
+
+// Acceptance: P13 high risk cannot install bank details, even after genuine passkey approval.
+it('holds CRS P13 risk 88 and cannot apply it with a passkey', async () => {
+  const http = vi.fn<typeof fetch>(async url => Response.json(String(url).endsWith('/users/login')
+    ? { token: 'test-token' } : { risk: { score: 88 }, privateEmail: 'must-not-escape' }));
+  const risk = createBankChangeRiskCheck({ env: { VENDOR_CRS: 'live', CRS_USERNAME: 'test', CRS_PASSWORD: 'test' },
+    fetch: http, identityForVendor: id => id === vendor.id ? 13 : undefined });
+  const { seat, state, repository, decide } = await setup(risk);
+  const result = await seat.propose(change, source);
+  expect(result).toMatchObject({ status: 'held', decision: { ruleIds: ['FRAUD_RISK_HOLD'], quote: { sentenceId: 'NF-028' } } });
+  expect((await repository.getBankChange(source.id))?.verified).toBe(false);
+  await decide(result.escalationId!);
+  expect((await seat.apply(source.id)).status).toBe('held');
+  expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
+  const audit = await state.listAudit();
+  expect(audit.find(row => row.action === 'bank_change_fraud_check')?.inputs).toMatchObject({ label: 'CRS sandbox: test identity #13', fraudRiskScore: 88, responseHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
+  expect(JSON.stringify(audit)).not.toContain('must-not-escape');
 });

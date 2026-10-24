@@ -13,19 +13,22 @@ export interface PreCallInput {
 }
 export interface PublicCompany { name: string; website: string; phone?: string }
 export interface CreditEvidence {
-  product: 'businessCredit' | 'ofac';
+  product: 'businessCredit' | 'ofac' | 'publicRecords';
   checkedAt: string;
   responseHash: string;
   creditScore?: number;
+  bankruptcies?: number;
 }
 export interface CreditResult {
   testIdentityId: number;
   ofacStatus: 'clear' | 'hit' | 'unknown';
+  bankruptcy?: boolean;
+  ofacAvailability?: 'not available in sandbox';
   /** Owner-configured signal names; no model determines these. */
   activeSignals: readonly string[];
   evidence: readonly CreditEvidence[];
 }
-export interface CreditCheck { check(testIdentityId: number): Promise<CreditResult> }
+export interface CreditCheck { label?: string; check(testIdentityId: number): Promise<CreditResult> }
 interface HealthEvidence { sourceUrl: string; observedAt: string }
 export type HealthSignal = HealthEvidence & (
   | { type: 'maps_status'; value: 'operating' | 'permanently_closed' | 'temporarily_closed' | 'unknown' }
