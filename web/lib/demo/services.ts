@@ -4,11 +4,15 @@ import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHeal
   northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, recordSignals, signalsFromCrs, signalsFromHealth,
   type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
+import type { PrecallEvidence } from '../calls/precall';
 
-const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
+const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services']; backroomDemoPrecall?: () => PrecallEvidence };
 /** Safe server-only observation for the real-vs-sim route; never initiates a probe. */
 export const getDemoHostServices = () => root.backroomDemoServiceStatus?.() ?? null;
 export function installDemoServiceStatus(read: () => DemoStatus['services']) { root.backroomDemoServiceStatus = read; }
+/** The desk phone's pre-call card source: evidence already fetched by prepare(). Never starts a check. */
+export const getDemoPrecallEvidence = () => root.backroomDemoPrecall?.() ?? null;
+export function installDemoPrecallEvidence(read: () => PrecallEvidence) { root.backroomDemoPrecall = read; }
 
 /** Adapters belong to the web host, survive company resets, and never serialize credentials. */
 export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; modelRoute?: typeof route } = {}) {
@@ -69,7 +73,11 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       ...(preCall.status === 'ready' ? { signals: preCall.signals } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
       nessie: { mode: live ? 'sandbox' : 'mock' }, apify: { ...apify },
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
-  return { bank, accountId, status,
+  // The same Apify rows prepare() records, rebuilt from its cached evidence.
+  const precall = (): PrecallEvidence => ({ preCall: { ...status().services.preCall,
+    ...(preCall?.status === 'ready' && 'warnings' in preCall ? { warnings: preCall.warnings } : {}) },
+    signals: evidence.health ? signalsFromHealth('1042', evidence.health, healthCheck.label ?? 'provided') : [] });
+  return { bank, accountId, status, precall,
     async prepare(state: StateStore) {
       if (!live) return;
       await prepare();

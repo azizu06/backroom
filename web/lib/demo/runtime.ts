@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { MemoryStateStore, SpacetimeStateStore, SpacetimeTransport, type SpacetimeOptions, installStateStore, getStateStore, SeatWorker, FakeEffects,
   northfield, createNorthfieldRepository, PaymentService, mirrorBankFeed, type Seat, type InvoiceState } from '@backroom/orchestrator';
 import { installInboxAgents, resetInboxAgents } from './agents';
-import { createDemoServices, installDemoServiceStatus } from './services';
+import { createDemoServices, installDemoPrecallEvidence, installDemoServiceStatus } from './services';
 import { createGateway } from '../gateway/http';
 import { installGatewayStore } from '../gateway/runtime';
 import { MemoryGatewayStore, type GatewayCall } from '../gateway/store';
@@ -16,6 +16,7 @@ import type { DemoStatus } from '../../../tools/demo/health';
 export async function createDemoRuntime() {
   let services = await createDemoServices();
   installDemoServiceStatus(() => services.status().services);
+  installDemoPrecallEvidence(() => services.precall());
   const mode = process.env.STATE_STORE === 'spacetime' ? 'spacetime' : 'memory';
   let config: SpacetimeOptions = { uri: process.env.SPACETIMEDB_URI || '', database: process.env.SPACETIMEDB_DATABASE || '', token: process.env.SPACETIMEDB_TOKEN || '' };
   let abort = new AbortController();
