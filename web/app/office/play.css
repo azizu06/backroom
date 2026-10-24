@@ -3,7 +3,7 @@
 .play-hud > * { pointer-events: auto; }
 .play-surface { position: absolute; inset: 0; cursor: crosshair; outline: none; touch-action: none; }
 .play-surface:focus-visible { box-shadow: inset 0 0 0 2px #f3dfb9; }
-.play-hud > .play-crosshair, .play-hud > .play-prompt, .play-hud > .play-touch-hint { pointer-events: none; }
+.play-hud > .play-crosshair, .play-hud > .play-prompt { pointer-events: none; }
 .play-crosshair { position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%); }
 .play-crosshair::before, .play-crosshair::after { content: ''; position: absolute; background: #f3dfb9e6; box-shadow: 0 0 2px #000a; }
 .play-crosshair::before { left: 9px; top: 0; width: 2px; height: 20px; }
@@ -11,7 +11,6 @@
 .play-prompt { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); margin: 0; padding: 5px 10px; background: #30382df2; border: 1px solid #839175; font-size: 13px; font-weight: 600; white-space: nowrap; color: #f3dfb9; }
 .play-prompt:empty { padding: 0; border: 0; }
 .office-shell .play-exit { position: absolute; top: 12px; right: 18px; padding: 6px 12px; background: #30382df2; border: 1px solid #839175; font-weight: 600; }
-.play-touch-hint { position: absolute; top: 12px; left: 16px; margin: 0; font-size: 11px; color: #c3ccb8; }
 .play-joystick { position: absolute; left: 20px; bottom: 44px; width: 112px; height: 112px; border-radius: 50%; background: #30382d99; border: 1px solid #839175; touch-action: none; display: grid; place-items: center; }
 .play-joystick span { width: 44px; height: 44px; border-radius: 50%; background: #c3ccb8cc; pointer-events: none; }
 .office-shell .play-interact { position: absolute; right: 20px; bottom: 56px; padding: 14px 20px; background: #3c4d47; border: 1px solid #c3b68e; font-weight: 700; }

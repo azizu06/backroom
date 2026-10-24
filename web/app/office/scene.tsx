@@ -13,6 +13,7 @@ import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 import { ServerRoom } from './rooms/ServerRoom';
+import { OfficeProps } from './props/OfficeProps';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -278,6 +279,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     </Fragment>)}
     </Instances>
     <ServerRoom position={[SERVER_ROOM.position[0], 0, SERVER_ROOM.position[1]]} />
+    <OfficeProps snapshot={snapshot} />
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
