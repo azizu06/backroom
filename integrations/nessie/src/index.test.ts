@@ -86,3 +86,27 @@ it('seeds Northfield once and reads the same customer and checking account on re
   expect(await seedNorthfield(client, new FileClaims(dir))).toEqual(first);
   expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2);
 });
+it('labels a display total derived only from API balance and completed balance deposits', async () => {
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ balance: 10 }))
+    .mockResolvedValueOnce(Response.json([
+      { _id: 'd1', amount: 2, status: 'completed', medium: 'balance' },
+      { _id: 'd2', amount: 99, status: 'pending', medium: 'balance' },
+      { _id: 'd3', amount: 88, status: 'cancelled', medium: 'balance' },
+      { _id: 'd4', amount: 77, status: 'completed', medium: 'rewards' },
+    ]));
+  const { client } = await setup(fetcher);
+  expect(await client.readBalanceWithPostedDeposits('a1')).toEqual({
+    label: 'Nessie account balance + Nessie-reported posted deposits',
+    sandboxLabel: 'Nessie = sandbox bank', accountBalance: 10, postedDepositsTotal: 2,
+    displayTotal: 12, postedDepositIds: ['d1'],
+  });
+});
+it.each([
+  [{ _id: 'd1', amount: 2, status: 'completed', medium: 'balance' }, { _id: 'd1', amount: 2, status: 'completed', medium: 'balance' }],
+  [{ _id: 'd1', amount: -1, status: 'completed', medium: 'balance' }],
+])('refuses an unsafe API-derived display for duplicate IDs or invalid amounts', async (...rows) => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ balance: 0 })).mockResolvedValueOnce(Response.json(rows));
+  const { client } = await setup(fetcher);
+  await expect(client.readBalanceWithPostedDeposits('a1')).rejects.toThrow('invalid posted deposit');
+});

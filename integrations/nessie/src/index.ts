@@ -3,6 +3,11 @@ import { mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const SANDBOX_LABEL = 'Nessie = sandbox bank';
+export const POSTED_DEPOSITS_LABEL = 'Nessie account balance + Nessie-reported posted deposits';
+export interface PostedDepositsDisplay {
+  label: typeof POSTED_DEPOSITS_LABEL; sandboxLabel: typeof SANDBOX_LABEL;
+  accountBalance: number; postedDepositsTotal: number; displayTotal: number; postedDepositIds: string[];
+}
 export interface CustomerInput {
   first_name: string; last_name: string;
   address: { street_number: string; street_name: string; city: string; state: string; zip: string };
@@ -91,6 +96,26 @@ export class NessieClient {
   getAccount(id: string) { return this.request<Account>('GET', `/accounts/${segment(id)}`); }
   createAccount(customerId: string, input: AccountInput) { return this.create<Account>(`/customers/${segment(customerId)}/accounts`, input); }
   async readBalance(accountId: string): Promise<number> { return (await this.getAccount(accountId)).balance; }
+  /** Explicit sandbox display formula, NOT the bank's balance or a settlement signal.
+   * Enable only while the hosted sandbox demonstrably leaves deposits out of account.balance.
+   */
+  async readBalanceWithPostedDeposits(accountId: string): Promise<PostedDepositsDisplay> {
+    const [accountBalance, deposits] = await Promise.all([this.readBalance(accountId), this.listDeposits(accountId)]);
+    if (!Number.isSafeInteger(accountBalance) || accountBalance < 0) throw new NessieError('invalid account balance');
+    const ids = new Set<string>();
+    let postedDepositsTotal = 0;
+    for (const deposit of deposits) {
+      if (deposit.status !== 'completed' || deposit.medium !== 'balance') continue;
+      if (!deposit._id || ids.has(deposit._id) || !Number.isSafeInteger(deposit.amount) || deposit.amount <= 0) {
+        throw new NessieError('invalid posted deposit: duplicate ID or amount');
+      }
+      ids.add(deposit._id); postedDepositsTotal += deposit.amount;
+    }
+    const displayTotal = accountBalance + postedDepositsTotal;
+    if (!Number.isSafeInteger(displayTotal)) throw new NessieError('invalid posted deposit total');
+    return { label: POSTED_DEPOSITS_LABEL, sandboxLabel: SANDBOX_LABEL, accountBalance, postedDepositsTotal,
+      displayTotal, postedDepositIds: [...ids] };
+  }
   listDeposits(accountId: string) { return this.request<Transaction[]>('GET', `/accounts/${segment(accountId)}/deposits`); }
   /** Bank feed: each collection remains tagged; no fictional aggregate /transactions endpoint. */
   async listTransactions(accountId: string) {

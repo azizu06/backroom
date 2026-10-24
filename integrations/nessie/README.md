@@ -21,7 +21,7 @@ const feed = await bank.listTransactions(account._id);
 ```
 
 Exports: `NessieClient`, `FileClaims`, `Claims`, `NessieError`, `seedNorthfield`,
-`paymentMemo`, `SANDBOX_LABEL`, and typed customer/account/payment/transaction
+`paymentMemo`, `SANDBOX_LABEL`, `POSTED_DEPOSITS_LABEL`, `PostedDepositsDisplay`, and typed customer/account/payment/transaction
 inputs and results. Customer/account create/get/list methods are available.
 `readBalance` returns the provider's balance in dollars; `amountCents` is integer
 cents and converts at the boundary. **The current API truncates fractional dollar
@@ -29,7 +29,8 @@ amounts, so the client rejects cents not divisible by 100 before any request.**
 Never silently round a permitted plan amount.
 
 **T4 FAIL:** deposits persist but the current hosted API does not increase the
-account balance. See [live evidence](../../docs/t4-nessie.md). Returning a deposit
+account balance. See [live evidence](../../docs/t4-nessie.md). A pending→completed transition also left balance at zero; see the follow-up
+status/purchase/transfer probes in the evidence. Returning a deposit
 is a receipt, not evidence of settlement. M7 must keep the invoice unresolved and
 surface an exception if the bank balance does not reflect the amount. This package
 does not fabricate a balance or implement a mock bank. Display `SANDBOX_LABEL`
@@ -53,6 +54,14 @@ claim reserved until an operator reconciles it. Claims never expire automaticall
 Raw `createCustomer`/`createAccount` methods do not promise idempotency; use
 `seedNorthfield` for the seed workflow.
 
+`readBalanceWithPostedDeposits(accountId)` is an explicitly selected sandbox display:
+“Nessie account balance + Nessie-reported posted deposits”. It returns `accountBalance`,
+`postedDepositsTotal`, `displayTotal`, and `postedDepositIds`, all from API reads.
+Only `completed` deposits with medium `balance` count; duplicate IDs/invalid amounts
+raise an exception. This is not available funds or settlement; it excludes withdrawals
+and would double-count if the sandbox begins updating its balance. `readBalance`
+continues to return the provider field verbatim.
+
 `listTransactions` combines tagged deposits and withdrawals, the supported feed
 routes. It intentionally excludes transfers: GET /accounts/<id>/transfers returned
 404 on the current host despite older SDK documentation. Provider IDs are UUIDs
@@ -64,8 +73,10 @@ on this host, despite the OpenAPI's 24-character examples.
 pnpm --filter @backroom/nessie test
 pnpm --filter @backroom/nessie typecheck
 # Only opt-in live script; loads root .env.local without printing it.
-# Seeds Northfield, reuses a fixed invoice/installment reference, writes redacted evidence.
+# Seeds Northfield, reuses a fixed invoice/installment reference, writes redacted evidence under ignored .nessie-state/.
 pnpm --filter @backroom/nessie live -- --confirm-sandbox
+# Optional diagnostic variants: one-time mutation claims; reads on replay.
+pnpm --filter @backroom/nessie live -- --confirm-sandbox --probe-variants
 ```
 
 The live command returns nonzero when T4 fails. Repeated runs reuse the same
