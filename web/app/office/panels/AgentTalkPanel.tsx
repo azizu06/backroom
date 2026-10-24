@@ -27,7 +27,8 @@ function SpeechBubble({ talk, line }: { talk: AgentTalk; line: TalkLine }) {
 }
 
 function Said({ line }: { line: TalkLine }) {
-  return <><HandoffText text={line.text} />{line.ruleIds.length > 0 && <> <span className='agent-talk-rules'>{line.ruleIds.join(', ')}</span></>}</>;
+  return <><HandoffText text={line.text} />{line.ruleIds.length > 0 && <> <span className='agent-talk-rules'>{line.ruleIds.join(', ')}</span></>}
+    {line.receiptIds.length > 0 && <> <span className='agent-talk-receipt'>Receipt <code>{line.receiptIds.join(', ')}</code></span></>}</>;
 }
 
 function AgentTalkBody({ panel, askWhy }: { panel: PlayPanel; askWhy?: (question?: string) => void }) {

@@ -43,6 +43,8 @@
 .play-panel .agent-talk-recent li { margin-bottom: 4px; }
 .play-panel .agent-talk-recent li[data-tone='fail'], .play-panel .agent-talk-reply[data-tone='fail'] { color: #ff9c8f; }
 .play-panel .agent-talk-recent li[data-tone='correction'] { color: #f3bf65; }
+.play-panel .agent-talk-receipt { font-size: 11px; color: #c9d1bd; }
+.play-panel .agent-talk-receipt code { font-family: ui-monospace, monospace; }
 .play-panel .agent-talk-rules { font-family: ui-monospace, monospace; font-size: 11px; color: #f3dfb9; }
 .play-panel .agent-talk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .play-panel .agent-talk-chips button {

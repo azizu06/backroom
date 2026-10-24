@@ -14,7 +14,14 @@ export const TALK_CHIPS: readonly { readonly id: TalkChip; readonly label: strin
 ];
 /** Same tones as the handoff speech bubbles (handoffs.css). */
 export type TalkTone = 'info' | 'fail' | 'passkey' | 'correction';
-export interface TalkLine { readonly id: string; readonly text: string; readonly ruleIds: readonly string[]; readonly tone: TalkTone }
+export interface TalkLine {
+  readonly id: string;
+  readonly text: string;
+  readonly ruleIds: readonly string[];
+  readonly tone: TalkTone;
+  /** Public audit entry ids this line cites (never handoff or decision ids). */
+  readonly receiptIds: readonly string[];
+}
 export type TalkSpeakerTag = { readonly kind: 'agent'; readonly id: string } | { readonly kind: 'handoff'; readonly actor: string };
 export interface AgentTalk {
   readonly speaker: { readonly name: string; readonly role: string; readonly color: string; readonly tag: TalkSpeakerTag };
@@ -50,17 +57,17 @@ function sentence(text: string): string {
   return !trimmed || /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 const caseName = (row: Handoff) => row.caseDisplayId || 'a case';
-const line = (id: string, text: string, tone: TalkTone = 'info', ruleIds: readonly string[] = []): TalkLine => ({ id, text: sentence(text), ruleIds, tone });
+const line = (id: string, text: string, tone: TalkTone = 'info', ruleIds: readonly string[] = [], receiptIds: readonly string[] = []): TalkLine => ({ id, text: sentence(text), ruleIds, tone, receiptIds });
 const codes = (row: Handoff) => row.status === 'rejected' && row.errorCode ? [row.errorCode] : [];
 const waitingOnHuman = (row: Handoff) => row.status !== 'completed' && row.status !== 'rejected' && needsHandoffHuman(row);
 
 function auditLine(row: OfficeAudit, i: number): TalkLine {
   const id = `audit-${i}`;
   switch (row.decision) {
-    case 'DENY': return line(id, `I was refused: ${row.summary}`, 'fail', row.ruleIds);
-    case 'ESCALATE': return line(id, `I escalated: ${row.summary}`, 'passkey', row.ruleIds);
-    case 'ALLOW': return line(id, `I was cleared: ${row.summary}`, 'info', row.ruleIds);
-    default: return line(id, `On the record: ${row.summary}`, 'info', row.ruleIds);
+    case 'DENY': return line(id, `I was refused: ${row.summary}`, 'fail', row.ruleIds, [row.id]);
+    case 'ESCALATE': return line(id, `I escalated: ${row.summary}`, 'passkey', row.ruleIds, [row.id]);
+    case 'ALLOW': return line(id, `I was cleared: ${row.summary}`, 'info', row.ruleIds, [row.id]);
+    default: return line(id, `On the record: ${row.summary}`, 'info', row.ruleIds, [row.id]);
   }
 }
 
@@ -118,7 +125,10 @@ function working(desk: Desk): TalkLine {
     tone = handoffTone(row);
   }
   if (desk.escalation) tone = 'passkey';
-  if (!parts.length) parts.push(sentence(`My last receipt: ${desk.audit.at(-1)!.summary}`));
+  if (!parts.length) {
+    const last = desk.audit.at(-1)!;
+    return line('working', sentence(`My last receipt: ${last.summary}`), tone, [], [last.id]);
+  }
   return line('working', parts.join(' '), tone);
 }
 
@@ -128,10 +138,10 @@ function stopped(desk: Desk): TalkLine {
   if (desk.escalation) {
     const receipt = desk.audit.findLast(row => row.decision === 'ESCALATE');
     const where = `${anchorLabel(desk.escalation.anchor)} (${desk.escalation.id})`;
-    return receipt ? line('stopped', `I stopped to escalate: ${sentence(receipt.summary)} It's waiting at ${where}`, 'passkey', receipt.ruleIds)
+    return receipt ? line('stopped', `I stopped to escalate: ${sentence(receipt.summary)} It's waiting at ${where}`, 'passkey', receipt.ruleIds, [receipt.id])
       : line('stopped', `My folder is waiting at ${where}`, 'passkey');
   }
-  if (lastAudit?.decision === 'DENY') return line('stopped', `I was refused: ${lastAudit.summary}`, 'fail', lastAudit.ruleIds);
+  if (lastAudit?.decision === 'DENY') return line('stopped', `I was refused: ${lastAudit.summary}`, 'fail', lastAudit.ruleIds, [lastAudit.id]);
   const row = latest(desk);
   if (row) {
     const relation = desk.relation(row);
