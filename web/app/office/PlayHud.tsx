@@ -7,6 +7,7 @@ import { serverRoomReadout, type Gx10Status } from '../../lib/gx10/server-room';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import PaymentLinkPanel from '../../components/PaymentLinkPanel';
+import { DeskPhonePanel } from './props/DeskPhonePanel';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -104,11 +105,12 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
     </p>}
     {panel.kind === 'paylink' && <PaymentLinkPanel />}
     {panel.kind === 'server' && <ServerPanel />}
-    {panel.kind !== 'treasury' && panel.kind !== 'paylink' && panel.kind !== 'server' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
+    {panel.kind === 'phone' && <DeskPhonePanel />}
+    {panel.kind !== 'treasury' && panel.kind !== 'paylink' && panel.kind !== 'server' && panel.kind !== 'phone' && (panel.entries.length ? <ol className='play-panel-audit' aria-label='Audit entries'>{panel.entries.map(entry => <li key={entry.id} data-audit-id={entry.id}>
       <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br />
       <span>{entry.ruleIds.join(', ') || 'no rule ids'}</span> · <code>{entry.id}</code>
     </li>)}</ol> : <p>No audit entries yet.</p>)}
-    {panel.kind !== 'paylink' && panel.kind !== 'server' && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
+    {panel.kind !== 'paylink' && panel.kind !== 'server' && panel.kind !== 'phone' && <button className='play-panel-ask' onClick={askWhy}>Ask why</button>}
   </section>;
 }
 
