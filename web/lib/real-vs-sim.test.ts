@@ -38,9 +38,9 @@ describe('demo disclosure status', () => {
   });
 
   it('labels a fresh live probe with a UTC clock time and expires it after 120 s', () => {
-    const probe: Probe = { state: 'verified', source: 'live', evidence: 'GET /v1/models · 5 models', at: '2026-10-24T13:09:12.000Z' };
+    const probe: Probe = { state: 'verified', source: 'live', evidence: 'GET /models · 5 models', at: '2026-10-24T13:09:12.000Z' };
     expect(getDisclosureStatus(item('gx10'), withProbe('gx10', probe), NOW))
-      .toEqual({ label: 'Verified', tone: 'good', detail: 'GET /v1/models · 5 models · 13:09:12 UTC' });
+      .toEqual({ label: 'Verified', tone: 'good', detail: 'GET /models · 5 models · 13:09:12 UTC' });
     const later = NOW + 120_000;
     expect(getDisclosureStatus(item('gx10'), withProbe('gx10', probe, { measuredAt: iso(later) }), later).label).toBe('Unverified');
   });
@@ -93,6 +93,12 @@ describe('demo disclosure status', () => {
       expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Unverified', tone: 'neutral' });
     }
   });
+});
+
+it('shows Checking while the first server probe run is pending', () => {
+  for (const id of ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'] as const) {
+    expect(getDisclosureStatus(item(id), snapshot({ notProbed: [], services: {}, probesCheckedAt: null }), NOW)).toEqual({ label: 'Checking…', tone: 'neutral' });
+  }
 });
 
 describe('GX10 router health fallback without a probe entry', () => {

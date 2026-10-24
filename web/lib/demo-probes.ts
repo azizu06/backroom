@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { open, readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { ServiceId } from './real-vs-sim';
 
@@ -11,6 +11,8 @@ export type ProbeDeps = {
   fetch: typeof fetch;
   now: () => number;
   readText: (path: string) => Promise<string | null>;
+  /** Reads at most the last `bytes` of a file; falls back to readText when absent. */
+  readTail?: (path: string, bytes: number) => Promise<string | null>;
   listDir: (path: string) => Promise<string[]>;
   evidenceRoot: string | null;
   voiceEvidencePaths: string[];
@@ -19,8 +21,11 @@ export type DemoProbes = { checkedAt: string; services: Record<ServiceId, Servic
 
 export const PROBE_TIMEOUT_MS = 2000;
 export const PROBE_CACHE_TTL_MS = 45_000;
+/** A snapshot older than this is never served; the caller waits (bounded) for a fresh run instead. */
+export const PROBE_CACHE_MAX_AGE_MS = 2 * PROBE_CACHE_TTL_MS;
 export const RECEIPT_MAX_AGE_MS = 72 * 3600_000;
 const FIRST_RUN_WAIT_MS = 2500;
+const GX10_DEFAULT_BASE_URL = 'http://100.117.44.20:11434/v1';
 const FUTURE_SKEW_MS = 5 * 60_000;
 const VOICE_TAIL_BYTES = 64 * 1024;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -67,15 +72,16 @@ async function httpProbe(deps: ProbeDeps, url: string, accept: (response: Respon
 
 async function probeGx10(deps: ProbeDeps): Promise<ServiceProbe> {
   if (deps.env.GX10_ENABLED === 'false') return { state: 'disabled', source: 'config', evidence: 'Disabled by config', at: null };
-  const base = deps.env.GX10_BASE_URL?.trim().replace(/\/+$/, '');
-  if (!base) return unverified('Not configured', 'config');
+  // Same default as the model router (orchestrator/src/router/index.ts), so the panel probes what the router uses.
+  const base = (deps.env.GX10_BASE_URL?.trim() || GX10_DEFAULT_BASE_URL).replace(/\/+$/, '');
   return httpProbe(deps, `${base}/models`, async response => {
     const body: unknown = await response.json().catch(() => null);
-    return isObject(body) && Array.isArray(body.data) ? `GET /v1/models · ${body.data.length} models` : null;
+    return isObject(body) && Array.isArray(body.data) ? `GET /models · ${body.data.length} models` : null;
   });
 }
 
 async function probeClaude(deps: ProbeDeps): Promise<ServiceProbe> {
+  if ((deps.env.LLM_CLOUD_PROVIDER ?? 'anthropic') !== 'anthropic') return unverified('Cloud route is not direct Anthropic', 'config');
   if (!deps.env.ANTHROPIC_API_KEY?.trim()) return unverified('No cloud credential in this process', 'config');
   if (!deps.evidenceRoot) return unverified('No fresh route receipt');
   const dir = join(deps.evidenceRoot, 'anthropic');
@@ -138,7 +144,7 @@ async function probePolicy(deps: ProbeDeps): Promise<ServiceProbe> {
 async function probePhone(deps: ProbeDeps): Promise<ServiceProbe> {
   let best: { at: string; status: number } | null = null;
   for (const path of deps.voiceEvidencePaths) {
-    const text = await deps.readText(path);
+    const text = await (deps.readTail ? deps.readTail(path, VOICE_TAIL_BYTES) : deps.readText(path));
     if (!text) continue;
     for (const line of text.slice(-VOICE_TAIL_BYTES).split('\n')) {
       const entry = parseJson(line.trim() || null);
@@ -186,6 +192,24 @@ export async function probeServices(deps: ProbeDeps): Promise<Record<ServiceId, 
   })) as Record<ServiceId, ServiceProbe>;
 }
 
+/** Bounded read: never loads more than `bytes` of an append-only log, and drops a partial first line. */
+async function readTail(path: string, bytes: number): Promise<string | null> {
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    handle = await open(path, 'r');
+    const { size } = await handle.stat();
+    const start = Math.max(0, size - bytes);
+    const buffer = Buffer.alloc(size - start);
+    await handle.read(buffer, 0, buffer.length, start);
+    const text = buffer.toString('utf8');
+    return start > 0 ? text.slice(text.indexOf('\n') + 1) : text;
+  } catch {
+    return null;
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
 function findEvidenceRoot(start: string) {
   let dir = start;
   for (let level = 0; level < 4; level += 1) {
@@ -213,6 +237,7 @@ function resolveDeps(overrides: Partial<ProbeDeps>): ProbeDeps {
     fetch: overrides.fetch ?? ((input, init) => globalThis.fetch(input, init)),
     now: overrides.now ?? Date.now,
     readText: overrides.readText ?? (path => readFile(path, 'utf8').catch(() => null)),
+    readTail: overrides.readTail ?? (overrides.readText ? undefined : readTail),
     listDir: overrides.listDir ?? (path => readdir(path).catch(() => [])),
     evidenceRoot,
     voiceEvidencePaths,
@@ -243,8 +268,9 @@ export async function getDemoProbes(overrides: Partial<ProbeDeps> = {}): Promise
   try {
     const deps = resolveDeps(overrides);
     if (cache) {
-      if (deps.now() - cache.at > PROBE_CACHE_TTL_MS) void refresh(deps);
-      return cache.value;
+      const age = deps.now() - cache.at;
+      if (age <= PROBE_CACHE_TTL_MS) return cache.value;
+      if (age <= PROBE_CACHE_MAX_AGE_MS) { void refresh(deps); return cache.value; }
     }
     const pending = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), FIRST_RUN_WAIT_MS); });
     return await Promise.race([refresh(deps), pending]);

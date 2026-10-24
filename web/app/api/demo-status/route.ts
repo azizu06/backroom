@@ -27,7 +27,8 @@ export async function GET() {
   const status: DemoStatus = {
     measuredAt: new Date().toISOString(),
     llmEnabled: getStateStore().llmEnabled,
-    notProbed: probedServices.filter(id => !services[id]),
+    // Null snapshot = first probe run still pending: the client shows Checking, not "Not probed".
+    notProbed: snapshot ? probedServices.filter(id => !services[id]) : [],
     gx10: health ? {
       localEnabled: health.localEnabled,
       localAvailable: health.localAvailable,

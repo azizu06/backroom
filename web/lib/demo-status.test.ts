@@ -30,7 +30,7 @@ it('reads OFF with no network requests and no secret or control exposure', async
   const response = await GET();
   expect(response.headers.get('Cache-Control')).toBe('no-store');
   const body = await response.json();
-  expect(body).toEqual({ measuredAt: expect.any(String), llmEnabled: false, notProbed: realIds, gx10: null, probesCheckedAt: null, services: {} });
+  expect(body).toEqual({ measuredAt: expect.any(String), llmEnabled: false, notProbed: [], gx10: null, probesCheckedAt: null, services: {} });
   expect(JSON.stringify(body)).not.toMatch(/https?:|key|token|secret|password/i);
   expect(fetch).not.toHaveBeenCalled();
   expect(readServiceStatus).toHaveBeenCalled();
@@ -58,13 +58,13 @@ it('allowlists probe fields and drops malformed entries so no secrets leak', asy
   runtime.probes = {
     checkedAt: at,
     services: {
-      gx10: { state: 'verified', source: 'live', evidence: 'GET /v1/models · 2 models', at, url: 'http://100.0.0.1:11434/v1', apiKey: 'sk-private' },
+      gx10: { state: 'verified', source: 'live', evidence: 'GET /models · 2 models', at, url: 'http://100.0.0.1:11434/v1', apiKey: 'sk-private' },
       claude: { state: 'online', source: 'live', evidence: 'bogus', at },
       unknown: { state: 'verified', source: 'live', evidence: 'x', at },
     },
   };
   const body = await (await GET()).json();
-  expect(body.services).toEqual({ gx10: { state: 'verified', source: 'live', evidence: 'GET /v1/models · 2 models', at } });
+  expect(body.services).toEqual({ gx10: { state: 'verified', source: 'live', evidence: 'GET /models · 2 models', at } });
   expect(body.notProbed).toContain('claude');
   expect(body.notProbed).not.toContain('gx10');
   expect(JSON.stringify(body)).not.toMatch(/https?:|key|token|secret|password|sk-private|100\.0\.0\.1/i);
