@@ -1,9 +1,10 @@
 'use client';
 
-import { Component, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useId, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
+import { isCloseKey, roomLabel, seatLabel } from '../../lib/office/a11y';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
@@ -11,6 +12,7 @@ import { INITIAL_VIEWPORT, boundaryStateForProps, reportViewFailure, viewportLay
 import { OfficeLobby } from './OfficeLobby';
 import type { RoomLabels } from './scene';
 import '../office.css';
+import './a11y.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -47,15 +49,15 @@ function PlanAgent({ agent, motion, recorded }: { agent: OfficeAgent; motion: Wa
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
   }, [motion, recorded]);
-  return <div ref={marker} className='plan-agent' data-escalating={!!agent.escalationId}
+  return <div ref={marker} className='plan-agent' role='img' aria-label={seatLabel(agent)} data-escalating={!!agent.escalationId}
     style={{ left: planLeft(motion.position), top: planTop(motion.position) }}>
-    {agent.escalationId && <span aria-label='Escalation folder'>▱ </span>}{agent.name}
+    {agent.escalationId && <span aria-hidden='true'>▱ </span>}{agent.name}
   </div>;
 }
-function FloorPlan({ snapshot, motions, select }: { snapshot: OfficeSnapshot; motions: MotionRegistry; select: (room: AnchorId) => void }) {
+function FloorPlan({ snapshot, motions, select }: { snapshot: OfficeSnapshot; motions: MotionRegistry; select: (room: AnchorId, opener: HTMLButtonElement) => void }) {
   return <div className='floor-plan' aria-label='2D office floor plan'>
-    <div className='plan-aisle' />
-    {visibleRooms(snapshot).map(room => <button key={room} className='plan-room' onClick={() => select(room)}
+    <div className='plan-aisle' aria-hidden='true' />
+    {visibleRooms(snapshot).map(room => <button key={room} className='plan-room' aria-label={roomLabel(room, snapshot)} onClick={event => select(room, event.currentTarget)}
       style={{ left: `${50 + OFFICE_ANCHORS[room].center[0] / 16 * 100}%`, top: `${50 + OFFICE_ANCHORS[room].center[1] / 11 * 100}%` }}>
       {OFFICE_ANCHORS[room].name}{room === 'treasury' && ' · Locked'}
       {matchingDenial(snapshot, room) && <span className='denial-text' data-denial-audit={matchingDenial(snapshot, room)!.auditId}>Entry denied</span>}
@@ -78,10 +80,15 @@ function valueText(value: unknown): string {
 function RoomInspector({ room, snapshot, close, inboxTray }: {
   room: AnchorId; snapshot: OfficeSnapshot; close: () => void; inboxTray?: ReactNode;
 }) {
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const headingId = useId();
+  useEffect(() => { closeButton.current?.focus(); }, [room]);
   const badge = snapshot.badges.find(row => row.seatId === room);
   const denial = matchingDenial(snapshot, room);
-  return <section className='room-inspector' aria-label={`${OFFICE_ANCHORS[room].name} details`}>
-    <header><h2>{OFFICE_ANCHORS[room].name}</h2><button onClick={close} aria-label='Close room details'>×</button></header>
+  return <section className='room-inspector' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+    if (isCloseKey(event.key)) { event.preventDefault(); close(); }
+  }}>
+    <header><h2 id={headingId}>{OFFICE_ANCHORS[room].name}</h2><button ref={closeButton} onClick={close} aria-label={`Close ${OFFICE_ANCHORS[room].name} details`}>×</button></header>
     {badge ? <>
       <p>Policy version {badge.policyVersion}</p>
       <dl>{Object.entries(badge.limits).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{valueText(value)}</dd></div>)}</dl>
@@ -117,7 +124,16 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
   }, []);
-  function inspect(room: AnchorId) { setInspecting(room); setFocus(room); }
+  const inspectorOpener = useRef<HTMLElement | null>(null);
+  const closeInspector = useCallback(() => {
+    setInspecting(null);
+    inspectorOpener.current?.focus();
+  }, []);
+  function inspect(room: AnchorId, opener: HTMLButtonElement) {
+    inspectorOpener.current = opener;
+    setInspecting(room);
+    setFocus(room);
+  }
   const plan = mode === 'plan' || lostContext;
   return <section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection}>
     <header className='office-toolbar'>
@@ -127,7 +143,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
-        <label>View <select aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
+        <label htmlFor='office-view'>View <select id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
           <option value='walk'>Orbit camera</option><option value='tween'>Fixed camera</option><option value='plan'>Floor plan</option>
         </select></label>
       </div>
@@ -137,6 +153,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
     </nav>
     <div className='office-viewport' data-testid='office-viewport'>
+      <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
@@ -147,20 +164,20 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
-              <button className='desk-label' onClick={() => inspect(room)} aria-label={badge ? `${OFFICE_ANCHORS[room].name} badge limits` : `${OFFICE_ANCHORS[room].name} details`}>
+              <button className='desk-label' onClick={event => inspect(room, event.currentTarget)} aria-label={roomLabel(room, snapshot)}>
                 {OFFICE_ANCHORS[room].name}<span>{badge ? `Badge · v${badge.policyVersion}` : room === 'treasury' ? 'Locked · Dana only' : room === 'lobby' ? 'Audit wall + inbox' : 'Human approval'}</span>
               </button>
             </div>;
           })}
         </>}
       </ViewBoundary>
-      {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={() => setInspecting(null)} inboxTray={inboxTray} />}
+      {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
     <footer className='office-footer'>
       <ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
-      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
+      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}
       </div>)}</div>
       </ViewBoundary>
