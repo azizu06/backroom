@@ -7,6 +7,46 @@ The office subscribes to the selected StateStore in SpacetimeDB mode; memory
 mode retains its labeled preview. The local voice relay and external sponsor
 checks are still separate integration paths. Keep the rehearsal banner visible.
 
+## Table-side recovery card
+
+Start on the Mac first; bring the owned state server up before the web/orchestrator
+host, then the optional voice relay. `demo:up` performs that order for you.
+Run from the repo root, with private `.env.local` already configured:
+
+```sh
+DEMO_TUNNEL=0 pnpm demo:up  # local SpacetimeDB + mock bank, LLM OFF
+pnpm demo:preflight        # six bounded read-only checks; exit 1 if any RED
+pnpm demo:reset            # fresh DB, seed_company, scripted public gateway/reducer setup
+```
+
+For a phone passkey use `pnpm demo:up` with the default HTTPS tunnel instead.
+Reset immediately before the pitch, reopen the printed approval/pay URLs, and
+reload the office. The 60-second approval starts during reset. A fresh publish
+can take longer than a few seconds: keep the labeled offline replay ready.
+Stop only this worktree's host with `pnpm demo:down` before changing modes.
+
+| Failure / RED row | Recovery at the table |
+| --- | --- |
+| Orchestrator | Inspect private `.demo/supervisor.log` and `.demo/web.log`; stop/start this owned host. Re-enroll the passkey if the origin changed. Never kill shared processes. |
+| SpacetimeDB | Confirm the publisher config and CLI 2.13.0. Maincloud unavailable: stop and restart with `DEMO_SPACETIME=local`, retaining a local CLI. Last fallback: `STATE_STORE=memory DEMO_TUNNEL=0 pnpm demo:up`, visibly labeled preview. |
+| Web | Use the printed port; close an unrelated listener only with its owner's permission, or select `DEMO_PORT=3300`. If only 3D fails, use 2D plan or `/audit`. |
+| Cartesia | Continue the deterministic text take or labeled recorded voice; no automatic redial. A GREEN catalog read proves API access, not call readiness. |
+| Nessie | Stop/start with `DEMO_LIVE=0` for the mock bank. Reset does not undo sandbox transactions; never replay an ambiguous payment. |
+| GX10 Ollama | Keep the Mac host and set `DEMO_LLM=off` for the deterministic take. Cloud inference requires a separately verified opt-in route; preflight makes no inference. |
+
+Preflight runs GETs in parallel (4-second provider timeouts), reads the owned
+host's authenticated status (5-second timeout, including a StateStore policy
+read), checks the web ping, Cartesia voice catalog, Nessie account and configured
+Ollama model listing. It prints all six rows even when the host is down, with
+no URLs, tokens or provider response bodies. Provider keys come from this
+command's private environment; run it on the actual host with the same config.
+Mock/memory/offline rehearsal intentionally leaves unused dependencies RED.
+GREEN reachability does not claim a completed call, inference or deposit.
+
+For GX10 deployment and a warm Mac fallback use [GX10 host operations](../tools/demo/host/README.md).
+Keep Anthropic credentials Mac-only; do not copy a Mac `.env.local` containing
+them to GX10. Do not reset a shared host while another presenter is using it.
+
 ## Bring up / reset / shut down
 
 Requires Node 22+, `pnpm install`, `cloudflared` on PATH, and SpacetimeDB CLI
@@ -18,6 +58,7 @@ AGENTS.md only if needed. No command here dials a phone.
 
 ```sh
 pnpm demo:up           # local DB + publish/import, production web, seats, quick tunnel
+pnpm demo:preflight    # six read-only reachability checks, nonzero on RED
 pnpm demo:health       # local status + configured/missing; no external probes
 pnpm demo:health --live # read-only, bounded GX10 /models, Nessie account, tunnel probes
 pnpm demo:reset        # fresh local DB + scripted starting state; reprint fresh approve/pay links
@@ -101,11 +142,40 @@ latency and an internet dependency. Describe the deployment as “web and
 orchestration on GX10; state hosted on SpacetimeDB Maincloud” when that is the
 actual topology. Do not claim all stack components run on GX10 in this mode.
 
-A seed is idempotent import and cannot reset completed work. Hosted rehearsals
-must publish fresh owned databases for clean takes; never delete or overwrite
-shared state to reset the demo. To return to local, stop this owned demo and
-restart with the local default after removing hosted state configuration;
-verify the connection indicator again. Keep the local CLI 2.13.0 installed.
+The owned demo host now supports fresh Maincloud databases too. Authenticate a
+SpacetimeDB CLI 2.13.0 config privately first (the same publisher config used by
+`demo:parity`). Then select the hosted lane at **startup**:
+
+```sh
+DEMO_SPACETIME=maincloud DEMO_MAINCLOUD=1 \
+  SPACETIME_CONFIG=/absolute/private/cli.toml pnpm demo:up
+pnpm demo:reset
+pnpm demo:preflight
+```
+
+`BACKROOM_DEMO=1` is set by the owned supervisor. Hosted mode additionally
+requires `DEMO_MAINCLOUD=1`, a private authenticated `SPACETIME_CONFIG`, and the
+fixed Maincloud endpoint. An existing `SPACETIMEDB_DATABASE` value must be named
+`backroom-demo-*` or startup refuses it; remove the legacy shared database
+selection from the private environment before starting this fresh-database lane.
+It never resets `backrooms-calhacks13` or any other existing shared DB.
+
+Each reset publishes a new `backroom-demo-<time>-<random>` module, then the
+existing private reset API stops the old seat workers, imports the seed company
+via `seed_company`, installs the new StateStore and recreates the scripted
+approval/pay scenario through public gateway/reducer APIs. No reducer changes,
+SQL deletes, clear-database flags, or fixture edits are involved. Old local and
+hosted databases remain for inspection; this is a clean **active run**, not data
+erasure. The runtime integration seam remains `/__demo/reset` with
+`{uri,database,token}`; autonomous runtimes must quiesce their own activations
+before switching the installed store. This command does not stop independent
+agent runtime processes or clear separate voice/usage journals.
+
+Keep the same backend for the lifetime of a host; changing shell variables on
+`demo:reset` does not retarget an already running host. To return to local,
+`pnpm demo:down`, then `DEMO_SPACETIME=local DEMO_MAINCLOUD=0 pnpm demo:up`.
+Reload the office and verify **State connected**. Maincloud publishing is opt-in
+network activity; preflight itself is read-only and makes no model calls.
 
 ## Phone / operator setup
 

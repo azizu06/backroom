@@ -49,7 +49,6 @@ async function available(port: number, host = '127.0.0.1') {
 }
 async function supervise() {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  closeSync(openSync(lockFile, 'wx', 0o600));
   const token = randomBytes(32).toString('hex');
   const env: NodeJS.ProcessEnv = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'spacetime',
     BACKROOM_DEMO: '1', BACKROOM_APPROVAL_DEMO: '0', BACKROOM_PAYMENT_DEMO: '0', DEMO_CONTROL_SECRET: token };
@@ -61,6 +60,7 @@ async function supervise() {
   let stopping = false;
   let base = '', publicUrl = '';
   const database = localSpacetime(root, env, children);
+  closeSync(openSync(lockFile, 'wx', 0o600));
   let remote: ReturnType<typeof externalState>;
   let bindHost = '127.0.0.1';
   let stateConfig: Awaited<ReturnType<typeof database.publish>> | undefined;
@@ -116,7 +116,8 @@ async function supervise() {
     if (remote) {
       stateConfig = remote;
     } else if (env.STATE_STORE === 'spacetime') {
-      await available(database.port, database.host); await database.start();
+      if (database.mode === 'local') await available(database.port, database.host);
+      await database.start();
       await waitFor(async () => { try { return (await fetch(`${database.http}/v1/ping`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
       stateConfig = await database.publish();
       env.SPACETIMEDB_URI = stateConfig.uri; env.SPACETIMEDB_DATABASE = stateConfig.database; env.SPACETIMEDB_TOKEN = stateConfig.token;
