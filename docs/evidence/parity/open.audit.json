@@ -1,0 +1,284 @@
+[
+  {
+    "seq": 1,
+    "id": "audit:1",
+    "ts": 1792832463794,
+    "actor": "code",
+    "seat": "payables",
+    "action": "route_inbox_item",
+    "ruleIds": [
+      "INBOX_ROUTING"
+    ],
+    "policyVersion": 0,
+    "refs": [
+      "4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "kind": "bank_change",
+      "routedSeat": "payables",
+      "scenario_source": "seed"
+    },
+    "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "02290d9a51582aedd3d15af9a24027d6a537e4acabc67e3d5aced851855dfd20"
+  },
+  {
+    "seq": 2,
+    "id": "audit:2",
+    "ts": 1792832463797,
+    "actor": "code",
+    "seat": "payables",
+    "action": "state.registerAgent",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "payables-demo"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "id": "payables-demo"
+    },
+    "prevHash": "02290d9a51582aedd3d15af9a24027d6a537e4acabc67e3d5aced851855dfd20",
+    "hash": "cb99c4ab0b1c70fa31517be1bd26000bfce93aad023c011ab43f03944015b313"
+  },
+  {
+    "seq": 3,
+    "id": "audit:3",
+    "ts": 1792832463800,
+    "actor": "code",
+    "seat": "controller",
+    "action": "state.insertInvoice",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "id": "4471"
+    },
+    "prevHash": "cb99c4ab0b1c70fa31517be1bd26000bfce93aad023c011ab43f03944015b313",
+    "hash": "cd98e96af792fe1b921c456efc6ae7d9aea91df642d67c74bd7528f7d985c8d7"
+  },
+  {
+    "seq": 4,
+    "id": "audit:4",
+    "ts": 1792832463801,
+    "actor": "code",
+    "seat": "payables",
+    "action": "state.enqueueTask",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "trap-4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "cursor": 0,
+      "id": "trap-4471",
+      "leaseToken": 0,
+      "taskId": "trap-4471"
+    },
+    "prevHash": "cd98e96af792fe1b921c456efc6ae7d9aea91df642d67c74bd7528f7d985c8d7",
+    "hash": "6b820daff5269c22ec5b67dd5e8741d29f888f01dbebdf63a305e8638415787b"
+  },
+  {
+    "seq": 5,
+    "id": "audit:5",
+    "ts": 1792832463804,
+    "actor": "code",
+    "seat": "payables",
+    "action": "state.claimTask",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "payables-demo"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "id": "payables-demo"
+    },
+    "prevHash": "6b820daff5269c22ec5b67dd5e8741d29f888f01dbebdf63a305e8638415787b",
+    "hash": "d830ad8c97f7f26061f731479e1e6694af333edde9f17e50e4c7cf3e66ebf12e"
+  },
+  {
+    "seq": 6,
+    "id": "audit:6",
+    "ts": 1792832463811,
+    "actor": "code",
+    "seat": "payables",
+    "action": "pay_invoice",
+    "ruleIds": [
+      "LOOKALIKE_DOMAIN"
+    ],
+    "policyVersion": 1,
+    "refs": [
+      "4471",
+      "acme-supp1y.com",
+      "acme-supply.com"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "decision": "ESCALATE",
+    "inputs": {
+      "action": {
+        "type": "pay_invoice"
+      },
+      "cursor": 0,
+      "decision": {
+        "kind": "ESCALATE",
+        "policyVersion": 1,
+        "quote": {
+          "sentenceId": "NF-020",
+          "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+        },
+        "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+        "ruleIds": [
+          "LOOKALIKE_DOMAIN"
+        ],
+        "toHuman": "Dana"
+      },
+      "effectInput": {
+        "invoice": {
+          "account": "operating",
+          "amountCents": 89000,
+          "id": "4471",
+          "lineItems": [
+            {
+              "description": "September packing bench supplies",
+              "quantity": 1,
+              "unitPriceCents": 89000
+            }
+          ],
+          "poMatched": true,
+          "vendorId": "acme"
+        }
+      },
+      "leaseToken": 1,
+      "taskId": "trap-4471",
+      "workerId": "payables-demo"
+    },
+    "prevHash": "d830ad8c97f7f26061f731479e1e6694af333edde9f17e50e4c7cf3e66ebf12e",
+    "hash": "37c49667d46a9c65a9f6884e918af50d9d2c8fd7da01ef0664bdfabea976a1e5"
+  },
+  {
+    "seq": 7,
+    "id": "audit:7",
+    "ts": 1792832463813,
+    "actor": "code",
+    "seat": "payables",
+    "action": "state.createEscalation",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "trap-4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "cursor": 0,
+      "id": "trap-4471",
+      "leaseToken": 1,
+      "taskId": "trap-4471"
+    },
+    "prevHash": "37c49667d46a9c65a9f6884e918af50d9d2c8fd7da01ef0664bdfabea976a1e5",
+    "hash": "82389de2f792d058deae8746f5f6f9a71889376a925ead3a126b875191c7aed5"
+  },
+  {
+    "seq": 8,
+    "id": "audit:8",
+    "ts": 1792832463815,
+    "actor": "code",
+    "seat": "payables",
+    "action": "state.setAgentTarget",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "trap-4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "cursor": 0,
+      "id": "trap-4471",
+      "leaseToken": 1,
+      "taskId": "trap-4471"
+    },
+    "prevHash": "82389de2f792d058deae8746f5f6f9a71889376a925ead3a126b875191c7aed5",
+    "hash": "b28f3971cc8bf02e8ad6e13669589d23aafc0594c5f28b7fc4b44e1902871cb8"
+  },
+  {
+    "seq": 9,
+    "id": "audit:9",
+    "ts": 1792832463819,
+    "actor": "code",
+    "seat": "payables",
+    "action": "state.transitionInvoice",
+    "ruleIds": [],
+    "policyVersion": 0,
+    "refs": [
+      "trap-4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "inputs": {
+      "cursor": 0,
+      "id": "trap-4471",
+      "leaseToken": 1,
+      "taskId": "trap-4471"
+    },
+    "prevHash": "b28f3971cc8bf02e8ad6e13669589d23aafc0594c5f28b7fc4b44e1902871cb8",
+    "hash": "b735d2177b1d4e0477eea46a27bceb5a5d4cdd81348ff5a30a0649dc87ee3509"
+  },
+  {
+    "seq": 10,
+    "id": "audit:10",
+    "ts": 1792832463826,
+    "actor": "code",
+    "seat": "payables",
+    "action": "bank_change_defense_check",
+    "ruleIds": [
+      "BANK_CHANGE_HOLD"
+    ],
+    "policyVersion": 1,
+    "refs": [
+      "4471"
+    ],
+    "route": "code",
+    "latencyMs": 0,
+    "costUsd": 0,
+    "decision": "ESCALATE",
+    "inputs": {
+      "decision": {
+        "kind": "ESCALATE",
+        "policyVersion": 1,
+        "quote": {
+          "sentenceId": "NF-019",
+          "text": "A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey."
+        },
+        "reason": "Dana must verify and approve this bank change before payment. Your policy says: “A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey.”",
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "toHuman": "Dana"
+      },
+      "hypothetical": "sender corrected; bank change still pending"
+    },
+    "prevHash": "b735d2177b1d4e0477eea46a27bceb5a5d4cdd81348ff5a30a0649dc87ee3509",
+    "hash": "d3f40b03af235847596360da566f862c622cc87c1bb08f78fb9d2e9faf444a9b"
+  }
+]

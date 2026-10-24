@@ -1,69 +1,66 @@
 # Office view (#24)
 
-Open `/office` (or `/`) for the low-poly floor. Room presets frame each room;
-seat badges open the exact subscribed actions, rooms, limits and policy version.
-Phone and reduced-motion clients start with a fixed camera. The floor-plan view
-uses the same source and walks; a WebGL context loss switches to it automatically.
+Open `/office` (or `/`) for the low-poly floor. `STATE_STORE=spacetime` selects the
+anonymous live source automatically using server-side `SPACETIMEDB_URI` and
+`SPACETIMEDB_DATABASE`. Only these two public coordinates reach the browser;
+the publisher token never does. Missing live configuration fails instead of
+falling back to fixtures. Configure the server environment as described in
+[`spacetime/README.md`](../spacetime/README.md).
 
-## State and controller seam
+Memory mode retains the explicitly labeled **Preview · simulated state** producer
+for tests and offline layout work. Its controls only change fixture state.
+
+## One subscription, one projection
+
+`web/lib/office/spacetime.ts` implements `OfficeState` using the exported generated
+client `@backroom/orchestrator/spacetime-client`. One anonymous subscription covers
+`agent`, `room`, `seat`, `badge`, `escalation`, `audit_entry`, and `runtime_control`.
+Row callbacks coalesce after each transaction; the immutable cached snapshot feeds
+the canvas, floor plan, badges, lobby audit receipts, and inbox receipt summaries.
+
+- Agents use stored positions and target anchors. `Dana_desk` maps to `dana`;
+  recognized desk aliases map to the fixed floor's named anchors. Unknown targets
+  are omitted instead of inventing a destination. Arriving never writes state.
+- A folder requires a pending escalation from that exact agent and a Dana target.
+  A target alone cannot fabricate an escalation. Rooms require room rows; badge
+  limits/actions/rooms come from a matching current seat/badge version.
+- Red doors require the exact `request_room_entry` DENY audit ID, agent, and room.
+  The door pulses red for 4.5 seconds from its server timestamp. Old receipts stay
+  on the wall without replaying a fresh flash when the view reconnects.
+- The physical audit-wall lines and inbox folder stack also project audit/intake
+  rows. The DOM wall shows the last 20 subscribed receipts, including lifecycle
+  rows labeled RECORDED. The full authenticated inspector remains at `/audit`.
+- The lobby mounts `InboxTray` for human submissions through `/api/inbox`.
+  Subscribed intake summaries come from `submit_inbox_item`, `route_inbox_item`,
+  and `judge_inbox_decision` audit receipts. The displayed count is receipt count,
+  **not** the size of a private queue. No anonymous subscription reads private
+  inbox payloads or credentials. Detailed receipt links open `/audit`.
+- Connection becomes live only after the whole subscription applies. Disconnect
+  retains visibly stale rows and clears LLM status to unknown; reconnect replaces
+  the view from current rows. The LLM switch displays the subscribed flag. Its
+  command remains disabled until a trusted controller transport is supplied.
 
 `web/app/office/Office.tsx` exports `Office({ source, onToggleLlm, auditWall,
-inboxTray, controls })`. `source` implements `OfficeState` from
-`web/lib/office/state.ts`: cache an immutable `OfficeSnapshot`, return the same
-object until rows change, and notify subscribers after updating it. The renderer
-never invokes a reducer, gateway, policy engine, model, approval or payment.
-Reaching an anchor has no business effect.
-
-The default route is explicitly **Preview · simulated state**. Its producer is
-`web/lib/office/preview.ts`; only its two labeled preview buttons append fixture
-receipts or change fixture targets. It reads the versioned Northfield policy
-fixture for badge values. These are not live policy rows.
-
-At implementation time main exposes the T8 `agent` binding only, not #15's full
-policy, badge, audit, escalation and runtime-control subscriptions. Do not treat
-T8 as the complete live adapter. Replace the preview route's producer with #15's
-projection when those tables land, preserving the `Office` interface:
-
-- Project all agents and their server positions/target anchors. A nonempty
-  `escalationId` makes that agent carry a folder. Clear it from server state.
-- Project current badge rows, including `policyVersion`; do not recompute limits
-  from client constants. Unrecognized server anchors must be handled by the
-  adapter, never cast blindly into `AnchorId`.
-- Project room-entry denial events with room, agent, audit ID and Unix-ms time.
-  A door flashes for 4.5 seconds only if the exact audit ID, agent, room,
-  `request_room_entry` action and `DENY` decision match a subscribed audit entry.
-  Unmatched events show no denied door. Old receipts remain visible without
-  replaying the flash on reconnect.
-- Set connection to `live` only after the complete subscription applies, and
-  `disconnected` immediately on disconnect. Model controls are disabled unless
-  live. Initial LLM state is unknown, not a cached ON claim.
-- Bind `onToggleLlm` to authenticated controller transport; await the server and
-  let authoritative rows update `llmEnabled`. Never put the gateway bearer
-  secret in client props, public env vars or unauthenticated proxy endpoints.
-  The existing switch displays unknown until a control value is supplied. The preview has
-  no controller transport and shows a disabled unavailable control.
-- Supply the merged `AuditWall` as `auditWall` and the inbox UI as `inboxTray`.
-  The Lobby inspector has both mount points, and the footer owns the audit wall
-  slot. #61 was still open during this implementation; no copied wall or new
-  audit API is introduced. RootLayout already mounts `RealVsSim` globally.
+inboxTray, controls })`. Room presets frame each room; clicking a seat badge opens
+its exact limits. Phone/reduced-motion clients start with a fixed camera. The
+floor-plan view uses the same snapshot, and WebGL context loss activates it.
 
 ## Verification
 
+[`parity.md`](parity.md) records the actual backend/browser proof and screenshots.
+
 ```sh
-pnpm install --frozen-lockfile
-pnpm --filter @backroom/web dev --port 3244
-# Another terminal:
-pnpm --filter @backroom/web exec node scripts/verify-office.mjs
 pnpm -r test
+pnpm -r typecheck
 pnpm -r build
+pnpm demo:parity
 ```
 
-The headless script writes `docs/evidence/office/`: screenshots of each room,
-clickable limits, an escalation walk, a denied Treasury entry with receipt, the
-floor plan and phone fallback, plus a JSON verification receipt. It intercepts
-only the disclosure status read to avoid integration dependencies. It checks
-preview target publication under one second, unchanged audit receipts across
-view changes, no renderer POSTs, no page errors and no phone overflow. The frame
-cadence is measured in headless Chromium; it is not proof of 60 fps on a team's
-physical laptop. The server-side 3D-closed business parity run remains an
-integration check against #15 and the orchestrator, not a fixture claim.
+`demo:parity` is an explicit opt-in real-service check. It owns fresh local DBs,
+its loopback server, production Next processes, and headless Chromium; it shuts
+those down afterward. No shared Chrome session, model, phone, or bank is used.
+The pinned CLI setup is in `spacetime/README.md`. Override `SPACETIME_CLI` and
+`SPACETIME_ROOT` to reuse a separately installed pinned CLI without changing it.
+
+The older `web/scripts/verify-office.mjs` remains the memory-preview layout check.
+Physical-laptop 60 fps and Maincloud latency are separate, unmeasured checks.

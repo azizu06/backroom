@@ -17,6 +17,7 @@ export interface OfficeAgent {
   readonly pos: FloorPosition;
   readonly state: string;
   readonly escalationId?: string;
+  readonly rowAt?: number;
 }
 export interface OfficeBadge {
   readonly seatId: SeatId;
@@ -28,9 +29,9 @@ export interface OfficeBadge {
 export interface OfficeAudit {
   readonly id: string;
   readonly agentId: string;
-  readonly seatId: SeatId;
+  readonly seatId: string;
   readonly action: string;
-  readonly decision: "ALLOW" | "DENY" | "ESCALATE";
+  readonly decision: "ALLOW" | "DENY" | "ESCALATE" | "RECORDED";
   readonly ruleIds: readonly string[];
   readonly room?: AnchorId;
   readonly summary: string;
@@ -42,6 +43,8 @@ export interface OfficeDenial {
   readonly at: number;
 }
 export interface OfficeSnapshot {
+  readonly rooms?: readonly { id: AnchorId; rowId: string }[];
+  readonly inboxReceipts?: readonly OfficeAudit[];
   readonly agents: readonly OfficeAgent[];
   readonly badges: readonly OfficeBadge[];
   readonly audit: readonly OfficeAudit[];
@@ -62,5 +65,10 @@ export function matchingDenial(snapshot: OfficeSnapshot, room: AnchorId) {
     entry.action === "request_room_entry" && entry.decision === "DENY"));
 }
 export const INITIAL_OFFICE: OfficeSnapshot = {
-  agents: [], badges: [], audit: [], denials: [], connection: "connecting", llmEnabled: null, inboxCount: 0,
+  rooms: [], agents: [], badges: [], audit: [], denials: [], connection: "connecting", llmEnabled: null, inboxCount: 0,
 };
+
+/** Live semantic rooms must have a subscribed row; previews retain the fixture floor. */
+export function visibleRooms(snapshot: OfficeSnapshot): AnchorId[] {
+  return snapshot.rooms ? snapshot.rooms.map(row => row.id) : Object.keys(OFFICE_ANCHORS) as AnchorId[];
+}

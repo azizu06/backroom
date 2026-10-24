@@ -5,6 +5,7 @@ import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot, typ
 export function createMockOfficeState() {
   let snapshot: OfficeSnapshot = {
     ...INITIAL_OFFICE, connection: 'preview', inboxCount: 3,
+    rooms: Object.keys(OFFICE_ANCHORS).map(id => ({ id: id as AnchorId, rowId: `preview:${id}` })),
     agents: [
       { id: 'collections-clerk', name: 'Alex', seatId: 'collections', targetAnchor: 'collections', pos: OFFICE_ANCHORS.collections.position, state: 'Reviewing invoice 1042' },
       { id: 'payables-clerk', name: 'Sam', seatId: 'payables', targetAnchor: 'payables', pos: OFFICE_ANCHORS.payables.position, state: 'Matching invoices' },
