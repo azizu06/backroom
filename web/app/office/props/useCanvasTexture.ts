@@ -3,6 +3,7 @@
 import { useLayoutEffect, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { CanvasTexture, SRGBColorSpace } from 'three';
+import { canvasTextureSize } from '../../../lib/office/props/readability';
 
 export const PROP_FONT = 'system-ui, sans-serif';
 
@@ -15,8 +16,9 @@ export function useCanvasTexture(width: number, height: number, draw: (ctx: Canv
   const invalidate = useThree(state => state.invalidate);
   const [texture] = useState(() => {
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    const size = canvasTextureSize(width, height);
+    canvas.width = size.width;
+    canvas.height = size.height;
     const created = new CanvasTexture(canvas);
     created.colorSpace = SRGBColorSpace;
     created.anisotropy = 4;
@@ -26,7 +28,9 @@ export function useCanvasTexture(width: number, height: number, draw: (ctx: Canv
     const canvas = texture.image as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0);
     draw(ctx);
     texture.needsUpdate = true;
     invalidate();

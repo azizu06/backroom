@@ -3,8 +3,10 @@
  * web/lib/office/targets). A new target with custom UI adds one file here and one line below.
  */
 import type { PlayTarget } from '../../../lib/office/play';
+import { coworkerPanel } from './CoworkerPanel';
 import { deskPanel } from './DeskPanel';
 import { paylinkPanel } from './PaylinkPanel';
+import { phonePanel } from './PhonePanel';
 import { serverPanel } from './ServerPanel';
 import { treasuryPanel } from './TreasuryPanel';
 import type { PlayPanelView } from './types';
@@ -15,4 +17,6 @@ export const PLAY_PANEL_VIEWS: Partial<Record<PlayTarget['kind'], PlayPanelView>
   treasury: treasuryPanel,
   paylink: paylinkPanel,
   server: serverPanel,
+  phone: phonePanel,
+  coworker: coworkerPanel,
 };
