@@ -7,6 +7,7 @@ import { Desks } from './Desks';
 import { Doors } from './Doors';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
+import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
 import type { SceneMount } from './types';
@@ -20,4 +21,5 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'props', instanced: false, Component: OfficeProps },
+  { id: 'performance', instanced: false, Component: Performance },
 ];
