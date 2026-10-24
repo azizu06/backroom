@@ -10,6 +10,7 @@ import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId
 import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
+import { ServerRoom } from './rooms/ServerRoom';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -274,6 +275,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
       {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
     </Fragment>)}
     </Instances>
+    <ServerRoom position={[7.1, 0, -0.8]} />
     <CameraRig focus={focus} fixed={fixed} tour={tour} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
