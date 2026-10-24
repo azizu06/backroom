@@ -4,14 +4,18 @@ import { Component, useCallback, useEffect, useRef, useState, useSyncExternalSto
 import { LlmToggle } from '../../components/LlmToggle';
 import { WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
-import { INITIAL_OFFICE, OFFICE_ANCHORS, matchingDenial, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
-import { OfficeScene, ROOM_IDS, type RoomLabels } from './scene';
+import { INITIAL_OFFICE, OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
+import { OfficeScene, type RoomLabels } from './scene';
 import '../office.css';
 
 type ViewMode = 'walk' | 'tween' | 'plan';
 function PlanAgent({ agent, recorded }: { agent: OfficeAgent; recorded: boolean }) {
   const marker = useRef<HTMLDivElement>(null);
   const motion = useRef(new WalkMotion(agent.pos));
+  useEffect(() => {
+    motion.current.position[0] = agent.pos[0]; motion.current.position[1] = agent.pos[1];
+    motion.current.moveTo(agent.targetAnchor);
+  }, [agent.pos[0], agent.pos[1]]);
   useEffect(() => { motion.current.moveTo(agent.targetAnchor); }, [agent.targetAnchor]);
   useEffect(() => {
     let frame = 0;
@@ -35,10 +39,10 @@ function PlanAgent({ agent, recorded }: { agent: OfficeAgent; recorded: boolean 
 function FloorPlan({ snapshot, select }: { snapshot: OfficeSnapshot; select: (room: AnchorId) => void }) {
   return <div className='floor-plan' aria-label='2D office floor plan'>
     <div className='plan-aisle' />
-    {ROOM_IDS.map(room => <button key={room} className='plan-room' onClick={() => select(room)}
+    {visibleRooms(snapshot).map(room => <button key={room} className='plan-room' onClick={() => select(room)}
       style={{ left: `${50 + OFFICE_ANCHORS[room].center[0] / 16 * 100}%`, top: `${50 + OFFICE_ANCHORS[room].center[1] / 11 * 100}%` }}>
       {OFFICE_ANCHORS[room].name}{room === 'treasury' && ' · Locked'}
-      {matchingDenial(snapshot, room) && <span className='denial-text'>Entry denied</span>}
+      {matchingDenial(snapshot, room) && <span className='denial-text' data-denial-audit={matchingDenial(snapshot, room)!.auditId}>Entry denied</span>}
     </button>)}
     {snapshot.agents.map(agent => <PlanAgent key={agent.id} agent={agent} recorded={snapshot.connection === 'replay'} />)}
   </div>;
@@ -69,7 +73,7 @@ function RoomInspector({ room, snapshot, close, inboxTray }: {
     </> : room === 'treasury' ? <p>Locked · Dana only. Entry and money movement require server authorization.</p>
       : room === 'dana' ? <p>Human review. Approvals require Dana’s passkey on the approval card.</p>
       : <><h3>Audit wall</h3><p><a href='#office-audit-wall'>Open the audit wall below</a></p>
-        <div data-office-mount='inbox'><h3>Inbox tray · {snapshot.inboxCount}</h3>{inboxTray ?? <p>Inbox integration pending. Preview contains three fixture items.</p>}</div></>}
+        <div data-office-mount='inbox-inspector'><h3>Inbox tray · {snapshot.inboxCount}</h3>{inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <p>Preview contains three fixture items.</p>}</div></>}
     {denial && <p className='denial-text' role='status'>Entry denied · audit {denial.auditId}</p>}
   </section>;
 }
@@ -105,13 +109,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
     </header>
     <nav className='room-navigation' aria-label='Room camera presets'>
       <button aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); }}>Full floor</button>
-      {ROOM_IDS.map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
+      {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
     </nav>
     <div className='office-viewport' data-testid='office-viewport'>
       <SceneBoundary fallback={<FloorPlan snapshot={snapshot} select={inspect} />} onFailure={onFailure}>
         {plan ? <FloorPlan snapshot={snapshot} select={inspect} /> : <>
           <OfficeScene snapshot={snapshot} fixed={mode === 'tween'} focus={focus} labels={labels} onFailure={onFailure} />
-          {ROOM_IDS.map(room => {
+          {visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
               <button className='desk-label' onClick={() => inspect(room)} aria-label={badge ? `${OFFICE_ANCHORS[room].name} badge limits` : `${OFFICE_ANCHORS[room].name} details`}>
@@ -126,15 +130,16 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
     <footer className='office-footer'>
-      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId}>
+      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {OFFICE_ANCHORS[agent.targetAnchor].name}</span>}
       </div>)}</div>
       <section id='office-audit-wall' className='office-audit' aria-label='Office audit receipts' data-office-mount='audit-wall'>
         {auditWall ?? <><h2>Lobby audit wall <span>{snapshot.connection === 'preview' ? 'Preview receipts' : snapshot.connection === 'replay' ? 'REPLAY receipts' : 'Subscribed receipts'}</span></h2>
-          {!snapshot.audit.length ? <p>No decisions received.</p> : <ol>{snapshot.audit.slice(-2).reverse().map(entry => <li key={entry.id}>
+          {!snapshot.audit.length ? <p>No decisions received.</p> : <ol>{snapshot.audit.slice(-20).reverse().map(entry => <li key={entry.id} data-audit-id={entry.id}>
             <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br /><code>{entry.id} · {entry.ruleIds.join(', ')}</code>
           </li>)}</ol>}</>}
       </section>
+      {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>{inboxTray}</section>}
       {controls}
     </footer>
   </section>;

@@ -52,3 +52,10 @@
   .office-footer { padding: 16px; }.seat-statuses { gap: 12px; }.office-shell .plan-room { font-size: 10px; padding: 4px; }
   body:has(.office-shell) .real-sim-overlay { padding: 16px; }
 }
+/* Live lobby panels grow with their rows and keep the whole page in the office theme. */
+.office-shell:has([data-office-mount=inbox]) { height: auto; min-height: 100dvh; }
+.office-shell:has([data-office-mount=inbox]) .office-viewport { height: 58dvh; flex: none; }
+.office-shell:has([data-office-mount=inbox]) .office-footer { padding: 18px 24px; }
+.office-shell [data-office-mount=inbox] { margin-top: 24px; }
+.office-shell [data-office-mount=inbox] a { color: #e5bf91; }
+body:has(.office-shell [data-office-mount=inbox]) .real-sim-overlay { position: static; width: 100%; border-radius: 0; }

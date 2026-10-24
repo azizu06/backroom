@@ -1,9 +1,2 @@
-import { MockOffice } from "./office";
-
-export default function Page() {
-  return (
-    <main>
-      <MockOffice />
-    </main>
-  );
-}
+export { default } from './office/page';
+export const dynamic = 'force-dynamic';
