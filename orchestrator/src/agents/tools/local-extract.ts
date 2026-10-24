@@ -9,7 +9,7 @@ export interface ExtractorDocument { text: string; attachment?: InvoiceAttachmen
 export interface LocalExtraction { fields: Json; confidence: number; model: string }
 /** The production router's cloud-only `fallback` entry (or a test double with the same contract). */
 export interface ExtractionRouter {
-  fallback(taskType: 'field_extraction', input: unknown, schema: OutputSchema<Json>): Promise<RouteResult<Json> | LlmOffResult>;
+  fallback(taskType: 'field_extraction', input: unknown, schema: OutputSchema<Json>, options?: { signal?: AbortSignal }): Promise<RouteResult<Json> | LlmOffResult>;
 }
 /** GX10 itself is unreachable: connection failure, timeout or 5xx. Nothing else triggers the cloud. */
 export class LocalOutage extends Error {
@@ -24,7 +24,7 @@ export const EXTRACTION_SCHEMA: OutputSchema<Json> = {
   jsonSchema: { anyOf: [invoiceSchema.jsonSchema, vendorSchema.jsonSchema] },
 };
 const productionRouter: ExtractionRouter = {
-  async fallback(taskType, input, schema) { return (await import('../../router')).routeCloudFallback(taskType, input, schema); },
+  async fallback(taskType, input, schema, options) { return (await import('../../router')).routeCloudFallback(taskType, input, schema, options); },
 };
 
 /** GX10 first, unchanged. Only when GX10 is unreachable does this same call go once through the
@@ -42,7 +42,8 @@ export async function extractWithFallback(document: ExtractorDocument, signal: A
     // Bad input, client errors and bad local answers keep today's hold/retry path.
     if (!(error instanceof LocalOutage) || !document.text.trim()) throw error;
   }
-  const routed = await (options.router ?? productionRouter).fallback('field_extraction', document.text, EXTRACTION_SCHEMA);
+  // The activation's own signal reaches the cloud request, so a cancelled case never starts a paid call.
+  const routed = await (options.router ?? productionRouter).fallback('field_extraction', document.text, EXTRACTION_SCHEMA, { signal });
   signal.throwIfAborted();
   if ('kind' in routed) throw new Error('LLM_OFF');
   return { fields: routed.output, model: routed.model, route: routed.route, latencyMs: Math.round(now() - started), costUsd: routed.costUsd };
@@ -72,7 +73,13 @@ export async function localExtract(document: ExtractorDocument, signal: AbortSig
   signal.throwIfAborted();
   if (response.status >= 500) throw new LocalOutage('http_5xx');
   if (!response.ok) throw new Error('LOCAL_EXTRACTION_UNAVAILABLE');
-  const body = await response.json() as { choices?: { message?: { content?: string } }[] };
+  // A link that drops (or times out) while the body streams is still an outage; malformed JSON is not.
+  let raw: string;
+  try { raw = await response.text(); } catch {
+    signal.throwIfAborted();
+    throw new LocalOutage(timeout.aborted ? 'timeout' : 'transport');
+  }
+  const body = JSON.parse(raw) as { choices?: { message?: { content?: string } }[] };
   const envelope = JSON.parse(body.choices?.[0]?.message?.content ?? '') as Record<string, unknown>;
   signal.throwIfAborted();
   if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) || Object.keys(envelope).length !== 2 ||
