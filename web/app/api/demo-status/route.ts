@@ -1,8 +1,12 @@
 import { getRouterHealth, getStateStore } from '@backroom/orchestrator';
-import { readServiceStatus, type ProbeState, type ServiceProbe } from '../../../lib/demo-probes';
-import { probedServices, type DemoStatus, type ServiceId } from '../../../lib/real-vs-sim';
+import { readServiceStatus, setServiceStatusSource, type ProbeState, type ServiceProbe } from '../../../lib/demo-probes';
+import { hostServiceSource } from '../../../lib/demo-host-status';
+import { hostSandboxServices, probedServices, type DemoStatus, type StatusId } from '../../../lib/real-vs-sim';
 
 export const dynamic = 'force-dynamic';
+
+// Demo web host contract (#117) for model/cloud, Apify, Nessie and CRS; falls back to local probes without a host.
+setServiceStatusSource(hostServiceSource);
 
 const states: readonly ProbeState[] = ['verified', 'simulated', 'unreachable', 'unverified', 'disabled'];
 const sources: readonly ServiceProbe['source'][] = ['live', 'receipt', 'config'];
@@ -19,8 +23,8 @@ function publicProbe(value: unknown): ServiceProbe | null {
 export async function GET() {
   const health = getRouterHealth();
   const snapshot = await readServiceStatus();
-  const services: Partial<Record<ServiceId, ServiceProbe>> = {};
-  for (const id of probedServices) {
+  const services: Partial<Record<StatusId, ServiceProbe>> = {};
+  for (const id of [...probedServices, ...hostSandboxServices]) {
     const probe = publicProbe(snapshot?.services?.[id]);
     if (probe) services[id] = probe;
   }

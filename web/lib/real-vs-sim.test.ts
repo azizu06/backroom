@@ -95,6 +95,21 @@ describe('demo disclosure status', () => {
   });
 });
 
+describe('host-reported sandbox rows', () => {
+  const at = iso(NOW - 60_000);
+  it('stay Simulated without a host report or with a stale status', () => {
+    for (const id of ['nessie', 'crs', 'company', 'card']) expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+    const stale = snapshot({ measuredAt: iso(NOW - 60_000), services: { crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
+    expect(getDisclosureStatus(item('crs'), stale, NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+  });
+  it('show the host adapter state when the demo host reports one', () => {
+    const status = snapshot({ services: { nessie: { state: 'simulated', source: 'config', evidence: 'Mock Nessie HTTP transport', at: null },
+      crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
+    expect(getDisclosureStatus(item('nessie'), status, NOW)).toEqual({ label: 'Simulated', tone: 'neutral', detail: 'Mock Nessie HTTP transport' });
+    expect(getDisclosureStatus(item('crs'), status, NOW)).toMatchObject({ label: 'Verified', tone: 'good' });
+  });
+});
+
 it('shows Checking while the first server probe run is pending', () => {
   for (const id of ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'] as const) {
     expect(getDisclosureStatus(item(id), snapshot({ notProbed: [], services: {}, probesCheckedAt: null }), NOW)).toEqual({ label: 'Checking…', tone: 'neutral' });

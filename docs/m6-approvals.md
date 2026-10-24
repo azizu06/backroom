@@ -49,7 +49,7 @@ still install a populated `GatewayStore` via `installGatewayStore`.
 - `decideEscalation(VerifiedApproval, now)` consumes a one-use server capability.
   Only the WebAuthn verifier mints it. Durable server adapters can use exported
   `consumeVerifiedApproval`; never replace it with a caller-supplied boolean.
-- Status is `pending | approved | denied | counter | pending_owner`. Decisions
+- Status is `pending | approved | denied | counter | pending_owner | expired`. Decisions
   are `{ kind: 'Approve' | 'Deny' }` or `{ kind: 'Counter', terms: ApprovalTerms }`.
   A verified decision carries `method: 'passkey'`, `decidedAt` and credential id.
 - `check_approval` reads this call's StateStore row and returns `approval_status`,
@@ -58,12 +58,23 @@ still install a populated `GatewayStore` via `installGatewayStore`.
   payment, or bypass a fresh policy check. The voice owner relays the recorded
   result. Applying an exception to a new committed plan remains a separately
   policy-checked controller action.
-- At `createdAt + 60_000` the request closes as `pending_owner`, appends one
-  hash-chained audit entry, and moves an existing matching AR invoice from
-  `in_collection`/`escalated` to `pending_owner`. Reads, gateway polls and worker
-  reaping enforce expiry lazily; no browser or timer is trusted to enforce it.
-  Late assertions cannot approve it. Gateway speech is exactly
-  “Dana will confirm by email today.” This records follow-up; it does not send email.
+- A live call (`callId` set) stays `pending` for the call, up to
+  `APPROVAL_WINDOW_MS` (default 300000, maximum 900000). It also closes when the
+  voice relay reports `call_completed` or `call_failed`. That status is
+  `expired`, with one `escalation_expired` audit. `check_approval` returns
+  `approval_status: "expired"` and `may_reask: true`. If the caller asks to send
+  the same terms again, `propose_plan` opens exactly one fresh row. A second
+  fresh row is refused (`ESCALATION_RETRY_USED`), and a second open row is
+  refused (`ESCALATION_OPEN`). Voice cannot approve. On an open call,
+  `check_approval` never says Dana will confirm by email. Rows with no `callId`
+  still close at 60 seconds as `pending_owner`. When a live call ends, a
+  matching AR invoice in `in_collection`/`escalated` moves to `pending_owner`,
+  including a row that already expired during the call. That follow-up is
+  written once and does not repeat `escalation_expired`.
+  Reads, gateway polls and the call-end hook enforce expiry; no browser timer
+  is trusted. Late assertions cannot approve an `expired` row. The approval
+  card's after-call `pending_owner` line remains “Dana will confirm by email
+  today.” That records follow-up; it does not send email.
 
 The HTTP surface is `GET /api/approvals/:id/view`,
 `POST /api/approvals/:id/options` (`{ decision }`), and
@@ -114,7 +125,7 @@ It also checks each local gateway escalation response completes in under 1 s.
 Focused Vitest coverage: real P-256 signatures through the installed verifier;
 private enrollment and replacement rejection; wrong origin/RP/signature/UV;
 missing assertion; assertion races and replay; cross-escalation challenge reuse;
-immutable counter terms; forged voice/text claims; exact 60-second timeout;
+immutable counter terms; forged voice/text claims; live-call window and call-end expiry; one re-ask then a refusal;
 worker row + target creation without 3D; HTTP origin/enrollment boundaries;
 real gateway evidence and timeout relay. No network is mocked because these
 paths make no external network requests. Existing policy/gateway suites remain.

@@ -12,9 +12,11 @@ vi.mock('@backroom/orchestrator', () => ({
 vi.mock('../lib/demo-probes', () => ({
   getDemoProbes: vi.fn(async () => runtime.probes),
   readServiceStatus: vi.fn(async () => runtime.probes),
+  setServiceStatusSource: vi.fn(),
 }));
+vi.mock('../lib/demo-host-status', () => ({ hostServiceSource: { name: 'host-mock', read: async () => null } }));
 import { GET } from '../app/api/demo-status/route';
-import { readServiceStatus } from './demo-probes';
+import { readServiceStatus, setServiceStatusSource } from './demo-probes';
 
 const realIds = ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'];
 const at = '2026-10-24T13:00:00.000Z';
@@ -83,4 +85,16 @@ it('never labels a service both probed and not probed', async () => {
   const { notProbed, services } = await (await GET()).json() as { notProbed: string[]; services: Record<string, unknown> };
   for (const id of notProbed) expect(services[id]).toBeUndefined();
   expect([...notProbed, ...Object.keys(services)].sort()).toEqual([...realIds].sort());
+});
+
+it('installs the host contract source and publishes allowlisted host sandbox rows', async () => {
+  expect(setServiceStatusSource).toHaveBeenCalledWith(expect.objectContaining({ name: 'host-mock' }));
+  runtime.probes = { checkedAt: at, services: { ...probes().services,
+    nessie: { state: 'simulated', source: 'config', evidence: 'Mock Nessie HTTP transport', at: null, apiKey: 'private' },
+    crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } };
+  const body = await (await GET()).json();
+  expect(body.services.nessie).toEqual({ state: 'simulated', source: 'config', evidence: 'Mock Nessie HTTP transport', at: null });
+  expect(body.services.crs.state).toBe('verified');
+  expect(body.notProbed).toEqual([]);
+  expect(JSON.stringify(body)).not.toContain('private');
 });

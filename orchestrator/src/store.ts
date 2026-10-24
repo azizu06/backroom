@@ -29,7 +29,7 @@ export interface Task extends NewTask {
 export interface Lease extends Task { leaseOwner: string; leaseExpiresAt: number }
 export interface Escalation {
   id: string; taskId: string; fromAgent: string; toHuman: string; ruleIds: string[];
-  evidenceRefs: string[]; status: 'pending' | 'approved' | 'denied' | 'counter' | 'pending_owner';
+  evidenceRefs: string[]; status: 'pending' | 'approved' | 'denied' | 'counter' | 'pending_owner' | 'expired';
   createdAt: number; expiresAt: number; policyVersion: number;
   quote: { sentenceId: string; text: string };
   callId?: string; invoiceId?: string; amountCents?: number; currency?: string;
@@ -85,7 +85,8 @@ export interface StateStore {
   getEscalation(id: string): Promise<Escalation | undefined>;
   createCallEscalation(input: CallEscalation, now: number): Promise<Escalation>;
   decideEscalation(approval: VerifiedApproval, now: number): Promise<Escalation>;
-  expireEscalations(now: number): Promise<void>;
+  /** Closes due rows. Pass callId when that live call has ended so its rows close immediately. An already-expired row still records pending_owner once. */
+  expireEscalations(now: number, callId?: string): Promise<void>;
   // Approval writes belong to the controller/passkey service, not to workers.
   appendAudit(entry: AuditInput): Promise<AuditEntry>;
   /** Atomic batch: either every entry is appended in order or none are. */
