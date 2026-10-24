@@ -3,6 +3,7 @@
  * the HUD reads and writes them through `loadPlaySettings` / `savePlaySettings` (localStorage, best effort).
  */
 import { LOOK_SENSITIVITY } from "./play";
+import { DEFAULT_FEEL, type FeelFlags } from "./playFeel";
 
 export interface PlaySettings {
   /** Multiplier on the base look sensitivity (mouse and touch drag). */
@@ -11,10 +12,18 @@ export interface PlaySettings {
   readonly invertY: boolean;
   /** Multiplier on the walking speed. */
   readonly speed: number;
+  /** Acceleration and friction instead of instant start and stop. */
+  readonly smoothMove: boolean;
+  /** Eye bobs with each step. */
+  readonly headBob: boolean;
+  /** Field of view widens slightly while walking. */
+  readonly fovKick: boolean;
 }
 export interface SettingRange { readonly min: number; readonly max: number; readonly step: number }
 
-export const DEFAULT_PLAY_SETTINGS: PlaySettings = { sensitivity: 1, invertY: false, speed: 1 };
+export const DEFAULT_PLAY_SETTINGS: PlaySettings = {
+  sensitivity: 1, invertY: false, speed: 1, smoothMove: DEFAULT_FEEL.smoothing, headBob: DEFAULT_FEEL.bob, fovKick: DEFAULT_FEEL.fovKick,
+};
 export const SENSITIVITY_RANGE: SettingRange = { min: 0.25, max: 3, step: 0.25 };
 export const SPEED_RANGE: SettingRange = { min: 0.5, max: 2, step: 0.25 };
 export const PLAY_SETTINGS_KEY = "backroom.office.play-settings.v1";
@@ -38,11 +47,15 @@ export function parsePlaySettings(raw: string | null | undefined): PlaySettings 
     sensitivity: clampSetting(row.sensitivity, SENSITIVITY_RANGE, DEFAULT_PLAY_SETTINGS.sensitivity),
     invertY: typeof row.invertY === "boolean" ? row.invertY : DEFAULT_PLAY_SETTINGS.invertY,
     speed: clampSetting(row.speed, SPEED_RANGE, DEFAULT_PLAY_SETTINGS.speed),
+    smoothMove: typeof row.smoothMove === "boolean" ? row.smoothMove : DEFAULT_PLAY_SETTINGS.smoothMove,
+    headBob: typeof row.headBob === "boolean" ? row.headBob : DEFAULT_PLAY_SETTINGS.headBob,
+    fovKick: typeof row.fovKick === "boolean" ? row.fovKick : DEFAULT_PLAY_SETTINGS.fovKick,
   };
 }
 
 export function sameSettings(a: PlaySettings, b: PlaySettings): boolean {
-  return a.sensitivity === b.sensitivity && a.invertY === b.invertY && a.speed === b.speed;
+  return a.sensitivity === b.sensitivity && a.invertY === b.invertY && a.speed === b.speed
+    && a.smoothMove === b.smoothMove && a.headBob === b.headBob && a.fovKick === b.fovKick;
 }
 
 type Reader = Pick<Storage, "getItem">;
@@ -68,6 +81,11 @@ export function savePlaySettings(storage: Writer | null | undefined, settings: P
 export function lookDelta(dx: number, dy: number, settings: PlaySettings, scale = 1): [dYaw: number, dPitch: number] {
   const gain = LOOK_SENSITIVITY * settings.sensitivity * scale;
   return [-dx * gain || 0, (settings.invertY ? dy : -dy) * gain || 0];
+}
+
+/** The settings' feel switches as the flags the rig reads (before reduced motion is applied). */
+export function feelFlags(settings: PlaySettings): FeelFlags {
+  return { smoothing: settings.smoothMove, bob: settings.headBob, fovKick: settings.fovKick };
 }
 
 export function formatMultiplier(value: number): string {

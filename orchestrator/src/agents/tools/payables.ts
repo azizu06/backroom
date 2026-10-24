@@ -95,7 +95,8 @@ export function createPayablesTools(deps: PayablesToolDeps): readonly DomainTool
         // A requested human review closes the payment path for this activation.
         if (humans.has(key)) return { status: 'held', verdict: 'ESCALATE', note: 'human review already requested; no payment made' };
         const { fields, source } = await deps.loadCase(ctx);
-        return outcome(await deps.seat.process(fields, source));
+        // The seat re-checks ownership synchronously at the effect boundary, after this await.
+        return outcome(await deps.seat.process(fields, source, ctx.fence ? { fence: () => ctx.fence!() } : undefined));
       });
       payments.set(key, run);
       run.catch(() => payments.delete(key));
