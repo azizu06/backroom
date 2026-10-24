@@ -280,15 +280,15 @@ describe("targets", () => {
 });
 
 describe("panels", () => {
-  it("describes an agent with its task and newest audit entries", () => {
+  it("talks as an agent, grounded in its state and newest audit entries", () => {
     const mock = createMockOfficeState();
     mock.setTargetAnchor("dana");
     const snapshot = mock.source.getSnapshot();
     const panel = playPanel(snapshot, { kind: "agent", id: "collections-clerk" })!;
-    expect(panel.title).toBe("Alex · collections-clerk");
-    expect(panel.state).toContain("awaiting Dana");
-    expect(panel.task).toContain("Dana’s desk");
-    expect(panel.task).toContain("preview-escalation-1042");
+    expect(panel.title).toBe("Talking with Alex");
+    expect(panel.talk!.greeting.text).toContain("awaiting Dana");
+    expect(panel.talk!.replies.stopped.text).toContain("preview-escalation-1042");
+    expect(panel.talk!.replies.stopped.ruleIds).toEqual(["MAX_INSTALLMENTS"]);
     expect(panel.entries[0]).toMatchObject({ decision: "ESCALATE", ruleIds: ["MAX_INSTALLMENTS"] });
     expect(targetLabel(snapshot, { kind: "agent", id: "collections-clerk" })).toBe("Talk to Alex");
     expect(playPanel(snapshot, { kind: "agent", id: "gone" })).toBeNull();
