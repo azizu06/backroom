@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Html } from '@react-three/drei';
+import { PROP_FONT, useCanvasTexture } from './props/useCanvasTexture';
 import { MathUtils, type Group } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
@@ -33,7 +33,29 @@ function Ghost({ peer }: { peer: PresencePeer }) {
   return <group ref={root} position={start}>
     <mesh position={[0, 0.78, 0]}><capsuleGeometry args={[0.22, 0.72, 3, 6]} /><meshBasicMaterial color={peer.color} transparent opacity={0.48} depthWrite={false} /></mesh>
     <mesh position={[0, 1.38, 0]}><coneGeometry args={[0.16, 0.28, 5]} /><meshBasicMaterial color={peer.color} transparent opacity={0.65} depthWrite={false} /></mesh>
-    <Html position={[0, 1.72, 0]} center distanceFactor={12} style={{ color: '#d0d6c6', background: '#272f25dd', border: '1px solid #8b987b', borderRadius: 3, padding: '2px 5px', fontSize: 11, whiteSpace: 'nowrap', pointerEvents: 'none' }}>{peer.name}</Html>
+    <NameTag name={peer.name} />
   </group>;
+}
+const TAG_W = 256, TAG_H = 48;
+/**
+ * The viewer's name above the ghost, drawn into a sprite texture. Not drei's <Html>: ghosts mount and expire
+ * while the viewer walks in Play, and unmounting an <Html> label there threw a removeChild error.
+ */
+function NameTag({ name }: { name: string }) {
+  const texture = useCanvasTexture(TAG_W, TAG_H, ctx => {
+    ctx.clearRect(0, 0, TAG_W, TAG_H);
+    ctx.font = `600 26px ${PROP_FONT}`;
+    const width = Math.min(TAG_W - 4, ctx.measureText(name).width + 20);
+    ctx.fillStyle = '#272f25dd';
+    ctx.fillRect((TAG_W - width) / 2, 4, width, TAG_H - 8);
+    ctx.strokeStyle = '#8b987b';
+    ctx.lineWidth = 2;
+    ctx.strokeRect((TAG_W - width) / 2, 4, width, TAG_H - 8);
+    ctx.fillStyle = '#d0d6c6';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, TAG_W / 2, TAG_H / 2 + 1, TAG_W - 24);
+  }, [name]);
+  return <sprite position={[0, 1.72, 0]} scale={[0.8, 0.15, 1]}><spriteMaterial map={texture} transparent depthWrite={false} /></sprite>;
 }
 export function PresenceGhosts({ peers }: { peers: PresencePeer[] }) { return <>{ghostPeers(peers).map(peer => <Ghost key={peer.viewerId} peer={peer} />)}</>; }

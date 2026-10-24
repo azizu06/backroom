@@ -49,8 +49,17 @@ export function yawToward(eye: Vec2, at: Vec2): number { return Math.atan2(-(at[
 export interface PlayPose { readonly position: Vec2; readonly yaw: number; readonly pitch: number }
 /** A requested guided walk to `room`; a new `seq` restarts the walk to the same room. */
 export interface PlayGuide { readonly room: AnchorId; readonly seq: number }
-/** Where a guided walk to `room` ends: the aisle in front of the room, facing its centre. */
+/**
+ * Rooms whose walk ends somewhere other than straight in front: the Treasury is a closed vault, so the walk stops
+ * back along the aisle, angled at the locked door and its DENY sign (web/app/office/props/TreasuryDeny.tsx).
+ */
+const GUIDE_STOPS: Partial<Record<AnchorId, { readonly position: Vec2; readonly look: Vec2 }>> = {
+  treasury: { position: [4.6, 0.1], look: [5.6, 0.9] },
+};
+/** Where a guided walk to `room` ends: by default the aisle in front of the room, facing its centre. */
 export function guidePose(room: AnchorId): PlayPose {
+  const stop = GUIDE_STOPS[room];
+  if (stop) return { position: stop.position, yaw: yawToward(stop.position, stop.look), pitch: GUIDE_PITCH };
   const center = OFFICE_ANCHORS[room].center;
   const position: Vec2 = [center[0], GUIDE_AISLE_Z];
   return { position, yaw: yawToward(position, [center[0], center[1]]), pitch: GUIDE_PITCH };

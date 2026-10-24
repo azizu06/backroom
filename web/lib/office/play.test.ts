@@ -324,7 +324,7 @@ describe("panels", () => {
 
 describe("guided walks", () => {
   it("stop in the open aisle in front of every room, facing its centre", () => {
-    for (const room of ALL) {
+    for (const room of ALL.filter(room => room !== "treasury")) {
       const pose = guidePose(room);
       const [cx, cz] = OFFICE_ANCHORS[room].center;
       expect(pose.position[0]).toBe(cx);
@@ -334,6 +334,15 @@ describe("guided walks", () => {
       const distance = Math.hypot(cx - pose.position[0], cz - pose.position[1]);
       expect(fx * (cx - pose.position[0]) + fz * (cz - pose.position[1])).toBeCloseTo(distance, 6);
     }
+  });
+
+  it("stop the Treasury walk in the free aisle with the locked door in view", () => {
+    const pose = guidePose("treasury");
+    expect(officeColliders(ALL, [SERVER_ROOM_BOX]).filter(box => insideAny(pose.position, [box], PLAYER_RADIUS))).toEqual([]);
+    const [fx, fz] = forwardOf(pose.yaw);
+    const [dx, dz] = [TREASURY_DOOR[0] - pose.position[0], TREASURY_DOOR[1] - pose.position[1]];
+    // Within the 70° vertical / wider horizontal view: well under 45° off the view axis.
+    expect(Math.acos((fx * dx + fz * dz) / Math.hypot(dx, dz))).toBeLessThan(Math.PI / 4);
   });
 
   it("interpolate position and pitch and turn the short way round", () => {

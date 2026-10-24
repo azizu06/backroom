@@ -17,8 +17,10 @@ const RING: readonly { at: [number, number, number]; size: [number, number, numb
   { at: [-(OPEN_W + RING_T) / 2, OPEN_H / 2, 0], size: [RING_T, OPEN_H, RING_D] },
   { at: [(OPEN_W + RING_T) / 2, OPEN_H / 2, 0], size: [RING_T, OPEN_H, RING_D] },
 ];
-// Free-standing sign on the aisle side of the door, right of the doorway and below the room label; faces +z.
+// Free-standing sign on the aisle side of the door, right of the doorway and below the room label. It faces -z,
+// toward a first-person viewer walking the aisle (the Treasury guided walk stops at (4.6, 0.1)).
 const SIGN_POS: [number, number, number] = [6.35, 0, 0.55];
+const SIGN_YAW = Math.PI;
 const SIGN_W = 1.6, SIGN_H = 0.72, SIGN_Y = 1.1, TEX_W = 512, TEX_H = Math.round(TEX_W * SIGN_H / SIGN_W);
 
 function fitFont(ctx: CanvasRenderingContext2D, text: string, size: number, maxWidth: number) {
@@ -99,7 +101,7 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
     <group position={[x, 0, RING_Z]}>
       {RING.map(({ at: position, size }, i) => <mesh key={i} position={position} material={ring}><boxGeometry args={size} /></mesh>)}
     </group>
-    <group position={SIGN_POS}>
+    <group position={SIGN_POS} rotation={[0, SIGN_YAW, 0]}>
       <mesh position={[0, (SIGN_Y - SIGN_H / 2) / 2, -0.03]} material={post}><boxGeometry args={[0.07, SIGN_Y - SIGN_H / 2, 0.05]} /></mesh>
       <mesh position={[0, 0.02, -0.03]} material={post}><boxGeometry args={[0.36, 0.04, 0.26]} /></mesh>
       <mesh position={[0, SIGN_Y, -0.02]} material={post}><boxGeometry args={[SIGN_W + 0.06, SIGN_H + 0.06, 0.03]} /></mesh>

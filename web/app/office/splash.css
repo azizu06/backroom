@@ -11,9 +11,6 @@
 .play-splash-controls kbd { font: 11px/1 'SFMono-Regular', Consolas, monospace; padding: 4px 6px; border: 1px solid #8b987b; border-radius: 3px; background: #30382d; color: #f3dfb9; }
 .office-shell .play-splash-overview { background: transparent; border: 0; padding: 4px 6px; font-size: 13px; color: #d0d6c6; text-decoration: underline; text-underline-offset: 3px; }
 .office-shell .play-splash-overview:hover { background: transparent; color: #f3dfb9; }
-/* Toolbar entry back into first person while in the overview. */
-.office-shell .office-enter-play { order: -1; background: #f3dfb9; color: #272f25; border-color: #f3dfb9; font-weight: 700; }
-.office-shell .office-enter-play:hover { background: #fff0cf; }
 @keyframes play-splash-in { from { opacity: 0; } }
 @keyframes play-splash-rise { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) {
