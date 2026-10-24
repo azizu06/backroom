@@ -108,6 +108,9 @@ tracked; a fake-bank pass does not establish it. Do not use `--live` in unit tes
 Cartesia Managed Agents provide the collections conversation and server-gated
 webhook tools; role-specific TTS makes responsibility handoffs audible. Code
 validates commitments and amounts. Voice never approves a payment or bank change.
+The office uses seven library voices (`is_owner=false`). We do not clone
+teammates or other people. Cloning remains a plan capability, not a feature of
+this demo.
 
 Start with [Cartesia configuration](docs/cartesia.md) and the
 [T1 call evidence/runbook](docs/t1-cartesia.md). Team credentials belong only in
