@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
+import { interpolateIntroPose, playIntroProgress, type IntroPose } from '../../lib/office/play-intro';
 import type { MotionRegistry } from '../../lib/office/motion';
 import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, headBob, interactCandidates, moveIntent, movePlayer, officeColliders,
@@ -15,9 +16,14 @@ import {
 } from '../../lib/office/play';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 
+const PLAY_EYE: IntroPose = {
+  position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]],
+  quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)],
+};
+
 /**
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
- * orthographic default camera. Renders on demand: frames continue only while input is active.
+ * orthographic default camera. Frames continue only during the intro or while input is active.
  */
 export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const handoffs = useHandoffPresentation()?.stage;
@@ -26,6 +32,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
   const get = useThree(state => state.get);
   // The camera before Play (read before PerspectiveCamera makes itself the default).
   const [previous] = useState(() => get().camera);
+  // The rig owns the camera/input handoff; scene mounts only receive the snapshot.
+  const [intro] = useState(() => ({
+    from: { position: previous.position.toArray(), quaternion: previous.quaternion.toArray() } satisfies IntroPose,
+    startedAt: null as number | null, done: false,
+  }));
   const position = useRef<[number, number]>([SPAWN.position[0], SPAWN.position[1]]);
   const yaw = useRef<number>(SPAWN.yaw);
   const pitch = useRef(0);
@@ -33,7 +44,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
   const wasActive = useRef(false);
   const written = useRef(false);
   const target = useRef('');
-  const reduced = useRef(false);
+  const reduced = useRef(window.matchMedia(REDUCED_MOTION_QUERY).matches);
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
   const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
@@ -58,6 +69,22 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
   }, [previous, get, invalidate]);
 
   useFrame((state, delta) => {
+    if (!camera.current) return;
+    if (!intro.done) {
+      const now = performance.now();
+      intro.startedAt ??= now;
+      const progress = playIntroProgress(now - intro.startedAt, reduced.current);
+      const pose = interpolateIntroPose(intro.from, PLAY_EYE, progress);
+      camera.current.position.fromArray(pose.position);
+      camera.current.quaternion.fromArray(pose.quaternion);
+      camera.current.updateMatrixWorld();
+      if (progress < 1) {
+        input.consumeLook();
+        state.invalidate();
+        return;
+      }
+      intro.done = true;
+    }
     const active = input.active();
     // The first frame after idle has a stale clock delta; treat it as one display frame.
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;

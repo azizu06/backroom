@@ -70,6 +70,7 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
   };
   return {
     getSnapshot: () => snapshot,
+    getPresenceConnection: () => snapshot.connection === 'live' ? connection : undefined,
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     disconnect,
     connect() {
