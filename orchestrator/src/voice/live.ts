@@ -32,7 +32,8 @@ if (command === 'setup') {
     controlSecret: required('DEMO_CONTROL_SECRET'), publicOrigin: required('DEMO_PUBLIC_URL') });
   const gatewaySecret = required('TOOL_GATEWAY_SECRET');
   const gateway = bridge.gateway;
-  const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId });
+  const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId,
+    onCallEnded: sessionId => bridge.endCall(sessionId) });
   const adminDigest = createHash('sha256').update(`Bearer ${required('VOICE_ADMIN_SECRET')}`).digest();
   createServer(withVoiceEvidence(async (req, res) => {
     try {
