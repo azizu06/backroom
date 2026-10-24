@@ -66,3 +66,83 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
   await expect(ask.getByRole('alert')).toContainText('The audit chain is broken');
   await expect(ask.getByRole('alert')).toContainText('AUDIT_CHAIN_BROKEN');
 });
+
+test('office judge tour visits the rooms with agent tags and stops on any key', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  // The preview fixture seats three agents; each gets one tag.
+  await expect(page.locator('.seat-statuses > div')).toHaveCount(3);
+  await expect(page.locator('[data-agent-tag]')).toHaveCount(3);
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('tour');
+  await expect(caption).toContainText('Tour');
+  await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Lobby', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Shift');
+  await expect(view).toHaveValue('tween');
+  await expect(caption).not.toContainText('Tour');
+  await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('office judge tour advances under reduced motion and stops on a click', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('tour');
+  await expect(caption).toContainText('Tour · 1 of');
+  await expect(caption).toContainText('Tour · 2 of', { timeout: 8000 });
+  const box = await page.getByTestId('office-viewport').boundingBox();
+  await page.mouse.click(box!.x + 8, box!.y + 8);
+  await expect(view).toHaveValue('tween');
+  await expect(caption).not.toContainText('Tour');
+  expect(errors).toEqual([]);
+});
+
+test('office judge tour is not cancelled by the view select navigation keys', async ({ page }) => {
+  // Portable: dispatch the keydown on the select itself, so no platform-specific native-select behaviour is involved.
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('tour');
+  await expect(caption).toContainText('Tour · 1 of');
+  for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown']) await view.dispatchEvent('keydown', { key });
+  await expect(view).toHaveValue('tour');
+  await expect(caption).toContainText('Tour');
+  // Any other key on the select still ends the tour.
+  await view.focus();
+  await page.keyboard.press('Tab');
+  await expect(view).toHaveValue('tween');
+  await expect(caption).not.toContainText('Tour');
+});
+
+test('office judge tour started with the native select arrow keys', async ({ page, browserName }) => {
+  // A closed <select> changes value on ArrowDown/ArrowUp in Linux/Windows Chromium; macOS opens the popup instead.
+  test.skip(process.platform === 'darwin' || browserName !== 'chromium', 'native select arrow-key navigation is platform-specific');
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('plan');
+  await view.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(view).toHaveValue('tour');
+  await page.waitForTimeout(500);
+  await expect(caption).toContainText('Tour · 1 of');
+  await page.keyboard.press('ArrowUp');
+  await expect(view).toHaveValue('plan');
+  await expect(page.getByLabel('2D office floor plan')).toBeVisible();
+  await view.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(view).toHaveValue('tour');
+  await page.keyboard.press('Tab');
+  await expect(view).toHaveValue('tween');
+});
