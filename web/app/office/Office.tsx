@@ -14,6 +14,10 @@ import { INITIAL_VIEWPORT, VIEW_OPTIONS, isFixedCamera, viewportLayers, viewport
 import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStops } from '../../lib/office/tour';
 import { OfficeLobby } from './OfficeLobby';
 import { OfficeHelp } from './OfficeHelp';
+import { StoryMode } from './StoryMode';
+import { useStoryMode } from './useStoryMode';
+import type { StoryChapter } from '../../lib/office/story';
+import { SoundToggle } from './SoundToggle';
 import { PresenceChip } from './PresenceChip';
 import { usePresence } from './usePresence';
 import { FloorPlan } from './FloorPlan';
@@ -38,9 +42,9 @@ const OfficeScene = dynamic(() => import('./scene').then(module => module.Office
 });
 
 /** All finance state comes through OfficeState. Commands belong to an authenticated controller. */
-export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: {
+export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, storyStart = false, storyPreview }: {
   source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
-  auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode;
+  auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode; storyStart?: boolean; storyPreview?: (preview: StoryChapter['preview']) => void;
 }) {
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
@@ -53,7 +57,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
-  const presence = usePresence({ mode, hud: play.hud });
+  const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
   function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
@@ -69,6 +73,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   const touring = mode === 'tour';
   const [tour, setTour] = useState<{ stops: AnchorId[]; index: number } | null>(null);
   const rooms = visibleRooms(snapshot);
+  const { storyActive, reducedMotion, chapters, closeStory, changeStoryChapter, startStory, viewportRef } = useStoryMode({
+    rooms, storyStart, setFocus, setInspecting, setTour, pickMode,
+  });
   const roomsRef = useRef(rooms);
   roomsRef.current = rooms;
   const stopTour = useCallback(() => dispatch({ type: 'endTour' }), []);
@@ -80,7 +87,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   }, [stopTour]);
   // The tour only moves the camera: each stop is a focus change, and finishing returns to the full floor.
   useEffect(() => {
-    if (!touring) return;
+    if (!touring || storyActive) return;
     const stops = tourStops(roomsRef.current);
     const started = performance.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -98,13 +105,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
     }
     step();
     return () => { clearTimeout(timer); setTour(null); };
-  }, [touring]);
+  }, [touring, storyActive]);
   // Added after the switch to the tour commits, so the select interaction that started it does not cancel it.
   useEffect(() => {
-    if (!touring) return;
+    if (!touring || storyActive) return;
     for (const type of TOUR_INTERRUPT_EVENTS) window.addEventListener(type, interruptTour, { capture: true, passive: true });
     return () => { for (const type of TOUR_INTERRUPT_EVENTS) window.removeEventListener(type, interruptTour, { capture: true }); };
-  }, [touring, interruptTour]);
+  }, [touring, interruptTour, storyActive]);
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
@@ -131,6 +138,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
+        <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
         <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
           {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
         </select></label>
@@ -140,14 +148,15 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       <button aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); }}>Full floor</button>
       {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
     </nav>
-    <div className='office-viewport' data-testid='office-viewport'>
+    <div ref={viewportRef} className='office-viewport' data-testid='office-viewport'>
+      <SoundToggle snapshot={snapshot} />
       <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} presence={presence.peers} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} presence={presence.peers} />
           </div>
           {/* The footer seat statuses already announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
@@ -169,6 +178,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
+      {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
     <footer className='office-footer'>
@@ -195,11 +205,11 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   </section>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */
-export function MockOffice() {
+export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
   const [mock] = useState(createMockOfficeState);
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
-  return <Office source={mock.source} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
+  return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Preview only</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>

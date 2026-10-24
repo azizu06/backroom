@@ -59,6 +59,12 @@ test('office demo guide and keyboard shortcuts help open and restore focus', asy
   const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(shortcuts).toBeVisible();
   await expect(shortcuts).toContainText('Interact');
+  // Focus stays inside the modal on Tab and Shift+Tab, so Escape still closes it.
+  const close = shortcuts.getByRole('button', { name: 'Close' });
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(close).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(shortcuts).toHaveCount(0);
   await page.getByLabel('Office view').selectOption('play');
