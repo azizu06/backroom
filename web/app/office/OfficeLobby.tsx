@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { AskWhyVoice } from '../../components/AskWhyVoice';
 import { AuditWall } from '../../components/AuditWall';
+import PaymentLinkPanel from '../../components/PaymentLinkPanel';
 import './lobby.css';
 
-/** Read-only lobby: the server's audit record plus ask-why. Answers cite entries; they never approve or pay. */
+/** Read-only lobby: the server's audit record, ask-why and the payment link kiosk. Answers cite entries; they never approve or pay. */
 export function OfficeLobby() {
   const [chainValid, setChainValid] = useState(true);
   return <>
@@ -13,6 +14,7 @@ export function OfficeLobby() {
       <div className='office-lobby-wall' data-office-mount='audit-wall-live'><AuditWall onChainChange={setChainValid} showAsk={false} headingLevel={3} /></div>
       <aside className='office-lobby-ask' data-office-mount='ask-why'><AskWhyVoice label='Ask why by voice' disabled={!chainValid}
         disabledReason='The audit chain is broken, so ask-why is paused (AUDIT_CHAIN_BROKEN).' /></aside>
+      <aside className='office-lobby-pay' data-office-mount='payment-link' aria-label='Payment link kiosk'><PaymentLinkPanel /></aside>
     </div>
   </>;
 }
