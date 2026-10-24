@@ -6,9 +6,10 @@ import { requestSceneFrame } from '../../lib/office/frame';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
-  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
+  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { crosshairView } from '../../lib/office/playFeel';
 import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
@@ -16,6 +17,7 @@ import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
 import './play.css';
+import './playfeel.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
 export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
@@ -77,6 +79,18 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
     <label className='play-setting play-setting-check'>
       <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked })} /> Invert Y (look)
     </label>
+    <fieldset className='play-setting-group'><legend>Movement feel</legend>
+      <label className='play-setting play-setting-check'>
+        <input type='checkbox' checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked })} /> Smooth movement
+      </label>
+      <label className='play-setting play-setting-check'>
+        <input type='checkbox' checked={settings.headBob} onChange={event => change({ ...settings, headBob: event.target.checked })} /> Head bob
+      </label>
+      <label className='play-setting play-setting-check'>
+        <input type='checkbox' checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked })} /> Field-of-view kick
+      </label>
+      <p className='play-settings-note'>All three stay off while your system asks to reduce motion.</p>
+    </fieldset>
     <p className='play-settings-note'>Saved in this browser only.</p>
     <button className='play-settings-reset' onClick={() => change(DEFAULT_PLAY_SETTINGS)}>Reset to defaults</button>
   </section>;
@@ -136,6 +150,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
     };
   }, [hud, input]);
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
+  useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
   useEffect(() => {
     if (panel && !playPanel(snapshot, panel)) { setPanel(null); hud.current?.focus(); }
   }, [panel, snapshot, hud]);
@@ -256,7 +271,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
 
   useGamepad({ input, enabled: true, move: !panel, onInteract: panel ? undefined : interact, onExit: panel ? closePanel : onExit });
 
-  const prompt = target && !panel ? targetLabel(snapshot, target) : '';
+  const { state: aim, prompt } = crosshairView(target ? targetLabel(snapshot, target) : null, !!panel);
   return <div className='play-hud'>
     <PlayMinimap snapshot={snapshot} hud={hud} />
     <div ref={hud} className='play-surface' tabIndex={0} role='application' data-touch={touch || undefined}
@@ -269,9 +284,9 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
         requestSceneFrame();
       }}
       onPointerDown={onSurfacePointerDown} onPointerMove={onSurfacePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} />
-    <div className='play-crosshair' aria-hidden='true' />
+    <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
-    <p className='play-prompt' aria-live='polite'>{prompt && `E · ${prompt}`}</p>
+    <p className='play-prompt' aria-live='polite'>{prompt}</p>
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     {touch && <>
@@ -279,7 +294,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
         onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
         <span ref={knob} />
       </div>
-      {prompt && <button className='play-interact' onClick={interact}>Interact</button>}
+      {aim === 'target' && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
     {settingsOpen && <PlaySettingsDialog settings={settings} change={changeSettings} close={closeSettings} />}
     {chat && <ProximityChat chat={chat} open={chatOpen} onOpen={openChat} onClose={() => setChatOpen(false)} hud={hud} />}
