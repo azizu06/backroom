@@ -9,6 +9,7 @@ import { CONVERSATIONS, runConversation } from './conversation';
 import { JUDGE_CASES, runJudgeCase, type JudgeCase } from './judge';
 import { PRECALL_STOPS, runPrecallStop } from './precall';
 import { runInboxTeam } from './inbox-team';
+import { runCallButton } from './call-button';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
@@ -158,6 +159,8 @@ for (const id of PRECALL_STOPS) {
   precallStops.push(run);
   if (!run.match) gaps.push({ id: `${id}:precall`, detail: `Pre-call stop missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 }
+const callButton = await runCallButton();
+if (!callButton.match) gaps.push({ id: 'call-button', detail: `In-app call button missed: ${Object.entries(callButton.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const conversations = [];
 for (const name of CONVERSATIONS) {
   const run = await runConversation(name);
@@ -194,6 +197,7 @@ const rates = {
   arConversations: fraction(conversations.filter(row => row.match).length, conversations.length),
   judgeCalls: fraction(judgeRuns.filter(row => row.match).length, judgeRuns.length),
   precallStops: fraction(precallStops.filter(row => row.match).length, precallStops.length),
+  callButton: fraction(callButton.passed, callButton.total),
   inboxTeam: fraction(Number(inboxTeam.match), 1),
   bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
@@ -203,7 +207,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -226,6 +230,7 @@ const report = {
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
     pdfExtraction: pdfRun ? `${pdfRun.scope} Recorded ${pdfRun.recordedAt} at ${String(pdfRun.baseCommit).slice(0, 7)}; p50 ${pdfRun.p50LatencyMs} ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.` : 'not recorded',
     precallStops: `${precallStops[0]?.scope ?? 'not run'} Scenarios: ${precallStops.map(row => row.id).join(', ')}.`,
+    callButton: callButton.scope,
     inboxTeam: inboxTeam.scope,
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
@@ -240,7 +245,7 @@ const report = {
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
     after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
-  failover: failoverRuns, conversations, judgeCalls: judgeRuns, precallStops, inboxTeam, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  failover: failoverRuns, conversations, judgeCalls: judgeRuns, precallStops, callButton, inboxTeam, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;
@@ -266,6 +271,7 @@ const lines = [
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
+  `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once) | ${display(rates.callButton)} |`,
   `| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0, mismatched origin rejected) | ${display(rates.inboxTeam)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
@@ -290,4 +296,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !inboxTeam.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
