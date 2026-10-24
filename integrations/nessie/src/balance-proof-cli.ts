@@ -4,11 +4,11 @@ import { FileClaims, NessieClient } from './index';
 import { runBalanceProof } from './balance-proof';
 
 // Read only:              pnpm --filter @backroom/nessie balance-proof
-// Fresh account + $1:     pnpm --filter @backroom/nessie balance-proof -- --confirm-sandbox
-// Fresh account, no deposit: add --deposit 0
+// Clean judge account ($0): pnpm --filter @backroom/nessie balance-proof -- --confirm-sandbox
+// Proof account (rise shown): add --deposit 1. That account starts at $1, so do NOT give it to judges.
 const args = process.argv.slice(2);
 const flag = args.indexOf('--deposit');
-const depositDollars = flag >= 0 ? Number(args[flag + 1]) : 1;
+const depositDollars = flag >= 0 ? Number(args[flag + 1]) : 0;
 const root = resolve(import.meta.dirname, '../../..');
 // Same durable claim domain as live.ts, so CLI writes never repeat an ambiguous POST.
 const claims = new FileClaims(resolve(root, '.nessie-state/claims'));
