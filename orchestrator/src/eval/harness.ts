@@ -349,6 +349,12 @@ async function plantedStopCase(step: PolicyStep): Promise<{ kind: string; seams:
   const next = await post('propose_plan', 'next', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
   const blocked = next.kind === 'DENY' && next.rule_ids?.includes('CALL_STOPPED');
   if (!blocked) return { kind: 'STOP_NOT_PERSISTED', seams };
+  if (step.operation === 'persist_bankruptcy_and_stop_calls_offers_links') {
+    const link = await post('send_payment_link', 'link', { plan_id: 'eval-unapproved-plan' });
+    const after = await store.transact(call.callId, current => current);
+    if (link.kind !== 'DENY' || !link.rule_ids?.includes('CALL_STOPPED') || after.links.length !== 0) return { kind: 'STOP_NOT_PERSISTED', seams };
+    seams.push('gateway:send_payment_link');
+  }
   return { kind: spec.rule, seams };
 }
 
