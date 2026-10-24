@@ -85,7 +85,10 @@ audit receipts. See [live receipt scope and reproduction](evidence/live-run/READ
 ## Maincloud state (opt-in; local fallback retained)
 
 The full module is published at <https://spacetimedb.com/backrooms-calhacks13>.
-See [Maincloud evidence](t8-spacetime.md) before making hosted latency claims.
+The [Maincloud office parity](evidence/maincloud-parity/README.md) passes with
+20/20 network-inclusive request-to-frame samples below 1s (max 208 ms).
+Reproduce with `DEMO_SPACETIME=maincloud pnpm demo:parity` after a production
+web build and CLI browser login. `pnpm demo:parity` remains the local lane.
 Server processes use `STATE_STORE=spacetime`,
 `SPACETIMEDB_URI=wss://maincloud.spacetimedb.com`, and
 `SPACETIMEDB_DATABASE=backrooms-calhacks13`, plus the publisher's private

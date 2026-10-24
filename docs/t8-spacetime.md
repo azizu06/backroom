@@ -72,7 +72,7 @@ The page only subscribes. Reducers perform permission checks with the renderer c
 or open; no UI event triggers authority or changes room permissions. Full §4.9 audit
 parity needs the forthcoming full schema and orchestrator adapter, and is not claimed here.
 
-## Maincloud: published (office parity pending)
+## Maincloud: VERIFIED
 
 On 2026-10-24, Aziz completed `spacetime login --no-browser` using CLI 2.13.0.
 `login show` confirmed the authenticated identity without printing a token.
@@ -92,9 +92,40 @@ failure. The full current-main schema/reducers published successfully:
 - Publisher credentials remain private server configuration; never expose them
   through browser props, public env vars, evidence, board posts or command output.
 
-Publication and a successful seed do not establish office parity or network
-latency. Hosted parity evidence is pending. Local standalone remains the default
-fallback; a Maincloud outage must not silently substitute simulated state.
+`DEMO_SPACETIME=maincloud pnpm demo:parity` passed on 2026-10-24 at
+13:48:26 UTC (06:48 PDT), against two fresh hosted databases. See the committed
+[proof and screenshots](evidence/maincloud-parity/README.md).
+
+- Browser closed/open runs: 10 byte-identical normalized audit rows, both chains
+  valid; IDs preserved; only `ts`, `hash` and `prevHash` excluded.
+- Closed-world office catch-up, authenticated reducer DENY preserving the agent,
+  visible red door (`audit:11`), and OFF propagation all passed.
+- Anonymous renderer: zero state writes and zero browser errors.
+- 20/20 request-to-frame samples below 1000 ms: min 86.2 ms, median (upper middle)
+  104.3 ms, nearest-rank p95 168.3 ms, max 207.7 ms. These include network time.
+  The browser uses `performance.now()` before reducer dispatch until DOM target
+  commit plus two animation frames. This includes Playwright/controller overhead;
+  it does not subtract a remote server clock or measure physical display latency.
+- The parity run made no bank, voice or model requests. Hosted publication does
+  not establish persistence for the separately in-memory gateway/finance stores.
+
+Reproduction (authenticated CLI 2.13.0, production web build):
+
+```sh
+pnpm --filter @backroom/web build
+DEMO_SPACETIME=maincloud pnpm demo:parity
+# Default local lane remains unchanged:
+pnpm demo:parity
+```
+
+`SPACETIME_CLI` / `SPACETIME_ROOT` select the CLI install; `SPACETIME_CONFIG`
+optionally selects a different authenticated CLI config for hosted parity. Do not
+pass the manager's own root config again: CLI 2.13.0 can stall publishing when
+that same config is explicitly supplied twice. Each parity run publishes two
+fresh owned databases and retains them for evidence; no shared DB is reset.
+
+Local standalone remains the default fallback; a Maincloud outage must not
+silently substitute simulated state.
 
 ## Scope and continuation
 
