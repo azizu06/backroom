@@ -9,6 +9,8 @@ export { createCallPlanner } from './planner';
 export { createCrsCreditCheck, createApifyHealthCheck } from './adapters';
 export { createApifyRunner, createPreCallHealthCheck, APIFY_DEMO_COMPANY } from './apify';
 export { fakeCreditCheck, fakeHealthCheck } from './fakes';
+export { recordSignals, signalsFromCrs, signalsFromHealth } from './signals';
+export type { SignalRow, SignalSink } from './signals';
 
 /** Prepares a plan only. The dial boundary must re-read state and evaluate call_client again. */
 export async function runPreCall(input: PreCallInput, deps: PreCallDependencies): Promise<PreCallResult> {
