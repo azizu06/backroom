@@ -4,16 +4,16 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "7af08249dbae88dbbf3f4e26a811f162c59abc98",
+    "baseCommit": "37cc03f298e83b756104952fe25e93d65a248780",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "accf5a5567a238bcfb337a3ec2564cd4e914178e7943efed5d1184f77312cbae",
+      "orchestrator/src/agents/eval/conversation.ts": "c4cd8e828a12e5dc782ad6ffc7162ef9661d19fd98c0591132236c1b88ca7b60",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "6d113616ff096e94961dc63be0b691e97bbdaca6dc5cd2d6e37165a6febf1671",
-      "orchestrator/src/agents/eval/call-button.ts": "b4c4b7df803fac52fb740d105c680e6fb012d5512c932d3556385c1a886cac58",
+      "orchestrator/src/agents/eval/call-button.ts": "e5743c6322744bed184de2d9029f35c1d7bc1a3967a6d4b5ced6fed1c9d1ffb2",
       "orchestrator/src/agents/eval/failover.ts": "9506d421ed7f91396eeed59c0752743a93c7ea887352a3159382d15dc607f36c",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
@@ -13976,7 +13976,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
-        "identityDenied": true
+        "identityDenied": true,
+        "numberFlagged": true
       },
       "callStatus": "human_requested",
       "caseStatus": "held",
@@ -13994,7 +13995,9 @@
         "collections.planner.get_invoice_context",
         "collections.planner.can_call",
         "collections.planner.run_precall",
-        "collections.planner.start_call"
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     },
