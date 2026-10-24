@@ -22,3 +22,6 @@ spacetime/dist/
 
 # Local Nessie idempotency claims; preserve across restarts.
 .nessie-state/
+
+# Owned demo processes, private controls, tunnel configuration and logs
+.demo/
