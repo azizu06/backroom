@@ -81,8 +81,9 @@ export function executeTool(
     input.tool === "report_already_paid"
   ) {
     const [status, speak] = stops[input.tool];
-    // Opt-out is sticky even if a later tool classifies the call differently.
-    if (call.status !== "opted_out") call.status = status;
+    // Opt-out sets opted_out from any status. A human hold stays until that opt-out.
+    if (input.tool === "record_opt_out") call.status = "opted_out";
+    else if (call.status !== "opted_out" && call.status !== "human_requested") call.status = status;
     call.outbox.push({ type: input.tool });
     // Asking for a human is how the voice agent handles anything it does not recognize: escalate.
     audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED", [input.tool.toUpperCase()]);

@@ -602,6 +602,28 @@ describe("Cartesia tool gateway", () => {
       expect((await store.transact("call-1", call => call)).status).toBe("human_requested");
     });
 
+    it.each(["report_already_paid", "mark_dispute", "request_human"])("a human hold stays after a later %s", async (later) => {
+      const store = new MemoryGatewayStore([judgeCall()], new MemoryStateStore());
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      const unknown = await post(gateway, "refund_late_fee", { call_id: "call-1", webhook_request_id: "unknown" });
+      expect(unknown.status).toBe(200);
+      expect(await unknown.json()).toMatchObject({ kind: "ESCALATE", can_confirm: false, rule_ids: ["UNRECOGNIZED_REQUEST"] });
+      const follow = await post(gateway, later, { call_id: "call-1", webhook_request_id: "later" });
+      expect(follow.status).toBe(200);
+      const body = await follow.json();
+      expect(body.kind).toBe("RECORDED");
+      if (later === "request_human") expect(body).toEqual({ kind: "RECORDED", can_confirm: false, speak: "I have requested a human to follow up and paused collection." });
+      expect((await store.transact("call-1", call => call)).status).toBe("human_requested");
+    });
+
+    it.each([["record_opt_out", "refund_late_fee"], ["refund_late_fee", "record_opt_out"]])("%s then %s stays opted out", async (first, second) => {
+      const store = new MemoryGatewayStore([judgeCall()], new MemoryStateStore());
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      await post(gateway, first, { call_id: "call-1", webhook_request_id: "first" });
+      await post(gateway, second, { call_id: "call-1", webhook_request_id: "second" });
+      expect((await store.transact("call-1", call => call)).status).toBe("opted_out");
+    });
+
     it("an unrecognized tool never un-stops an opted-out call", async () => {
       const store = new MemoryGatewayStore([{ ...judgeCall(), status: "opted_out" }], new MemoryStateStore());
       const gateway = createGateway({ secret: () => "test-secret", store });
