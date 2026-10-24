@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instances, OrbitControls } from '@react-three/drei';
 import { Group, MathUtils, Vector3 } from 'three';
@@ -14,6 +14,8 @@ import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING, officeLightRig } from '../../lib/office/lighting';
 import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights';
 import { ROLES } from '../../lib/office/palette';
+import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
+import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
 import { PresenceGhosts } from './PresenceGhosts';
@@ -71,12 +73,19 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
     poseBear(rig, walk.distance, walk.moving && !tween && !recorded, reduced);
   });
+  const bakedVersion = useSyncExternalStore(subscribeBakedCharacters, bakedCharacterVersion, () => 0);
+  // The character mount sets this only after that agent's GLB clone exists. Otherwise the bear stays.
+  const showGlb = bakedVersion > 0 && bakedCharacterReady(agent.id);
   const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
-  return <group ref={body} position={[motion.position[0], 0, motion.position[1]]}>
-    <Bear color={color} seed={agent.id} rig={rig} carry={agent.escalationId ? 'paw' : 'none'} paw={agent.escalationId && <group name={`folder:${agent.escalationId}`}>
-      <Block at={[0.05, 0.04, 0.14]} size={[0.1, 0.43, 0.5]} color='#e0b365' />
-      <Block at={[0.06, 0.13, 0.14]} size={[0.11, 0.04, 0.34]} color='#f3dfb9' />
-    </group>} />
+  const folder = agent.escalationId ? <group name={`folder:${agent.escalationId}`}>
+    <Block at={[0.05, 0.04, 0.14]} size={[0.1, 0.43, 0.5]} color='#e0b365' />
+    <Block at={[0.06, 0.13, 0.14]} size={[0.11, 0.04, 0.34]} color='#f3dfb9' />
+  </group> : null;
+  // Same paw the bear holds the folder in (bear.ts pawPosition). The GLB has no paw, so the folder sits there on its own.
+  const carried = pawPosition(1, BEAR_CARRY_PAW);
+  return <group ref={body} name={`agent:${agent.id}`} position={[motion.position[0], 0, motion.position[1]]}>
+    {showGlb ? null : <Bear color={color} seed={agent.id} rig={rig} carry={agent.escalationId ? 'paw' : 'none'} paw={folder} />}
+    {showGlb && folder && <group position={[carried[0], carried[1], carried[2]]}>{folder}</group>}
   </group>;
 }
 /** Tour moves start from wherever the camera is when the frame after a focus change renders. */
