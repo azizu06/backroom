@@ -24,7 +24,9 @@ try {
     const { before, after } = result.fresh;
     console.log(`\nProvider account.balance: $${before.accountBalance} -> $${after.accountBalance} (${result.fresh.providerBalanceRose ? 'ROSE' : 'unchanged'})`);
     console.log(`Labelled display (account balance + posted deposits): $${before.displayTotal} -> $${after.displayTotal}`);
-    console.log(`\nTo show judges a rising balance from $0, set in .env.local and restart the host:\nNESSIE_ACCOUNT_ID=${result.fresh.accountId}`);
+    console.log(after.displayTotal === 0
+      ? `\nClean $0 account. For judges, set in .env.local and restart the host:\nNESSIE_ACCOUNT_ID=${result.fresh.accountId}`
+      : `\nThis proof account starts at $${after.displayTotal}. Do NOT give it to judges: rerun without --deposit for a clean $0 account.`);
   }
   console.log(`\nEvidence: ${evidence}`);
 } catch (error) {
