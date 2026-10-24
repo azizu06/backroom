@@ -14,8 +14,9 @@ import { createCollectionsPlannerSpecialist } from '../roles/collections';
 import { MemoryVendorEvidenceStore, type VendorToolDeps } from '../tools/vendor';
 import { ApifyBudget } from '../tools/vendor-apify';
 import { MemoryStateStore } from '../../store';
+import { createRouter } from '../../router';
 import { createNorthfieldRepository, northfield, northfieldInvoice, northfieldSource, PayablesSeat } from '../../payables';
-import type { InvoiceFields } from '../../payables';
+import type { FinanceRepository, InvoiceFields } from '../../payables';
 
 const fixtureRoot = fileURLToPath(new URL('../../../../fixtures/', import.meta.url));
 export interface Trace { role: Role; tool: string; output: Json }
@@ -51,11 +52,13 @@ export async function auditCase(store: MemoryStateStore, id: string, refs: strin
 }
 
 export async function runInvoice(id: string, options: { caseId?: string; pendingBankChange?: boolean; senderDomain?: string;
-  candidate?: InvoiceFields } = {}) {
+  candidate?: InvoiceFields; repository?: FinanceRepository; state?: MemoryStateStore;
+  /** P12: route extraction through the production router with GX10 healthy or cut; records routing audits. */
+  gx10?: 'healthy' | 'cut' } = {}) {
   const caseId = options.caseId ?? `ap:${id}`;
   const trace: Trace[] = [];
-  const repository = await createNorthfieldRepository();
-  const state = new MemoryStateStore();
+  const repository = options.repository ?? await createNorthfieldRepository();
+  const state = options.state ?? new MemoryStateStore();
   const fields = northfieldInvoice(id);
   const source = { ...northfieldSource(id), ...(options.senderDomain && { senderDomain: options.senderDomain }) };
   const seedInvoice = northfield.apInvoices.find(row => row.id === id)!;
@@ -69,22 +72,35 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
 
   // Explicit oracle-fed mock: this tests the schema/evidence path, NOT document reading ability.
   let extraction: ExtractionArtifact | undefined;
+  const gx10: typeof fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+    output: options.candidate ?? fields, confidence: 1,
+  }) } }] }), { status: 200 });
+  // P12 link cut: every GX10 request fails; the canned Anthropic transport returns the same oracle candidate.
+  const cut: typeof fetch = async () => { throw new TypeError('fetch failed'); };
+  const cloudBodies: { system: string; messages: unknown }[] = [];
+  const router = options.gx10 && createRouter({ stateStore: state, anthropicApiKey: 'offline-eval-not-a-key', anthropicModel: 'claude-sonnet-5-5',
+    fetch: async (url, init) => {
+      if (!String(url).startsWith('https://api.anthropic.com/')) return options.gx10 === 'cut' ? cut(url, init) : gx10(url, init);
+      cloudBodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ model: 'claude-sonnet-5-5', stop_reason: 'end_turn', usage: { input_tokens: 1500, output_tokens: 400 },
+        content: [{ type: 'text', text: JSON.stringify({ output: options.candidate ?? fields, confidence: 0.95 }) }] });
+    } });
   const extractor: ExtractorDependencies = { readDocument: async () => ({ text }),
     saveExtraction: async (_ctx, artifact) => { extraction = artifact; return `extraction:${caseId}`; },
-    fetch: async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
-      output: options.candidate ?? fields, confidence: 1,
-    }) } }] }), { status: 200 }) };
+    fetch: options.gx10 === 'cut' ? cut : gx10, ...(router && { router, audit: state }) };
   const verifier: VendorToolDeps = { loadCase: async () => ({ vendorId: fields.vendorId, kind: 'invoice',
     senderDomain: source.senderDomain, claimedAccountId: fields.bankAccountId }), vendors: repository,
-    bankChangeRisk: { check: async () => ({ score: 0, label: 'FAKE offline fixture; not checked', checkedAt: northfield.snapshotAt }) },
+    bankChangeRisk: { check: async () => ({ score: 0, label: 'FAKE: synthetic fraud risk (not checked)' }) },
     publicRecords: async () => ({ bankruptcies: 0, evidenceRef: 'mock:public-records-clear' }),
     health: { check: async () => ({ signals: [{ type: 'website_reachable', value: vendor.footprint.websiteReachable,
       sourceUrl: `https://${vendor.knownDomain}/`, observedAt: northfield.snapshotAt }] }) },
     contact: async () => { throw new Error('OFFLINE_CONTACT_NOT_CONFIGURED'); },
     budget: new ApifyBudget(), evidence: new MemoryVendorEvidenceStore(), now: () => Date.parse(northfield.snapshotAt) };
   const receipts: string[] = [];
-  const seat = new PayablesSeat({ repository, state, controller,
-    nessie: { payInvoice: async () => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt); return { id: receipt, status: 'completed' }; } } });
+  const destinations: string[] = [];
+  const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'nessie', bankChangeRisk: verifier.bankChangeRisk,
+    nessie: { payInvoice: async payment => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt);
+      destinations.push(payment.destinationAccountId); return { id: receipt, status: 'completed' }; } } });
   const store = new MemoryHandoffStore({ audit: state });
   const ledger = new MemoryUsageLedger();
   const roles = createRoleRegistry({ intake, extractor, vendor: verifier,
@@ -136,7 +152,11 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
   return { id, caseId, vendorDecision, historical: seedInvoice.status === 'paid',
     actual: ['failed', 'paused', 'cancelled'].includes(dispatched.status) ? 'ERROR' as const
       : result.status === 'paid' ? 'ALLOW' as const : 'HOLD' as const,
-    extraction: extraction?.fields, assessment, vendor: verdict, result, mockDebits: receipts.length, trace,
+    routing: { audits: (await state.listAudit()).filter(row => row.action === 'extraction_routed')
+      .map(row => ({ route: row.route, ruleIds: row.ruleIds, model: row.inputs?.model, latencyMs: row.latencyMs, costUsd: row.costUsd })),
+      cloudRequests: cloudBodies.length,
+      cloudTextOnly: cloudBodies.every(body => JSON.stringify(body.messages) === JSON.stringify([{ role: 'user', content: JSON.stringify(text) }])) },
+    extraction: extraction?.fields, assessment, vendor: verdict, result, mockDebits: receipts.length, destinations, trace,
     runtime: { status: dispatched.status, reason: dispatched.reason,
       activations: dispatched.activations.map(row => ({ role: row.role, kind: row.kind, reason: row.reason, model: row.model })),
       handoffs: dispatched.handoffs.map(row => ({ from: row.from, to: row.to, status: row.status })),
@@ -178,13 +198,11 @@ export async function runReceivable(id: string, caseId = `ar:${id}`) {
   return { id, result, audit, trace };
 }
 
-/** Only the pre-call permit seam is measured here. Scenario speech is exercised by the legacy harness. */
-export async function runCollectionsPermit(id: string, invoiceId: string, overrides: Record<string, any> = {}) {
+/** Network-forbidden dependencies for the production Collections planner. */
+export function collectionsPlannerFixture(id: string, invoiceId: string, overrides: Record<string, any> = {}) {
   const invoice = northfield.arInvoices.find(row => row.id === invoiceId)!;
   const client = northfield.clients.find(row => row.id === invoice.clientId)!;
   const state = new MemoryStateStore();
-  const trace: Trace[] = [];
-  const ctx = context(id, 'collections', [`ar_invoice:${invoiceId}`]);
   const { spec } = createCollectionsPlannerSpecialist({
     cases: { load: async () => ({ sessionId: `mock:${id}`, invoice: { amountCents: invoice.principalCents + invoice.lateFeeCents,
       currency: 'USD', daysPastDue: 30 }, precall: { clientId: client.id, invoiceId, testIdentityId: 0,
@@ -199,6 +217,14 @@ export async function runCollectionsPermit(id: string, invoiceId: string, overri
       health: { check: async () => { throw new Error('OFFLINE_HEALTH_FORBIDDEN'); } },
       planner: { draft: async () => { throw new Error('OFFLINE_MODEL_FORBIDDEN'); } } },
   });
+  return { spec, state };
+}
+
+/** Only the pre-call permit seam is measured here. Scenario speech is exercised by the legacy harness. */
+export async function runCollectionsPermit(id: string, invoiceId: string, overrides: Record<string, any> = {}) {
+  const trace: Trace[] = [];
+  const ctx = context(id, 'collections', [`ar_invoice:${invoiceId}`]);
+  const { spec } = collectionsPlannerFixture(id, invoiceId, overrides);
   await call(spec, ctx, trace, 'get_invoice_context');
   const result = await call(spec, ctx, trace, 'can_call');
   return { id, result, trace };
