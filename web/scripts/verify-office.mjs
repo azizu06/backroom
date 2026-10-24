@@ -25,11 +25,28 @@ for (const [room, slug] of [['Lobby', 'lobby'], ['Collections', 'collections'], 
   await capture(slug);
 }
 await page.getByRole('button', { name: 'Full floor', exact: true }).click();
-await page.getByRole('button', { name: 'Collections badge limits', exact: true }).click();
-await expect(page.getByRole('region', { name: 'Collections details' })).toContainText('maxInstallments');
-await expect(page.getByRole('region', { name: 'Collections details' })).toContainText('feesWaivablefalse');
+const collectionsLabel = page.getByRole('button', { name: /^Collections · badge v[0-9]+ · open limits$/ });
+const collectionsDialog = page.getByRole('dialog', { name: 'Collections', exact: true });
+const closeCollections = collectionsDialog.getByRole('button', { name: 'Close Collections details', exact: true });
+await collectionsLabel.click();
+await expect(closeCollections).toBeFocused();
+await expect(collectionsDialog).toContainText('maxInstallments');
+await expect(collectionsDialog).toContainText('feesWaivablefalse');
 await capture('badge-limits');
-await page.getByRole('button', { name: 'Close room details' }).click();
+// Escape in an unrelated control must leave the non-modal inspector open.
+await page.getByLabel('Office view').focus();
+await page.keyboard.press('Escape');
+await expect(collectionsDialog).toBeVisible();
+await expect(page.getByLabel('Office view')).toBeFocused();
+await closeCollections.focus();
+await page.keyboard.press('Escape');
+await expect(collectionsDialog).toHaveCount(0);
+await expect(collectionsLabel).toBeFocused();
+await page.keyboard.press('Enter');
+await expect(closeCollections).toBeFocused();
+await closeCollections.click();
+await expect(collectionsDialog).toHaveCount(0);
+await expect(collectionsLabel).toBeFocused();
 await page.getByRole('button', { name: 'Full floor', exact: true }).click();
 const started = Date.now();
 await page.getByRole('button', { name: 'Preview escalation', exact: true }).click();

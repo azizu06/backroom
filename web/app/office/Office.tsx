@@ -79,16 +79,11 @@ function RoomInspector({ room, snapshot, close, inboxTray }: {
   const closeButton = useRef<HTMLButtonElement>(null);
   const headingId = useId();
   useEffect(() => { closeButton.current?.focus(); }, [room]);
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (isCloseKey(event.key)) { event.preventDefault(); close(); }
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [close]);
   const badge = snapshot.badges.find(row => row.seatId === room);
   const denial = matchingDenial(snapshot, room);
-  return <section className='room-inspector' role='dialog' aria-labelledby={headingId}>
+  return <section className='room-inspector' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+    if (isCloseKey(event.key)) { event.preventDefault(); close(); }
+  }}>
     <header><h2 id={headingId}>{OFFICE_ANCHORS[room].name}</h2><button ref={closeButton} onClick={close} aria-label={`Close ${OFFICE_ANCHORS[room].name} details`}>×</button></header>
     {badge ? <>
       <p>Policy version {badge.policyVersion}</p>
