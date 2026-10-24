@@ -13,6 +13,9 @@ export interface ReconciliationCase {
   correctionReturns: number;
   paymentLinkId?: string;
   vendorId?: string;
+  /** Dispatcher hosts: the one agent activation this Collections task lease was handed to. The agent
+   * activation is fenced by ctx.assertCurrent; the task lease by assertLease. Omit for direct-lease hosts. */
+  activationId?: string;
 }
 export interface ReconciliationDependencies {
   store: StateStore;
@@ -25,6 +28,11 @@ export const MAX_RECONCILIATION_RETURNS = 2;
 const empty = z.strictObject({});
 const exceptionInput = z.strictObject({ reason: z.string().trim().min(1).max(500) });
 
+/** Exactly one case per activation: a host-declared pairing (Dispatcher) or the lease is the activation (direct hosts). */
+export const leaseBound = (row: ReconciliationCase, ctx: ToolContext) => row.activationId !== undefined
+  ? row.activationId === ctx.activation.activationId
+  : row.lease.id === ctx.activation.taskId && row.lease.leaseOwner === ctx.activation.leaseOwner && row.lease.leaseToken === ctx.activation.leaseToken;
+
 /** No arbitrary invoice/account selectors, amounts, approvals or receipt imports. */
 export function createReconciliationTools(deps: ReconciliationDependencies): readonly DomainTool<any, Json>[] {
   async function current(ctx: ToolContext) {
@@ -34,8 +42,7 @@ export function createReconciliationTools(deps: ReconciliationDependencies): rea
     if (row.caseId !== ctx.activation.caseId || !ctx.activation.artifactRefs.includes(row.invoiceRef)
       || !row.invoiceId || !row.expectedMemo.trim() || !Number.isSafeInteger(row.amountCents) || row.amountCents <= 0
       || !Number.isSafeInteger(row.correctionReturns) || row.correctionReturns < 0
-      || row.lease.id !== ctx.activation.taskId || row.lease.leaseOwner !== ctx.activation.leaseOwner
-      || row.lease.leaseToken !== ctx.activation.leaseToken || !row.lease.refs.includes(row.invoiceId)
+      || !leaseBound(row, ctx) || !row.lease.refs.includes(row.invoiceId)
       || row.lease.seatId !== 'collections') throw new Error('RECONCILIATION_CASE_MISMATCH');
     await deps.store.assertLease(row.lease, Date.now());
     await ctx.assertCurrent();

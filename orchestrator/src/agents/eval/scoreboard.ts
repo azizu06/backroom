@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { northfield, northfieldInvoice } from '../../payables';
 import { runEval, scriptedPersona } from '../../eval/harness';
+import { runFailoverPair } from './failover';
+import { CONVERSATIONS, runConversation } from './conversation';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
+import { runBankChange } from './bank-change';
+import { runRecovery } from './recovery';
+import { runBadgeAttack } from './badge-attack';
+import { evaluatorSourceHash } from './provenance';
 import { score, type Observation } from './score';
 
 // All outbound network attempts fail closed, including accidental provider calls in future adapters.
@@ -46,6 +52,9 @@ for (const invoice of northfield.apInvoices) {
 
 // Use only explicit key labels for accuracy: the other AP invoices do not have per-item expected decisions.
 const gradedAP = [];
+// P12 replays the keyed AP steps of its comparison scenarios with GX10 healthy, then cut.
+const failoverScenarioIds: string[] = apScenarios.find((row: any) => row.id === 'P12').steps[0].comparisonScenarioIds;
+const failoverRuns = [];
 for (const scenario of apScenarios) {
   const entry = key.payables[scenario.id];
   for (const [index, step] of scenario.steps.entries()) {
@@ -57,6 +66,8 @@ for (const scenario of apScenarios) {
     const run = await runInvoice(invoiceId, { caseId: `${scenario.id}:${index}`,
       pendingBankChange: step.vendorOverrides?.pendingBankChange,
       senderDomain: step.vendorOverrides?.sourceDomain });
+    if (failoverScenarioIds.includes(scenario.id)) failoverRuns.push(await runFailoverPair(scenario.id, invoiceId,
+      { caseId: `P12:${scenario.id}:${index}`, pendingBankChange: step.vendorOverrides?.pendingBankChange, senderDomain: step.vendorOverrides?.sourceDomain }));
     const wanted = step.operation === 'vendor_evidence_gate' ? 'HOLD' : expected.kind === 'ALLOW' ? 'ALLOW' : 'HOLD';
     const observation: Observation = { id: `${scenario.id}/${index}`, expected: wanted, actual: run.actual,
       fraud: expected.ruleIds?.includes('LOOKALIKE_DOMAIN') ?? false,
@@ -98,11 +109,54 @@ for (const invoice of northfield.arInvoices) {
   if (expected && expected !== actual) gaps.push({ id: scenario.id, detail: `Reconciler expected ${expected}, got ${actual}.` });
 }
 const legacy = await runEval({ persona: scriptedPersona });
+const recoveryRuns = [];
+for (const variant of [{ lateCancel: false }, { lateCancel: true }, { checkpoint: 'before_provider' as const }]) {
+  const run = await runRecovery(variant);
+  recoveryRuns.push(run);
+  const name = variant.checkpoint === 'before_provider' ? 'pre-provider' : variant.lateCancel ? 'late-cancel' : 'late-tool';
+  if (run.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') gaps.push({ id: `P11:memory:${name}`,
+    detail: 'Expired memory activation recovery failed; see retained recovery observation.' });
+}
+const badgeAttack = await runBadgeAttack();
+const badgeIsolationMatch = badgeAttack.outcome === 'REFUSED_NO_PAYMENT_CAPABILITY';
+const badgePolicyExpected = key.payables.P10.expectedSteps[0];
+const badgePolicyMatch = badgeAttack.policyReference.kind === badgePolicyExpected.kind &&
+  JSON.stringify(badgeAttack.policyReference.ruleIds) === JSON.stringify(badgePolicyExpected.ruleIds);
+if (!badgeIsolationMatch) gaps.push({ id: 'P10:dispatcher', detail: 'Collections tool isolation failed during the scripted badge attack.' });
+if (!badgePolicyMatch) gaps.push({ id: 'P10:policy', detail: 'The separate direct policy reference disagrees with the frozen key.' });
+const bankChange = await runBankChange();
+const bankChangeMatch = bankChange.outcome === key.payables.P04.plantedRule;
+if (!bankChangeMatch) gaps.push({ id: 'P04:dispatcher', detail: `Dispatcher bank-change workflow returned ${bankChange.outcome}.` });
+const bankChangeGuards = [];
+for (const approval of ['missing', 'deny', 'voice'] as const) {
+  const run = await runBankChange({ approval });
+  const match = run.master.accountId === run.beforeApproval.accountId && run.master.revision === run.beforeApproval.revision &&
+    run.appliedStatus !== 'approved' && run.after.actual === 'HOLD' && run.destinations.length === 0;
+  bankChangeGuards.push({ approval, match, appliedStatus: run.appliedStatus, master: run.master,
+    destinations: run.destinations, runtime: run.after.runtime, spokenRejected: run.spokenRejected });
+  if (!match) gaps.push({ id: `P04:${approval}`, detail: 'Unapproved bank change escaped the hold or made a payment.' });
+}
+for (const run of failoverRuns) if (!run.match) gaps.push({ id: `P12:${run.id}`,
+  detail: run.sameOutcome ? 'GX10-cut run kept the outcome but cloud_fallback routing or audit evidence is missing.' : 'GX10-cut run changed the outcome vector.' });
+const failoverCovered = new Set(failoverRuns.map(row => row.scenarioId));
+const failoverComplete = failoverRuns.length > 0 && failoverRuns.every(row => row.match);
+const failoverUnreplayed = failoverScenarioIds.filter(id => !failoverCovered.has(id));
 for (const row of legacy.reports) {
   for (const violation of row.violations) gaps.push({ id: row.id, detail: `Existing eval: ${violation}` });
+  // P12's integration step is executed by the dispatcher failover pairs above, not by the legacy runner.
+  if (row.id === 'P12' && failoverComplete) {
+    if (failoverUnreplayed.length) gaps.push({ id: 'P12:scope', detail: `No keyed AP invoice step to replay for ${failoverUnreplayed.join(', ')}; their GX10 failover is not measured here.` });
+    continue;
+  }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
-gaps.push({ id: 'AR_RUNTIME', detail: 'AR probes exercise real specialist DomainTools with a Collections reducer lease, but do not drive the dispatcher/post-call role or a voice conversation. Those end-to-end runtime outcomes remain unmeasured.' });
+const conversations = [];
+for (const name of CONVERSATIONS) {
+  const run = await runConversation(name);
+  conversations.push(run);
+  if (!run.match) gaps.push({ id: `AR:${run.scenarioId}:${name}`, detail: `Scripted call through the Dispatcher missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
+}
+gaps.push({ id: 'AR_RUNTIME', detail: 'Six AR conversations (C02, C06, C07, C08, C10, C12) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor. Caller lines and voice-agent tool choices are scripted; Cartesia speech, live phone and the other collections scenarios are not driven through the Dispatcher.' });
 const metrics = score(observations);
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
 const rates = {
@@ -112,14 +166,24 @@ const rates = {
   exactAPRules: fraction(gradedAP.filter(row => row.exactRuleMatch === true).length, gradedAP.filter(row => row.exactRuleMatch !== null).length),
   collectionsPermits: fraction(permits.filter(row => row.match === true).length, permits.filter(row => row.match !== null).length),
   reconciliation: fraction(receivables.filter(row => row.match === true).length, receivables.filter(row => row.match !== null).length),
+  dispatcherMemoryRecovery: fraction(recoveryRuns.filter(row => row.outcome === 'RECOVERED_ONE_MOCK_DEBIT').length, recoveryRuns.length),
+  runtimeBadgeIsolation: fraction(Number(badgeIsolationMatch), 1),
+  dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
+  gx10Failover: fraction(failoverRuns.filter(row => row.match).length, failoverRuns.length),
+  arConversations: fraction(conversations.filter(row => row.match).length, conversations.length),
+  bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
 };
 const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
-    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'score.ts', 'scoreboard.ts'].map(name => {
-      const path = `orchestrator/src/agents/eval/${name}`; return [path, sha(path)];
+    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+      const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
+    })),
+    recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
+      const path = `orchestrator/src/agents/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json'].map(path => [path, sha(path)])),
@@ -130,14 +194,24 @@ const report = {
     extraction: 'Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.',
     providers: 'Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.',
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
-    payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 passkey application, P10 badge attack, P11 recovery and P12 failover are legacy checks/gaps.',
+    payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.',
+    recovery: recoveryRuns[0]!.scope,
+    arConversations: conversations[0]?.scope ?? 'not run',
+    gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
+    badgeAttack: badgeAttack.scope,
+    bankChange: bankChange.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
     unscored: 'The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy.' },
   coverage: { apRuntimeErrors: invoiceRuns.filter(row => row.actual === 'ERROR').map(row => row.id),
     historicalItems: invoiceRuns.filter(row => row.historical).length,
     historicalMockDebits: invoiceRuns.filter(row => row.historical).reduce((sum, row) => sum + row.mockDebits, 0) },
   rates, ap: invoiceRuns, gradedAP, permits, receivables,
-  legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  recovery: recoveryRuns,
+  badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
+  bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
+    before: { ...bankChange.before, trace: undefined, extraction: undefined },
+    after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
+  failover: failoverRuns, conversations, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;
@@ -159,12 +233,18 @@ const lines = [
   `| Authoritative AP decision rule agreement | ${display(rates.exactAPRules)} |`,
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
+  `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
+  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out) | ${display(rates.arConversations)} |`,
+  `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
+  `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
+  `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,
+  `| P12 GX10 cut: same outcome with audited cloud_fallback (mock transport) | ${display(rates.gx10Failover)} |`,
   `| Existing eval answer-key checks (partial execution permitted) | ${display(rates.legacyKeyChecks)} |`,
   `| Existing eval scenarios with no unexecuted integration step | ${display(rates.legacyCompleteScenarios)} |`, '',
   '## Coverage and limits', '',
   ...Object.entries(report.scope).map(([name, value]) => `- **${name}**: ${value}`), '',
   '- Every AP invoice runs from a fresh repository snapshot, including historical invoices. Every AR invoice gets a reconciliation trial; every scenario is visited by the existing eval and every collections scenario gets a permit probe.',
-  '- Only the initial hold is measured for legitimate bank changes. That hold is required and is not counted as a false hold. No role was tuned to the key.',
+  '- Initial AP decisions retain the required legitimate-bank-change hold and do not count it as a false hold. Separately, P04 runs the production runtime/dispatcher before and after VendorSeat applies a ControllerApprovals-verified software passkey receipt on the same repository. This is two cases around a code-owned human boundary, not an autonomous agent approval or human tap. No role was tuned to the key.',
   '- The frozen key has 34 team-authored scenarios and zero external scenarios. Small planted-trap denominators cannot support a general fraud-detection claim.', '',
   '## Disagreements and unexecuted evidence', '',
   ...(gaps.length ? gaps.map(row => `- **${row.id}**: ${row.detail}`) : ['No disagreements in the measured seams.']), '',
@@ -177,4 +257,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR')) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete) process.exitCode = 1;

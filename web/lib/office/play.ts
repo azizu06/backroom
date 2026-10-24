@@ -2,6 +2,7 @@
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
+import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -9,11 +10,11 @@ import { DESKS, DESK_RADIUS, DESK_SIZE } from "./targets/desk";
 import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
-import type { HandoffResolver, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+import type { CoworkerSpot, HandoffResolver, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
 export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
-export type { PlayPanelEntry, PlayTarget, Vec2 };
+export type { CoworkerSpot, PlayPanelEntry, PlayTarget, Vec2 };
 
 export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
@@ -118,6 +119,10 @@ export class PlayInput {
   readonly joystick: [number, number] = [0, 0];
   lookYaw = 0;
   lookPitch = 0;
+  /** Walking speed multiplier from the viewer's Play settings. */
+  speed = 1;
+  /** Game-feel switches from the viewer's Play settings; the rig also applies reduced motion. */
+  feel: FeelFlags = DEFAULT_FEEL;
   press(control: PlayControl) { this.held.add(control); }
   release(control: PlayControl) { this.held.delete(control); }
   setJoystick(x: number, y: number) {
@@ -143,7 +148,7 @@ export function moveIntent(input: PlayInput, yaw: number, dt: number): [number, 
   const side = (input.held.has("right") ? 1 : 0) - (input.held.has("left") ? 1 : 0) + input.joystick[0];
   const length = Math.hypot(ahead, side);
   if (!length || dt <= 0) return [0, 0];
-  const scale = Math.min(1, 1 / length) * WALK_SPEED * dt;
+  const scale = Math.min(1, 1 / length) * WALK_SPEED * input.speed * dt;
   const [fx, fz] = forwardOf(yaw), [rx, rz] = rightOf(yaw);
   return [(fx * ahead + rx * side) * scale, (fz * ahead + rz * side) * scale];
 }
@@ -164,10 +169,10 @@ export function targetKey(target: PlayTarget | null): string {
 
 /**
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
- * each visible desk at its room centre, the Treasury door, the lobby payment kiosk and the GX10 server.
+ * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
  */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
-  const context = { agents, visible: new Set(rooms), handoffAgents };
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = [], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), handoffAgents, coworkers };
   return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 
@@ -196,7 +201,7 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
 }
 
 export function headBob(distance: number, moving: boolean, reduced: boolean): number {
-  return reduced || !moving ? 0 : Math.sin(distance * 7) * 0.035;
+  return reduced || !moving ? 0 : bobHeight(distance, 1);
 }
 
 export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;
@@ -215,4 +220,6 @@ export interface PlayBridge {
   readonly input: PlayInput;
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };
+  /** Other viewers in Play (soft targets), read on each rig frame. */
+  readonly coworkers?: { readonly current: readonly CoworkerSpot[] };
 }

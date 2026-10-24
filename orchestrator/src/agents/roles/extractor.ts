@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { invoiceSchema, vendorSchema } from '../../payables/schemas';
 import type { Activation, DomainTool, Json, Specialist, ToolContext } from '../contracts';
-import { localExtract, type ExtractorDocument } from '../tools/local-extract';
+import type { StateStore } from '../../store';
+import { extractWithFallback, type ExtractionRouter, type ExtractorDocument, type RoutedExtraction } from '../tools/local-extract';
 
 export type ExtractionArtifact = {
   kind: 'validated_extraction'; documentRef: string; fields: Json; bankAccountUsage: 'evidence_only';
@@ -12,6 +13,10 @@ export interface ExtractorDependencies {
   /** Persist immutable evidence, checking lease/generation atomically at commit. No master/payment writes. */
   saveExtraction(ctx: ToolContext, artifact: ExtractionArtifact): Promise<string>;
   fetch?: typeof fetch;
+  /** Cloud fallback when GX10 is unreachable; defaults to the production router. */
+  router?: ExtractionRouter;
+  /** Records route, model, latency and cost for every extraction (local and cloud_fallback). Defaults to the shared StateStore. */
+  audit?: Pick<StateStore, 'appendAudit'>;
 }
 const ref = z.string().min(1).max(256);
 const documentInput = z.object({ documentRef: ref }).strict();
@@ -84,15 +89,21 @@ export function createExtractorSpecialist(deps: ExtractorDependencies): Speciali
       if (!document) return { decision: 'DENY', errors: ['READ_DOCUMENT_FIRST'] };
       if (s.localAttempts >= MAX_ATTEMPTS) return { decision: 'ESCALATE', errors: ['LOCAL_ATTEMPTS_EXHAUSTED'], next: 'intake' };
       s.localAttempts++;
-      let result;
-      try { result = await localExtract(document, ctx.activation.signal, deps.fetch); }
+      let result: RoutedExtraction;
+      try { result = await extractWithFallback(document, ctx.activation.signal, { fetch: deps.fetch, router: deps.router }); }
       catch {
         await ctx.assertCurrent();
         ctx.activation.signal.throwIfAborted();
         return { decision: 'DENY', errors: ['LOCAL_EXTRACTION_FAILED'], attemptsRemaining: MAX_ATTEMPTS - s.localAttempts };
       }
       await ctx.assertCurrent();
-      if (result.confidence < .7) return { decision: 'ESCALATE', errors: ['LOW_CONFIDENCE'], next: 'intake' };
+      const sink = deps.audit ?? (await import('../../runtime')).getStateStore();
+      await sink.appendAudit({ ts: Date.now(), actor: result.route === 'local' ? 'local_model' : 'claude', seat: 'controller',
+        action: 'extraction_routed', ruleIds: result.route === 'cloud_fallback' ? ['ROUTE_FALLBACK'] : [], policyVersion: 0,
+        refs: [ctx.activation.caseId, args.documentRef], route: result.route, latencyMs: result.latencyMs, costUsd: result.costUsd,
+        inputs: { model: result.model, taskType: 'field_extraction', activationId: ctx.activation.activationId } });
+      if (result.confidence !== undefined && result.confidence < .7) return { decision: 'ESCALATE', errors: ['LOW_CONFIDENCE'], next: 'intake' };
+      // Cloud output is the same untrusted candidate: it still needs validate_extraction.
       s.localRefs.add(args.documentRef);
       return { decision: 'ALLOW', documentRef: args.documentRef, ...result };
     }),
