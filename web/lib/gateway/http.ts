@@ -7,6 +7,8 @@ export function createGateway(options: {
   secret: () => string | undefined;
   store: GatewayStore;
   decide?: DecidePlan;
+  /** Trusted state read before each new action, never from webhook JSON. */
+  currentPolicy?: () => ReturnType<import('@backroom/orchestrator').StateStore['getPolicy']>;
   approvalBridge?: (call: import("./store").GatewayCall, input: import("./parser").Invocation, result?: import("./store").ToolResult) => Promise<void>;
 }) {
   return async (tool: string, request: Request) => {
@@ -47,6 +49,11 @@ export function createGateway(options: {
             duplicate: true,
             speak: "This delivery was already processed.",
           };
+        }
+        if (options.currentPolicy) {
+          const policy = await options.currentPolicy();
+          call.policyState = { ...call.policyState, policy };
+          call.policyVersion = policy.policyVersion;
         }
         await options.approvalBridge?.(call, input);
         const result = executeTool(call, input, options.decide);

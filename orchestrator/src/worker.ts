@@ -79,8 +79,10 @@ export class SeatWorker {
         await store.completeTask(lease, escalation?.status === 'approved' ? 'done' : 'denied', this.now());
         this.lease = undefined; return;
       }
-      const step = task.steps[task.cursor];
+      let step = task.steps[task.cursor];
       if (!step) { await store.completeTask(lease, 'done', this.now()); this.lease = undefined; return; }
+      const policy = await store.getPolicy();
+      step = { ...step, context: { ...step.context, policy, policyVersion: policy.policyVersion } };
       const decision = (this.options.evaluate ?? evaluateStep)(seat, step);
       await store.appendAudit({ ts: this.now(), actor: 'code', seat, action: step.action.type,
         ruleIds: decision.ruleIds, policyVersion: decision.policyVersion, refs: task.refs,

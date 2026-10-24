@@ -1,14 +1,42 @@
 import { consumeVerifiedApproval, type VerifiedApproval } from './approvals/verified';
 import { AuditLog } from './audit';
-import type { Decision } from '@backroom/policy';
+import { DEFAULT_POLICY, savePolicy, type Decision, type Policy } from '@backroom/policy';
 import type { Agent, AgentState, AuditEntry, AuditInput, Escalation, Invoice, InvoiceState,
-  CallEscalation, Lease, NewTask, PaymentReceipt, Seat, StateStore, Task } from './store';
+  CallEscalation, Lease, NewTask, PaymentReceipt, Seat, StateStore, Task, PolicyLimits } from './store';
 
 const copy = <T>(value: T): T => structuredClone(value);
 export { hashAudit } from './audit';
 
 /** Single-process reducer analogue: no awaits inside read/check/write sections. */
 export class MemoryStateStore implements StateStore {
+  private policies = new Map<number, Policy>([[1, copy(DEFAULT_POLICY)]]);
+  private currentPolicyVersion = 1;
+  async getPolicy(version = this.currentPolicyVersion): Promise<Policy> {
+    const policy = this.policies.get(version);
+    if (!policy) throw new Error('POLICY_NOT_FOUND');
+    return copy(policy);
+  }
+  async savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number): Promise<Policy> {
+    if (expectedVersion !== this.currentPolicyVersion) throw new Error('POLICY_CONFLICT');
+    if (!limits || Object.keys(limits).sort().join(',') !== 'maxInstallments,maxPaymentCents,maxPlanDays,minFirstPct'
+      || !Number.isSafeInteger(limits.maxInstallments) || limits.maxInstallments < 1
+      || !Number.isFinite(limits.minFirstPct) || limits.minFirstPct < 0 || limits.minFirstPct > 100
+      || !Number.isSafeInteger(limits.maxPlanDays) || limits.maxPlanDays < 0
+      || !Number.isSafeInteger(limits.maxPaymentCents) || limits.maxPaymentCents < 1) throw new Error('INVALID_LIMITS');
+    const previous = this.policies.get(this.currentPolicyVersion)!;
+    const draft = copy(previous);
+    Object.assign(draft.badges.collections.limits, { maxInstallments: limits.maxInstallments,
+      minFirstPct: limits.minFirstPct, maxPlanDays: limits.maxPlanDays });
+    draft.badges.payables.maxPaymentCents = limits.maxPaymentCents;
+    const next = savePolicy(previous, draft);
+    // No await in this check/write section; audit failure leaves policy unchanged.
+    this.append({ ts: now, actor: 'human', seat: 'controller', action: 'save_policy', ruleIds: ['POLICY_SAVED'],
+      policyVersion: next.policyVersion, refs: [`policy:v${previous.policyVersion}`, `policy:v${next.policyVersion}`],
+      route: 'code', latencyMs: 0, costUsd: 0, inputs: { previousVersion: previous.policyVersion, limits: copy(limits), method: 'demo_pin' } });
+    this.policies.set(next.policyVersion, next);
+    this.currentPolicyVersion = next.policyVersion;
+    return copy(next);
+  }
   private modelController = new AbortController();
   private modelsEnabled = true;
   get llmEnabled() { return this.modelsEnabled; }

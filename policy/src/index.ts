@@ -8,7 +8,15 @@ export { POLICY_SENTENCES, RULE_SENTENCES, type RuleId } from "./sentences";
 
 function block(policy: Policy, rule: RuleId, kind: "DENY" | "ESCALATE", message: string): Decision {
   const sentenceId = RULE_SENTENCES[rule];
-  const quote = { sentenceId, text: POLICY_SENTENCES[sentenceId] };
+  const limits = policy.badges.collections.limits;
+  const saved: Partial<Record<RuleId, string>> = {
+    MAX_INSTALLMENTS: `maximum installment count: ${limits.maxInstallments}`,
+    MIN_FIRST_PCT: `minimum first-payment percentage: ${limits.minFirstPct}%`,
+    MAX_PLAN_DAYS: `maximum plan duration: ${limits.maxPlanDays} days`,
+    OVER_LIMIT: `Payables limit: $${(policy.badges.payables.maxPaymentCents / 100).toFixed(2)}`,
+  };
+  const annotation = policy.policyVersion > 1 && saved[rule] ? ` Saved ${saved[rule]} in v${policy.policyVersion}.` : '';
+  const quote = { sentenceId, text: POLICY_SENTENCES[sentenceId] + annotation };
   const fields = { ruleIds: [rule], policyVersion: policy.policyVersion, quote,
     reason: `${message.replace(/\bDana\b/g, () => policy.toHuman)} Your policy says: “${quote.text}”` };
   return kind === "DENY" ? { kind, ...fields } : { kind, ...fields, toHuman: policy.toHuman };
