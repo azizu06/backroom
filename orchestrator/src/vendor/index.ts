@@ -1,3 +1,6 @@
+import { createBankChangeRiskCheck, assessBankChangeRisk } from './crs';
+export { createBankChangeRiskCheck, createCrsBankChangeRisk } from './crs';
+export type { BankChangeRisk } from './crs';
 import { DEFAULT_POLICY, evaluate } from '@backroom/policy';
 import { audit, domain, hold } from '../payables/decisions';
 import { sourceSchema, vendorSchema } from '../payables/schemas';
@@ -12,7 +15,8 @@ export interface VendorChecks {
   footprint(vendorId: string): Promise<{ websiteReachable: boolean; listingOperating: boolean; domain: string; evidenceRef: string }>;
 }
 export class VendorSeat {
-  constructor(private readonly options: SeatOptions & { checks: VendorChecks }) {}
+  constructor(private readonly options: SeatOptions & { checks: VendorChecks }) { this.risk = options.bankChangeRisk ?? createBankChangeRiskCheck(); }
+  private readonly risk: ReturnType<typeof createBankChangeRiskCheck>;
   async propose(unchecked: VendorFields, envelope: InboxSource): Promise<SeatResult> {
     const fields = vendorSchema.parse(unchecked), source = sourceSchema.parse(envelope), repo = this.options.repository;
     return repo.withVendorLock(`proposal:${source.id}`, () => repo.withVendorLock(`vendor:${fields.vendorId}`, async () => {
@@ -62,6 +66,13 @@ export class VendorSeat {
           if (sanctioned) decision = hold('OFAC_STOP');
           else if (!verified) decision = hold('INVALID_INPUT');
         } catch { decision = hold('INVALID_INPUT'); }
+      }
+      const risk = fields.kind === 'bank_change' && vendor
+        ? await assessBankChangeRisk(this.risk, vendor.id, vendor.domain) : undefined;
+      if (risk) {
+        refs.push(...risk.refs);
+        if (risk.decision && !sanctioned) { decision = risk.decision; verified = false; }
+        await audit(this.options, 'vendor_onboarding', 'bank_change_fraud_check', source, decision, risk.refs, risk.inputs);
       }
       const result: SeatResult = { status: sanctioned || decision.ruleIds.includes('LOOKALIKE_DOMAIN') ? 'rejected' : verified ? 'awaiting_controller' : 'held', decision, evidenceRefs: refs };
       const change: BankChange = { id: source.id, fields, source, baselineRevision: vendor?.revision ?? null, verified, result };

@@ -1,4 +1,5 @@
 import type { APInvoice, Decision, LineItem } from '@backroom/policy';
+import type { BankChangeRisk } from '../vendor/crs';
 import type { StateStore } from '../store';
 
 export interface InboxSource { id: string; source: 'seed' | 'judge'; senderDomain: string }
@@ -56,5 +57,6 @@ export interface ControllerPort {
 }
 export interface SeatOptions {
   repository: FinanceRepository; state: Pick<StateStore, 'appendAudit' | 'getEscalation' | 'expireEscalations'>;
+  bankChangeRisk?: BankChangeRisk;
   controller: ControllerPort; now?: () => number;
 }
