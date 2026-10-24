@@ -32,7 +32,8 @@ export async function cartesia(path, body, method = body ? 'POST' : 'GET') {
   // Error payloads can contain request data. Keep them in gitignored local evidence.
   const text = await response.text();
   if (!response.ok) {
-    writeFileSync('.env.t1/last-error.json', text, { mode: 0o600 });
+    // A dial error can echo the destination: do not persist that response body.
+    writeFileSync('.env.t1/last-error.json', path === '/agents/calls' ? JSON.stringify({ status: response.status }) : text, { mode: 0o600 });
     throw new Error(`Cartesia ${method} ${path}: HTTP ${response.status}; see private evidence`);
   }
   return JSON.parse(text);
@@ -153,7 +154,7 @@ async function main() {
     if (process.env.T1_DIAL_GO !== 'yes') throw new Error('Firstmate target-and-go approval required (T1_DIAL_GO=yes)');
     const number = required('T1_DIAL_TO');
     if (!/^\+1\d{10}$/.test(number)) throw new Error('T1 requires a US E.164 destination');
-    const consent = { number, source: required('T1_CONSENT_SOURCE'), text: required('T1_CONSENT_TEXT'), timestamp: required('T1_CONSENT_AT') };
+    const consent = { number_reference: '.env.local:T1_DIAL_TO', source: required('T1_CONSENT_SOURCE'), text: required('T1_CONSENT_TEXT'), timestamp: required('T1_CONSENT_AT') };
     if (!Number.isFinite(Date.parse(consent.timestamp)) || Date.parse(consent.timestamp) > Date.now()) throw new Error('Invalid consent timestamp');
     if (process.env.T1_B2B_TEST !== 'yes') throw new Error('T1_B2B_TEST=yes required for the synthetic B2B scenario');
     const local = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date());
@@ -163,7 +164,7 @@ async function main() {
     const demoOverride = process.env.DEMO_OVERRIDE === 'true';
     if (!inWindow && !demoOverride) throw new Error('CALL_WINDOW: set DEMO_OVERRIDE=true for the consenting demo');
     if (!state.agent_id || !state.number_id || !state.callback_number) throw new Error('Run setup and number first');
-    // Store the consent before any dial request. This private file contains the number.
+    // Store consent before dialing; the destination itself stays only in .env.local.
     writeFileSync('.env.t1/consent.json', JSON.stringify(consent, null, 2), { mode: 0o600 });
     state.dial_requested_at = new Date().toISOString();
     save(state);
@@ -173,8 +174,8 @@ async function main() {
       outbound_calls: [{ to_number: number, dynamic_variables: { callback_number: state.callback_number } }],
     });
     // A 200 can still carry a per-destination failure. Never retry an ambiguous dial automatically.
-    writeFileSync('.env.t1/dial-result.json', JSON.stringify(result), { mode: 0o600 });
     const call = result.calls?.[0];
+    writeFileSync('.env.t1/dial-result.json', JSON.stringify({ accepted: Boolean(call?.agent_call_id && !call.error), call_id: call?.agent_call_id }), { mode: 0o600 });
     if (!call?.agent_call_id || call.error) throw new Error('Dial rejected; see private dial-result.json. No automatic retry.');
     state.call_id = call.agent_call_id; save(state);
     console.log('Dial accepted. Await actual ring confirmation and Cartesia call_turn; no automatic retry.');

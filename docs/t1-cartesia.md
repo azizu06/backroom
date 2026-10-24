@@ -1,6 +1,6 @@
 # T1 Cartesia smoke test
 
-Status: **PENDING — no outbound dial yet** (2026-10-24). M4 implementation is gated on a real T1 pass.
+Status: **FAIL — first attempt did not exercise the mid-call tool** (2026-10-24). M4 implementation remains gated on a real T1 pass. The phone and event delivery worked; a coordinated retest is needed before calling this a platform go/no-go failure.
 
 | Check | Evidence | Result |
 | --- | --- | --- |
@@ -9,9 +9,13 @@ Status: **PENDING — no outbound dial yet** (2026-10-24). M4 implementation is 
 | Number | Free Cartesia US number provisioned; number itself costs $0; calling usage remains metered | Setup complete |
 | Public HTTPS tool route | Cloudflared quick tunnel → local `/api/tools/t1_echo`; authenticated probe HTTP 200, 105 ms; no credentials HTTP 401 | Setup probe only |
 | Event route and replay | `/api/voice/cartesia`: authenticated synthetic event HTTP 200, 95 ms; missing secret HTTP 401; retry returned `duplicate: true` | Setup probe only |
-| Actual phone ring ≤60 s | No dial authorized yet | NOT TESTED |
-| Mid-call tool round trip ≤2 s | Public probe is not a Cartesia mid-call measurement | NOT TESTED |
-| Actual `call_turn` receipt | Synthetic event does not count | NOT TESTED |
+| Actual phone ring ≤60 s | Dial request at 07:56:07.594Z; connected call starts 07:56:15.830606Z and contains real caller speech. Time to connection is 8.236 s, an upper bound on ring time; exact observed ring time was not separately recorded | PASS (upper bound) |
+| Mid-call tool round trip ≤2 s | No tool invocation in the real call; caller interruptions prevented identity confirmation. Public probe is not a Cartesia mid-call measurement | FAIL / latency unmeasured |
+| Actual `call_turn` receipt | First real event received 07:56:17.033Z, Cartesia event time 07:56:17.003135821Z; call `ac_Zk7d1K54Kson8CpMgMmm5J` | PASS |
+
+Firstmate relayed explicit consent and target-and-go at 07:55:42Z. The destination remains only in `.env.local:T1_DIAL_TO`; the private consent fixture records source/text/timestamp and that env reference. `DEMO_OVERRIDE` was logged because the test was outside calling hours. The call ended with `client_hangup`. The configured fixed welcome was verified via API before dialing, but actual speech was repeatedly interrupted, so full disclosure delivery was **not** demonstrated. No financial amounts were sent to or spoken by the agent. No second call was placed automatically.
+
+A retest should coordinate with the phone owner to let the disclosure finish and answer the synthetic Jordan identity check, then verify the echo response and a measured Cartesia tool duration. Until then, report T1 as failed/incomplete and keep M4 gated; do not represent the tunnel probe as mid-call evidence.
 
 ## Run
 
@@ -37,7 +41,7 @@ node --env-file=.env.local orchestrator/src/voice/t1.mjs number
 node --env-file=.env.local orchestrator/src/voice/t1.mjs setup
 ```
 
-Resource IDs, callback number, consent, API errors, and receipts live only in gitignored `.env.t1/`. The setup command reuses recorded resources. A changed tunnel requires updating the existing webhook/tool URLs before another call; keep the current receiver and tunnel alive through T1. The receiver logs identifiers/timing only, not speech or destination numbers. Synthetic probes are labeled by their synthetic call ID and do not count as live-call evidence.
+Resource IDs, callback number, consent, API errors, and receipts live only in gitignored `.env.t1/`. The dial destination stays only in `.env.local`; the consent fixture references that variable and dial responses omit destination fields. The setup command reuses recorded resources. A changed tunnel requires updating the existing webhook/tool URLs before another call; keep the current receiver and tunnel alive through T1. The receiver logs identifiers/timing only, not speech or destination numbers. Synthetic probes are labeled by their synthetic call ID and do not count as live-call evidence.
 
 **Dial only after firstmate's explicit target-and-go reply.** The opt-in `dial` command requires `T1_DIAL_TO` (US E.164), `T1_DIAL_GO=yes`, `T1_CONSENT_SOURCE`, `T1_CONSENT_TEXT`, `T1_CONSENT_AT` (ISO timestamp), and `T1_B2B_TEST=yes`. Outside weekday 9 AM–6 PM Los Angeles time, also set `DEMO_OVERRIDE=true`; the permit receipt records the override. The target and consent stay in private env/evidence, never this document. T1 is a synthetic Northfield B2B connectivity scenario: it exposes no debt amounts or financial actions. M4 must enforce client-specific policy and identity in its gateway.
 
