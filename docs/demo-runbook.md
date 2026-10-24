@@ -145,7 +145,11 @@ phone by Sun 3 AM. This document does not claim those rehearsals happened.
    An ambiguous dial is **not** automatically retried: the current voice adapter
    requires checking whether it connected first. Current browser WebSocket smoke
    is not yet proof of an integrated tool session. If unavailable, say so and
-   proceed to labeled `pnpm demo:core` / recording; do not improvise a live call.
+   proceed to labeled `STATE_STORE=memory pnpm demo:core` / recording; do not improvise a live call.
+   Main now bundles `/office?replay=core-offline` and `/audit?replay=core-offline`
+   with a persistent REPLAY label, play/pause and phase controls. This recording
+   contains synthetic state/audit, **no call audio**; pair an actual recorded clip
+   with it for the last voice fallback. See `docs/replay-mode.md`.
 2. **GX10 down:** use exported router `route()`'s cloud fallback only after a
    successful cloud probe/live smoke. Last known OpenRouter response in this
    task was HTTP 402. A green GX10 `/models` read is not model-quality or fallback
