@@ -140,3 +140,33 @@ describe("shared motion registry", () => {
     expect(registry.moving).toBe(false);
   });
 });
+
+describe("registry wake-up and replay → live", () => {
+  const alex = { id: "collections-clerk", pos: [-5, -1.8] as const, targetAnchor: "collections" as AnchorId };
+
+  it("reports when a sync changed what the views draw, so an on-demand renderer can request a frame", () => {
+    const registry = new MotionRegistry();
+    expect(registry.sync([alex])).toBe(true);
+    expect(registry.sync([alex])).toBe(false);
+    expect(registry.sync([{ ...alex, targetAnchor: "dana" }])).toBe(true);
+    expect(registry.moving).toBe(true);
+    expect(registry.sync([{ ...alex, targetAnchor: "dana" }])).toBe(false);
+    expect(registry.sync([{ ...alex, pos: [-3, 0.6], targetAnchor: "dana" }])).toBe(true);
+    expect(registry.sync([])).toBe(true);
+  });
+
+  it("walks every agent on to its target when replay hands over to live rows", () => {
+    const registry = new MotionRegistry();
+    registry.sync([{ ...alex, targetAnchor: "dana" }], { recorded: true });
+    const walk = registry.get(alex);
+    expect(walk.moving).toBe(false);
+    expect(registry.sync([{ ...alex, targetAnchor: "dana" }], { recorded: true })).toBe(false);
+    expect(registry.sync([{ ...alex, targetAnchor: "dana" }])).toBe(true);
+    expect(walk.moving).toBe(true);
+    expect(walk.position).toEqual([-5, -1.8]);
+    for (let frame = 0; frame < 360; frame += 1) walk.advance(1 / 60);
+    expect(walk.position).toEqual([0, 2.2]);
+    // Staying live does not restart the walk.
+    expect(registry.sync([{ ...alex, targetAnchor: "dana" }])).toBe(false);
+  });
+});
