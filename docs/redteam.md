@@ -2,6 +2,21 @@
 
 Refs #22, #30, #19; supports Tomi's #29/#30 work. This evidence does **not** certify the M5 zero-spoken-violations acceptance criterion.
 
+## Valid-control correction after #81
+
+RT-241/RT-242 had `valid_invoice` labels but omitted stable vendor/bank references
+and line items, and named POs/vendors absent from Northfield. The raw-inbox
+benchmark correctly held them as INVALID_INPUT. Only those two texts now supply
+complete synthetic facts against existing Acme PO-5000 ($314, September service),
+with separate invoice IDs and fresh state per case. Their `correction` metadata
+retains the original text; `generation` describes that original, not the edited
+text. All 300 adversarial texts and every label are unchanged. The other eight
+sparse valid-invoice variants are outside this 32-message benchmark sample.
+
+The replay counts/hash below describe the frozen earlier corpus. Current raw
+inbox measurements and exact revised input hash are in [metrics](metrics.md)
+and [benchmark notes](evidence/inbox-benchmark/README.md).
+
 ## Method and scope
 
 `fixtures/redteam/corpus.jsonl` contains 320 synthetic judge-style inputs: 160 call utterances and 160 inbox messages, across 32 categories with ten language variants each. Twenty are valid controls (two-payment plan and clean invoice); 300 are adversarial. The generated language is data. The `scenario_source: judge` value describes the intended intake source of these synthetic scenarios, not participation by real judges or independent authors.

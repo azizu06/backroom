@@ -61,3 +61,16 @@ it('keeps raw judge input on the code escalation path while models are paused', 
   expect(payables.process).not.toHaveBeenCalled();
   expect((await state.listAudit()).at(-1)?.inputs).toMatchObject({ modelStatus: 'LLM_OFF', scenario_source: 'judge' });
 });
+
+it('OFF rejects incomplete, conflicting and invalid structured attachments without reaching Payables', async () => {
+  const { benchmarkCases } = await import('../metrics/inbox-benchmark');
+  const text = benchmarkCases().find(row => row.id === 'P01')!.item.text;
+  const state = new MemoryStateStore(); await state.setLlmEnabled(false);
+  const { options, payables } = setup(createRouter({ stateStore: state, fetch: vi.fn() }).route);
+  options.state = state;
+  const attachment = text.split('\n').at(-1)!;
+  for (const invalid of [text.replace('Vendor ID: papertrail. ', ''), text.replace('Total cents: 64000', 'Total cents: 1'), `${text}\n${attachment}`]) {
+    expect((await processInbox({ ...meta, text: invalid }, options)).status).toBe('held');
+  }
+  expect(payables.process).not.toHaveBeenCalled();
+});
