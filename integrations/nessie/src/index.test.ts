@@ -6,9 +6,9 @@ import { FileClaims, NessieClient } from './index.js';
 
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
-async function setup(fetcher: typeof fetch) {
+async function setup(fetcher: typeof fetch, options: { surface?: 'mock' | 'nessie_sandbox' } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'nessie-')); dirs.push(dir);
-  return { dir, client: new NessieClient({ apiKey: 'secret', claims: new FileClaims(dir), fetch: fetcher }) };
+  return { dir, client: new NessieClient({ apiKey: 'secret', claims: new FileClaims(dir), fetch: fetcher, ...options }) };
 }
 it('R13: concurrent clients sharing durable claims issue only one POST', async () => {
   const deposits: unknown[] = [];
@@ -96,11 +96,24 @@ it('labels a display total derived only from API balance and completed balance d
       { _id: 'd4', amount: 77, status: 'completed', medium: 'rewards' },
     ]));
   const { client } = await setup(fetcher);
+  const live = (await import('./index.js')).bankSurfaceCopy('nessie_sandbox');
   expect(await client.readBalanceWithPostedDeposits('a1')).toEqual({
-    label: 'Nessie account balance + Nessie-reported posted deposits',
-    sandboxLabel: 'Nessie = sandbox bank', accountBalance: 10, postedDepositsTotal: 2,
+    ...live,
+    label: live.postedDepositsLabel, accountBalance: 10, postedDepositsTotal: 2,
     displayTotal: 12, postedDepositIds: ['d1'],
   });
+});
+it('labels a mock adapter as an offline bank, not the Nessie sandbox', async () => {
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ balance: 10 }))
+    .mockResolvedValueOnce(Response.json([{ _id: 'mock-deposit-1', amount: 2, status: 'completed', medium: 'balance' }]));
+  const { client } = await setup(fetcher, { surface: 'mock' });
+  const display = await client.readBalanceWithPostedDeposits('a1');
+  expect(display.sandboxLabel).toBe('Mock bank (offline)');
+  expect(display.cardNotice).toBe('Mock bank (offline); simulated card.');
+  expect(display.panelLine).toBe('Mock bank (offline) · simulated card');
+  expect(display.sandboxLabel).not.toContain('Nessie');
+  expect(client.surfaceCopy().surface).toBe('mock');
 });
 it.each([
   [{ _id: 'd1', amount: 2, status: 'completed', medium: 'balance' }, { _id: 'd1', amount: 2, status: 'completed', medium: 'balance' }],

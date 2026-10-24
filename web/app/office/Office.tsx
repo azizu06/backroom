@@ -217,6 +217,8 @@ export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
   return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Preview only</span>
+    <a href='/inbox'>Judge inbox</a>
+    <span>Receipts there are not synced into this static scene.</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>
   </div>} />;

@@ -2,10 +2,42 @@ import { createHash } from 'node:crypto';
 import { mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export const SANDBOX_LABEL = 'Nessie = sandbox bank';
-export const POSTED_DEPOSITS_LABEL = 'Nessie account balance + Nessie-reported posted deposits';
-export interface PostedDepositsDisplay {
-  label: typeof POSTED_DEPOSITS_LABEL; sandboxLabel: typeof SANDBOX_LABEL;
+/** Display copy for the bank adapter actually in use. Live Nessie wording stays on the sandbox adapter only. */
+export type BankSurface = 'mock' | 'nessie_sandbox';
+export interface BankSurfaceCopy {
+  surface: BankSurface;
+  sandboxLabel: string;
+  postedDepositsLabel: string;
+  cardNotice: string;
+  panelLine: string;
+  readbackLabel: string;
+  readNote: string;
+}
+const MOCK_SURFACE: BankSurfaceCopy = {
+  surface: 'mock',
+  sandboxLabel: 'Mock bank (offline)',
+  postedDepositsLabel: 'Mock bank balance + posted deposits (offline)',
+  cardNotice: 'Mock bank (offline); simulated card.',
+  panelLine: 'Mock bank (offline) · simulated card',
+  readbackLabel: 'Mock bank (offline) readback',
+  readNote: 'Read from the offline mock bank. This labeled display is not available funds or proof of settlement.',
+};
+const SANDBOX_SURFACE: BankSurfaceCopy = {
+  surface: 'nessie_sandbox',
+  sandboxLabel: 'Nessie = sandbox bank',
+  postedDepositsLabel: 'Nessie account balance + Nessie-reported posted deposits',
+  cardNotice: 'Nessie = sandbox bank; simulated card.',
+  panelLine: 'Nessie sandbox · simulated card',
+  readbackLabel: 'Nessie sandbox readback',
+  readNote: 'Read from Nessie. This labeled sandbox display is not available funds or proof of settlement.',
+};
+export function bankSurfaceCopy(surface: BankSurface = 'nessie_sandbox'): BankSurfaceCopy {
+  return surface === 'mock' ? MOCK_SURFACE : SANDBOX_SURFACE;
+}
+export const SANDBOX_LABEL = bankSurfaceCopy('nessie_sandbox').sandboxLabel;
+export const POSTED_DEPOSITS_LABEL = bankSurfaceCopy('nessie_sandbox').postedDepositsLabel;
+export interface PostedDepositsDisplay extends BankSurfaceCopy {
+  label: string;
   accountBalance: number; postedDepositsTotal: number; displayTotal: number; postedDepositIds: string[];
 }
 export interface CustomerInput {
@@ -56,6 +88,8 @@ export class MemoryBalanceDisplayCache implements BalanceDisplayCache {
 export const BALANCE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export interface ClientOptions {
   apiKey: string; claims: Claims; fetch?: typeof fetch; baseUrl?: string;
+  /** Which adapter this client is. Defaults to the live Nessie sandbox. */
+  surface?: BankSurface;
   readAttempts?: number; timeoutMs?: number;
   /** Opt-in outage fallback for readBalanceDisplay only. */
   displayCache?: BalanceDisplayCache; displayCacheMaxAgeMs?: number; now?: () => number;
@@ -69,7 +103,9 @@ export function paymentMemo(payment: Pick<Payment, 'invoiceId' | 'installment'>)
 export class NessieClient {
   private readonly fetcher: typeof fetch;
   private readonly baseUrl: string;
+  private readonly copy: BankSurfaceCopy;
   constructor(private readonly options: ClientOptions) {
+    this.copy = bankSurfaceCopy(options.surface);
     if (!options.apiKey) throw new NessieError('API key required');
     this.fetcher = options.fetch ?? fetch;
     this.baseUrl = options.baseUrl ?? 'https://prod-api.nessieisreal.com';
@@ -140,9 +176,11 @@ export class NessieClient {
     }
     const displayTotal = accountBalance + postedDepositsTotal;
     if (!Number.isSafeInteger(displayTotal)) throw new NessieError('invalid posted deposit total');
-    return { label: POSTED_DEPOSITS_LABEL, sandboxLabel: SANDBOX_LABEL, accountBalance, postedDepositsTotal,
+    return { ...this.copy, label: this.copy.postedDepositsLabel, accountBalance, postedDepositsTotal,
       displayTotal, postedDepositIds: [...ids] };
   }
+  /** The label set for this adapter. Payment surfaces render this instead of a hardcoded Nessie string. */
+  surfaceCopy(): BankSurfaceCopy { return this.copy; }
   /**
    * readBalanceWithPostedDeposits for display, live first. During a Nessie outage only, it returns the last good
    * figures labelled "cached at HH:MM UTC" (at most 24 h old). Invalid data and refusals still throw. Health probes,
