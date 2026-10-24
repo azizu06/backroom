@@ -1,7 +1,7 @@
 # Proof-it-works metrics
 
-Generated: 2026-10-24T09:23:04.003Z
-Source git SHA: `43dc6384fe824d2738f5c52ac050384462cf66bc` (report/tool changes may be uncommitted at generation time).
+Generated: 2026-10-24T09:23:36.279Z
+Source git SHA: `295328b63b85c03a06591d593b99b6ecde4d64c9` (report/tool changes may be uncommitted at generation time).
 Exact command (repository root): `pnpm metrics --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/collections.audit.json --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/inbox.audit.json --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/off.audit.json`
 
 Refs #29 #32; spec §7.2. Saved-run mode verifies retained audit chains without network calls. Live service scope and simulation boundaries are documented in [receipt notes](evidence/live-run/README.md); the live-model sample uses an explicit GX10-only operator override. Historical service receipts are labeled separately.
