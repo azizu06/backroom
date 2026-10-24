@@ -34,7 +34,7 @@ describe('ClaudeAgentRuntime', () => {
     expect(o.disallowedTools).toEqual([...BUILTIN_TOOL_NAMES]);
     expect(o.allowedTools).toEqual(['mcp__backroom__read_document', 'mcp__backroom__handoff']);
     expect(o.settingSources).toEqual([]);
-    expect(o).toMatchObject({ persistSession: false, maxTurns: 6, maxBudgetUsd: 0.02, model: 'claude-haiku-5-5', permissionMode: 'dontAsk' });
+    expect(o).toMatchObject({ persistSession: false, maxTurns: 10, maxBudgetUsd: 0.02, model: 'claude-haiku-5-5', permissionMode: 'dontAsk' });
     expect(Object.keys(o.env!).sort()).toEqual(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', 'CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER', 'ENABLE_TOOL_SEARCH', 'HOME', 'PATH']);
     const gate = o.hooks!.PreToolUse![0]!.hooks[0]!;
     expect(await gate({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: {} } as never, undefined, { signal: new AbortController().signal }))

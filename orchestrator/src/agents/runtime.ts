@@ -73,7 +73,7 @@ export class ClaudeAgentRuntime implements AgentRuntime {
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', DISABLE_AUTOUPDATER: '1', ENABLE_TOOL_SEARCH: 'false' },
         tools: [], disallowedTools: [...BUILTIN_TOOL_NAMES], allowedTools: allowedNames, permissionMode: 'dontAsk',
         mcpServers: { [server.name]: server }, settingSources: [], persistSession: false,
-        maxTurns: this.options.maxTurns ?? 6, maxBudgetUsd: this.options.maxBudgetUsd?.(spec) ?? ACTIVATION_BUDGET_USD[spec.model],
+        maxTurns: this.options.maxTurns ?? 10, maxBudgetUsd: this.options.maxBudgetUsd?.(spec) ?? ACTIVATION_BUDGET_USD[spec.model],
         // allowedTools pre-approves (and would shadow canUseTool); the catch-all hook is the gate.
         abortController: controller, hooks: { PreToolUse: [{ hooks: [gate] }] },
       };
@@ -92,7 +92,9 @@ export class ClaudeAgentRuntime implements AgentRuntime {
       this.options.onDiagnostic?.({ activationId: activation.activationId, role: spec.role, code: codeOf(error),
         detail: String(error instanceof Error ? error.message : error).replace(/sk-ant-[\w-]+/g, '[redacted]').slice(0, 400) });
       if (!session.staged || unexpected) failure = activation.signal.aborted ? { kind: 'paused', reason: reasonOf(activation.signal) }
-        : { kind: 'failed', reason: controller.signal.aborted ? String(controller.signal.reason) : codeOf(error) };
+        : { kind: 'failed', reason: controller.signal.aborted ? String(controller.signal.reason)
+          : /maximum number of turns/i.test(String((error as Error)?.message)) ? 'ERROR_MAX_TURNS'
+          : /budget/i.test(String((error as Error)?.message)) ? 'ERROR_MAX_BUDGET_USD' : codeOf(error) };
     } finally {
       clearTimeout(timeout); clearTimeout(drain);
       activation.signal.removeEventListener('abort', onCancel);

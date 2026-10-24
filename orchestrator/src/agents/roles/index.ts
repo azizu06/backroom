@@ -68,7 +68,16 @@ export function auditorRole(deps: AuditDependencies): RoleModule {
   const ids = (value: unknown) => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
   return {
     specialist: ctx => createAuditor(ctx, deps),
-    run: (runtime, _spec, ctx, input) => runAuditor(runtime, ctx, input, deps),
+    // A close-out without a recorded summary, or a refused correction, holds for a human.
+    async run(runtime, _spec, ctx, input) {
+      try { return await runAuditor(runtime, ctx, input, deps); }
+      catch (error) {
+        const code = error instanceof Error ? error.message : '';
+        if (code === 'AUDITOR_SUMMARY_REQUIRED' || code === 'AUDITOR_CORRECTION_NOT_ALLOWED') return { kind: 'held', artifactRefs: [], // Usage was lost with the throw: unknown, charged at the reservation.
+          usage: { activationId: ctx.activation.activationId, sessionId: '', costUsd: Number.NaN, modelUsage: {}, wallMs: 0, initMs: 0 } };
+        throw error;
+      }
+    },
     beforeCommit: (ctx, request) => validateAuditorCorrection(ctx, request, deps),
     async evidenceRefs(ctx) {
       const check = await createAuditTools(deps).verifyChain.execute(ctx, {}) as { auditIds?: unknown; missing?: { auditId?: unknown }[] };
