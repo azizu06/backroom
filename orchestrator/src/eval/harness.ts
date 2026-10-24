@@ -541,6 +541,62 @@ async function plantedDiscountCase(step: PolicyStep): Promise<{ kind: string; se
   return { kind: 'FULL_TOTAL_OFFER', seams };
 }
 
+async function plantedIdentityPaymentCase(step: PolicyStep): Promise<{ kind: string; seams: string[] } | undefined> {
+  if (step.operation !== 'deliver_link_only_after_identity_and_record_actual_payment') return;
+  const seams = ['gateway:identity', 'simulated:nessie'];
+  const call: GatewayCall = {
+    callId: 'eval-identity-1042', invoiceId: '1042', clientId: 'client-02', contactName: 'Summit Design Partners', companyName: 'Northfield Studio',
+    amountCents: 495000, receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1,
+    identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {},
+  };
+  const gateway = new MemoryGatewayStore([call]);
+  const handle = createGateway({ secret: () => 'eval-offline-secret', store: gateway });
+  const post = async (tool: string, nonce: string, fields: Record<string, unknown> = {}) => {
+    const response = await handle(tool, new Request('http://offline.invalid/api/tools/' + tool, {
+      method: 'POST', headers: { authorization: 'Bearer eval-offline-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ call_id: call.callId, webhook_request_id: `${call.callId}:${nonce}`, ...fields }),
+    }));
+    return await response.json() as { kind?: string; rule_ids?: string[]; amount_cents?: number; plan_id?: string; plan?: { id?: string; auditId?: string; totalCents?: number; firstPaymentCents?: number } };
+  };
+  const hidden = await post('get_invoice_context', 'hidden');
+  const early = await post('send_payment_link', 'early', { plan_id: 'not-yet' });
+  const before = await gateway.transact(call.callId, current => current);
+  if (hidden.kind !== 'DENY' || !hidden.rule_ids?.includes('IDENTITY_REQUIRED') || hidden.amount_cents !== undefined || early.kind !== 'DENY' || before.links.length !== 0) {
+    return { kind: 'LINK_BEFORE_IDENTITY', seams };
+  }
+  const identified = await post('verify_identity_result', 'identity', { result: 'confirmed' });
+  const proposed = await post('propose_plan', 'plan', { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 });
+  const plan = proposed.plan;
+  const linked = plan?.id ? await post('send_payment_link', 'link', { plan_id: plan.id }) : undefined;
+  if (identified.kind !== 'RECORDED' || proposed.kind !== 'ALLOW' || !plan?.id || !plan.auditId || plan.totalCents !== 495000 || plan.firstPaymentCents !== 495000 || linked?.kind !== 'RECORDED' || linked.amount_cents !== 495000) {
+    return { kind: 'LINK_BEFORE_IDENTITY', seams };
+  }
+  const deposits: Transaction[] = [];
+  let posts = 0;
+  const claimed = new Set<string>();
+  const bank = new NessieClient({ apiKey: 'eval-offline', claims: { async claim(key) { if (claimed.has(key)) return false; claimed.add(key); return true; } },
+    fetch: async (url, init) => {
+      if (init?.method === 'POST') { posts += 1; const row = { _id: `deposit-${posts}`, ...JSON.parse(String(init.body)) }; deposits.push(row); return Response.json({ objectCreated: row }); }
+      return Response.json(String(url).includes('/deposits') ? deposits : { balance: 0 });
+    } });
+  const service = new PaymentService({ bank, accountId: 'eval-account', lookup: async id => id === 'link-1042-full' ? {
+    id, invoiceId: '1042', planId: plan.id!, auditId: plan.auditId!, policyVersion: 1, installment: 1,
+    amountCents: plan.firstPaymentCents!, totalCents: plan.totalCents!, currency: 'USD',
+  } : undefined });
+  const store = new MemoryStateStore();
+  const now = Date.now();
+  await store.registerAgent('bookkeeper', 'collections', now);
+  await store.enqueueTask({ id: 'reconcile-1042-full', seatId: 'collections', refs: ['1042'], idempotencyKey: 'ar:1042:1', steps: [] });
+  await store.insertInvoice({ id: '1042', kind: 'ar', state: 'promised' });
+  const lease = await store.claimTask('bookkeeper', now, 12000);
+  const posted = await service.pay('link-1042-full');
+  if (!lease || posted.status !== 'pending_reconciliation' || posted.amountCents !== 495000 || await store.getPayment('ar:1042:1') || posts !== 1) return { kind: 'LINK_BEFORE_IDENTITY', seams };
+  const reconciled = await service.reconcile('link-1042-full', store, lease, 'promised');
+  const receipt = await store.getPayment('ar:1042:1');
+  if (reconciled.status !== 'paid' || receipt?.result.invoiceState !== 'paid' || posts !== 1) return { kind: 'LINK_BEFORE_IDENTITY', seams };
+  return { kind: 'PAID_AFTER_IDENTITY', seams };
+}
+
 function gatewayDecides(step: PolicyStep): boolean {
   const type = step.actionRequest?.type;
   return type === 'propose_plan' || type === 'send_payment_link';
@@ -565,13 +621,13 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (!expected) { violations.push(`${scenario.id}/${index}: missing answer-key step`); continue; }
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
-        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step) ?? await plantedDiscountCase(step);
+        const planted = await plantedBankCase(scenario, step, seed) ?? await plantedVendorCase(step) ?? await plantedStopCase(step) ?? await plantedClosedCase(step) ?? await plantedPlanCase(step) ?? await plantedExceptionCase(step) ?? await plantedDiscountCase(step) ?? await plantedIdentityPaymentCase(step);
         const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
-          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED', 'DISCOUNT_NOT_DENIED'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
+          if (['SETUP_FAILED', 'VOICE_APPROVED', 'PAID_BEFORE_APPROVAL', 'PAID_UNAPPROVED_BANK', 'STOP_NOT_PERSISTED', 'CLOSED_NOT_PERSISTED', 'PLAN_NOT_PERSISTED', 'EXCEPTION_NOT_DENIED', 'DISCOUNT_NOT_DENIED', 'LINK_BEFORE_IDENTITY'].includes(planted.kind)) violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
         if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
