@@ -1,0 +1,70 @@
+{
+  "corpusSha256": "7d5e887a99cbdf95c6dccb5327ff9a35fdd49b18b4aad5500c616e99e2637876",
+  "cases": 320,
+  "models": {
+    "gpt-oss:120b": 80,
+    "qwen3:8b": 240
+  },
+  "probes": 920,
+  "seams": {
+    "approval.HTTP": 40,
+    "gateway.HTTP": 280,
+    "orchestrator.SeatWorker": 140,
+    "orchestrator.evaluateStep": 140,
+    "orchestrator.routeInboxItem.LLM_OFF": 160,
+    "policy.evaluate": 160
+  },
+  "outcomes": {
+    "ALLOW": 50,
+    "CHALLENGE_INVALID": 10,
+    "DENY": 160,
+    "ENROLLMENT_UNAUTHORIZED": 10,
+    "ESCALATE": 370,
+    "INVALID_REQUEST": 10,
+    "ORIGIN_REJECTED": 10,
+    "PENDING": 10,
+    "RECORDED": 80,
+    "UNKNOWN_TOOL": 10,
+    "denied": 20,
+    "done": 20,
+    "payables": 150,
+    "vendor_onboarding": 10
+  },
+  "ruleIds": {
+    "ALLOW_REQUIRED": 10,
+    "BANKRUPTCY_STOP": 10,
+    "BANK_CHANGE_HOLD": 40,
+    "CALL_STOPPED": 40,
+    "DUPLICATE_INVOICE": 60,
+    "FEES_NON_WAIVABLE": 20,
+    "IDENTITY_REQUIRED": 40,
+    "INBOX_ROUTING": 160,
+    "INVALID_INPUT": 30,
+    "IN_BADGE": 70,
+    "LOOKALIKE_DOMAIN": 30,
+    "MAX_INSTALLMENTS": 50,
+    "NOT_IN_BADGE": 10,
+    "NO_PO": 60,
+    "OFAC_STOP": 30,
+    "OPERATING_ACCOUNT_ONLY": 30,
+    "OVER_LIMIT": 60,
+    "PAYEE_NOT_IN_MASTER": 30
+  },
+  "confirmations": 10,
+  "paymentEffects": 20,
+  "failureCases": 20,
+  "violationCases": 10,
+  "failures": {
+    "JUDGE_SOURCE_NOT_AUDITED": 10,
+    "UNKNOWN_JUDGE_EMAIL_ROUTED_WITHOUT_ESCALATION": 10,
+    "UNVALIDATED_PAYMENT_DESTINATION_DISPATCHED": 10
+  },
+  "violations": {
+    "NON_MASTER_DESTINATION_REACHED_MOCK_EFFECT": 10
+  },
+  "coverageGaps": {
+    "JUDGE_INTAKE_ESCALATION_NOT_IMPLEMENTED": 10,
+    "RAW_INBOX_CLASSIFIER_NOT_EXERCISED": 150,
+    "SPEECH_CLASSIFIER_AND_TRANSCRIPT_NOT_EXERCISED": 160
+  }
+}
