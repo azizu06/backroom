@@ -29,21 +29,21 @@ test('Play hands control over after the intro and immediately with reduced motio
     return !!(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
   });
   expect(available, 'Play requires WebGL').toBe(true);
-  const view = page.getByLabel('Office view');
-  await expect(view).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await view.selectOption({ label: 'Play (first person)' });
+  await surface(page).focus();
   await expect(surface(page)).toBeFocused();
   await page.waitForTimeout(1200);
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
   await walkForward(page, 2000);
 
-  await page.keyboard.press('Escape');
-  await expect(view).toHaveValue('walk');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await view.selectOption({ label: 'Play (first person)' });
-  await expect(surface(page)).toBeFocused();
-  // No intro wait: the fresh spawn pose (z 0.900, not the previous session's) and movement must arrive before a 900 ms glide could finish.
+  await page.reload();
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('office-viewport').getByText('Loading 3D office…')).toHaveCount(0);
+  await surface(page).focus();
+  // The scene module is loaded; with no intro its first frame already reports the pose.
+  await page.waitForTimeout(100);
+  // No intro wait: the spawn pose (z 0.900) and movement must arrive before a 900 ms glide could finish.
   await expect(surface(page)).toHaveAttribute('data-player-z', '0.900', { timeout: 400 });
   await walkForward(page, 400);
   expect(errors).toEqual([]);

@@ -26,6 +26,17 @@ async function aimAtPhone(page: Page) {
     p = await pos(page); angle = Math.atan2(-(phone[0] - p.x), -(phone[1] - p.z)); diff = Math.atan2(Math.sin(angle - p.yaw), Math.cos(angle - p.yaw));
   }
 }
+/** Aims at the phone; a walk that overshot toward the desk (the nearer target wins the prompt) backs off a step and re-aims. */
+async function reachPhone(page: Page) {
+  const prompt = page.getByText('E · Use desk phone');
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await aimAtPhone(page);
+    if (await prompt.isVisible({ timeout: 300 }).catch(() => false)) break;
+    const z = (await pos(page)).z;
+    await hold(page, 's', p => p.z >= z + 0.08);
+  }
+  await expect(prompt).toBeVisible();
+}
 test('collections desk phone plays a mock callback and keeps call requests unavailable', async ({ page }) => {
   const shots = process.env.BR_SHOTS === '1';
   if (shots) await mkdir('/tmp/br-3d', { recursive: true });
@@ -38,9 +49,7 @@ test('collections desk phone plays a mock callback and keeps call requests unava
     await page.screenshot({ path: '/tmp/br-3d/phone-overview.png' });
   }
   await page.goto('/office?calls=mock&callsSpeed=fast&view=overview');
-  const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
-  await select.selectOption({ label: 'Play (first person)' });
+  await surface(page).focus();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
   // Pass the collections doorway between its posts, then move to the phone's aisle-side x.
   await page.keyboard.down('w');
@@ -51,8 +60,7 @@ test('collections desk phone plays a mock callback and keeps call requests unava
   await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.9);
   await page.keyboard.up('w');
   // Face the phone (desk top) from the aisle.
-  await aimAtPhone(page);
-  await expect(page.getByText('E · Use desk phone')).toBeVisible();
+  await reachPhone(page);
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: 'Collections desk phone' });
   await expect(dialog).toBeVisible();
@@ -71,16 +79,14 @@ test('collections desk phone plays a mock callback and keeps call requests unava
 });
 
 test('phone stays idle without the mock query', async ({ page }) => {
-  await page.goto('/office');
-  const select = page.getByLabel('Office view');
-  await select.selectOption({ label: 'Play (first person)' });
-  await expect(surface(page)).toBeVisible();
+  await page.goto('/office?view=overview');
+  await surface(page).focus();
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
   // Target is already within reach at spawn only after approaching the Collections desk.
   await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.0); await page.keyboard.up('w');
   await walkX(page, -4.2);
   await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.9); await page.keyboard.up('w');
-  await aimAtPhone(page);
-  await expect(page.getByText('E · Use desk phone')).toBeVisible();
+  await reachPhone(page);
   await page.keyboard.press('e');
   await expect(page.getByRole('dialog', { name: 'Collections desk phone' }).getByTestId('phone-status')).toHaveText('Idle · no call');
 });

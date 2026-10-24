@@ -35,7 +35,11 @@ test('plays and scrubs the original state/audit into 3D, floor plan and audit wa
   await page.waitForTimeout(400);
   await expect(page.getByRole('slider', { name: 'Replay position' })).toHaveValue(position);
   await page.screenshot({ path: `${out}/office-mid-replay.png`, fullPage: true });
-  await page.getByLabel('Office view').selectOption('plan');
+  // First person is the only view; the floor plan is the lost-WebGL fallback, so force that path.
+  await page.locator('canvas').evaluate(canvas => {
+    const gl = (canvas as HTMLCanvasElement).getContext('webgl2') ?? (canvas as HTMLCanvasElement).getContext('webgl');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  });
   await expect(page.getByLabel('2D office floor plan')).toBeVisible();
   await page.screenshot({ path: `${out}/floor-plan-paused.png`, fullPage: true });
   await seek(page, 0);
@@ -66,7 +70,6 @@ test('phone and invalid recordings keep an explicit replay label', async ({ page
   await page.goto('/office?replay=core-offline');
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await seek(page, 4000);
-  await page.getByLabel('Office view').selectOption('plan');
   await expect(page.getByLabel('Replay disclosure')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   await page.screenshot({ path: `${out}/phone-replay.png`, fullPage: true });

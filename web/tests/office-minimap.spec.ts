@@ -1,12 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
 
 test('Play minimap toggles with M without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
-  const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
-  await select.selectOption({ label: 'Play (first person)' });
+  await surface(page).focus();
   const minimap = page.getByRole('img', { name: /Office map/ });
   await expect(minimap).toBeVisible();
   await page.keyboard.press('m');
@@ -18,9 +18,7 @@ test('Play minimap toggles with M without page errors', async ({ page }) => {
 
 test('Play minimap can be hidden and restored by touch button and persists after reload', async ({ page }) => {
   await page.goto('/office?view=overview');
-  const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
-  await select.selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeVisible();
 
   const minimap = page.getByRole('img', { name: /Office map/ });
   const toggle = page.getByRole('button', { name: 'Hide map' });
@@ -34,8 +32,6 @@ test('Play minimap can be hidden and restored by touch button and persists after
   await expect(minimap).toBeVisible();
 
   await page.reload();
-  const reloadedSelect = page.getByLabel('Office view');
-  await expect(reloadedSelect).toHaveValue('walk');
-  await reloadedSelect.selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeVisible();
   await expect(page.getByRole('img', { name: /Office map/ })).toBeVisible();
 });

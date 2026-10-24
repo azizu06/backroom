@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
-const HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
+const HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc text view';
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
@@ -92,21 +92,21 @@ async function startPlay(page: Page, setup?: () => Promise<void>) {
   await page.goto('/office?view=overview');
   await requireWebGL(page);
   await setup?.();
-  const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
+  // ?view=overview skips the splash: the page opens in first person without taking focus.
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await select.selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeVisible();
+  await surface(page).focus();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
   return errors;
 }
 
-test('play mode walks to Alex, opens the talk panel and exits back to the previous view', async ({ page }) => {
+test('play mode walks to Alex, opens the talk panel and exits to the text view', async ({ page }) => {
   const errors = await startPlay(page);
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('.office-caption')).toHaveText(HINT);
   await expect(viewport.locator('.play-crosshair')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Text view', exact: true })).toBeVisible();
   const start = await player(page);
 
   const prompt = page.getByText('E · Talk to Alex');
@@ -128,10 +128,10 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
   await expect(dialog).toBeHidden();
   await expect(surface(page)).toBeFocused();
 
+  // First person is the only view: Escape leaves for the text view and the scene stays.
   await page.keyboard.press('Escape');
-  await expect(page.getByLabel('Office view')).toHaveValue('walk');
-  await expect(viewport.locator('.play-crosshair')).toHaveCount(0);
-  await expect(surface(page)).toHaveCount(0);
+  await expect(page.locator('#office-text-view')).toBeFocused();
+  await expect(viewport.locator('.play-crosshair')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -267,16 +267,9 @@ test.describe('play mode on a phone', () => {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('/office');
     await requireWebGL(page);
-    const select = page.getByLabel('Office view');
-    await expect(select).toBeEnabled();
-    // Narrow screens may prefer another initial view; retry until hydrated so the pick sticks.
-    await expect(async () => {
-      await select.selectOption({ label: 'Play (first person)' });
-      await expect(surface(page)).toBeVisible({ timeout: 1_000 });
-    }).toPass();
-    await expect(select).toHaveValue('play');
+    await expect(surface(page)).toBeVisible();
     const caption = page.getByTestId('office-viewport').locator('.office-caption');
-    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Overview to leave');
+    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Text view to read');
     await expect(caption).not.toContainText('WASD');
     await expect(page.locator('.play-joystick')).toBeVisible();
     await expect(page.locator('.play-touch-hint')).toHaveCount(0);
@@ -310,11 +303,10 @@ test('play settings change speed and invert Y, persist per viewer and return foc
   const moved = await player(page);
   expect(start.z - moved.z).toBeGreaterThan(0.3);
 
-  // Leaving and re-entering Play keeps the saved values.
-  await page.keyboard.press('Escape');
-  await expect(page.getByLabel('Office view')).toHaveValue('walk');
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
-  await expect(surface(page)).toBeFocused();
+  // A reload keeps the saved values.
+  await page.reload();
+  await expect(surface(page)).toBeVisible();
+  await surface(page).focus();
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(dialog).toContainText('Movement speed 2×');
   await expect(dialog.getByRole("checkbox", { name: /Invert Y/ })).toBeChecked();
