@@ -12,7 +12,7 @@
 .real-sim-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .real-sim-overlay[data-expanded=false] .real-sim-header { margin-bottom: 4px; }
 .real-sim-overlay[data-expanded=false] .real-sim-note { margin-top: 0; }
-.real-sim-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.real-sim-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .real-sim h3 { font-size: 12px; color: #c9c9d1; font-weight: 600; margin-bottom: 4px; }
 .real-sim ul { list-style: none; padding: 0; margin: 0; }
 .real-sim-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 3px 0; }
