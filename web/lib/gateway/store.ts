@@ -5,6 +5,7 @@ import type {
 
 export interface GatewayCall {
   callId: string;
+  agentId?: string;
   invoiceId: string;
   clientId: string;
   contactName: string;
@@ -64,7 +65,9 @@ export interface AllowedPlan extends PlanTerms {
 export interface Escalation {
   id: string;
   ruleIds: string[];
-  status: "pending" | "approved" | "denied" | "counter";
+  status: "pending" | "approved" | "denied" | "counter" | "pending_owner";
+  createdAt?: number; expiresAt?: number; decidedAt?: number;
+  decision?: import("@backroom/orchestrator").ControllerDecision;
   toHuman: string;
   plan?: PlanTerms;
   method?: "passkey"; // Only the trusted approval backend may set this, never a tool.

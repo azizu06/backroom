@@ -97,3 +97,11 @@ a running server: set `TOOL_GATEWAY_URL`, `TOOL_GATEWAY_SECRET`, then run
 existing fixture call to exercise context; otherwise expect unknown-call 404.
 It does not place a Cartesia call. Live voice and durable-store wiring remain
 integration checks for their owning streams.
+
+## M6 controller bridge
+
+The default runtime now installs a StateStore-backed approval bridge. Escalations
+return `approval_path`; `check_approval` reads server-verified decisions and returns
+`pending_owner` after 60 seconds. Optional trusted `GatewayCall.agentId` connects
+the desk target to the live office agent. Full configuration, wire shapes,
+passkey enrollment, and single-process persistence limits: `docs/m6-approvals.md`.

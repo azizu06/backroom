@@ -1,3 +1,5 @@
+import type { ControllerDecision, ApprovalTerms } from './approvals/types';
+import type { VerifiedApproval } from './approvals/verified';
 import type { Action, Badge, Context, Decision } from '@backroom/policy';
 
 export type Seat = Badge;
@@ -23,9 +25,14 @@ export interface Task extends NewTask {
 export interface Lease extends Task { leaseOwner: string; leaseExpiresAt: number }
 export interface Escalation {
   id: string; taskId: string; fromAgent: string; toHuman: string; ruleIds: string[];
-  evidenceRefs: string[]; status: 'pending' | 'approved' | 'denied';
-  decision?: string; decidedAt?: number; method?: 'passkey';
+  evidenceRefs: string[]; status: 'pending' | 'approved' | 'denied' | 'counter' | 'pending_owner';
+  createdAt: number; expiresAt: number; policyVersion: number;
+  quote: { sentenceId: string; text: string };
+  callId?: string; invoiceId?: string; amountCents?: number; currency?: string;
+  principalCents?: number; lateFeeCents?: number; requestedTerms?: ApprovalTerms;
+  decision?: ControllerDecision; decidedAt?: number; method?: 'passkey'; credentialId?: string;
 }
+export type CallEscalation = Omit<Escalation, 'status' | 'decision' | 'decidedAt' | 'method' | 'credentialId' | 'createdAt' | 'expiresAt'> & { seat: Seat };
 export interface AuditInput {
   ts: number; actor: 'code' | 'local_model' | 'claude' | 'human' | 'client' | 'system';
   seat: Seat | 'controller'; action: string; ruleIds: string[]; policyVersion: number; refs: string[];
@@ -65,6 +72,9 @@ export interface StateStore {
   completeTask(lease: Lease, status: 'done' | 'denied' | 'failed', now: number): Promise<void>;
   createEscalation(lease: Lease, decision: Extract<Decision, { kind: 'ESCALATE' }>, now: number): Promise<Escalation>;
   getEscalation(id: string): Promise<Escalation | undefined>;
+  createCallEscalation(input: CallEscalation, now: number): Promise<Escalation>;
+  decideEscalation(approval: VerifiedApproval, now: number): Promise<Escalation>;
+  expireEscalations(now: number): Promise<void>;
   // Approval writes belong to the controller/passkey service, not to workers.
   appendAudit(entry: AuditInput): Promise<AuditEntry>;
   listAudit(): Promise<AuditEntry[]>;
