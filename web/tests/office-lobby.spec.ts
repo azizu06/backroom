@@ -99,7 +99,27 @@ test('office judge tour advances under reduced motion and stops on a click', asy
   expect(errors).toEqual([]);
 });
 
-test('office judge tour started from the keyboard is not cancelled by the select keys', async ({ page }) => {
+test('office judge tour is not cancelled by the view select navigation keys', async ({ page }) => {
+  // Portable: dispatch the keydown on the select itself, so no platform-specific native-select behaviour is involved.
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('tour');
+  await expect(caption).toContainText('Tour · 1 of');
+  for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown']) await view.dispatchEvent('keydown', { key });
+  await expect(view).toHaveValue('tour');
+  await expect(caption).toContainText('Tour');
+  // Any other key on the select still ends the tour.
+  await view.focus();
+  await page.keyboard.press('Tab');
+  await expect(view).toHaveValue('tween');
+  await expect(caption).not.toContainText('Tour');
+});
+
+test('office judge tour started with the native select arrow keys', async ({ page, browserName }) => {
+  // A closed <select> changes value on ArrowDown/ArrowUp in Linux/Windows Chromium; macOS opens the popup instead.
+  test.skip(process.platform === 'darwin' || browserName !== 'chromium', 'native select arrow-key navigation is platform-specific');
   await page.goto('/office');
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
