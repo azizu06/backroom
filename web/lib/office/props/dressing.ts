@@ -1,3 +1,4 @@
+import type { Box } from '../play';
 import { OFFICE_ANCHORS, visibleRooms, type AnchorId, type OfficeSnapshot } from '../state';
 
 /** Floor (x, z). */
@@ -47,7 +48,8 @@ export const DRESSING: Dressing = {
     { room: 'lobby', x: -7.4, z: 4.95, size: 0.6 },
     { room: 'dana', x: -1.85, z: 4.95, size: 0.6 },
     { room: 'treasury', x: 7.4, z: 4.95, size: 0.6 },
-    { room: 'vendor_onboarding', x: 7.4, z: -1.05, size: 0.6 },
+    // Just inside the x = 2.5 partition; the GX10 server room occupies the right front corner.
+    { room: 'vendor_onboarding', x: 3.1, z: -1.05, size: 0.6 },
   ],
   signs: [sign('collections'), sign('payables'), sign('vendor_onboarding')],
   routes: [
@@ -62,13 +64,38 @@ export const DRESSING: Dressing = {
 
 /** A room's dressing shows only while the room is visible; a route only while both ends are. */
 export function dressingFor(snapshot: OfficeSnapshot, dressing: Dressing = DRESSING): Dressing {
-  const rooms = new Set(visibleRooms(snapshot));
+  return dressingInRooms(visibleRooms(snapshot), dressing);
+}
+
+export function dressingInRooms(visible: readonly AnchorId[], dressing: Dressing = DRESSING): Dressing {
+  const rooms = new Set(visible);
   return {
     shelves: dressing.shelves.filter(item => rooms.has(item.room)),
     plants: dressing.plants.filter(item => rooms.has(item.room)),
     signs: dressing.signs.filter(item => rooms.has(item.room)),
     routes: dressing.routes.filter(route => rooms.has(route.from) && rooms.has(route.to)),
   };
+}
+
+const footprintBox = (x: number, z: number, width: number, depth: number): Box =>
+  ({ minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 });
+
+/**
+ * Solid floor footprints for Play (same shape as officeColliders' boxes): every visible shelf and plant.
+ * Plants use the wider of pot and foliage. Floor paint and the plaques (above the door posts) are not solid.
+ */
+export function dressingColliders(rooms: readonly AnchorId[], dressing: Dressing = DRESSING): Box[] {
+  const { shelves, plants } = dressingInRooms(rooms, dressing);
+  return [
+    ...shelves.map(({ x, z, rotationY, width }) => {
+      const cos = Math.abs(Math.cos(rotationY)), sin = Math.abs(Math.sin(rotationY));
+      return footprintBox(x, z, width * cos + SHELF_DEPTH * sin, width * sin + SHELF_DEPTH * cos);
+    }),
+    ...plants.map(({ x, z, size }) => {
+      const side = Math.max(PLANT_POT, 2 * PLANT_RADIUS) * size;
+      return footprintBox(x, z, side, side);
+    }),
+  ];
 }
 
 export interface PaintSegment { from: FloorPoint; to: FloorPoint }
@@ -116,13 +143,16 @@ export function routeArrow(points: readonly FloorPoint[], size: number): PaintSe
   });
 }
 
+const pointKey = (p: FloorPoint) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
+/** Direction-free identity of a painted piece (to 1 mm), used to draw shared pieces once. */
+export const paintKey = (segment: PaintSegment) => [pointKey(segment.from), pointKey(segment.to)].sort().join('|');
+
 /** Every route's dashes and end chevron, with pieces shared by overlapping routes drawn once. */
 export function routePaint(routes: readonly DressingRoute[]): PaintSegment[] {
   const seen = new Set<string>(), out: PaintSegment[] = [];
-  const key = (p: FloorPoint) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
   for (const route of routes) {
     for (const segment of [...routeDashes(route.points, ROUTE_DASH, ROUTE_GAP), ...routeArrow(route.points, ROUTE_ARROW)]) {
-      const id = [key(segment.from), key(segment.to)].sort().join('|');
+      const id = paintKey(segment);
       if (seen.has(id)) continue;
       seen.add(id);
       out.push(segment);

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from '../state';
 import {
-  DRESSING, DRESSING_INSTANCE_LIMIT, PLANT_RADIUS, ROUTE_ARROW, ROUTE_DASH, ROUTE_GAP, ROUTE_WIDTH, SIGN_HEIGHT,
-  dressingBoxes, dressingFor, polylineLength, routeArrow, routeDashes, routePaint, type DressingBox, type FloorPoint, type PaintSegment,
+  DRESSING, DRESSING_INSTANCE_LIMIT, PLANT_POT, PLANT_RADIUS, ROUTE_ARROW, ROUTE_DASH, ROUTE_GAP, ROUTE_WIDTH, SIGN_HEIGHT,
+  dressingBoxes, dressingColliders, dressingFor, paintKey, polylineLength, routeArrow, routeDashes, routePaint,
+  type DressingBox, type FloorPoint, type PaintSegment,
 } from './dressing';
+import { FLOOR as PLAY_FLOOR, PLAYER_RADIUS, SPAWN, insideAny, movePlayer, officeColliders, type Box as PlayBox } from '../play';
 import { OFFICE_PROP_INTERACTIONS } from './index';
 
 const snapshot = (patch: Partial<OfficeSnapshot> = {}): OfficeSnapshot => ({ ...INITIAL_OFFICE, connection: 'preview', ...patch });
@@ -45,6 +47,8 @@ const OBSTACLES: Box[] = [
   ...[[-7.1, -4.6], [7.1, -4.6], [1.7, 4.5]].map(([x, z]) => rect('plant', x!, z!, 1, 1)),
   ...[-2.5, 2.5].flatMap(x => [rect('partition', x, -3.15, 0.12, 4.6), rect('partition', x, 3.5, 0.12, 3.8)]),
   span('treasury door keep-clear', 3.5, 6.5, 0.5, 1.8),
+  // GX10 ServerRoom (web/app/office/rooms/ServerRoom.tsx) at (7.1, -0.8): plinth 1.2 x 1.05, plus a 0.1 margin.
+  rect('server room', 7.1, -0.8, 1.2 + 0.2, 1.05 + 0.2),
 ];
 const AISLE = rect('aisle', 0, 0.6, 15.8, 1.3);
 const pad = (room: AnchorId) => {
@@ -61,6 +65,13 @@ const boxes = dressingBoxes(DRESSING);
 const foliage = DRESSING.plants.map(({ x, z, size }) => rect('foliage', x, z, 2 * PLANT_RADIUS * size, 2 * PLANT_RADIUS * size));
 const length = ([a, b]: readonly [FloorPoint, FloorPoint]) => Math.hypot(b[0] - a[0], b[1] - a[1]);
 const segLength = (segment: PaintSegment) => length([segment.from, segment.to]);
+/** The four corners of a painted strip ROUTE_WIDTH wide, as dressingBoxes renders it. */
+function paintCorners({ from, to }: PaintSegment): FloorPoint[] {
+  const len = segLength({ from, to }), half = ROUTE_WIDTH / 2;
+  const nx = -(to[1] - from[1]) / len * half, nz = (to[0] - from[0]) / len * half;
+  return [from, to].flatMap(([x, z]) => [[x + nx, z + nz], [x - nx, z - nz]] as FloorPoint[]);
+}
+const toRect = (name: string, b: PlayBox): Box => span(name, b.minX, b.maxX, b.minZ, b.maxZ);
 
 describe('room dressing layout', () => {
   it('keeps every item on the floor and inside the walls', () => {
@@ -136,7 +147,9 @@ describe('floor routes', () => {
       expect(contains(FLOOR, point), `${route.to} ${point}`).toBe(true);
       expect(WALKWAY.some(area => contains(area, point)), `${route.to} ${point}`).toBe(true);
     }
-    for (const segment of routePaint(DRESSING.routes)) for (const point of [segment.from, segment.to]) {
+    // Every corner of each painted strip (ROUTE_WIDTH wide), not just its centre line.
+    for (const segment of routePaint(DRESSING.routes)) for (const point of paintCorners(segment)) {
+      expect(contains(FLOOR, point), `paint ${point}`).toBe(true);
       expect(WALKWAY.some(area => contains(area, point)), `paint ${point}`).toBe(true);
     }
     for (const box of boxes.filter(box => box.kind === 'paint')) {
@@ -149,8 +162,11 @@ describe('floor routes', () => {
   it('draw shared trunk dashes once', () => {
     const all = DRESSING.routes.flatMap(route => [...routeDashes(route.points, ROUTE_DASH, ROUTE_GAP), ...routeArrow(route.points, ROUTE_ARROW)]);
     const painted = routePaint(DRESSING.routes);
+    const keys = painted.map(paintKey);
     expect(painted.length).toBeLessThan(all.length);
-    expect(painted.length).toBe(new Set(painted.map(s => JSON.stringify([s.from.map(n => n.toFixed(3)), s.to.map(n => n.toFixed(3))]))).size);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(new Set(all.map(paintKey))).toEqual(new Set(keys));
+    expect(paintKey({ from: [1, 2], to: [3, 4] })).toBe(paintKey({ from: [3, 4], to: [1, 2] }));
   });
 });
 
@@ -245,5 +261,57 @@ describe('dressingFor', () => {
     expect(dressingFor(withRooms('dana', 'lobby')).routes.map(r => r.to)).toEqual(['dana']);
     const treasury = dressingFor(withRooms('treasury'));
     expect(treasury).toEqual({ shelves: [], plants: DRESSING.plants.filter(p => p.room === 'treasury'), signs: [], routes: [] });
+  });
+});
+
+describe('dressingColliders', () => {
+  const allRooms = Object.keys(OFFICE_ANCHORS) as AnchorId[];
+  const colliders = dressingColliders(allRooms);
+
+  it('gives every shelf and plant a collider covering what is drawn', () => {
+    expect(colliders).toHaveLength(DRESSING.shelves.length + DRESSING.plants.length);
+    const rects = colliders.map((c, i) => toRect(`collider ${i}`, c));
+    for (const [i, box] of boxes.entries()) {
+      if (box.kind !== 'shelf' && box.kind !== 'book' && box.kind !== 'pot') continue;
+      const area = footprint(box, `${box.kind} ${i}`);
+      expect(rects.some(r => inside(area, r)), area.name).toBe(true);
+    }
+    for (const area of foliage) expect(rects.some(r => inside(area, r)), area.name).toBe(true);
+    for (const { x, z, size } of DRESSING.plants) {
+      expect(rects.some(r => inside(rect('pot', x, z, PLANT_POT * size, PLANT_POT * size), r))).toBe(true);
+    }
+    for (const c of colliders) expect(c.maxX - c.minX > 0 && c.maxZ - c.minZ > 0).toBe(true);
+  });
+
+  it('filters by visible rooms like dressingFor', () => {
+    expect(dressingColliders([])).toEqual([]);
+    for (const room of allRooms) {
+      const shown = dressingFor(withRooms(room));
+      expect(dressingColliders([room]), room).toHaveLength(shown.shelves.length + shown.plants.length);
+    }
+    expect(dressingColliders(['lobby'])).toHaveLength(2);
+  });
+
+  it('stays clear of the Play spawn and the aisle walking line', () => {
+    expect(insideAny(SPAWN.position, colliders, PLAYER_RADIUS)).toBe(false);
+    const walkingLine = span('aisle walking line', -7.5, 7.5, 0.3, 0.9);
+    for (const [i, c] of colliders.entries()) expect(overlaps(toRect(`collider ${i}`, c), walkingLine), `collider ${i}`).toBe(false);
+    for (const c of colliders) {
+      expect(c.minX >= PLAY_FLOOR.minX && c.maxX <= PLAY_FLOOR.maxX && c.minZ >= PLAY_FLOOR.minZ && c.maxZ <= PLAY_FLOOR.maxZ).toBe(true);
+    }
+  });
+
+  it('lets the player walk the whole aisle with the office colliders', () => {
+    const solid = officeColliders(allRooms, colliders);
+    for (const [from, to] of [[-7.5, 7.5], [7.5, -7.5]] as const) {
+      let position: [number, number] = [from, 0.6];
+      const step = Math.sign(to - from) * 0.05;
+      while ((to - position[0]) * Math.sign(step) > 1e-6) {
+        const next = movePlayer(position, [Math.abs(to - position[0]) < Math.abs(step) ? to - position[0] : step, 0], solid);
+        expect(next[0], `stuck at ${position}`).not.toBe(position[0]);
+        position = next;
+      }
+      expect(position[1]).toBe(0.6);
+    }
   });
 });
