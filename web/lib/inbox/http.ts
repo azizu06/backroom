@@ -11,9 +11,13 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 const LIMIT = 4 * 1024 * 1024;
 
 /** Public synthetic judge intake: no payment adapter, approval writes, or live vendor checks. */
-export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown> } = {}) {
+export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>; origin?: () => string | undefined } = {}) {
+  const origin = options.origin ?? (() => process.env.DEMO_PUBLIC_URL || process.env.WEBAUTHN_ORIGIN);
   return async (request: Request) => {
-    if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'Origin rejected.' }, 403);
+    // Compare the browser Origin with the deployment origin. Next rewrites request.url
+    // (127.0.0.1 becomes localhost; a tunnel can gain an explicit port) and Host is not a source of truth.
+    const allowed = origin();
+    if (!allowed || request.headers.get('origin') !== allowed) return json({ error: 'Origin rejected.' }, 403);
     if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) return json({ error: 'Use the inbox form.' }, 415);
     if (Number(request.headers.get('content-length')) > LIMIT + 64000) return json({ error: 'Attachment must be 4 MB or smaller.' }, 413);
     let form: FormData;
