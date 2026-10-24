@@ -6,8 +6,10 @@ import { OfficeProps } from '../props/OfficeProps';
 import { LobbyInbox } from '../props/LobbyInbox';
 import { ReceiptPrinter } from '../props/ReceiptPrinter';
 import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
+import { AuditWallMount } from './AuditWallMount';
 import { Desks } from './Desks';
 import { Doors } from './Doors';
+import { InboxTrayMount } from './InboxTrayMount';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
 import { Performance } from './Performance';
@@ -23,6 +25,8 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
+  { id: 'audit-wall', instanced: false, Component: AuditWallMount },
+  { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },
   { id: 'props', instanced: false, Component: OfficeProps },
   { id: 'lobby-inbox', instanced: false, Component: LobbyInbox },
   { id: 'receipt-printer', instanced: false, Component: ReceiptPrinter },
