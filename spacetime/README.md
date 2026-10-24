@@ -1,126 +1,215 @@
-# SpacetimeDB module
+# SpacetimeDB state backend (#15)
 
-T8 is implemented in `src/index.ts`. Local evidence: [`../docs/t8-spacetime.md`](../docs/t8-spacetime.md).
-This is the small go/no-go module, not the full §4.7 schema or the orchestrator StateStore adapter (follow-up #15).
+`src/index.ts` is the full §4.7 module. It imports the same deterministic
+`ReducerEngine` and policy package as `MemoryStateStore`; external I/O stays in
+Node. `SpacetimeStateStore` implements the exported orchestrator `StateStore`
+over generated TypeScript client reducers. There is no alternate policy or audit
+implementation in the adapter.
 
-## Dev loop
+Requires Node 22+, pnpm, and **SpacetimeDB 2.13.0** (SDK and CLI pinned together).
+T8's original local latency evidence and Maincloud 401 are in
+[`docs/t8-spacetime.md`](../docs/t8-spacetime.md). The full-state evidence is below.
 
-Requires Node 22+, pnpm, and SpacetimeDB **2.13.0** (CLI and SDK pinned together).
-Official installation: <https://spacetimedb.com/docs/>.
+## Local setup
 
 ```sh
-# From repo root, once:
-curl -sSf https://install.spacetimedb.com | sh
 pnpm install
+# Install locally if a pinned spacetime CLI is not already available:
+mkdir -p .t8-tools
+curl -sSf https://install.spacetimedb.com -o .t8-tools/install.sh
+sh .t8-tools/install.sh --root-dir "$PWD/.t8-tools/spacetime" --yes
 
-# Terminal 1. Port 3108 avoids Next.js's default port.
-spacetime start --listen-addr 127.0.0.1:3108 --data-dir .t8-tools/db
+# Separate terminal; durable data unless you explicitly request --in-memory.
+.t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime start \
+  --listen-addr 127.0.0.1:3115 --data-dir .t8-tools/db
 
-# Terminal 2. Publish first; init records the publishing identity as controller.
-spacetime publish backroom-t8-validation --server http://127.0.0.1:3108 --module-path spacetime --yes
-spacetime generate --lang typescript --module-path spacetime --out-dir web/lib/spacetime --yes
-pnpm --filter @backroom/web dev --port 3208
-# Open http://localhost:3208/t8
-
-# The same CLI identity that published can write. The browser only subscribes.
-spacetime call --server http://127.0.0.1:3108 backroom-t8-validation set_agent_target collections-1 collections-door
-spacetime call --server http://127.0.0.1:3108 backroom-t8-validation request_room_entry collections-1 payables
-# Expected failure: DENY:NOT_IN_BADGE; the transaction leaves the row unchanged.
+.t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime publish \
+  backroom-local --server http://127.0.0.1:3115 --module-path spacetime --yes
 ```
 
-For an isolated CLI install (used in T8), install with
-`sh install.sh --root-dir "$PWD/.t8-tools/spacetime" --yes`, then replace each
-`spacetime` command with `.t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime`.
-Download `install.sh` from the official installer URL above. `.t8-tools/` is ignored.
-Use `--in-memory` on `start` only for disposable tests; those rows disappear on exit.
+Publish records the publisher identity in the private `controller` table. Use
+that identity's **private token on trusted servers only**, never in browser props,
+`NEXT_PUBLIC_*`, tool arguments, or model input. Anonymous clients can subscribe
+but cannot invoke a writer. Maincloud browser authentication is still deferred;
+no hosted publish is claimed.
 
-After editing the module: publish again, regenerate bindings, run `pnpm -r build` and
-`pnpm -r test`. Commit the generated `web/lib/spacetime/` files together with schema changes.
-Do not log out between publishing and writing: the stored controller is the original
-publisher identity. Back up CLI credentials privately; never put them in the repository.
-
-## Exported contract
-
-- Public `agent` table: `id` (string PK), `seatId`, `state`, `room`, `targetAnchor`,
-  `posX`, `posY`, `heartbeatAt` (server Timestamp), optional `currentTaskId`, `modelRoute`.
-  One seed row: `collections-1` / seat `collections` / room `collections`.
-- `request_room_entry({ agentId, room })`: publishing identity only; calls the real
-  `@backroom/policy.evaluate` with the **stored** seat badge. Non-ALLOW throws a
-  `SenderError` carrying decision kind and rule IDs; no row is written.
-- `set_agent_target({ agentId, targetAnchor })`: publishing identity only; updates
-  target + server heartbeat. Anchor must be nonblank and at most 120 characters.
-  This is visual targeting only, not permission to enter a room or approve anything.
-- Private `controller` table: protects writes; no credential/token is public.
-- Generated client: `web/lib/spacetime` exports `DbConnection`, `tables`, `reducers`;
-  `web/lib/spacetime/types` exports `Agent`.
-- `/t8`: anonymous, read-only subscription; records row-write → React DOM commit
-  latency for fresh `t8-sample-*` targets. Initial/reconnect snapshots are excluded.
-
-Optional public web config in `web/.env.local` (restart Next.js after changes):
+Put server settings in the repo root `.env.local`, loaded by the orchestrator
+runtime, or supply them in the process environment:
 
 ```dotenv
-NEXT_PUBLIC_SPACETIME_URI=ws://127.0.0.1:3108
-NEXT_PUBLIC_SPACETIME_DATABASE=backroom-t8-validation
+STATE_STORE=spacetime
+SPACETIMEDB_URI=ws://127.0.0.1:3115
+SPACETIMEDB_DATABASE=backroom-local
+SPACETIMEDB_TOKEN=<private publisher token>
 ```
 
-Never expose `SPACETIMEDB_TOKEN` as a `NEXT_PUBLIC_*` value. The browser needs no
-writer token. The existing server-side `SPACETIMEDB_*` env vars remain reserved for
-the future StateStore adapter.
+`STATE_STORE=memory` remains the default. Vitest's process-wide default stays
+memory; the contract lane explicitly injects the real reducer harness. Invalid
+store names/configuration fail rather than silently falling back. Next server
+routes and workers use `getStateStore()` so each process connects to the same DB.
+A new durable store starts with models fenced until its subscription and writer
+authority are verified. Reads and writes await readiness.
 
-## Verification
+`pnpm state:seed` imports `fixtures/company/northfield.json` through `seed_company`.
+It preserves stable IDs, all fixture fields and unprovisioned provider IDs. Repeating
+it inserts missing rows without overwriting existing state. The company is synthetic;
+these consent records must never authorize a real dial. Publish a fresh DB for each
+clean demo; seeding cannot reset completed tasks, approvals, bank changes or audits.
 
-`pnpm --filter @backroom/spacetime test` runs Vitest against the SDK's local WASM
-datastore, with no network or credentials. For an already-running disposable local
-module and an open `/t8` page:
+## Tables and subscription contract
+
+All §4.7 tables exist: `policy`, `seat`, `badge`, `room`, `agent`, `human`, `task`,
+`escalation`, `inbox_item`, `client`, `ar_invoice`, `payment_plan`, `payment_link`,
+`vendor`, `ap_invoice`, `po`, `bank_change`, `call`, `call_turn`, `signal`,
+`bank_txn`, `audit_entry`, plus `runtime_control`, private controller/payment
+receipts and short-lived operation results.
+
+Typed public projections for the office:
+
+| Table | Fields |
+| --- | --- |
+| `agent` | `id`, `seatId`, `state`, `room`, `targetAnchor`, `posX/Y/Z`, `heartbeatAt` (Timestamp), optional `currentTaskId`, `modelRoute` |
+| `room` | `id`, `name`, `requiredBadge`, `anchors` (JSON) |
+| `escalation` | `id`, `taskId`, `fromAgent`, `toHuman`, `status`, `ruleIds`, `evidenceRefs`, `createdAt`, `expiresAt`, `json` (full StateStore row) |
+| `audit_entry` | `seq` (u64), unique `id`, `ts` (integer ms), actor/seat/action, ruleIds/policyVersion/refs/route, latencyMs/costUsd, optional decision, canonical `inputs` JSON, prevHash/hash |
+| `runtime_control` | `id=global`, `llmEnabled`, monotonic `generation` (u64), `heartbeatAt` |
+| `policy`, `seat`, `badge` | immutable policy snapshots and current code-enforced badges/limits |
+
+`agent.state` includes `paused`; an escalation target is `Dana_desk`. Map that
+anchor to the existing office desk. Treasury entry is evaluated against the
+**stored seat**, never a caller-supplied badge. `request_room_entry` commits an
+ALLOW/DENY audit with action `request_room_entry` and `inputs.agentId/room`; a denial leaves the complete agent row unchanged. Unlike T8's
+rollback error, this deliberate denial commits evidence so the red door has a
+matching wall entry. `set_agent_target` preserves T8's visual-only API; workers
+use `set_agent_target_leased` with fencing.
+
+Private business tables use `{id,json}` with typed state/index columns where
+needed (`task`, AR/AP invoices). JSON preserves exported `StateStore` and fixture
+shapes without inventing a second domain model. Finance payloads, raw inbox/call
+records, payment receipts and passkey credential metadata are not public tables.
+The full escalation and audit wall are intended for the synthetic demo office;
+they are not a production tenant-authorization system.
+
+Generated bindings live in `orchestrator/src/spacetime-client`, exported as
+`@backroom/orchestrator/spacetime-client` and `/spacetime-client/types`.
+`web/lib/spacetime` reexports this single schema. After schema edits:
 
 ```sh
-T8_LIVE=1 node spacetime/scripts/live-t8.mjs
-# Isolated install:
-T8_LIVE=1 SPACETIME_CLI="$PWD/.t8-tools/spacetime/spacetime" \
-  SPACETIME_ROOT="$PWD/.t8-tools/spacetime" node spacetime/scripts/live-t8.mjs
+.t8-tools/spacetime/spacetime --root-dir=.t8-tools/spacetime generate \
+  --lang typescript --module-path spacetime --out-dir orchestrator/src/spacetime-client --yes
 ```
 
-The opt-in script checks forbidden-room rollback, anonymous-writer rejection,
-allowed-room success, then writes 20 unique targets. Read the page's latency samples;
-filter by the printed run ID and require **20 samples**, each between 0 and 1000 ms.
-Measurements assume server and browser are on the same host. A cross-host test needs
-clock synchronization or a separate same-clock end-to-end measurement.
+Browser example (no token):
 
-## Maincloud
+```ts
+import { DbConnection } from '@backroom/orchestrator/spacetime-client';
+const connection = DbConnection.builder()
+  .withUri('ws://127.0.0.1:3115').withDatabaseName('backroom-local')
+  .onConnect(db => db.subscriptionBuilder().subscribe([
+    'SELECT * FROM agent', 'SELECT * FROM room',
+    'SELECT * FROM escalation', 'SELECT * FROM audit_entry',
+  ])).build();
+```
 
-Local PASS does not establish Maincloud auth or deployment. T8's Maincloud attempt
-returned 401 `InvalidSignature` using the local-only CLI identity. Anthony/Diego can
-finish `spacetime login` in their browser, publish with `--server maincloud`, and
-verify an HTTPS/WSS subscription. Keep the production writer identity distinct from
-anonymous renderer clients. No Convex implementation is included.
+Client accessors use camel case (`db.auditEntry`, `db.runtimeControl`). Safely
+convert u64 sequence values to JS integers before canonical audit verification;
+the adapter rejects overflow and returns numeric `StateStore` sequences. Do not
+hash bigint values as quoted decimal strings. Room positions/anchors are view data;
+the renderer grants no authority.
 
-## #15 audit adapter contract (Refs #23)
+## Reducer contract
 
-The canonical reference, read API, hash format and replay rules live in
-[`orchestrator/src/audit/README.md`](../orchestrator/src/audit/README.md).
-Implement the exported orchestrator `StateStore`; use one shared chain for all
-seats, the tool gateway, model-route evidence, recovery, approvals and LLM OFF.
+Every public StateStore method has a snake-case reducer. These accept
+`{requestId,payload}`, where payload is the canonical JSON array of the exported
+method's arguments. `setAgentTarget` maps to `set_agent_target_leased`. Server
+results are private and exposed only through the identity-filtered
+`server_results` view; anonymous clients receive no result rows. The generated
+client awaits the reducer result, then acknowledges its temporary receipt.
+The adapter does not retry an ambiguous side effect automatically.
 
-`audit_entry` table: `seq` (unique monotonic integer, primary key), `id` (unique
-string), `ts` (integer Unix milliseconds), `actor` (`code | local_model | claude |
-human | client | system`), `seat`, `action`, `inputs` (canonical JSON), `ruleIds`
-(string array), `policyVersion` (integer), `refs` (evidence string array), `route`,
-`latencyMs`, `costUsd` (finite nonnegative numbers), optional `decision`
-(`ALLOW | DENY | ESCALATE`), `prevHash`, `hash` (lowercase SHA-256 hex).
-The selected model ID remains in `inputs.model` when present. Preserve numeric
-values exactly; bigint database seq/ts values must be safely converted to JS
-integers for canonical serialization, never hashed as quoted decimal strings.
+- Reducers replace caller time arguments with `ctx.timestamp`. Claims are atomic,
+  one active task per seat, with owner/token/expiry/heartbeat checks on mutations.
+  Expired agents/tasks are reaped, old owners are fenced, payment fingerprints and
+  receipts survive adapter reconnects. Lease duration is bounded to 60 seconds.
+- Transition reducers rerun the exported policy binding on persisted tasks and
+  actual effect inputs. Invoice transitions also check the persisted agent badge,
+  invoice kind and task reference; an out-of-seat invoice write is refused. Current stored vendor
+  holds override stale task context. AP approval needs its passkey escalation; AP
+  paid needs a persisted payment receipt.
+- Business state transitions append `state.<method>` code evidence in the same
+  transaction. Heartbeat/renewal timestamps do not add wall noise. Existing
+  policy, approval, expiry and payment evidence remains in the same chain.
+- `append_audit`/`append_audits` validate input, assign sequence/id/previous hash and
+  hash canonical JSON atomically. No audit update/delete reducer exists. Caller
+  chain metadata is ignored. Batches roll back entirely. Canonical SHA-256 uses
+  the same audited format as [`orchestrator/src/audit/README.md`](../orchestrator/src/audit/README.md).
+- `decide_escalation` is trusted-server ingress, protected by publisher identity.
+  The adapter consumes the one-use `VerifiedApproval` capability issued by the
+  real WebAuthn verifier **before serialization**. JSON/voice cannot mint it.
+  The module checks the human, decision, pending status and expiry; no model or
+  browser receives that publisher token. SpacetimeDB does not itself run WebAuthn.
+- Immutable `record_call`, `record_call_turn`, `record_signal`, `record_bank_txn`,
+  `record_payment_plan` and `record_payment_link` ingress supports service adapters.
+  Provider turn IDs dedupe globally; stored call identity and the saved policy
+  bound plan determine link amounts, with no caller override.
+- `seed_company`, `submit_inbox_item`, `verify_bank_change`, `apply_bank_change`
+  are trusted-server ingress. A bank change is immutable after verification;
+  apply requires bound evidence, an approved passkey escalation, correct policy
+  version and unchanged vendor revision. No generic row-update reducer exists.
+- `save_policy_limits` uses optimistic version checks and appends the owner audit
+  atomically with an immutable snapshot, updating current seat/badge projections.
+  Reducers and workers evaluate the latest policy; historical snapshots remain readable.
+- OFF and its code audit commit atomically. Subscriptions abort the old model
+  signal on OFF, disconnect, stale heartbeat (>5s), or generation change; ON gets
+  a fresh signal. A server heartbeat runs each second. Recreate a disconnected
+  adapter to reconnect; cached ON never grants model authority.
 
-`append_audit` is an authenticated trusted-server reducer, never a browser/model
-writer. Accept `AuditInput` (optional stable ID; otherwise `audit:<seq>`), validate
-metadata/JSON and ID uniqueness, atomically assign the next seq and previous hash,
-compute the canonical SHA-256 hash, and insert. For a batch, validate/append all or
-none. Never trust a caller's seq, prevHash or hash. Expose **no update/delete
-reducer** for `audit_entry`; state-changing reducers must append their evidence in
-the same transaction. Gateway call/dedupe/outbox and its audit must commit together.
-An LLM-OFF change and its audit also commit together; see `docs/llm-control.md`.
+The StateStore adapter owns tasks, agents, invoices, escalation decisions, payment
+receipts, runtime control and audits. `MemoryGatewayStore`, voice call storage,
+`MemoryFinanceRepository` and the demo bank remain their explicitly named adapters;
+this PR provides their tables and StateStore seam, not an unimplemented claim that
+those separate repository interfaces persist automatically. Gateway tests use the
+durable shared audit writer; binding complete call/outbox/finance repositories to
+these tables remains integration work. The core demo uses fake external services,
+scripted call turns and a real software test passkey verifier.
 
-Support `listAudit(sinceSeq=0)` with exclusive `seq > sinceSeq` in ascending order,
-`getAudit(id)` and full `verifyAuditChain()` status. Do not verify a page as if it
-were a complete chain from genesis. Subscription rows can feed the wall, while
-ask-why uses an authorized verified snapshot and its existing allowlist projection.
+## Verification and parity
+
+```sh
+pnpm -r test
+pnpm --filter @backroom/spacetime test:contract
+SPACETIME_LIVE=1 pnpm state:live
+pnpm -r build
+pnpm -r typecheck
+```
+
+The ordinary module suite runs actual reducers on the SDK's local WASM datastore,
+with no network: forged clock, stale leases, cross-badge writes, actual-payment
+policy, batch rollback, anonymous writes, seed replay, passkey-bound bank change,
+room-denial evidence and disconnect generation fencing.
+
+`test:contract` runs the existing StateStore/audit/real-policy/LLM-OFF/approval/
+gateway/core-demo suites through that same module and `SpacetimeStateStore`.
+Worker tests that deliberately replace policy with arbitrary mocks remain in the
+memory lane; the real-policy worker cases run in both lanes. Test clock control
+belongs exclusively to the SDK harness, never to a production reducer argument.
+
+`state:live` is the opt-in real-service lane. It starts its **own loopback server**,
+uses an isolated CLI config, publishes six fresh DBs, and shuts its server down.
+It makes no model, bank, voice or paid-service request. It verifies:
+
+- Anonymous office subscriptions see Dana's target and all audit rows within 1s;
+  anonymous `server_results` stays empty.
+- The complete 3D-closed collection loop has identical audit bodies to memory
+  replay, modulo timestamps and their derived hashes; both original chains verify.
+  Recorded gateway UUIDs are reused so the comparison does not normalize evidence.
+- OFF/ON propagates between independent clients and fences old signals. A fresh
+  connection reads completed work, and an anonymous writer is refused.
+- The actual `STATE_STORE=spacetime pnpm demo:core` command passes the collection, ON/OFF traps, and frozen Northfield AP moments.
+  The CLI uses fresh `<database>`, `<database>-on`, `<database>-off`, `<database>-ap` databases to keep
+  each demonstration isolated. The live script publishes those names for you.
+- Server termination fences model work. Synthetic logs and a small proof JSON are
+  saved under ignored `.t8-tools/store-live-*/`.
+
+Local-only evidence does not establish Maincloud deployment, browser DOM latency,
+real phone consent, human passkey hardware, or live Nessie reconciliation.

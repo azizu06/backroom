@@ -13,3 +13,4 @@ export * from './payables/inbox';
 export * from './vendor';
 export * from './why';
 export * from './payments';
+export * from './spacetime-store';

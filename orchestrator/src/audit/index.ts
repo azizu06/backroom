@@ -1,5 +1,13 @@
-import { createHash } from 'node:crypto';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import type { AuditEntry, AuditInput } from '../store';
+
+/** JSON-shaped state clone usable in both Node and the reducer V8 runtime. */
+export function cloneState<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(item => cloneState(item)) as T;
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneState(item)])) as T;
+  return value;
+}
 
 export const AUDIT_GENESIS_HASH = '0'.repeat(64);
 
@@ -26,7 +34,7 @@ export function canonicalAuditJson(value: unknown): string {
 }
 
 export const hashAudit = (entry: Omit<AuditEntry, 'hash'>): string =>
-  createHash('sha256').update(canonicalAuditJson(entry), 'utf8').digest('hex');
+  bytesToHex(sha256(new TextEncoder().encode(canonicalAuditJson(entry))));
 
 export type ChainFailure = 'SEQ_MISMATCH' | 'ID_MISMATCH' | 'PREV_HASH_MISMATCH' | 'HASH_MISMATCH' | 'INVALID_ENTRY';
 export type ChainStatus = { length: number; headHash: string } & (
@@ -82,7 +90,7 @@ export class AuditLog {
   constructor(entries: readonly AuditEntry[] = []) {
     const status = verifyChain(entries);
     if (!status.valid) throw new Error(`AUDIT_CHAIN_BROKEN:${status.firstBrokenSeq}`);
-    this.entries = structuredClone([...entries]);
+    this.entries = cloneState([...entries]);
   }
   append(input: AuditInput): AuditEntry { return this.appendMany([input])[0]!; }
   appendMany(inputs: readonly AuditInput[]): AuditEntry[] {
@@ -102,12 +110,12 @@ export class AuditLog {
       pending.push(entry); ids.add(id); previous = entry.hash;
     }
     this.entries.push(...pending);
-    return structuredClone(pending);
+    return cloneState(pending);
   }
   list(sinceSeq = 0): AuditEntry[] {
     if (!Number.isSafeInteger(sinceSeq) || sinceSeq < 0) throw new Error('INVALID_AUDIT_CURSOR');
-    return structuredClone(this.entries.filter(entry => entry.seq > sinceSeq));
+    return cloneState(this.entries.filter(entry => entry.seq > sinceSeq));
   }
-  get(id: string): AuditEntry | undefined { return structuredClone(this.entries.find(entry => entry.id === id)); }
+  get(id: string): AuditEntry | undefined { return cloneState(this.entries.find(entry => entry.id === id)); }
   verifyChain(): ChainStatus { return verifyChain(this.entries); }
 }

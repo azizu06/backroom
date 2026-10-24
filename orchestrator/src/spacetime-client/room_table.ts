@@ -12,13 +12,7 @@ import {
 
 export default __t.row({
   id: __t.string().primaryKey(),
-  seatId: __t.string().name("seat_id"),
-  state: __t.string(),
-  room: __t.string(),
-  targetAnchor: __t.string().name("target_anchor"),
-  posX: __t.f64().name("pos_x"),
-  posY: __t.f64().name("pos_y"),
-  heartbeatAt: __t.timestamp().name("heartbeat_at"),
-  currentTaskId: __t.option(__t.string()).name("current_task_id"),
-  modelRoute: __t.string().name("model_route"),
+  name: __t.string(),
+  requiredBadge: __t.string().name("required_badge"),
+  anchors: __t.string(),
 });

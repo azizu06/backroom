@@ -64,6 +64,6 @@ describe('heartbeat recovery', () => {
     await store.heartbeat('a', 16000);
     expect((await store.getTask('t'))?.status).toBe('queued');
     await expect(store.renewLease(lease, 16000, 30000)).rejects.toThrow('LEASE_LOST');
-    expect((await store.listAudit())[0]).toMatchObject({ actor: 'system', action: 'lease_expired', ruleIds: ['LEASE_EXPIRED'] });
+    expect((await store.listAudit()).find(entry => entry.action === 'lease_expired')).toMatchObject({ actor: 'system', action: 'lease_expired', ruleIds: ['LEASE_EXPIRED'] });
   });
 });

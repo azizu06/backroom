@@ -16,14 +16,14 @@ describe('seat worker policy gate', () => {
     const store = new MemoryStateStore();
     const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     let auditedBeforeEffect = false;
-    effects.beforeEffect = async () => { auditedBeforeEffect = (await store.listAudit())[0]?.decision === 'ALLOW'; };
+    effects.beforeEffect = async () => { auditedBeforeEffect = (await store.listAudit()).find(entry => entry.decision)?.decision === 'ALLOW'; };
     const decision: Decision = kind === 'ALLOW' ? allow : kind === 'DENY'
       ? { ...allow, kind, reason: 'NOT_IN_BADGE', quote: quote('NOT_IN_BADGE') }
       : { ...allow, kind, reason: 'OVER_LIMIT', toHuman: 'dana', quote: quote('OVER_LIMIT') };
     const worker = new SeatWorker({ id: 'payables-1', seat: 'payables', store, effects, now: () => 0,
       evaluate: () => decision });
     await worker.start(); await store.enqueueTask(payment); await worker.tick();
-    expect((await store.listAudit())[0]).toMatchObject({ actor: 'code', seat: 'payables',
+    expect((await store.listAudit()).find(entry => entry.decision)).toMatchObject({ actor: 'code', seat: 'payables',
       action: 'pay_invoice', decision: kind, policyVersion: 3, ruleIds: ['IN_BADGE'],
       refs: ['invoice:1'], route: 'code' });
     expect(effects.calls).toHaveLength(kind === 'ALLOW' ? 1 : 0);
@@ -161,6 +161,6 @@ describe('effect execution boundary', () => {
     permitted = false; await worker.tick();
     expect(effects.calls.map(call => call.kind)).toEqual(['crs']);
     expect((await store.getTask('vendor-check'))?.status).toBe('denied');
-    expect((await store.listAudit()).at(-1)).toMatchObject({ action: 'run_apify', policyVersion: 4, decision: 'DENY' });
+    expect((await store.listAudit()).filter(entry => entry.decision).at(-1)).toMatchObject({ action: 'run_apify', policyVersion: 4, decision: 'DENY' });
   });
 });

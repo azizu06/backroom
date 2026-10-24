@@ -11,7 +11,9 @@
     "test": "pnpm -r test",
     "dev:web": "pnpm --filter @backroom/web dev",
     "demo:core": "pnpm --filter @backroom/orchestrator exec tsx src/core-demo/cli.ts",
-    "eval:run": "pnpm --filter @backroom/orchestrator exec tsx src/eval/cli.ts"
+    "eval:run": "pnpm --filter @backroom/orchestrator exec tsx src/eval/cli.ts",
+    "state:live": "pnpm --filter @backroom/spacetime test:live",
+    "state:seed": "pnpm --filter @backroom/orchestrator exec tsx ../spacetime/scripts/seed.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3"

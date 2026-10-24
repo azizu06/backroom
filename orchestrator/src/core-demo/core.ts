@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
+import { verifyChain as verifyAudit } from '../audit';
 import { evaluate, type Context, type Decision } from '@backroom/policy';
 import { MemoryStateStore, SeatWorker, FakeEffects, routeInboxItem, createRouter } from '../index';
 import { northfield } from '../payables';
 import { askWhy, type WhyAuditEntry } from '../why';
-import type { AuditEntry } from '../store';
+import type { AuditEntry, StateStore } from '../store';
 import { runPreCall, createCallPlanner, fakeCreditCheck, fakeHealthCheck } from '../collections';
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
@@ -28,17 +28,10 @@ const terms = (installments: number, waive_fee = false) => ({ installments, firs
 const requireThat: (condition: unknown, message: string) => asserts condition = (condition, message) => {
   if (!condition) throw new Error(`CORE_DEMO: ${message}`);
 };
-export function verifyChain(entries: AuditEntry[]): boolean {
-  let previous = '0'.repeat(64);
-  return entries.every(({ hash, ...body }, index) => {
-    const valid = body.seq === index + 1 && body.prevHash === previous
-      && hash === createHash('sha256').update(JSON.stringify(body)).digest('hex');
-    previous = hash; return valid;
-  });
-}
+export function verifyChain(entries: AuditEntry[]): boolean { return verifyAudit(entries).valid; }
 
-export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string } = {}) {
-  const store = new MemoryStateStore();
+export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string; store?: StateStore } = {}) {
+  const store = options.store ?? new MemoryStateStore();
   const gatewayStore = new MemoryGatewayStore([baseCall()], store);
   const gateway = createGateway({ secret: () => secret, store: gatewayStore,
     approvalBridge: createApprovalBridge(store, () => NOW) });
@@ -167,8 +160,7 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
 }
 
 /** #22 thin adapter: typed inbox -> real SeatWorker/evaluateStep; no PDF/email extraction model. */
-export async function runInboxTrap({ llmOff = false } = {}) {
-  const store = new MemoryStateStore();
+export async function runInboxTrap({ llmOff = false, store = new MemoryStateStore() }: { llmOff?: boolean; store?: StateStore } = {}) {
   if (llmOff) await store.setLlmEnabled(false);
   let modelRequests = 0;
   const forbiddenNetwork: typeof fetch = async () => { modelRequests++; throw new Error('DEMO_NETWORK_FORBIDDEN'); };
