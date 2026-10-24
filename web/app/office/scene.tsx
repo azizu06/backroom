@@ -68,19 +68,20 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
     <mesh ref={door} visible={false} position={[x, 0.65, z]}><boxGeometry args={[1.5, 1.3, 0.2]} /><meshBasicMaterial color='#ed6252' transparent opacity={0.85} /></mesh>
   </group>;
 }
-function Avatar({ agent, tween }: { agent: OfficeAgent; tween: boolean }) {
+function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean; recorded: boolean }) {
   const body = useRef<Group>(null);
   const legs = useRef<Group>(null);
   const motion = useRef(new WalkMotion(agent.pos));
   useEffect(() => { motion.current.moveTo(agent.targetAnchor); }, [agent.targetAnchor]);
   useFrame((_, delta) => {
     const walk = motion.current;
-    walk.advance(delta);
+    if (recorded) walk.position.splice(0, 2, ...agent.pos);
+    else walk.advance(delta);
     if (!body.current) return;
     body.current.position.set(walk.position[0], 0, walk.position[1]);
     const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = walk.moving && !tween ? Math.sin(walk.distance * 9 + i * Math.PI) * 0.38 : 0; });
+    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = walk.moving && !tween && !recorded ? Math.sin(walk.distance * 9 + i * Math.PI) * 0.38 : 0; });
   });
   const color = OFFICE_ANCHORS[agent.seatId].color;
   return <group ref={body} position={[agent.pos[0], 0, agent.pos[1]]}>
@@ -170,7 +171,7 @@ export function OfficeScene({ snapshot, fixed, focus, labels, onFailure }: {
     <Block at={[5, 0.7, 3.35]} size={[1.4, 1.05, 0.08]} color='#718176' />
     <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
-    {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} tween={fixed} />)}
+    {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} tween={fixed} recorded={snapshot.connection === 'replay'} />)}
     </Instances>
     <CameraRig focus={focus} fixed={fixed} /><ContextLoss onFailure={onFailure} />
   </Canvas>;

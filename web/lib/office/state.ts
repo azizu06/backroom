@@ -46,7 +46,7 @@ export interface OfficeSnapshot {
   readonly badges: readonly OfficeBadge[];
   readonly audit: readonly OfficeAudit[];
   readonly denials: readonly OfficeDenial[];
-  readonly connection: "preview" | "connecting" | "live" | "disconnected";
+  readonly connection: "preview" | "connecting" | "live" | "disconnected" | "replay";
   readonly llmEnabled: boolean | null;
   readonly inboxCount: number;
 }

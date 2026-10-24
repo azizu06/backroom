@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { AuditEntry, ChainStatus, WhyAnswer } from '@backroom/orchestrator';
 import './AuditWall.css';
 
-type Snapshot = { entries: AuditEntry[]; chain: ChainStatus; measuredAt: string };
+export type AuditSnapshot = { entries: AuditEntry[]; chain: ChainStatus; measuredAt: string };
 const message = (error: unknown) => error instanceof Error ? error.message : 'Request failed. Try again.';
 async function api(path: string, body?: unknown, signal?: AbortSignal) {
   const response = await fetch(`/api/audit/${path}`, { cache: 'no-store', signal,
@@ -32,8 +32,9 @@ function policyQuote(entry: AuditEntry, entries: AuditEntry[]) {
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 /** A DOM panel: mount alongside the lobby canvas, or in a drei Html surface. */
-export function AuditWall() {
-  const [snapshot, setSnapshot] = useState<Snapshot>();
+export function AuditWall({ recording }: { recording?: AuditSnapshot } = {}) {
+  const [liveSnapshot, setSnapshot] = useState<AuditSnapshot>();
+  const snapshot = recording ?? liveSnapshot;
   const [locked, setLocked] = useState(false);
   const [code, setCode] = useState('');
   const [revision, setRevision] = useState(0);
@@ -47,11 +48,12 @@ export function AuditWall() {
   const replay = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    if (recording) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const next: Snapshot = await api('entries', undefined, controller.signal);
+        const next: AuditSnapshot = await api('entries', undefined, controller.signal);
         setSnapshot(next); setLocked(false); setError('');
         const requested = new URLSearchParams(window.location.search).get('entry');
         setSelected(current => current ?? (requested || next.entries.at(-1)?.id));
@@ -66,7 +68,7 @@ export function AuditWall() {
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [revision]);
+  }, [revision, recording]);
 
   async function unlock(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
@@ -85,7 +87,7 @@ export function AuditWall() {
     requestAnimationFrame(() => replay.current?.focus());
   }
   const entries = snapshot?.entries ?? [];
-  const entry = entries.find(row => row.id === selected);
+  const entry = entries.find(row => row.id === selected) ?? (recording ? entries.at(-1) : undefined);
   const quote = entry && policyQuote(entry, entries);
   const trusted = !!snapshot?.chain.valid && !error;
   function citation(id: string, key: number | string) {
@@ -97,9 +99,9 @@ export function AuditWall() {
   return <section className="audit-wall" aria-labelledby="audit-title">
     <header className="audit-heading">
       <div><p className="audit-eyebrow">Northfield Studio / Decision record</p><h1 id="audit-title">Audit wall</h1>
-        <p>Every action leaves a record. Follow the evidence.</p></div>
+        <p>{recording ? 'REPLAY · original recorded entries. No actions run.' : 'Every action leaves a record. Follow the evidence.'}</p></div>
       {snapshot && <div className={`audit-chain ${!snapshot.chain.valid ? 'audit-broken' : error ? 'audit-stale' : 'audit-verified'}`} role="status">
-        {!snapshot.chain.valid ? `Chain broken · first broken seq ${snapshot.chain.firstBrokenSeq}` : error ? 'Chain status stale' : `Chain verified · ${snapshot.chain.length} entries`}
+        {!snapshot.chain.valid ? `Chain broken · first broken seq ${snapshot.chain.firstBrokenSeq}` : error ? 'Chain status stale' : `${recording ? 'Recorded chain verified' : 'Chain verified'} · ${snapshot.chain.length} entries`}
       </div>}
     </header>
     {error && <p className="audit-error" role="alert">{error} <button type="button" onClick={() => setRevision(n => n + 1)}>Retry</button></p>}
@@ -113,7 +115,7 @@ export function AuditWall() {
       <div className="audit-workspace">
         <section className="audit-panel audit-records" aria-labelledby="audit-records-title">
           <div className="audit-section-heading"><h2 id="audit-records-title">Recorded actions</h2><span>{entries.length} total</span></div>
-          <p className="audit-muted">Updates every 2 seconds · {new Date(snapshot.measuredAt).toLocaleTimeString()}</p>
+          <p className="audit-muted">{recording ? 'REPLAY position' : 'Updates every 2 seconds'} · {new Date(snapshot.measuredAt).toLocaleTimeString()}</p>
           {!entries.length && <p>No actions recorded yet. Run the core loop in the connected server to see its decisions here.</p>}
           <ol className="audit-entries">{[...entries].reverse().map(row => {
             const quote = policyQuote(row, entries);
@@ -143,7 +145,7 @@ export function AuditWall() {
               <details><summary>Evidence and chain hashes</summary><pre>{pretty({ refs: entry.refs, seq: entry.seq, hash: entry.hash, prevHash: entry.prevHash })}</pre></details>
             </> : <p>Select an action to inspect its inputs, rules and outcome.</p>}
           </section>
-          <section className="audit-panel audit-why" aria-labelledby="audit-why-title">
+          {!recording && <section className="audit-panel audit-why" aria-labelledby="audit-why-title">
             <h2 id="audit-why-title">Ask why</h2><p className="audit-muted">Answers cite the recorded evidence. They cannot approve or pay.</p>
             <form onSubmit={ask}><label htmlFor="audit-question">Question about a decision</label>
               <textarea id="audit-question" rows={3} maxLength={1000} required placeholder="Why didn’t you pay invoice #4419?" value={question} onChange={e => setQuestion(e.target.value)} />
@@ -156,10 +158,10 @@ export function AuditWall() {
               {!!answer.citations.length && <p className="audit-citations">Cited entries: {answer.citations.map(id => citation(id, id))}</p>}
               {!trusted && <p className="audit-error">This answer predates the current chain warning. Do not rely on it until the record is verified.</p>}
             </div>}
-          </section>
+          </section>}
         </div>
       </div>
-      <footer className="audit-footer">This server’s audit snapshot · chain integrity checks detect changed entries and broken links.<br />The reference store is process-local. A verified chain alone cannot detect a removed suffix.</footer>
+      <footer className="audit-footer">{recording ? 'REPLAY · saved audit chain, verified from the complete fixture. No live polling, model calls or effects.' : <>This server’s audit snapshot · chain integrity checks detect changed entries and broken links.<br />The reference store is process-local. A verified chain alone cannot detect a removed suffix.</>}</footer>
     </>}
   </section>;
 }
