@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { northfield, northfieldInvoice } from '../../payables';
 import { runEval, scriptedPersona } from '../../eval/harness';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
+import { runBankChange } from './bank-change';
+import { evaluatorSourceHash } from './provenance';
 import { score, type Observation } from './score';
 
 // All outbound network attempts fail closed, including accidental provider calls in future adapters.
@@ -98,6 +100,18 @@ for (const invoice of northfield.arInvoices) {
   if (expected && expected !== actual) gaps.push({ id: scenario.id, detail: `Reconciler expected ${expected}, got ${actual}.` });
 }
 const legacy = await runEval({ persona: scriptedPersona });
+const bankChange = await runBankChange();
+const bankChangeMatch = bankChange.outcome === key.payables.P04.plantedRule;
+if (!bankChangeMatch) gaps.push({ id: 'P04:dispatcher', detail: `Dispatcher bank-change workflow returned ${bankChange.outcome}.` });
+const bankChangeGuards = [];
+for (const approval of ['missing', 'deny', 'voice'] as const) {
+  const run = await runBankChange({ approval });
+  const match = run.master.accountId === run.beforeApproval.accountId && run.master.revision === run.beforeApproval.revision &&
+    run.appliedStatus !== 'approved' && run.after.actual === 'HOLD' && run.destinations.length === 0;
+  bankChangeGuards.push({ approval, match, appliedStatus: run.appliedStatus, master: run.master,
+    destinations: run.destinations, runtime: run.after.runtime, spokenRejected: run.spokenRejected });
+  if (!match) gaps.push({ id: `P04:${approval}`, detail: 'Unapproved bank change escaped the hold or made a payment.' });
+}
 for (const row of legacy.reports) {
   for (const violation of row.violations) gaps.push({ id: row.id, detail: `Existing eval: ${violation}` });
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
@@ -112,14 +126,17 @@ const rates = {
   exactAPRules: fraction(gradedAP.filter(row => row.exactRuleMatch === true).length, gradedAP.filter(row => row.exactRuleMatch !== null).length),
   collectionsPermits: fraction(permits.filter(row => row.match === true).length, permits.filter(row => row.match !== null).length),
   reconciliation: fraction(receivables.filter(row => row.match === true).length, receivables.filter(row => row.match !== null).length),
+  dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
+  bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
 };
 const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
-    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'score.ts', 'scoreboard.ts'].map(name => {
-      const path = `orchestrator/src/agents/eval/${name}`; return [path, sha(path)];
+    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
+    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'bank-change.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+      const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json'].map(path => [path, sha(path)])),
@@ -130,13 +147,17 @@ const report = {
     extraction: 'Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.',
     providers: 'Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.',
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
-    payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 passkey application, P10 badge attack, P11 recovery and P12 failover are legacy checks/gaps.',
+    payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 also has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 badge attack, P11 recovery and P12 failover remain legacy checks/gaps.',
+    bankChange: bankChange.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
     unscored: 'The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy.' },
   coverage: { apRuntimeErrors: invoiceRuns.filter(row => row.actual === 'ERROR').map(row => row.id),
     historicalItems: invoiceRuns.filter(row => row.historical).length,
     historicalMockDebits: invoiceRuns.filter(row => row.historical).reduce((sum, row) => sum + row.mockDebits, 0) },
   rates, ap: invoiceRuns, gradedAP, permits, receivables,
+  bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
+    before: { ...bankChange.before, trace: undefined, extraction: undefined },
+    after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
   legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
@@ -159,12 +180,14 @@ const lines = [
   `| Authoritative AP decision rule agreement | ${display(rates.exactAPRules)} |`,
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
+  `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
+  `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,
   `| Existing eval answer-key checks (partial execution permitted) | ${display(rates.legacyKeyChecks)} |`,
   `| Existing eval scenarios with no unexecuted integration step | ${display(rates.legacyCompleteScenarios)} |`, '',
   '## Coverage and limits', '',
   ...Object.entries(report.scope).map(([name, value]) => `- **${name}**: ${value}`), '',
   '- Every AP invoice runs from a fresh repository snapshot, including historical invoices. Every AR invoice gets a reconciliation trial; every scenario is visited by the existing eval and every collections scenario gets a permit probe.',
-  '- Only the initial hold is measured for legitimate bank changes. That hold is required and is not counted as a false hold. No role was tuned to the key.',
+  '- Initial AP decisions retain the required legitimate-bank-change hold and do not count it as a false hold. Separately, P04 runs the production runtime/dispatcher before and after VendorSeat applies a ControllerApprovals-verified software passkey receipt on the same repository. This is two cases around a code-owned human boundary, not an autonomous agent approval or human tap. No role was tuned to the key.',
   '- The frozen key has 34 team-authored scenarios and zero external scenarios. Small planted-trap denominators cannot support a general fraud-detection claim.', '',
   '## Disagreements and unexecuted evidence', '',
   ...(gaps.length ? gaps.map(row => `- **${row.id}**: ${row.detail}`) : ['No disagreements in the measured seams.']), '',
@@ -177,4 +200,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR')) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match)) process.exitCode = 1;
