@@ -22,7 +22,7 @@ function setup() {
     method: 'POST', headers: { authorization: 'Bearer test-tool', 'Content-Type': 'application/json' },
     body: JSON.stringify({ call_id: 'approval-demo', webhook_request_id: `r${++seq}`, ...fields }),
   }));
-  return { state, service, handler, tool, advance: () => { now += 60_000; } };
+  return { state, service, handler, tool, gatewayStore, advance: () => { now += 60_000; } };
 }
 
 describe('M6 HTTP and gateway boundary', () => {
@@ -56,8 +56,15 @@ describe('M6 HTTP and gateway boundary', () => {
   });
 
   it('never exposes decide_escalation to voice, including claimed passkey flags', async () => {
-    const { tool } = setup();
-    expect((await tool('decide_escalation', { decision: 'Approve' })).status).toBe(404);
+    const { tool, gatewayStore } = setup();
+    const before = await gatewayStore.transact('approval-demo', call => structuredClone(call.escalations));
+    // #30: an unknown tool on a known call pauses it for a human (ESCALATE); it still decides nothing.
+    const response = await tool('decide_escalation', { decision: 'Approve' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ kind: 'ESCALATE', can_confirm: false, rule_ids: ['UNRECOGNIZED_REQUEST'] });
+    const after = await gatewayStore.transact('approval-demo', call => call);
+    expect(after.escalations).toEqual(before);
+    expect(after.status).not.toBe('active');
     expect((await tool('check_approval', { escalation_id: 'fake', method: 'passkey', approved: true })).status).toBe(400);
   });
 });

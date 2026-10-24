@@ -16,6 +16,8 @@ export interface GatewayCall {
   policyState?: GatewayPolicyState;
   currency: string;
   policyVersion: number;
+  /** Who supplied this call's scenario. A live judge caller is 'judge'; absent means seeded. */
+  scenarioSource?: "judge" | "seed";
   identityConfirmed: boolean;
   status:
     | "active"
@@ -188,7 +190,8 @@ export class MemoryGatewayStore implements GatewayStore {
         refs: [saved.callId, saved.invoiceId, saved.clientId], route: 'code',
         decision: entry.kind === 'RECORDED' ? undefined : entry.kind,
         inputs: { kind: entry.kind, webhookRequestId: entry.webhookRequestId,
-          invoiceId: saved.invoiceId, plan: entry.plan, decision: entry.decision },
+          invoiceId: saved.invoiceId, plan: entry.plan, decision: entry.decision,
+          scenario_source: saved.scenarioSource ?? 'seed' },
         latencyMs: 0, costUsd: 0,
       }));
       if (inputs.length) {

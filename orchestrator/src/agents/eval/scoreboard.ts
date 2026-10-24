@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { northfield, northfieldInvoice } from '../../payables';
 import { runEval, scriptedPersona } from '../../eval/harness';
+import { JUDGE_CASES, runJudgeCase, type JudgeCase } from './judge';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runBadgeAttack } from './badge-attack';
@@ -125,6 +126,12 @@ for (const row of legacy.reports) {
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 gaps.push({ id: 'AR_RUNTIME', detail: 'AR probes exercise real specialist DomainTools with a Collections reducer lease, but do not drive the dispatcher/post-call role or a voice conversation. Those end-to-end runtime outcomes remain unmeasured.' });
+const judgeRuns = [];
+for (const name of Object.keys(JUDGE_CASES) as JudgeCase[]) {
+  const run = await runJudgeCase(name);
+  judgeRuns.push(run);
+  if (!run.match) gaps.push({ id: `C5:judge:${name}`, detail: `Judge call missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
+}
 const metrics = score(observations);
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
 const rates = {
@@ -136,6 +143,7 @@ const rates = {
   reconciliation: fraction(receivables.filter(row => row.match === true).length, receivables.filter(row => row.match !== null).length),
   runtimeBadgeIsolation: fraction(Number(badgeIsolationMatch), 1),
   dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
+  judgeCalls: fraction(judgeRuns.filter(row => row.match).length, judgeRuns.length),
   bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
@@ -144,7 +152,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'judge.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
@@ -157,6 +165,7 @@ const report = {
     providers: 'Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.',
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
     payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 has a separate Collections runtime tool-isolation probe; its NOT_IN_BADGE reference is a direct policy check, not a runtime permission error. P11 recovery and P12 failover remain legacy checks/gaps.',
+    judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
@@ -169,7 +178,7 @@ const report = {
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
     after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
-  legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  judgeCalls: judgeRuns, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;
@@ -194,6 +203,7 @@ const lines = [
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
   `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,
+  `| C5 judge calls: unrecognized ends ESCALATE, tagged scenario_source judge | ${display(rates.judgeCalls)} |`,
   `| Existing eval answer-key checks (partial execution permitted) | ${display(rates.legacyKeyChecks)} |`,
   `| Existing eval scenarios with no unexecuted integration step | ${display(rates.legacyCompleteScenarios)} |`, '',
   '## Coverage and limits', '',
@@ -212,4 +222,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || judgeRuns.some(row => !row.match)) process.exitCode = 1;

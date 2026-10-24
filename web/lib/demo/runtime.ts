@@ -119,7 +119,7 @@ export async function createDemoRuntime() {
         clientId: 'northfield-jordan', contactName: 'Jordan', companyName: northfield.company.name,
         amountCents: invoice.principalCents + invoice.lateFeeCents,
         receivable: { principalCents: invoice.principalCents, lateFeeCents: invoice.lateFeeCents },
-        currency: 'USD', policyVersion: (await getStateStore().getPolicy()).policyVersion,
+        currency: 'USD', policyVersion: (await getStateStore().getPolicy()).policyVersion, scenarioSource: 'judge',
         identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} });
     }, check: () => getStateStore().getPolicy(), status: (): DemoStatus => ({
     llmEnabled: getStateStore().llmEnabled, stateStore: mode, voice: process.env.DEMO_VOICE_RUNNING === '1',

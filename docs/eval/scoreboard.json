@@ -4,16 +4,17 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "862c882256cfaf8e95ed03478cda9bca677e93a3",
+    "baseCommit": "9a191ffd234c01281112e5d11ddc8b71abb5b547",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "82bc1146624f5786bc1fb33b6bda7001d3528efb8efd6b5560050e3842fd968e",
+      "orchestrator/src/agents/eval/judge.ts": "e434e56aaa86b10ca248c7c575d930058d27aef02e95281b5a2b738a22e4d4d4",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "d8e87c9cf5eb79a9e13bad005430af5d7e207f76a72da309cb87512fc9629258"
+      "orchestrator/src/agents/eval/scoreboard.ts": "12da9e41531bbb9385742c22cf2d6d1146f609ad3cf86593691aa8e112977a99"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
@@ -47,6 +48,7 @@
     "providers": "Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.",
     "fraudDefinition": "Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.",
     "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement around production VendorSeat/ControllerApprovals. P10 has a separate Collections runtime tool-isolation probe; its NOT_IN_BADGE reference is a direct policy check, not a runtime permission error. P11 recovery and P12 failover remain legacy checks/gaps.",
+    "judgeCalls": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, opt_out. The opt-out control must not escalate.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
@@ -119,6 +121,11 @@
     "dispatcherBankChange": {
       "numerator": 1,
       "denominator": 1,
+      "percent": 100
+    },
+    "judgeCalls": {
+      "numerator": 5,
+      "denominator": 5,
       "percent": 100
     },
     "bankChangeApprovalGuards": {
@@ -12747,6 +12754,148 @@
       }
     ]
   },
+  "judgeCalls": [
+    {
+      "id": "dispute",
+      "match": true,
+      "checks": {
+        "everyRowTaggedJudge": true,
+        "escalation": true,
+        "caseOutcome": true,
+        "neverPassed": true,
+        "noCommitment": true,
+        "auditChain": true
+      },
+      "callStatus": "disputed",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "terminalDecision": "ESCALATE",
+      "responses": [
+        {
+          "tool": "verify_identity_result",
+          "status": 200,
+          "kind": "RECORDED"
+        },
+        {
+          "tool": "mark_dispute",
+          "status": 200,
+          "kind": "RECORDED"
+        }
+      ],
+      "scope": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model."
+    },
+    {
+      "id": "wrong_number",
+      "match": true,
+      "checks": {
+        "everyRowTaggedJudge": true,
+        "escalation": true,
+        "caseOutcome": true,
+        "neverPassed": true,
+        "noCommitment": true,
+        "auditChain": true
+      },
+      "callStatus": "human_requested",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "terminalDecision": "ESCALATE",
+      "responses": [
+        {
+          "tool": "verify_identity_result",
+          "status": 200,
+          "kind": "RECORDED"
+        }
+      ],
+      "scope": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model."
+    },
+    {
+      "id": "unrecognized_request",
+      "match": true,
+      "checks": {
+        "everyRowTaggedJudge": true,
+        "escalation": true,
+        "caseOutcome": true,
+        "neverPassed": true,
+        "noCommitment": true,
+        "auditChain": true
+      },
+      "callStatus": "human_requested",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "terminalDecision": "ESCALATE",
+      "responses": [
+        {
+          "tool": "verify_identity_result",
+          "status": 200,
+          "kind": "RECORDED"
+        },
+        {
+          "tool": "request_human",
+          "status": 200,
+          "kind": "RECORDED"
+        }
+      ],
+      "scope": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model."
+    },
+    {
+      "id": "invented_tool",
+      "match": true,
+      "checks": {
+        "everyRowTaggedJudge": true,
+        "escalation": true,
+        "caseOutcome": true,
+        "neverPassed": true,
+        "noCommitment": true,
+        "auditChain": true
+      },
+      "callStatus": "human_requested",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "terminalDecision": "ESCALATE",
+      "responses": [
+        {
+          "tool": "verify_identity_result",
+          "status": 200,
+          "kind": "RECORDED"
+        },
+        {
+          "tool": "apply_owner_discount",
+          "status": 200,
+          "kind": "ESCALATE"
+        }
+      ],
+      "scope": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model."
+    },
+    {
+      "id": "opt_out",
+      "match": true,
+      "checks": {
+        "everyRowTaggedJudge": true,
+        "escalation": true,
+        "caseOutcome": true,
+        "neverPassed": true,
+        "noCommitment": true,
+        "auditChain": true
+      },
+      "callStatus": "opted_out",
+      "caseStatus": "done",
+      "reason": null,
+      "terminalDecision": null,
+      "responses": [
+        {
+          "tool": "verify_identity_result",
+          "status": 200,
+          "kind": "RECORDED"
+        },
+        {
+          "tool": "record_opt_out",
+          "status": 200,
+          "kind": "RECORDED"
+        }
+      ],
+      "scope": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model."
+    }
+  ],
   "legacy": {
     "signoff": "approved",
     "reports": [

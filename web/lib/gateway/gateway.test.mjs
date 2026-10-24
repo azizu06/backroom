@@ -344,7 +344,8 @@ describe("Cartesia tool gateway", () => {
   });
 
   it.each([
-    ["unknown", {}, 404],
+    // #30: an unrecognized tool on a known authenticated call escalates (pause for a human) instead of 404.
+    ["unknown", {}, 200],
     ["get_invoice_context", { amount_cents: 1 }, 400],
     ["verify_identity_result", { result: "yes" }, 400],
     [
@@ -544,5 +545,73 @@ describe("Cartesia tool gateway", () => {
       rule_ids: ["BANKRUPTCY_STOP"],
     });
     expect(await store.transact("call-1", (c) => c.outbox)).toHaveLength(1);
+  });
+
+  describe("judge scenarios (#30)", () => {
+    const post = (gateway, tool, body, token) => gateway(tool, new Request(`https://example.test/api/tools/${tool}`, {
+      method: "POST", headers: { authorization: `Bearer ${token ?? "test-secret"}` }, body: typeof body === "string" ? body : JSON.stringify(body) }));
+    const judgeCall = () => ({ ...seed(), scenarioSource: "judge" });
+
+    it("tags every mirrored audit row with the call's scenario source", async () => {
+      const audit = new MemoryStateStore();
+      const store = new MemoryGatewayStore([judgeCall(), { ...seed(), callId: "seeded" }], audit);
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      await post(gateway, "verify_identity_result", { call_id: "call-1", webhook_request_id: "j1", result: "confirmed" });
+      await post(gateway, "mark_dispute", { call_id: "call-1", webhook_request_id: "j2" });
+      await post(gateway, "verify_identity_result", { call_id: "seeded", webhook_request_id: "s1", result: "confirmed" });
+      const rows = await audit.listAudit();
+      expect(rows.map(row => [row.refs[0], row.inputs.scenario_source])).toEqual([["call-1", "judge"], ["call-1", "judge"], ["seeded", "seed"]]);
+    });
+
+    it("request_human keeps its status, speech and response but is audited as ESCALATE", async () => {
+      const audit = new MemoryStateStore();
+      const store = new MemoryGatewayStore([judgeCall()], audit);
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      const body = await (await post(gateway, "request_human", { call_id: "call-1", webhook_request_id: "h1" })).json();
+      expect(body).toEqual({ kind: "RECORDED", can_confirm: false, speak: "I have requested a human to follow up and paused collection." });
+      expect((await store.transact("call-1", call => call)).status).toBe("human_requested");
+      expect(await audit.listAudit()).toEqual([expect.objectContaining({ action: "request_human", decision: "ESCALATE",
+        ruleIds: ["REQUEST_HUMAN"], inputs: expect.objectContaining({ kind: "ESCALATE", scenario_source: "judge" }) })]);
+    });
+
+    it("an unrecognized tool on a known authenticated call pauses it and escalates, once per delivery", async () => {
+      const audit = new MemoryStateStore();
+      const store = new MemoryGatewayStore([judgeCall()], audit);
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      const delivery = { call_id: "call-1", webhook_request_id: "u1", amount: 1 };
+      const first = await post(gateway, "wire_funds_to_crypto", delivery);
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({ kind: "ESCALATE", can_confirm: false, rule_ids: ["UNRECOGNIZED_REQUEST"], requested_tool: "wire_funds_to_crypto" });
+      expect(await (await post(gateway, "wire_funds_to_crypto", delivery)).json()).toMatchObject({ kind: "ESCALATE", duplicate: true });
+      expect((await post(gateway, "other_unknown", delivery)).status).toBe(409);
+      const call = await store.transact("call-1", saved => saved);
+      expect(call).toMatchObject({ status: "human_requested", plans: [], links: [] });
+      expect(await audit.listAudit()).toEqual([expect.objectContaining({ action: "unrecognized_request", decision: "ESCALATE",
+        ruleIds: ["UNRECOGNIZED_REQUEST"], inputs: expect.objectContaining({ scenario_source: "judge" }) })]);
+      // The call stays stopped: no plan can be confirmed afterwards.
+      await post(gateway, "verify_identity_result", { call_id: "call-1", webhook_request_id: "u2", result: "confirmed" });
+      expect(await (await post(gateway, "propose_plan", { call_id: "call-1", webhook_request_id: "u3", installments: 1, first_payment_pct: 100,
+        duration_days: 0, waive_fee: false, discount_pct: 0 })).json()).toMatchObject({ kind: "DENY", can_confirm: false });
+    });
+
+    it("an unrecognized tool never un-stops an opted-out call", async () => {
+      const store = new MemoryGatewayStore([{ ...judgeCall(), status: "opted_out" }], new MemoryStateStore());
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      await post(gateway, "anything_else", { call_id: "call-1", webhook_request_id: "o1" });
+      expect((await store.transact("call-1", call => call)).status).toBe("opted_out");
+    });
+
+    it("keeps 401/404/400 for unauthenticated, unknown-call, malformed and bad known-tool requests", async () => {
+      const audit = new MemoryStateStore();
+      const store = new MemoryGatewayStore([judgeCall()], audit);
+      const gateway = createGateway({ secret: () => "test-secret", store });
+      expect((await post(gateway, "wire_funds", { call_id: "call-1", webhook_request_id: "a" }, "wrong")).status).toBe(401);
+      expect((await post(gateway, "wire_funds", { call_id: "no-such-call", webhook_request_id: "b" })).status).toBe(404);
+      expect((await post(gateway, "wire_funds", "not json")).status).toBe(404);
+      expect((await post(gateway, "wire_funds", { call_id: "call-1" })).status).toBe(404);
+      expect((await post(gateway, "propose_plan", { call_id: "call-1", webhook_request_id: "c", installments: "two" })).status).toBe(400);
+      expect((await store.transact("call-1", call => call)).status).toBe("active");
+      expect(await audit.listAudit()).toEqual([]);
+    });
   });
 });
