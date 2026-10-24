@@ -110,4 +110,5 @@ Primary references: [official TypeScript quickstart](https://spacetimedb.com/doc
 [official installation/local server guide](https://spacetimedb.com/docs/).
 
 Validation: `pnpm -r build` passed, including static generation of `/t8`;
-`pnpm -r test` passed 124 tests (94 policy, 29 ask-why, 1 module reducer).
+`pnpm -r test` passed 143 tests after rebasing on the merged orchestrator/gateway
+(94 policy, 48 orchestrator, 1 module reducer).
