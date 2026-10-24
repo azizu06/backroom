@@ -6,11 +6,12 @@ import { Group, MathUtils, Mesh, Vector3, type MeshStandardMaterial } from 'thre
 import { REDUCED_MOTION_QUERY, legSwing } from '../../../lib/office/a11y';
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, type HandoffAgentId } from '../../../lib/office/handoffs';
 import { nextChange, type HandoffFrame, type HandoffStage } from '../../../lib/office/handoff-plan';
+import { setHandoffText } from '../../../lib/office/handoff-text';
 
 /** Looks up the HTML tag (name + speech bubble) Office renders for a handoff agent. */
 export type HandoffTagLookup = (actor: HandoffAgentId) => HTMLDivElement | undefined;
 const FOLDER_POOL = 8;
-const MANILA = '#e0b365', RETURNED = '#e0574a';
+const MANILA = '#e0b365', RETURNED = '#e0574a', CORRECTION = '#f3bf65';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -69,7 +70,11 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
       const legGroup = legs.current.get(actor.id);
       if (legGroup) legGroup.children.forEach((leg, i) => { leg.rotation.x = legSwing(actor.stride, i, actor.moving, reduced); });
       const ring = rings.current.get(actor.id);
-      if (ring) ring.visible = actor.returning;
+      if (ring) {
+        ring.visible = actor.returning;
+        const correction = frame.bubbles.some(bubble => bubble.actor === actor.id && bubble.tone === 'correction');
+        (ring.material as MeshStandardMaterial).color.set(correction ? CORRECTION : RETURNED);
+      }
     }
     if (human.current) human.current.visible = frame.human;
     folders.current.forEach((group, i) => {
@@ -79,8 +84,7 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
       if (!folder) return;
       group.position.set(...folder.position);
       const cover = group.children[0] as Mesh | undefined;
-      (cover?.material as MeshStandardMaterial | undefined)?.color.set(folder.failed ? RETURNED : MANILA);
-      group.name = `handoff-folder:${folder.handoffId}`;
+      (cover?.material as MeshStandardMaterial | undefined)?.color.set(folder.failed ? RETURNED : folder.correction ? CORRECTION : MANILA);
     });
     // Tags and bubbles: projected like the agent name tags.
     if (tag) {
@@ -94,17 +98,16 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
         element.style.visibility = shown && !offscreen ? 'visible' : 'hidden';
         element.style.transform = `translate(${(point.current.x + 1) * state.size.width / 2}px, ${(1 - point.current.y) * state.size.height / 2}px) translate(-50%, -100%)`;
         element.dataset.returning = actor.returning ? 'true' : 'false';
+        element.dataset.correction = bubbles.get(actor.id)?.tone === 'correction' ? 'true' : 'false';
         const bubble = bubbles.get(actor.id);
         const box = element.firstElementChild as HTMLElement | null;
         if (!box) continue;
         if (bubble && shown) {
-          if (box.textContent !== bubble.text) box.textContent = bubble.text;
+          setHandoffText(box, bubble.text);
           box.dataset.tone = bubble.tone;
-          box.dataset.handoffId = bubble.handoffId;
           box.hidden = false;
         } else if (!box.hidden) {
           box.hidden = true;
-          delete box.dataset.handoffId;
         }
       }
     }

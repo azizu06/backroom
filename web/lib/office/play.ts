@@ -3,7 +3,7 @@
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { OFFICE_ANCHORS, anchorLabel, matchingDenial, type AnchorId, type FloorPosition, type OfficeSnapshot } from "./state";
-import { handoffAgentName, statusLabel, type Handoff } from "./handoffs";
+import { compareHandoffs, handoffAgentName, handoffStatus, needsHandoffHuman, statusLabel, type Handoff } from "./handoffs";
 
 export const EYE_HEIGHT = 1.55;
 export const WALK_SPEED = 3;
@@ -218,7 +218,7 @@ export interface PlayPanel {
   readonly seated?: readonly { readonly id: string; readonly name: string; readonly state: string }[];
   readonly locked?: string;
   readonly denial?: PlayPanelEntry;
-  readonly handoff?: { readonly id: string; readonly from: string; readonly to: string; readonly item: string; readonly summary: string; readonly status: string };
+  readonly handoff?: { readonly from: string; readonly to: string; readonly caseDisplayId: string; readonly reason: string; readonly summary: string; readonly status: string; readonly correction: boolean; readonly errorCode?: string };
   readonly entries: readonly PlayPanelEntry[];
 }
 const MAX_ENTRIES = 8;
@@ -236,16 +236,16 @@ function valueText(value: unknown): string {
  */
 export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget, handoffFor?: (actor: string) => Handoff | undefined): PlayPanel | null {
   if (target.kind === "handoff") {
-    const rows = (snapshot.handoffs ?? []).filter(row => row.from === target.actor || row.to === target.actor);
+    const rows = (snapshot.handoffs ?? []).filter(row => row.fromRole === target.actor || row.toRole === target.actor || (target.actor === 'human' && needsHandoffHuman(row)));
     if (!rows.length) return null;
-    const current = handoffFor?.(target.actor) ?? [...rows].sort((a, b) => b.at - a.at)[0]!;
+    const current = handoffFor?.(target.actor) ?? [...rows].sort((a, b) => compareHandoffs(b, a))[0]!;
     return {
       kind: "handoff", title: `${handoffAgentName(target.actor)} · handoff`, state: statusLabel(current.status),
-      task: `${handoffAgentName(current.from)} → ${handoffAgentName(current.to)}${current.item ? ` · ${current.item}` : ""}`,
-      handoff: { id: current.id, from: handoffAgentName(current.from), to: handoffAgentName(current.to), item: current.item, summary: current.summary, status: statusLabel(current.status) },
-      entries: [...rows].sort((a, b) => b.at - a.at).slice(0, MAX_ENTRIES).map(row => ({
-        id: row.id, decision: statusLabel(row.status).toUpperCase(),
-        summary: `${handoffAgentName(row.from)} → ${handoffAgentName(row.to)}${row.item ? ` · ${row.item}` : ""}: ${row.summary}`, ruleIds: [],
+      task: `${current.caseDisplayId} · ${current.reason}`,
+      handoff: { correction: current.correction, from: handoffAgentName(current.fromRole), to: handoffAgentName(current.toRole), caseDisplayId: current.caseDisplayId, reason: current.reason, summary: current.summary, status: handoffStatus(current), errorCode: current.status === 'rejected' ? current.errorCode : undefined },
+      entries: rows.filter(row => row.caseDisplayId === current.caseDisplayId).sort((a, b) => compareHandoffs(b, a)).slice(0, MAX_ENTRIES).map((row, i) => ({
+        id: `handoff-${i}`, decision: statusLabel(row.status).toUpperCase(),
+        summary: `${row.caseDisplayId}: ${row.reason} · ${row.summary}${row.status === 'completed' ? ` · ${handoffStatus(row)}` : ''}${row.errorCode ? ` · ${row.errorCode}` : ""}`, ruleIds: [],
       })),
     };
   }
@@ -294,7 +294,7 @@ export interface PlayBridge {
   /** Live handoff choreography, when handoff rows exist; its agents become interact targets. */
   readonly handoffs?: {
     sample(now: number, reduced?: boolean): { actors: readonly { id: string; position: Vec2 }[]; human: boolean };
-    readonly current: readonly { readonly from: string; readonly to: string }[];
+    readonly current: readonly Handoff[];
   };
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };

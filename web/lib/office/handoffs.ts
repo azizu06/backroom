@@ -5,24 +5,19 @@
  */
 import type { AnchorId, FloorPosition } from './state';
 
-export type HandoffStatus = 'pending' | 'accepted' | 'failed' | 'awaiting_passkey';
-export interface Handoff {
-  readonly id: string;
-  /** Agent role id (see HANDOFF_AGENTS); `human` is Dana at the passkey step. */
-  readonly from: string;
-  readonly to: string;
-  /** What is being handed over, e.g. an invoice id. */
-  readonly item: string;
-  /** One-line summary shown in the speech bubble. */
-  readonly summary: string;
-  readonly status: HandoffStatus;
-  /** Epoch ms the row was written. */
-  readonly at: number;
-  /** Epoch ms of the latest status change, when the row was updated after insert. */
-  readonly updatedAt?: number;
+// Mirrors orchestrator/src/agents/contracts.ts ROLES and the public projection in docs/agents.md / PR #152.
+export const HANDOFF_ROLES = ['intake', 'extractor', 'vendor', 'payables', 'collections', 'reconciler', 'auditor'] as const;
+export type HandoffRole = typeof HANDOFF_ROLES[number];
+export type HandoffStatus = 'offered' | 'accepted' | 'completed' | 'rejected';
+export interface OfficeHandoffRow {
+  readonly handoffId: string; readonly sequence: bigint | number; readonly caseDisplayId: string;
+  readonly fromAgentId: string; readonly toAgentId: string; readonly fromRole: HandoffRole; readonly toRole: HandoffRole;
+  readonly fromVoiceRole: string; readonly toVoiceRole: string; readonly status: HandoffStatus; readonly correction: boolean;
+  readonly reason: string; readonly summary: string; readonly line: string; readonly createdAt: number;
+  readonly acceptedAt?: number; readonly completedAt?: number; readonly decisionRef?: string; readonly errorCode?: string;
 }
-
-export type HandoffAgentId = 'intake' | 'extractor' | 'vendor_verifier' | 'payables' | 'collections' | 'reconciler' | 'auditor' | 'human';
+export type Handoff = OfficeHandoffRow;
+export type HandoffAgentId = HandoffRole | 'human';
 export interface HandoffAgent {
   readonly name: string;
   readonly room: AnchorId;
@@ -31,7 +26,7 @@ export interface HandoffAgent {
   readonly color: string;
 }
 export const HUMAN = 'human' satisfies HandoffAgentId;
-/** Provisional desks for the backend's agents; the office has five rooms, so some rooms seat two. */
+/** Desks for the runtime roles; the office has five rooms, so some rooms seat two. */
 export const HANDOFF_AGENTS: Record<HandoffAgentId, HandoffAgent> = {
   intake: { name: 'Intake', room: 'lobby', station: [-6.0, 2.5], color: '#8fa7b8' },
   extractor: { name: 'Extractor', room: 'lobby', station: [-7.0, 1.7], color: '#9fb6a0' },
@@ -39,7 +34,7 @@ export const HANDOFF_AGENTS: Record<HandoffAgentId, HandoffAgent> = {
   collections: { name: 'Collections', room: 'collections', station: [-4.4, -1.6], color: '#a9bc8f' },
   reconciler: { name: 'Reconciler', room: 'payables', station: [-0.6, -1.6], color: '#8fb3ad' },
   payables: { name: 'Payables', room: 'payables', station: [0.6, -1.6], color: '#d2b27a' },
-  vendor_verifier: { name: 'Vendor verifier', room: 'vendor_onboarding', station: [4.4, -1.6], color: '#b2a3bb' },
+  vendor: { name: 'Vendor verifier', room: 'vendor_onboarding', station: [4.4, -1.6], color: '#b2a3bb' },
   human: { name: 'Dana', room: 'dana', station: [0, 2.3], color: '#cc9c7d' },
 };
 export function isHandoffAgent(id: unknown): id is HandoffAgentId {
@@ -82,76 +77,67 @@ export function routeLength(route: readonly FloorPosition[]): number {
   return total;
 }
 
-const STATUSES: Record<string, HandoffStatus> = {
-  pending: 'pending', sent: 'pending', in_progress: 'pending', open: 'pending',
-  accepted: 'accepted', done: 'accepted', ok: 'accepted', passed: 'accepted', complete: 'accepted', completed: 'accepted',
-  failed: 'failed', rejected: 'failed', returned: 'failed', error: 'failed',
-  awaiting_passkey: 'awaiting_passkey', needs_passkey: 'awaiting_passkey', passkey: 'awaiting_passkey', awaiting_approval: 'awaiting_passkey',
-};
-const AGENT_ALIASES: Record<string, HandoffAgentId> = {
-  vendor: 'vendor_verifier', vendor_verification: 'vendor_verifier', verifier: 'vendor_verifier',
-  dana: 'human', controller: 'human', approver: 'human', reconciliation: 'reconciler', audit: 'auditor',
-};
-export function normalizeAgent(value: unknown): string {
-  const id = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-  return AGENT_ALIASES[id] ?? id;
-}
-export function normalizeStatus(value: unknown): HandoffStatus {
-  return STATUSES[String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')] ?? 'pending';
-}
 function epochMs(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value > 1e14 ? Math.floor(value / 1000) : value; // micros → ms
-  if (typeof value === 'bigint') return Number(value > 100_000_000_000_000n ? value / 1000n : value);
-  if (value && typeof value === 'object' && 'microsSinceUnixEpoch' in value) return epochMs((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch);
-  if (value && typeof value === 'object' && '__timestamp_micros_since_unix_epoch__' in value) {
-    return epochMs((value as { __timestamp_micros_since_unix_epoch__: unknown }).__timestamp_micros_since_unix_epoch__);
-  }
-  if (typeof value === 'string' && value) { const parsed = Date.parse(value); return Number.isNaN(parsed) ? undefined : parsed; }
-  return undefined;
+  const n = typeof value === 'bigint' ? Number(value) : value;
+  return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
 }
-
-/**
- * ┌──────────────────────────────────────────────────────────────────────────────────────────┐
- * │ BACKEND CONTRACT MAPPING — the one place to wire Aziz's real handoff table.              │
- * │ Provisional: the heads-up (board comment 6385111138) promised a SpacetimeDB row with     │
- * │ from, to, item, one-line summary and status. When the table/reducer contract is posted,  │
- * │ replace the field picks below with its exact column names and add the subscription in    │
- * │ spacetime.ts (`snapshot.handoffs = rows.map(handoffFromRow).filter(Boolean)`).           │
- * └──────────────────────────────────────────────────────────────────────────────────────────┘
- * Returns null for rows that cannot be drawn (missing id or endpoints). Unknown agent ids are kept
- * (they appear in the text log) but the planner does not animate them.
- */
-const firstSeen = new Map<string, number>();
-export function handoffFromRow(row: Readonly<Record<string, unknown>>, received = Date.now()): Handoff | null {
-  const id = row.id ?? row.handoffId ?? row.handoff_id;
-  const from = normalizeAgent(row.from ?? row.fromAgent ?? row.from_agent);
-  const to = normalizeAgent(row.to ?? row.toAgent ?? row.to_agent);
-  if (id === undefined || id === null || !from || !to) return null;
-  let at = epochMs(row.at ?? row.createdAt ?? row.created_at);
-  if (at === undefined) {
-    // No timestamp column: keep the first time this id was seen, so re-projecting the rows does not replay them.
-    at = firstSeen.get(String(id)) ?? received;
-    firstSeen.set(String(id), at);
-    if (firstSeen.size > 1000) firstSeen.delete(firstSeen.keys().next().value!);
-  }
-  const updatedAt = epochMs(row.updatedAt ?? row.updated_at);
+const pick = (r: Readonly<Record<string, unknown>>, camel: string, snake: string) => r[camel] ?? r[snake];
+const short = (v: unknown, max: number) => typeof v === 'string' ? v.slice(0, max) : '';
+/** Public projection adapter; missing timestamps leave a static historical row rather than replaying it. */
+export function handoffFromRow(raw: unknown): Handoff | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const row = raw as Readonly<Record<string, unknown>>;
+  const fromRole = pick(row, 'fromRole', 'from_role'), toRole = pick(row, 'toRole', 'to_role');
+  const status = row.status, handoffId = short(pick(row, 'handoffId', 'handoff_id'), 128);
+  if (!handoffId || !(HANDOFF_ROLES as readonly unknown[]).includes(fromRole) || !(HANDOFF_ROLES as readonly unknown[]).includes(toRole)
+    || typeof status !== 'string' || !['offered', 'accepted', 'completed', 'rejected'].includes(status)) return null;
+  const sequence = row.sequence;
+  if (!(typeof sequence === 'bigint' ? sequence >= 0n && sequence <= 18_446_744_073_709_551_615n
+    : typeof sequence === 'number' && Number.isSafeInteger(sequence) && sequence >= 0)) return null;
+  const acceptedAt = epochMs(pick(row, 'acceptedAt', 'accepted_at')), completedAt = epochMs(pick(row, 'completedAt', 'completed_at'));
+  const decisionRef = short(pick(row, 'decisionRef', 'decision_ref'), 256), errorCode = short(pick(row, 'errorCode', 'error_code'), 128);
   return {
-    id: String(id), from, to,
-    item: String(row.item ?? row.itemId ?? row.item_id ?? ''),
-    summary: String(row.summary ?? ''),
-    status: normalizeStatus(row.status),
-    at, ...(updatedAt !== undefined && updatedAt !== at ? { updatedAt } : {}),
+    handoffId, sequence: sequence as bigint | number, caseDisplayId: short(pick(row, 'caseDisplayId', 'case_display_id'), 128),
+    fromAgentId: short(pick(row, 'fromAgentId', 'from_agent_id'), 128), toAgentId: short(pick(row, 'toAgentId', 'to_agent_id'), 128),
+    fromRole: fromRole as HandoffRole, toRole: toRole as HandoffRole,
+    fromVoiceRole: short(pick(row, 'fromVoiceRole', 'from_voice_role'), 64), toVoiceRole: short(pick(row, 'toVoiceRole', 'to_voice_role'), 64),
+    status: status as HandoffStatus, correction: row.correction === true,
+    reason: short(row.reason, 1000), summary: short(row.summary, 160), line: typeof row.line === 'string' ? row.line : '',
+    createdAt: epochMs(pick(row, 'createdAt', 'created_at')) ?? 0,
+    ...(acceptedAt !== undefined ? { acceptedAt } : {}), ...(completedAt !== undefined ? { completedAt } : {}),
+    ...(decisionRef ? { decisionRef } : {}), ...(errorCode ? { errorCode } : {}),
   };
 }
-
-export function statusLabel(status: HandoffStatus): string {
-  return status === 'awaiting_passkey' ? 'awaiting passkey' : status;
+/** Relational comparison preserves u64 order even above Number.MAX_SAFE_INTEGER. */
+export function compareHandoffs(a: Handoff, b: Handoff): number {
+  return a.sequence < b.sequence ? -1 : a.sequence > b.sequence ? 1 : a.handoffId.localeCompare(b.handoffId);
 }
-/** One line for the aria-live log and the reduced-motion view. */
-export function handoffLine(handoff: Handoff): string {
-  const item = handoff.item ? ` · ${handoff.item}` : '';
-  const outcome = handoff.status === 'failed' ? ' · check failed, returned' : handoff.status === 'awaiting_passkey' ? ' · waiting for Dana’s passkey' : ` · ${statusLabel(handoff.status)}`;
-  return `${handoffAgentName(handoff.from)} → ${handoffAgentName(handoff.to)}${item}: ${handoff.summary}${outcome}`;
+/** Never infer human involvement from a status, role, summary or spoken line. */
+export function needsHandoffHuman(row: Handoff): boolean {
+  return [row.reason, row.decisionRef ?? ''].some(text => /\b(?:passkey|human approval|escalat)/i.test(text)
+    && !/\b(?:no|not|without)[\s_-]+(?:(?:an?|any)\s+)?(?:passkey|human approval|escalat)/i.test(text));
+}
+export function handoffLine(h: Handoff): string {
+  return `${h.correction ? 'Correction · ' : ''}${handoffAgentName(h.fromRole)} → ${handoffAgentName(h.toRole)} · ${h.caseDisplayId}: ${h.reason} · ${h.summary} · ${handoffStatus(h)}${h.status === 'rejected' && h.errorCode ? ` · ${h.errorCode}` : ''}`;
+}
+export function statusLabel(status: HandoffStatus): string { return status === 'completed' ? 'done' : status; }
+export function handoffStatus(row: Handoff): string {
+  return row.status === 'completed' ? `done · ${handoffAgentName(row.toRole)} finished its turn` : statusLabel(row.status);
+}
+/** Subscription snapshots/events replace by primary key, even when sequence has not changed. */
+export function upsertHandoffs(rows: readonly Handoff[], updates: readonly Handoff[]): Handoff[] {
+  const keyed = new Map(rows.map(row => [row.handoffId, row]));
+  for (const row of updates) keyed.set(row.handoffId, row);
+  return [...keyed.values()].sort(compareHandoffs);
+}
+/** Sequence-ordered case groups for the accessible log. */
+export function handoffGroups(rows: readonly Handoff[]): { caseDisplayId: string; rows: Handoff[] }[] {
+  const groups = new Map<string, Handoff[]>();
+  for (const row of [...rows].sort(compareHandoffs).slice(-8)) {
+    const group = groups.get(row.caseDisplayId) ?? [];
+    group.push(row); groups.set(row.caseDisplayId, group);
+  }
+  return [...groups].map(([caseDisplayId, rows]) => ({ caseDisplayId, rows }));
 }
 
 /** Office search flag: `?handoffs=mock` plays the fixture stream; `handoffSpeed` (1–8) speeds it up. */

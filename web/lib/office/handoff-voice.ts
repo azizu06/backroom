@@ -4,42 +4,34 @@
  * Sound is off until the viewer turns it on, and any failure falls back to silent visuals.
  */
 import type { HandoffLine } from '@backroom/orchestrator/handoff-client';
-import type { HandoffAgentId } from './handoffs';
+
 import type { HandoffPlan } from './handoff-plan';
 
 export type HandoffRole = HandoffLine['role'];
 /** Mirrors orchestrator/src/voice/voices.ts (server-only); the type check keeps the names in step. */
-export const HANDOFF_ROLES = ['intake_sorter', 'extractor', 'vendor_verifier', 'payables', 'collections_caller', 'reconciler', 'auditor'] as const satisfies readonly HandoffRole[];
-const ROLE_OF: Partial<Record<HandoffAgentId, HandoffRole>> = {
-  intake: 'intake_sorter', extractor: 'extractor', vendor_verifier: 'vendor_verifier', payables: 'payables',
-  collections: 'collections_caller', reconciler: 'reconciler', auditor: 'auditor',
-};
+export const VOICE_ROLES = ['intake_sorter', 'extractor', 'vendor_verifier', 'payables', 'collections_caller', 'reconciler', 'auditor'] as const satisfies readonly HandoffRole[];
+
 export const MAX_LINE = 240;
 
 export function isHandoffRole(value: unknown): value is HandoffRole {
-  return typeof value === 'string' && (HANDOFF_ROLES as readonly string[]).includes(value);
+  return typeof value === 'string' && (VOICE_ROLES as readonly string[]).includes(value);
 }
 /** Same rules the voice server enforces: non-empty, ≤240 characters, no control characters, no angle brackets. */
 export function validLineText(text: unknown): text is string {
   return typeof text === 'string' && !!text.trim() && Array.from(text).length <= MAX_LINE && !/[\x00-\x1f\x7f<>]/.test(text);
 }
-/** A speakable line for an agent, or null (Dana and unknown agents have no voice). */
-export function handoffVoiceLine(actor: string, text: string): HandoffLine | null {
-  const role = ROLE_OF[actor as HandoffAgentId];
-  if (!role) return null;
-  const clean = Array.from(text.replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/[<>]/g, '').replace(/^✕\s*/, '').trim()).slice(0, MAX_LINE).join('').trim();
-  return validLineText(clean) ? { role, text: clean } : null;
+/** Uses the projection's voice role and Cartesia-safe line verbatim; never synthesizes a fallback. */
+export function handoffVoiceLine(role: string, text: string): HandoffLine | null {
+  return isHandoffRole(role) && validLineText(text) ? { role, text } : null;
 }
-
 export interface VoiceCue { readonly key: string; readonly at: number; readonly line: HandoffLine }
-/** Spoken cues for a plan: each agent bubble (delivery summary or failed-check reason) at its start time. */
+/** The author speaks while offering the folder. Historical terminal rows have no cue. */
 export function voiceCues(plan: HandoffPlan): VoiceCue[] {
-  const cues: VoiceCue[] = [];
-  for (const bubble of plan.bubbles) {
-    const line = handoffVoiceLine(bubble.actor, bubble.text);
-    if (line) cues.push({ key: `${bubble.handoffId}:${bubble.tone}:${bubble.actor}`, at: bubble.start, line });
-  }
-  return cues.sort((a, b) => a.at - b.at);
+  return plan.trips.flatMap(trip => {
+    if (trip.handoff.status !== 'offered') return [];
+    const line = handoffVoiceLine(trip.handoff.fromVoiceRole, trip.handoff.line);
+    return line && Number.isFinite(trip.start) ? [{ key: trip.handoff.handoffId, at: trip.start, line }] : [];
+  }).sort((a, b) => a.at - b.at);
 }
 
 export type FetchAudio = (line: HandoffLine) => Promise<Blob>;

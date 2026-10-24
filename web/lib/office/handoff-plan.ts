@@ -1,42 +1,30 @@
-/**
- * Pure handoff choreography. `planHandoffs` turns handoff rows into a timeline of walks, holds,
- * folder passes and speech bubbles per agent; `sampleHandoffs` reads that timeline at a clock time.
- * Visual only: nothing here writes state. The scene samples it per frame; Play reads positions from it.
- *
- * Rules:
- * - Rows play in (at, id) order. A handoff starts once its row exists and both agents are free, so one
- *   agent's handoffs queue while handoffs between other agents overlap.
- * - The courier is `from` (or `to` when the row comes from Dana): it walks the aisle to the other desk,
- *   passes the folder, then walks home.
- * - `failed`: the receiver checks the folder, then walks it back to the sender (red folder, return
- *   bubble). When the receiver is Dana the courier carries it back instead.
- * - Dana (`human`) only appears at the passkey step: from the courier's arrival until the row is
- *   resolved (`updatedAt` on a non-passkey status), or indefinitely while it awaits her passkey.
+/** Pure visual choreography for the public agent runtime projection (docs/agents.md / PR #152).
+ * Sequence orders independent handoffs; status updates keep an existing courier's journey.
+ * Offered carries the folder; accepted passes it to the worker; rejected carries it home.
+ * Corrections are separate reverse rows. No business writes or decisions happen here.
  */
 import {
-  HANDOFF_AGENTS, HUMAN, handoffAgentName, handoffRoute, handoffSpot, isHandoffAgent, routeLength,
-  type Handoff, type HandoffAgentId,
+  HANDOFF_AGENTS, HUMAN, compareHandoffs, handoffLine, handoffRoute, handoffSpot, isHandoffAgent, needsHandoffHuman, routeLength,
+  upsertHandoffs, type Handoff, type HandoffAgentId,
 } from './handoffs';
 import type { FloorPosition } from './state';
 
 /** Matches WalkMotion (2.4 floor units per second). */
 export const HANDOFF_WALK_SPEED = 2.4 / 1000;
 export const PASS_MS = 1200;
-export const CHECK_MS = 900;
 export const BUBBLE_TAIL_MS = 1600;
-export const HUMAN_HOLD_MS = 1500;
 /** Only the most recent rows are choreographed; older ones stay in the text log. */
 export const MAX_PLANNED = 40;
 
-export interface Leg { readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly route: readonly FloorPosition[]; readonly returning: boolean }
-export interface Hold { readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly at: FloorPosition; readonly facing: FloorPosition }
-/** Folder segment: carried by an actor, passed from one actor's hands to another's, or held by Dana. */
+export interface Leg { readonly handoffId: string; readonly phase: 'out' | 'home' | 'return' | 'reset'; readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly route: readonly FloorPosition[]; readonly returning: boolean }
+export interface Hold { readonly handoffId: string; readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly at: FloorPosition; readonly facing: FloorPosition }
+/** Folder segment: carried by an actor or passed between two actors. */
 export type FolderSegment =
   | { readonly kind: 'carry'; readonly actor: HandoffAgentId; readonly start: number; readonly end: number }
   | { readonly kind: 'pass'; readonly from: HandoffAgentId; readonly to: HandoffAgentId; readonly start: number; readonly end: number };
-export interface Folder { readonly handoffId: string; readonly failed: boolean; readonly failAt: number; readonly segments: readonly FolderSegment[] }
-export type BubbleTone = 'info' | 'fail' | 'passkey';
-export interface Bubble { readonly actor: HandoffAgentId; readonly handoffId: string; readonly start: number; readonly end: number; readonly text: string; readonly tone: BubbleTone }
+export interface Folder { readonly handoffId: string; readonly failed: boolean; readonly correction: boolean; readonly failAt: number; readonly segments: readonly FolderSegment[] }
+export type BubbleTone = 'info' | 'fail' | 'passkey' | 'correction';
+export interface Bubble { readonly actor: HandoffAgentId; readonly start: number; readonly end: number; readonly text: string; readonly tone: BubbleTone }
 export interface Trip {
   readonly handoff: Handoff;
   readonly courier: HandoffAgentId;
@@ -45,6 +33,8 @@ export interface Trip {
   /** Courier reaches the other desk. */
   readonly arrive: number;
   readonly end: number;
+  /** Rejection after delivery: B returns the folder, while A finishes walking home. */
+  readonly returnAt?: number;
 }
 export interface HandoffPlan {
   readonly legs: readonly Leg[];
@@ -62,111 +52,124 @@ export const EMPTY_PLAN: HandoffPlan = { legs: [], holds: [], folders: [], bubbl
 function reversed(route: readonly FloorPosition[]): FloorPosition[] { return [...route].reverse(); }
 function walkMs(route: readonly FloorPosition[], speed: number) { return routeLength(route) / speed; }
 
-export interface PlanOptions { readonly speed?: number }
-export function planHandoffs(rows: readonly Handoff[], { speed = 1 }: PlanOptions = {}): HandoffPlan {
-  const pace = HANDOFF_WALK_SPEED * speed;
-  const pass = PASS_MS / speed, check = CHECK_MS / speed, tail = BUBBLE_TAIL_MS / speed, hold = HUMAN_HOLD_MS / speed;
-  const ordered = [...rows].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(-MAX_PLANNED);
+/** Prefix of a walk, including its exact current position, for an immediate rejection return. */
+function routeUntil(leg: Leg, now: number): FloorPosition[] {
+  const distance = routeLength(leg.route) * Math.min(1, Math.max(0, (now - leg.start) / (leg.end - leg.start)));
+  const points: FloorPosition[] = [leg.route[0]!];
+  let walked = 0;
+  for (let i = 1; i < leg.route.length; i++) {
+    const a = leg.route[i - 1]!, b = leg.route[i]!;
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (walked + length >= distance) { points.push(along(leg.route, distance).position); break; }
+    points.push(b); walked += length;
+  }
+  return points;
+}
+export interface PlanOptions {
+  readonly speed?: number;
+  readonly previous?: HandoffPlan;
+  readonly now?: number;
+  readonly openEscalation?: boolean;
+}
+export function planHandoffs(rows: readonly Handoff[], { speed = 1, previous = EMPTY_PLAN, now = -Infinity, openEscalation = false }: PlanOptions = {}): HandoffPlan {
+  const pace = HANDOFF_WALK_SPEED * speed, pass = PASS_MS / speed, tail = BUBBLE_TAIL_MS / speed;
+  const ordered = upsertHandoffs([], rows).slice(-MAX_PLANNED);
   const free = new Map<HandoffAgentId, number>();
   const legs: Leg[] = [], holds: Hold[] = [], folders: Folder[] = [], bubbles: Bubble[] = [], trips: Trip[] = [];
-  const human: [number, number][] = [], skipped: string[] = [];
+  const human: [number, number][] = openEscalation ? [[0, Infinity]] : [], skipped: string[] = [];
   const freeAt = (id: HandoffAgentId) => free.get(id) ?? -Infinity;
 
   for (const row of ordered) {
-    if (!isHandoffAgent(row.from) || !isHandoffAgent(row.to) || row.from === row.to || (row.from === HUMAN && row.to === HUMAN)) {
-      skipped.push(row.id);
+    const courier = row.fromRole, receiver = row.toRole;
+    if (!isHandoffAgent(courier) || !isHandoffAgent(receiver) || courier === receiver) { skipped.push(row.handoffId); continue; }
+    const prior = previous.trips.find(trip => trip.handoff.handoffId === row.handoffId && trip.start <= now);
+    const priorOut = prior && previous.legs.find(leg => leg.handoffId === row.handoffId && leg.phase === 'out');
+    const priorHome = prior && previous.legs.find(leg => leg.handoffId === row.handoffId && leg.phase === 'home');
+    const priorFolder = prior && previous.folders.find(folder => folder.handoffId === row.handoffId);
+    const rejected = row.status === 'rejected';
+    const addReturnBubble = (trip: Trip, actor: HandoffAgentId, at: number) => {
+      bubbles.push({ actor, start: at, end: trip.end + tail, text: handoffLine(row), tone: 'fail' });
+      if (needsHandoffHuman(row)) human.push([row.createdAt, (row.completedAt ?? trip.end) + tail]);
+    };
+    // Keep an interrupted journey immutable on subsequent updates to this same primary key.
+    if (rejected && prior?.handoff.status === 'rejected' && priorFolder) {
+      const trip = { ...prior, handoff: row };
+      const savedLegs = previous.legs.filter(leg => leg.handoffId === row.handoffId);
+      legs.push(...savedLegs); holds.push(...previous.holds.filter(hold => hold.handoffId === row.handoffId));
+      folders.push(priorFolder); trips.push(trip);
+      addReturnBubble(trip, trip.returnAt !== undefined ? receiver : courier, trip.returnAt ?? trip.start);
+      free.set(courier, Math.max(...savedLegs.filter(leg => leg.actor === courier).map(leg => leg.end)));
+      free.set(receiver, trip.returnAt !== undefined ? trip.end : priorFolder.failAt);
       continue;
     }
-    const fromHuman = row.from === HUMAN, toHuman = row.to === HUMAN;
-    const courier: HandoffAgentId = fromHuman ? row.to : row.from;
-    const receiver: HandoffAgentId = fromHuman ? HUMAN : row.to;
-    const giver: HandoffAgentId = fromHuman ? HUMAN : courier;
-    const taker: HandoffAgentId = fromHuman ? courier : receiver;
-    const start = Math.max(row.at, freeAt(courier), freeAt(receiver));
-    const out = handoffRoute(courier, receiver);
-    const back = reversed(out);
-    const arrive = start + walkMs(out, pace);
-    const passEnd = arrive + pass;
-    const spot = handoffSpot(receiver);
-    const receiverHome = HANDOFF_AGENTS[receiver].station, courierHome = HANDOFF_AGENTS[courier].station;
-    const facingSender = courierHome;
-    const failed = row.status === 'failed' && !fromHuman;
-    // A failure reported after the pass still plays: the check ends when the failure arrived.
-    const checkEnd = failed ? Math.max(passEnd + check, row.updatedAt ?? 0) : passEnd;
-
-    legs.push({ actor: courier, start, end: arrive, route: out, returning: false });
+    // Once B owns the folder, a stopped case sends B back to A. A's existing walk stays continuous.
+    const delivery = priorFolder?.segments.find(segment => segment.kind === 'pass');
+    if (rejected && prior?.handoff.status === 'accepted' && priorFolder && delivery && now >= delivery.start) {
+      const returnAt = Math.max(now, delivery.end);
+      const current = actorAt(previous, receiver, returnAt).position;
+      const route = [current, ...handoffRoute(receiver, courier).slice(1)];
+      const arrive = returnAt + walkMs(route, pace), homeStart = arrive + pass;
+      const home = reversed(route), end = homeStart + walkMs(home, pace);
+      legs.push(...previous.legs.filter(leg => leg.handoffId === row.handoffId),
+        { handoffId: row.handoffId, phase: 'return', actor: receiver, start: returnAt, end: arrive, route, returning: true },
+        { handoffId: row.handoffId, phase: 'reset', actor: receiver, start: homeStart, end, route: home, returning: false });
+      holds.push(...previous.holds.filter(hold => hold.handoffId === row.handoffId),
+        { handoffId: row.handoffId, actor: receiver, start: arrive, end: homeStart, at: route.at(-1)!, facing: HANDOFF_AGENTS[courier].station });
+      const segments: FolderSegment[] = priorFolder.segments.filter(segment => segment.start < returnAt)
+        .map(segment => ({ ...segment, end: Math.min(segment.end, returnAt) }));
+      segments.push({ kind: 'carry', actor: receiver, start: returnAt, end: arrive },
+        { kind: 'pass', from: receiver, to: courier, start: arrive, end: homeStart });
+      const trip = { ...prior, handoff: row, end, returnAt };
+      folders.push({ ...priorFolder, failed: true, failAt: now, segments }); trips.push(trip);
+      addReturnBubble(trip, receiver, now);
+      free.set(courier, Math.max(prior.end, homeStart)); free.set(receiver, end);
+      continue;
+    }
+    const start = prior?.start ?? Math.max(row.createdAt ?? 0, freeAt(courier), freeAt(receiver));
+    let out = priorOut?.route ?? handoffRoute(courier, receiver);
+    let arrive = prior?.arrive ?? start + walkMs(out, pace);
+    const newlyRejected = rejected && !!prior && prior.handoff.status !== 'rejected';
+    if (newlyRejected && priorOut && now < priorOut.end) { out = routeUntil(priorOut, now); arrive = now; }
+    const back = reversed(out), spot = out.at(-1)!;
+    const receiverHome = HANDOFF_AGENTS[receiver].station;
+    let passStart = Math.max(arrive, row.acceptedAt ?? arrive);
+    // Once a pass or homeward walk has begun, a late timestamp cannot move it back in time.
+    if (priorHome && prior!.handoff.status !== 'offered' && now >= prior!.arrive) passStart = priorHome.start - pass;
+    let homeStart = rejected ? (newlyRejected ? Math.max(arrive, now) : priorHome?.start ?? arrive)
+      : row.status === 'offered' ? Infinity : passStart + pass;
+    const keepHome = priorHome && priorHome.start <= now && (!newlyRejected || now < priorHome.end);
+    if (keepHome) homeStart = priorHome.start;
+    const homeRoute = keepHome ? priorHome.route : newlyRejected && now >= prior!.end ? [HANDOFF_AGENTS[courier].station] : back;
+    const end = keepHome ? priorHome.end : homeStart + walkMs(homeRoute, pace);
+    legs.push({ handoffId: row.handoffId, phase: 'out', actor: courier, start, end: arrive, route: out, returning: row.correction });
+    if (homeStart > arrive) holds.push({ handoffId: row.handoffId, actor: courier, start: arrive, end: homeStart, at: spot, facing: receiverHome });
+    if (Number.isFinite(homeStart)) legs.push({ handoffId: row.handoffId, phase: 'home', actor: courier, start: homeStart, end, route: homeRoute, returning: rejected });
     const segments: FolderSegment[] = [];
-    if (fromHuman) {
-      holds.push({ actor: courier, start: arrive, end: passEnd, at: spot, facing: receiverHome });
-      segments.push({ kind: 'pass', from: giver, to: taker, start: arrive, end: passEnd });
-    } else {
-      segments.push({ kind: 'carry', actor: courier, start, end: arrive }, { kind: 'pass', from: giver, to: taker, start: arrive, end: passEnd });
-    }
-    let end: number;
-    const bubbleText = failed ? `${row.item || 'Folder'} → ${handoffAgentName(receiver)}` : row.summary;
-    bubbles.push({ actor: courier, handoffId: row.id, start: Math.max(start, arrive - 400 / speed), end: passEnd + tail, text: bubbleText, tone: toHuman && row.status === 'awaiting_passkey' ? 'passkey' : 'info' });
-
-    if (toHuman) {
-      const resolved = row.status === 'awaiting_passkey' ? Infinity : Math.max(passEnd + hold, row.updatedAt ?? 0);
-      human.push([arrive, failed ? checkEnd + pass + hold : resolved]);
-      if (row.status === 'awaiting_passkey') bubbles.push({ actor: HUMAN, handoffId: row.id, start: passEnd, end: Infinity, text: 'Passkey needed to approve', tone: 'passkey' });
-      if (failed) {
-        // Dana declines: the courier waits, takes the folder back and carries it home.
-        holds.push({ actor: courier, start: arrive, end: checkEnd + pass, at: spot, facing: receiverHome });
-        segments.push({ kind: 'carry', actor: HUMAN, start: passEnd, end: checkEnd }, { kind: 'pass', from: HUMAN, to: courier, start: checkEnd, end: checkEnd + pass });
-        const home = checkEnd + pass + walkMs(back, pace);
-        legs.push({ actor: courier, start: checkEnd + pass, end: home, route: back, returning: true });
-        segments.push({ kind: 'carry', actor: courier, start: checkEnd + pass, end: home });
-        bubbles.push({ actor: HUMAN, handoffId: row.id, start: passEnd, end: checkEnd + pass + tail, text: `✕ ${row.summary}`, tone: 'fail' });
-        end = home;
-        free.set(courier, home);
-      } else {
-        holds.push({ actor: courier, start: arrive, end: passEnd, at: spot, facing: receiverHome });
-        const home = passEnd + walkMs(back, pace);
-        legs.push({ actor: courier, start: passEnd, end: home, route: back, returning: false });
-        if (row.status !== 'awaiting_passkey') segments.push({ kind: 'carry', actor: HUMAN, start: passEnd, end: resolved });
-        else segments.push({ kind: 'carry', actor: HUMAN, start: passEnd, end: Infinity });
-        end = home;
-        free.set(courier, home);
+    if (rejected) segments.push({ kind: 'carry', actor: courier, start, end });
+    else {
+      segments.push({ kind: 'carry', actor: courier, start, end: row.status === 'offered' ? Infinity : passStart });
+      if (row.status !== 'offered') {
+        segments.push({ kind: 'pass', from: courier, to: receiver, start: passStart, end: homeStart });
+        const nextWork = ordered.find(next => next.sequence > row.sequence && next.fromRole === receiver && next.caseDisplayId === row.caseDisplayId)?.createdAt ?? Infinity;
+        const workEnd = row.status === 'completed' ? Math.max(homeStart, row.completedAt ?? homeStart) : nextWork;
+        if (workEnd > homeStart) segments.push({ kind: 'carry', actor: receiver, start: homeStart, end: workEnd });
       }
-      free.set(HUMAN, end);
-    } else if (fromHuman) {
-      human.push([arrive, passEnd + hold]);
-      const home = passEnd + walkMs(back, pace);
-      legs.push({ actor: courier, start: passEnd, end: home, route: back, returning: false });
-      segments.push({ kind: 'carry', actor: courier, start: passEnd, end: home });
-      end = home;
-      free.set(courier, home);
-    } else if (failed) {
-      holds.push({ actor: courier, start: arrive, end: passEnd, at: spot, facing: receiverHome });
-      const senderBack = passEnd + walkMs(back, pace);
-      legs.push({ actor: courier, start: passEnd, end: senderBack, route: back, returning: false });
-      holds.push({ actor: receiver, start: arrive, end: checkEnd, at: receiverHome, facing: spot });
-      segments.push({ kind: 'carry', actor: receiver, start: passEnd, end: checkEnd });
-      // The receiver walks the folder back and waits for the sender to be home to take it.
-      const returnRoute = handoffRoute(receiver, courier);
-      const returnArrive = checkEnd + walkMs(returnRoute, pace);
-      const passBack = Math.max(returnArrive, senderBack);
-      const backHome = passBack + pass + walkMs(reversed(returnRoute), pace);
-      legs.push({ actor: receiver, start: checkEnd, end: returnArrive, route: returnRoute, returning: true });
-      const senderSpot = handoffSpot(courier);
-      holds.push({ actor: receiver, start: returnArrive, end: passBack + pass, at: senderSpot, facing: facingSender });
-      legs.push({ actor: receiver, start: passBack + pass, end: backHome, route: reversed(returnRoute), returning: false });
-      segments.push({ kind: 'carry', actor: receiver, start: checkEnd, end: passBack }, { kind: 'pass', from: receiver, to: courier, start: passBack, end: passBack + pass });
-      bubbles.push({ actor: receiver, handoffId: row.id, start: passEnd, end: passBack + pass + tail, text: `✕ ${row.summary}`, tone: 'fail' });
-      end = backHome;
-      free.set(courier, passBack + pass);
-      free.set(receiver, backHome);
-    } else {
-      holds.push({ actor: courier, start: arrive, end: passEnd, at: spot, facing: receiverHome });
-      const home = passEnd + walkMs(back, pace);
-      legs.push({ actor: courier, start: passEnd, end: home, route: back, returning: false });
-      end = home;
-      free.set(courier, home);
-      free.set(receiver, passEnd);
     }
-    folders.push({ handoffId: row.id, failed, failAt: failed ? checkEnd : Infinity, segments });
+    const tone: BubbleTone = rejected ? 'fail' : row.correction ? 'correction' : 'info';
+    bubbles.push({ actor: courier, start, end: rejected ? end + tail : homeStart + tail,
+      text: handoffLine(row), tone });
+    if (!rejected && row.status !== 'offered') bubbles.push({ actor: receiver,
+      start: homeStart, end: Math.max(homeStart, row.completedAt ?? homeStart) + tail,
+      text: handoffLine(row), tone });
+    if (needsHandoffHuman(row)) {
+      const until = row.completedAt ?? (rejected ? end : Infinity);
+      human.push([row.createdAt ?? start, until + tail]);
+      bubbles.push({ actor: HUMAN, start: row.createdAt ?? start, end: until + tail,
+        text: 'Human passkey approval · ' + row.caseDisplayId, tone: 'passkey' });
+    }
+    folders.push({ handoffId: row.handoffId, failed: rejected, correction: row.correction, failAt: rejected ? homeStart : Infinity, segments });
     trips.push({ handoff: row, courier, receiver, start, arrive, end });
+    free.set(courier, end); free.set(receiver, homeStart);
   }
   return { legs, holds, folders, bubbles, trips, human, skipped };
 }
@@ -181,7 +184,7 @@ export interface ActorFrame {
   readonly stride: number;
   readonly returning: boolean;
 }
-export interface FolderFrame { readonly handoffId: string; readonly position: [number, number, number]; readonly failed: boolean }
+export interface FolderFrame { readonly handoffId: string; readonly position: [number, number, number]; readonly failed: boolean; readonly correction: boolean }
 export interface HandoffFrame {
   readonly actors: readonly ActorFrame[];
   readonly folders: readonly FolderFrame[];
@@ -252,13 +255,13 @@ export function sampleHandoffs(plan: HandoffPlan, now: number, { reduced = false
     const failed = folder.failed && now >= folder.failAt;
     if (segment.kind === 'carry') {
       if (segment.actor === HUMAN && !human) continue;
-      folders.push({ handoffId: folder.handoffId, position: handOf(actors.get(segment.actor)!), failed });
+      folders.push({ handoffId: folder.handoffId, position: handOf(actors.get(segment.actor)!), failed, correction: folder.correction });
     } else {
       const t = Math.min(1, Math.max(0, (now - segment.start) / Math.max(1e-9, segment.end - segment.start)));
       const ease = t * t * (3 - 2 * t);
       const a = handOf(actors.get(segment.from)!), b = handOf(actors.get(segment.to)!);
       // A small arc so the pass reads as a hand-over rather than a slide.
-      folders.push({ handoffId: folder.handoffId, failed, position: [a[0] + (b[0] - a[0]) * ease, a[1] + (b[1] - a[1]) * ease + Math.sin(Math.PI * ease) * 0.18, a[2] + (b[2] - a[2]) * ease] });
+      folders.push({ handoffId: folder.handoffId, failed, correction: folder.correction, position: [a[0] + (b[0] - a[0]) * ease, a[1] + (b[1] - a[1]) * ease + Math.sin(Math.PI * ease) * 0.18, a[2] + (b[2] - a[2]) * ease] });
     }
   }
   const latest = new Map<HandoffAgentId, Bubble>();
@@ -288,8 +291,8 @@ export function nextChange(plan: HandoffPlan, now: number): number | null {
 /** The handoff an actor is carrying or handling at `now`, else its most recent one. */
 export function handoffFor(plan: HandoffPlan, rows: readonly Handoff[], actor: string, now: number): Handoff | undefined {
   const live = plan.trips.find(trip => (trip.courier === actor || trip.receiver === actor) && now >= trip.start && now < trip.end);
-  if (live) return rows.find(row => row.id === live.handoff.id) ?? live.handoff;
-  return rows.filter(row => row.from === actor || row.to === actor).sort((a, b) => b.at - a.at)[0];
+  if (live) return rows.find(row => row.handoffId === live.handoff.handoffId) ?? live.handoff;
+  return rows.filter(row => row.fromRole === actor || row.toRole === actor || (actor === HUMAN && needsHandoffHuman(row))).sort((a, b) => compareHandoffs(b, a))[0];
 }
 
 /**
@@ -299,11 +302,13 @@ export function handoffFor(plan: HandoffPlan, rows: readonly Handoff[], actor: s
 export class HandoffStage {
   private rows: readonly Handoff[] = [];
   plan: HandoffPlan = EMPTY_PLAN;
+  private openEscalation = false;
   constructor(readonly speed = 1) {}
-  update(rows: readonly Handoff[]): boolean {
-    if (rows === this.rows) return false;
+  update(rows: readonly Handoff[], now = Date.now(), openEscalation = false): boolean {
+    if (rows === this.rows && openEscalation === this.openEscalation) return false;
+    this.openEscalation = openEscalation;
     this.rows = rows;
-    this.plan = rows.length ? planHandoffs(rows, { speed: this.speed }) : EMPTY_PLAN;
+    this.plan = planHandoffs(rows, { speed: this.speed, previous: this.plan, now, openEscalation });
     return true;
   }
   get current(): readonly Handoff[] { return this.rows; }

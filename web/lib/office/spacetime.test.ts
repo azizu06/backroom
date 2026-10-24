@@ -83,7 +83,7 @@ describe('anonymous office projection', () => {
     const source = createSpacetimeOfficeState({ uri: 'ws://test', database: 'test' });
     const listener = vi.fn(); source.subscribe(listener);
     source.connect(); connected(db);
-    expect(subscribe).toHaveBeenCalledWith(OFFICE_QUERIES);
+    expect(subscribe).toHaveBeenCalledWith(OFFICE_QUERIES.filter(query => !query.endsWith('agent_handoff_public')));
     expect(source.getSnapshot().connection).toBe('live');
     listener.mockClear();
     data.control[0]!.llmEnabled = true;

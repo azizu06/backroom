@@ -20,7 +20,7 @@ function tag(page: Page, actor: string) {
   return page.locator(`[data-handoff-actor='${actor}']`);
 }
 
-test('mock handoffs walk folders between desks, return a failed check and call Dana only for the passkey', async ({ page }) => {
+test('mock handoffs walk folders between desks, return a rejected folder, show a correction and call Dana only for the passkey', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&handoffSpeed=4');
@@ -39,10 +39,11 @@ test('mock handoffs walk folders between desks, return a failed check and call D
   const failure = page.locator(".handoff-bubble[data-tone='fail']:not([hidden])");
   await expect(failure).toBeVisible({ timeout: 20_000 });
   await expect(failure).toContainText('Remit-to ••4821');
-  await expect(tag(page, 'vendor_verifier')).toHaveAttribute('data-returning', 'true', { timeout: 10_000 });
-  await expect(log(page).locator("li[data-status='failed']")).toContainText('check failed, returned');
+  await expect(tag(page, 'extractor')).toHaveAttribute('data-returning', 'true', { timeout: 10_000 });
+  await expect(log(page).locator("li[data-status='rejected']")).toContainText('VENDOR_MISMATCH');
   await shot(page, 'fail-return');
 
+  await expect(page.locator(".handoff-bubble[data-tone='correction']:not([hidden])").first()).toContainText('Correction', { timeout: 20_000 });
   await expect(tag(page, 'human')).toBeVisible({ timeout: 30_000 });
   await expect(tag(page, 'human').locator(".handoff-bubble[data-tone='passkey']")).toBeVisible({ timeout: 5_000 });
   await expect(log(page)).toContainText('waiting for Dana’s passkey');
@@ -58,7 +59,7 @@ test('reduced motion lists handoffs instead of animating them', async ({ page })
   await expect(region).toContainText('Reduced motion · listed instead of animated');
   await expect(log(page)).toHaveAttribute('aria-live', 'polite');
   await expect(log(page)).toContainText('Intake → Extractor');
-  await expect(log(page).locator("li[data-status='failed']")).toBeVisible({ timeout: 20_000 });
+  await expect(log(page).locator("li[data-status='rejected']")).toBeVisible({ timeout: 20_000 });
   // Nobody walks: no tag is ever marked as returning.
   await expect(page.locator(".handoff-tag[data-returning='true']")).toHaveCount(0);
   await region.scrollIntoViewIfNeeded();
@@ -112,7 +113,7 @@ test('play mode: facing a handoff agent and pressing E shows the handoff details
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: /Intake · handoff/ });
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('dl[data-handoff-id]')).toContainText('Extractor');
+  await expect(dialog.locator('.play-panel-handoff')).toContainText('Extractor');
   await expect(dialog).toContainText('INV-1043');
   await shot(page, 'play-details');
   await page.keyboard.press('Escape');
@@ -128,7 +129,7 @@ function silentWav(ms = 200) {
   buffer.writeUInt32LE(rate * 2, 28); buffer.writeUInt16LE(2, 32); buffer.writeUInt16LE(16, 34); buffer.write('data', 36); buffer.writeUInt32LE(data, 40);
   return buffer;
 }
-const ROLES = ['intake_sorter', 'extractor', 'vendor_verifier', 'payables', 'collections_caller', 'reconciler', 'auditor'];
+const VOICE_ROLES = ['intake_sorter', 'extractor', 'vendor_verifier', 'payables', 'collections_caller', 'reconciler', 'auditor'];
 
 test('voices stay off until enabled, then speak handoff lines through the proxy', async ({ page }) => {
   const lines: { role: string; text: string }[] = [];
@@ -148,7 +149,7 @@ test('voices stay off until enabled, then speak handoff lines through the proxy'
   await expect.poll(() => lines.length, { timeout: 20_000 }).toBeGreaterThan(0);
   for (const line of lines) {
     expect(Object.keys(line).sort()).toEqual(['role', 'text']);
-    expect(ROLES).toContain(line.role);
+    expect(VOICE_ROLES).toContain(line.role);
     expect(Array.from(line.text).length).toBeLessThanOrEqual(240);
     expect(line.text).not.toMatch(/[<>\x00-\x1f]/);
   }

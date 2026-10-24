@@ -1,0 +1,57 @@
+import { createElement, type ReactElement } from 'react';
+import * as React from 'react';
+import { createRequire } from 'node:module';
+import { describe, expect, it } from 'vitest';
+import { HandoffEntries } from '../../app/office/handoffs/HandoffLog';
+import { HandoffDetails } from '../../app/office/handoffs/HandoffDetails';
+import { handoffText } from './handoff-text';
+import { handoffFromRow, handoffLine } from './handoffs';
+import { planHandoffs, sampleHandoffs } from './handoff-plan';
+import { playPanel } from './play';
+import { INITIAL_OFFICE } from './state';
+
+const { renderToStaticMarkup } = createRequire(import.meta.url)('react-dom/server') as { renderToStaticMarkup: (node: ReactElement) => string };
+// Match the classic TSX transform used by the existing office render tests.
+Object.assign(globalThis, { React });
+const row = handoffFromRow({ handoffId: 'raw-case-secret:handoff:1', decisionRef: 'raw-case-secret:decision:2', sequence: 1n,
+  caseDisplayId: 'INV-42', fromAgentId: 'a', toAgentId: 'b', fromRole: 'extractor', toRole: 'vendor',
+  fromVoiceRole: 'extractor', toVoiceRole: 'vendor_verifier', status: 'offered', correction: false, createdAt: 0,
+  reason: 'Verify documents', summary: 'GB29 NWBK ••6819 / ••6819 / [email]', line: 'Check GB29 NWBK ••6819 for [email].',
+  privateCaseId: 'PRIVATE-CASE', privatePayload: 'PRIVATE-PAYLOAD' })!;
+
+describe('public handoff display', () => {
+  it('never includes handoffId, decisionRef or private fields in rendered HTML or panel/bubble models', () => {
+    const panel = playPanel({ ...INITIAL_OFFICE, handoffs: [row] }, { kind: 'handoff', actor: 'extractor' })!;
+    const bubbles = sampleHandoffs(planHandoffs([row]), 100).bubbles;
+    const html = renderToStaticMarkup(createElement(HandoffEntries, { rows: [row] }))
+      + renderToStaticMarkup(createElement(HandoffDetails, { handoff: panel.handoff! }));
+    for (const output of [html, JSON.stringify(panel), JSON.stringify(bubbles), handoffLine(row)]) {
+      for (const forbidden of [row.handoffId, row.decisionRef!, 'raw-case-secret', 'PRIVATE-CASE', 'PRIVATE-PAYLOAD']) {
+        expect(output).not.toContain(forbidden);
+      }
+      expect(output).toContain(row.caseDisplayId);
+    }
+    expect(html).not.toContain('data-handoff-id');
+  });
+  it('preserves complete masked tokens in text and non-wrapping spans without escape artifacts', () => {
+    const parts = handoffText(row.summary);
+    expect(parts.map(part => part.text).join('')).toBe(row.summary);
+    expect(parts.filter(part => part.masked).map(part => part.text)).toEqual(['GB29 NWBK ••6819', '••6819', '[email]']);
+    const html = renderToStaticMarkup(createElement(HandoffEntries, { rows: [row] }));
+    for (const token of ['GB29 NWBK ••6819', '••6819', '[email]']) {
+      expect(html).toContain(`<span class="handoff-token">${token}</span>`);
+    }
+    expect(html).not.toMatch(/&(?:bull|amp);|\\u2022/);
+    expect(row.line).toBe('Check GB29 NWBK ••6819 for [email].');
+  });
+  it.each(['held', 'failed', 'paused'])('shows completed as neutral done even when B ended %s', outcome => {
+    const done = { ...row, status: 'completed' as const, summary: `B ended ${outcome}`, completedAt: 100 };
+    const panel = playPanel({ ...INITIAL_OFFICE, handoffs: [done] }, { kind: 'handoff', actor: 'vendor' })!;
+    expect(panel.state).toBe('done');
+    expect(panel.handoff!.status).toBe('done · Vendor verifier finished its turn');
+    expect(panel.entries[0]!.decision).toBe('DONE');
+    const plan = planHandoffs([done]);
+    expect(plan.bubbles.every(bubble => bubble.tone === 'info' && bubble.text.includes('done · Vendor verifier finished its turn'))).toBe(true);
+    expect(handoffLine(done)).not.toMatch(/success|✓|✔/i);
+  });
+});
