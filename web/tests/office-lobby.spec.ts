@@ -132,6 +132,19 @@ async function patchRedness(page: Page, canvas: Locator, point: readonly [number
   return r - Math.max(g, b);
 }
 
+/**
+ * Red margins of the DENY sign board (centred (6.35, 1.1, 0.55), 1.6 x 0.72, facing +z), right half only:
+ * clear of the 'DENIED' and rule text, whose position on screen shifts with the canvas size, and of the door ring and flash.
+ */
+const SIGN_MARGINS = [[6.95, 0.84, 0.56], [7.0, 1.38, 0.56], [6.7, 0.82, 0.56], [6.95, 1.1, 0.56]] as const;
+
+/** Redness at every sign margin point under the Treasury focus camera. */
+async function signRedness(page: Page, canvas: Locator): Promise<number[]> {
+  const out: number[] = [];
+  for (const point of SIGN_MARGINS) out.push(await patchRedness(page, canvas, point));
+  return out;
+}
+
 test('office props render in the 3D scene', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -266,19 +279,27 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const treasury = page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: /^Treasury/ });
   await treasury.click();
   await expect(treasury).toHaveAttribute('aria-pressed', 'true');
-  // A red part of the DENY sign board (right of the 'DENIED' line), on the aisle side of the door.
-  const sign = [6.95, 1.2, 0.56] as const;
-  // Let the focus camera settle: the sign's spot stops changing and is not red before the denial.
+  // The margin points must fit the focus view for both the lobby's canvas (1440 x 580) and a taller one (1440 x 1000).
+  for (const [width, height] of [[1440, 580], [1440, 1000]] as const) {
+    for (const point of SIGN_MARGINS) {
+      const [x, y] = projectFocus(point, width, height, TREASURY);
+      expect(x >= 3 && y >= 3 && x <= width - 3 && y <= height - 3, `sign point (${point.join(', ')}) projects to (${x.toFixed(1)}, ${y.toFixed(1)}), outside a ${width} x ${height} canvas`).toBe(true);
+    }
+  }
+  // Let the focus camera settle: no sign margin point is red before the denial.
   await page.waitForTimeout(2500);
-  expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
+  const before = await signRedness(page, canvas);
+  expect(Math.max(...before), `redness before the preview: ${before.join(', ')}`).toBeLessThan(40);
   await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
   const clicked = Date.now();
   // The preview button sits below the scene, so clicking it can scroll the canvas out of view.
   await canvas.scrollIntoViewIfNeeded();
   await page.waitForTimeout(1000);
-  expect(await patchRedness(page, canvas, sign)).toBeGreaterThan(80);
+  const during = await signRedness(page, canvas);
+  expect(Math.max(...during), `redness about 1 s into the moment: ${during.join(', ')}`).toBeGreaterThan(80);
   await page.waitForTimeout(Math.max(0, clicked + DENY_MOMENT_MS + 1000 - Date.now()));
-  expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
+  const after = await signRedness(page, canvas);
+  expect(Math.max(...after), `redness after the moment: ${after.join(', ')}`).toBeLessThan(40);
   // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
