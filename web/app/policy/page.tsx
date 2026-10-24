@@ -32,7 +32,7 @@ export default function PolicyPage() {
       if (!res.ok) throw new Error(code !== undefined && Object.prototype.hasOwnProperty.call(messages, code)
         ? messages[code] : 'The policy could not be loaded or saved. Try again.');
       const saved = data.policy as Policy | undefined;
-      if (!saved || typeof saved.policyVersion !== 'number') throw new Error(outageMessage(res.status));
+      if (!saved || typeof saved.policyVersion !== 'number') throw new Error('The policy could not be loaded or saved. Try again.');
       setPolicy(saved); setRevision(value => value + 1);
       if (body) setNotice(`Saved v${saved.policyVersion}. New decisions use these limits. Your change is recorded in the audit wall.`);
     } catch (e) { setError(e instanceof Error ? e.message : 'The policy request failed. Try again.'); }

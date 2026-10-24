@@ -33,6 +33,9 @@ test('audit wall explains an HTML 502 on unlock and recovers its poll after an o
   await page.unroute('**/api/audit/session');
   await page.route('**/api/audit/session', route => route.fulfill({ json: { ok: true } }));
   await page.getByRole('button', { name: 'Open audit wall' }).click();
+  // Prove the entries 502 itself was shown, not the stale session alert.
+  await expect.poll(() => entries).toBeGreaterThanOrEqual(2);
+  await expect(page.getByText('Loading audit records…')).toBeVisible();
   await expect(alert(page)).toContainText(outage);
   await expect(page.getByText('Chain verified · 0 entries', { exact: true })).toBeVisible({ timeout: 6000 });
   await expect(alert(page)).toHaveCount(0);
