@@ -3,9 +3,9 @@
 import { useEffect, useRef, type ComponentRef, type RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Instance, Instances, OrbitControls } from '@react-three/drei';
-import { Group, Mesh, MathUtils, Vector3 } from 'three';
+import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import { WalkMotion } from '../../lib/office/motion';
-import { OFFICE_ANCHORS, matchingDenial, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
+import { OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
@@ -54,7 +54,8 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
     if (!door.current) return;
     const age = denial ? Date.now() - denial.at : Infinity;
     const flash = age >= 0 && age < 4500 && Math.floor(age / 300) % 2 === 0;
-    door.current.visible = flash;
+    door.current.visible = age >= 0 && age < 4500;
+    (door.current.material as MeshBasicMaterial).opacity = flash ? 0.95 : 0.65;
   });
   if (room === 'lobby' || room === 'dana') return null;
   const z = room === 'treasury' ? 1.15 : -0.65;
@@ -72,6 +73,10 @@ function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean
   const body = useRef<Group>(null);
   const legs = useRef<Group>(null);
   const motion = useRef(new WalkMotion(agent.pos));
+  useEffect(() => {
+    motion.current.position[0] = agent.pos[0]; motion.current.position[1] = agent.pos[1];
+    motion.current.moveTo(agent.targetAnchor);
+  }, [agent.pos[0], agent.pos[1]]);
   useEffect(() => { motion.current.moveTo(agent.targetAnchor); }, [agent.targetAnchor]);
   useFrame((_, delta) => {
     const walk = motion.current;
@@ -152,7 +157,7 @@ export function OfficeScene({ snapshot, fixed, focus, labels, onFailure }: {
       <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color='#828976' />
       <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color='#828976' />
     </group>)}
-    {ROOM_IDS.map(room => {
+    {visibleRooms(snapshot).map(room => {
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
         <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : '#626e5b'} />
@@ -160,16 +165,18 @@ export function OfficeScene({ snapshot, fixed, focus, labels, onFailure }: {
         <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
       </group>;
     })}
-    {deskIds.map(room => <Desk key={room} room={room} />)}
-    <group position={[-5.9, 0, 3.9]}>
+    {deskIds.filter(room => visibleRooms(snapshot).includes(room)).map(room => <Desk key={room} room={room} />)}
+    {visibleRooms(snapshot).includes('lobby') && <group position={[-5.9, 0, 3.9]}>
       <Block at={[0, 1.25, 0]} size={[2, 1.45, 0.15]} color='#303d34' />
-      {[0, 1, 2].map(i => <Block key={i} at={[0, 1.65 - i * 0.35, -0.09]} size={[1.55, 0.09, 0.04]} color={i === 1 ? '#cc9c7d' : '#a9bc8f'} />)}
+      {snapshot.audit.slice(-3).map((row, i) => <Block key={row.id} at={[0, 1.65 - i * 0.35, -0.09]} size={[1.55, 0.09, 0.04]} color={row.decision === 'DENY' ? '#ed6252' : '#a9bc8f'} />)}
       <Block at={[1.5, 0.72, -0.8]} size={[0.8, 0.12, 1]} color='#bcaa8c' />
-      {[0, 1, 2].map(i => <Block key={i} at={[1.5, 0.84 + i * 0.09, -0.8]} size={[0.5, 0.06, 0.65]} color='#e7ddc5' rotation={i * 0.06} />)}
-    </group>
+      {Array.from({ length: Math.min(snapshot.inboxCount, 3) }, (_, i) => <Block key={i} at={[1.5, 0.84 + i * 0.09, -0.8]} size={[0.5, 0.06, 0.65]} color='#e7ddc5' rotation={i * 0.06} />)}
+    </group>}
+    {visibleRooms(snapshot).includes('treasury') && <group>
     <Block at={[5, 0.7, 4]} size={[1.8, 1.4, 1.25]} color='#3d4e47' />
     <Block at={[5, 0.7, 3.35]} size={[1.4, 1.05, 0.08]} color='#718176' />
     <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
+    </group>}
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
     {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} tween={fixed} recorded={snapshot.connection === 'replay'} />)}
     </Instances>
