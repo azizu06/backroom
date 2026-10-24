@@ -3,6 +3,7 @@
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
+import { OPEN_DOORS, doorCollider, type DoorState } from './doors';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -10,7 +11,7 @@ import { DESKS, DESK_RADIUS, DESK_SIZE } from "./targets/desk";
 import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
-import type { CoworkerSpot, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+import type { CoworkerSpot, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
 export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
@@ -54,7 +55,7 @@ const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfie
  * `extra` takes footprints of room geometry mounted elsewhere (e.g. a self-contained room at an anchor),
  * so new furniture becomes solid without editing this list.
  */
-export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = []): Box[] {
+export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
   const boxes: Box[] = [...extra];
   for (const x of [-2.5, 2.5]) boxes.push(box(x, -3.15, 0.12, 4.6), box(x, 3.5, 0.12, 3.8));
@@ -69,6 +70,8 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
     if (!visible.has(room)) continue;
     const [x] = OFFICE_ANCHORS[room].center;
     boxes.push(box(x - 0.72, -0.65, 0.14, 0.18), box(x + 0.72, -0.65, 0.14, 0.18));
+    const leaf = doorCollider(doors, room);
+    if (leaf) boxes.push(leaf);
   }
   if (visible.has("treasury")) {
     const [x] = OFFICE_ANCHORS.treasury.center;
@@ -161,7 +164,7 @@ export function applyLook(yaw: number, pitch: number, dYaw: number, dPitch: numb
   return { yaw: next, pitch: clamp(pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT) };
 }
 
-export interface PlayCandidate { readonly target: PlayTarget; readonly position: Vec2; readonly radius: number }
+export type PlayCandidate = PlayCandidateOf<PlayTarget>;
 export function targetKey(target: PlayTarget | null): string {
   if (!target) return "";
   return playTargetModule(target.kind).key?.(target) ?? target.kind;
@@ -179,25 +182,32 @@ export function interactCandidates(agents: readonly { id: string; position: Vec2
 /**
  * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone; agents win ties.
  * Up close the cone widens to the candidate's angular size (asin(radius / distance)), so a target stays
- * picked while the crosshair is anywhere on it.
+ * picked while the crosshair is anywhere on it. Open doors require facing the swung leaf. Open leaves
+ * yield to other targets; closed leaves compete by distance so targets behind them cannot take priority.
  */
 export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCandidate[], range = INTERACT_RANGE, cone = PICK_CONE): PlayTarget | null {
   const [fx, fz] = forwardOf(yaw);
   let best: { target: PlayTarget; distance: number } | null = null;
+  let door: { target: PlayTarget; distance: number } | null = null;
   for (const candidate of candidates) {
     const dx = candidate.position[0] - eye[0], dz = candidate.position[1] - eye[1];
     const distance = Math.hypot(dx, dz);
     if (distance - candidate.radius > range) continue;
     if (distance > 1e-6) {
       const bearing = Math.acos(clamp((dx * fx + dz * fz) / distance, -1, 1));
-      if (bearing > Math.max(cone, Math.asin(Math.min(1, candidate.radius / distance)))) continue;
+      const pickCone = candidate.target.kind === "door" && !candidate.blocksInteraction ? cone : Math.max(cone, Math.asin(Math.min(1, candidate.radius / distance)));
+      if (bearing > pickCone) continue;
+    }
+    if (candidate.target.kind === "door" && !candidate.blocksInteraction) {
+      if (!door || distance < door.distance) door = { target: candidate.target, distance };
+      continue;
     }
     const agent = candidate.target.kind === "agent";
     if (!best || distance < best.distance - 1e-9 || (Math.abs(distance - best.distance) <= 1e-9 && agent && best.target.kind !== "agent")) {
       best = { target: candidate.target, distance };
     }
   }
-  return best?.target ?? null;
+  return best?.target ?? door?.target ?? null;
 }
 
 export function headBob(distance: number, moving: boolean, reduced: boolean): number {

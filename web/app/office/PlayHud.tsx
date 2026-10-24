@@ -10,6 +10,11 @@ import {
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { crosshairView } from '../../lib/office/playFeel';
+import { interactionLabel } from '../../lib/office/folder';
+import { interactionStore } from '../../lib/office/interactions';
+import { playTargetModule } from '../../lib/office/targets';
+import { visibleRooms } from '../../lib/office/state';
+import { InteractPrompt } from './InteractPrompt';
 import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
@@ -128,6 +133,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
   snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; chat?: PlayChat;
 }) {
   const touch = useTouch();
+  const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, setSettings] = useState<PlaySettings>(() => loadPlaySettings(viewerStorage()));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -156,8 +162,22 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
   }, [panel, snapshot, hud]);
 
   function interact() {
+    if (panel || settingsOpen || chatOpen) return;
     const current = targetRef.current;
+    if (!current && interactionStore.getSnapshot().folder === null) {
+      const pose = hud.current?.dataset;
+      if (pose?.playerX === undefined || pose.playerZ === undefined || pose.playerYaw === undefined) return;
+      interactionStore.putDown([Number(pose.playerX), Number(pose.playerZ)], Number(pose.playerYaw), visibleRooms(snapshot));
+      requestSceneFrame();
+      return;
+    }
     if (!current) return;
+    const module = playTargetModule(current.kind);
+    if (module.activate) {
+      module.activate(current);
+      requestSceneFrame();
+      return;
+    }
     setSettingsOpen(false);
     releaseStick();
     input.clear();
@@ -271,7 +291,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
 
   useGamepad({ input, enabled: true, move: !panel, onInteract: panel ? undefined : interact, onExit: panel ? closePanel : onExit });
 
-  const { state: aim, prompt } = crosshairView(target ? targetLabel(snapshot, target) : null, !!panel);
+  const { state: aim, prompt } = crosshairView(interactionLabel(target ? targetLabel(snapshot, target) : null, local.folder), !!panel || settingsOpen || chatOpen);
   return <div className='play-hud'>
     <PlayMinimap snapshot={snapshot} hud={hud} />
     <div ref={hud} className='play-surface' tabIndex={0} role='application' data-touch={touch || undefined}
@@ -286,7 +306,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, chat }: {
       onPointerDown={onSurfacePointerDown} onPointerMove={onSurfacePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} />
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
-    <p className='play-prompt' aria-live='polite'>{prompt}</p>
+    <InteractPrompt prompt={prompt} />
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     {touch && <>
