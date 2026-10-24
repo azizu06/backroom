@@ -1,11 +1,22 @@
 'use client';
 
-import { useEffect, useRef, type ComponentRef, type RefObject } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
+import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../../lib/office/a11y';
 import { WalkMotion } from '../../lib/office/motion';
 import { OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
+
+function subscribeReducedMotion(onChange: () => void) {
+  const query = window.matchMedia(REDUCED_MOTION_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+function useReducedMotion() {
+  return useSyncExternalStore(subscribeReducedMotion,
+    () => window.matchMedia(REDUCED_MOTION_QUERY).matches, () => false);
+}
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
@@ -47,15 +58,16 @@ function Plant({ x, z }: { x: number; z: number }) {
   </group>;
 }
 function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) {
+  const reduced = useReducedMotion();
   const denial = matchingDenial(snapshot, room);
   const door = useRef<Mesh>(null);
   const [x] = OFFICE_ANCHORS[room].center;
   useFrame(() => {
     if (!door.current) return;
     const age = denial ? Date.now() - denial.at : Infinity;
-    const flash = age >= 0 && age < 4500 && Math.floor(age / 300) % 2 === 0;
-    door.current.visible = age >= 0 && age < 4500;
-    (door.current.material as MeshBasicMaterial).opacity = flash ? 0.95 : 0.65;
+    const highlight = doorHighlight(age, reduced);
+    door.current.visible = highlight.visible;
+    (door.current.material as MeshBasicMaterial).opacity = highlight.opacity;
   });
   if (room === 'lobby' || room === 'dana') return null;
   const z = room === 'treasury' ? 1.15 : -0.65;
@@ -70,6 +82,7 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
   </group>;
 }
 function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean; recorded: boolean }) {
+  const reduced = useReducedMotion();
   const body = useRef<Group>(null);
   const legs = useRef<Group>(null);
   const motion = useRef(new WalkMotion(agent.pos));
@@ -86,7 +99,7 @@ function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean
     body.current.position.set(walk.position[0], 0, walk.position[1]);
     const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = walk.moving && !tween && !recorded ? Math.sin(walk.distance * 9 + i * Math.PI) * 0.38 : 0; });
+    if (legs.current) legs.current.children.forEach((leg, i) => { leg.rotation.x = legSwing(walk.distance, i, walk.moving && !tween && !recorded, reduced); });
   });
   const color = OFFICE_ANCHORS[agent.seatId].color;
   return <group ref={body} position={[agent.pos[0], 0, agent.pos[1]]}>
@@ -104,6 +117,7 @@ function Avatar({ agent, tween, recorded }: { agent: OfficeAgent; tween: boolean
   </group>;
 }
 function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean }) {
+  const reduced = useReducedMotion();
   const { camera, size } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const moving = useRef(true);
@@ -117,7 +131,7 @@ function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean })
   }, [focus, size, fixed]);
   useFrame((_, delta) => {
     if (!moving.current || !controls.current) return;
-    const alpha = 1 - Math.exp(-7 * Math.min(delta, 0.1));
+    const alpha = cameraAlpha(delta, reduced);
     camera.position.lerp(destination.current, alpha);
     controls.current.target.lerp(target.current, alpha);
     const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
@@ -141,7 +155,7 @@ function ContextLoss({ onFailure }: { onFailure: () => void }) {
 export function OfficeScene({ snapshot, fixed, focus, labels, onFailure }: {
   snapshot: OfficeSnapshot; fixed: boolean; focus: AnchorId | null; labels: RoomLabels; onFailure: () => void;
 }) {
-  return <Canvas shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
+  return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
     <color attach='background' args={['#202620']} />
     <ambientLight intensity={1.7} />
