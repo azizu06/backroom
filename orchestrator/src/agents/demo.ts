@@ -26,6 +26,8 @@ async function main() {
     credential: live ? () => execFileSync('security', ['find-generic-password', '-s', 'backroom-anthropic-key', '-w'], { encoding: 'utf8' }).trim() : () => 'mock-no-network',
     ...(live ? {} : { query: scriptedQuery(role => DEMO_SCRIPTS[role as Role]?.() ?? [], { calls }) }),
     recordArtifacts: (ctx, refs) => store.recordArtifacts(ctx, refs),
+    ...(live ? { onToolCall: (e: { role: string; name: string; ok: boolean; code?: string; output?: unknown }) =>
+      console.log(`  [tool] ${e.role}.${e.name} ${e.ok ? 'ok' : e.code} ${JSON.stringify(e.output ?? null).slice(0, 220)}`) } : {}),
     onDiagnostic: d => console.log(`  [diagnostic] ${d.role} ${d.code}: ${d.detail}`),
   });
   const ledger = live ? new FileUsageLedger() : new MemoryUsageLedger();

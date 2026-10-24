@@ -41,7 +41,11 @@ const errorCode = (error: unknown) => {
   return /^[A-Z][A-Z0-9_]*(?::[A-Z0-9_,]+)?$/.test(message) ? message : 'TOOL_FAILED';
 };
 
-export interface ToolHooks { recordArtifacts?(ctx: ToolContext, refs: string[]): Promise<void> }
+export interface ToolHooks {
+  recordArtifacts?(ctx: ToolContext, refs: string[]): Promise<void>;
+  /** Server-side trace of each tool call (no arguments); for logs and debugging only. */
+  onToolCall?(event: { activationId: string; role: string; name: string; ok: boolean; code?: string; output?: Json }): void;
+}
 
 /** Wrap one plain DomainTool. Policy lives in `execute`; this adds the fencing around it:
  * sealed check, full schema parse, assertCurrent before and after, code-owned ref capture. */
@@ -49,7 +53,10 @@ export function toSdkTool(domain: DomainTool<any, Json>, ctx: ToolContext, sessi
   const shape = (domain.input as unknown as { shape?: z.ZodRawShape }).shape;
   if (!shape || typeof shape !== 'object') throw new Error(`TOOL_INPUT_NOT_OBJECT:${domain.name}`);
   return tool(domain.name, domain.description, shape, async args => {
-    const record = (ok: boolean, code?: string) => session.toolCalls.push({ name: domain.name, ok, ...(code ? { code } : {}) });
+    const record = (ok: boolean, code?: string, output?: Json) => {
+      session.toolCalls.push({ name: domain.name, ok, ...(code ? { code } : {}) });
+      hooks.onToolCall?.({ activationId: ctx.activation.activationId, role: ctx.activation.role, name: domain.name, ok, ...(code ? { code } : {}), ...(output !== undefined ? { output } : {}) });
+    };
     if (session.sealed) { record(false, 'ACTIVATION_SEALED'); return text({ error: 'ACTIVATION_SEALED', instruction: 'Handoff is staged. Stop now.' }, true); }
     try {
       await ctx.assertCurrent();
@@ -63,7 +70,7 @@ export function toSdkTool(domain: DomainTool<any, Json>, ctx: ToolContext, sessi
       const refs = refsIn(output);
       if (refs.length) { await hooks.recordArtifacts?.(ctx, refs); for (const ref of refs) session.producedRefs.add(ref); }
       session.held ??= heldOutput(output);
-      record(true);
+      record(true, undefined, output);
       return text(output);
     } catch (error) {
       const code = errorCode(error);

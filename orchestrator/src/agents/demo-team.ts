@@ -49,8 +49,8 @@ export async function createDemoTeam(options: { store?: (control: MemoryStateSto
   const call: CallRecordView = { callId: 'call-1042', status: 'already_paid', plans: [], escalations: [], links: [] };
   const collectionsCase = { sessionId: 'sess-1042', precall: { clientId: 'client-1042', invoiceId: '1042' } } as unknown as CollectionsCase;
   const itemRef = `inbox:${AP_INVOICE}`;
-  const text = [`From: billing@${source.senderDomain}`, `Invoice ${fields.invoiceId} from Papertrail Print Co`, `PO: ${fields.poId}`,
-    ...fields.lineItems.map(l => `${l.description}: ${l.quantity} x $${(l.unitPriceCents / 100).toFixed(2)}`), `Total due: $${(fields.amountCents / 100).toFixed(2)}`].join('\n');
+  const text = [`From: billing@${source.senderDomain}`, `Invoice ${fields.invoiceId} from Papertrail Print Co (vendor id ${fields.vendorId})`, `PO: ${fields.poId}`,
+    ...fields.lineItems.map(l => `${l.description}: ${l.quantity} x $${(l.unitPriceCents / 100).toFixed(2)}`), `Total due: $${(fields.amountCents / 100).toFixed(2)} USD`, `Remit to the account on file: ${fields.bankAccountId}`].join('\n');
   const extractions = new Map<string, unknown>();
   // Stand-in for the shared GX10 Ollama endpoint: a deterministic local-eyes candidate.
   const gx10: typeof fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ output: fields, confidence: 0.93 }) } }] });
