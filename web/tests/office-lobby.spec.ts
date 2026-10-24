@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DENY_MOMENT_MS } from '../lib/office/props/treasuryDeny';
+import { ROLES } from '../lib/office/palette';
 
 // Run via test:office:browser after building the web app.
 const code = process.env.OFFICE_LOBBY_OPERATOR_CODE ?? 'local-audit-test-only';
@@ -135,6 +136,23 @@ async function patchBrightness(page: Page, canvas: Locator, point: Point, focus:
   return sum / (data!.length / 4);
 }
 
+/** Mean RGB of a 6x6 screenshot patch around a projected world point. */
+async function patchColor(page: Page, canvas: Locator, point: Point, focus: readonly [number, number] = PAYABLES): Promise<number[]> {
+  const [data] = await samplePatches(page, canvas, [point], focus);
+  return [0, 1, 2].map(c => { let sum = 0; for (let i = c; i < data!.length; i += 4) sum += data![i]!; return sum / (data!.length / 4); });
+}
+
+/** The scene clears to the palette's cream background; a lit surface differs from it by at least a few levels per channel. */
+const BACKGROUND = [1, 3, 5].map(i => parseInt(ROLES.background.slice(i, i + 2), 16));
+const offBackground = (rgb: readonly number[]) => Math.max(...rgb.map((v, i) => Math.abs(v - BACKGROUND[i]!)));
+/** A blank part of the Payables board (right of the empty-audit note) and a point just above it, which is background. */
+const PAYABLES_BOARD: Point = [1.74, 1.47, -5.349], ABOVE_PAYABLES_BOARD: Point = [1.74, 3.3, -5.349];
+/** Bright board pixels that are not the cream background: the focus camera settled and the board drew. */
+async function payablesBoardDrawn(page: Page, canvas: Locator): Promise<number> {
+  const color = await patchColor(page, canvas, PAYABLES_BOARD);
+  return Math.min(...color) > 170 ? offBackground(color) : 0;
+}
+
 const TREASURY = [5, 3.4] as const;
 
 /** How far the mean red channel of RGBA pixels stands above the other two (the DENY sign's #ed6252 is about 140). */
@@ -168,9 +186,9 @@ test('office props render in the 3D scene', async ({ page }) => {
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
-  // A blank part of the board (right of the empty-audit note) turns cream once the focus camera settles; just above it is background.
-  await expect.poll(() => patchBrightness(page, canvas, [1.74, 1.47, -5.349]), { timeout: 10_000 }).toBeGreaterThan(170);
-  expect(await patchBrightness(page, canvas, [1.74, 3.3, -5.349])).toBeLessThan(90);
+  // The blank board turns bright once the focus camera settles; just above it is the cream scene background.
+  await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
+  expect(offBackground(await patchColor(page, canvas, ABOVE_PAYABLES_BOARD))).toBeLessThan(6);
   // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
   // (The Canvas keeps a hidden '3D unavailable' fallback inside <canvas>; only a visible one means failure.)
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
@@ -212,7 +230,7 @@ test('office ambience renders a still scene under reduced motion', async ({ page
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   // With the ambient ticker off, the static pose still has to reach the screen: the focused Payables board draws.
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
-  await expect.poll(() => patchBrightness(page, canvas, [1.74, 1.47, -5.349]), { timeout: 10_000 }).toBeGreaterThan(170);
+  await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
   expect(errors).toEqual([]);
