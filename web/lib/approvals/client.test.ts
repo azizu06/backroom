@@ -34,6 +34,11 @@ describe('approvalRequest', () => {
     expect((await failure(approvalRequest('/api/controller/view'))).message).toContain('HTTP 200');
   });
 
+  it('treats a JSON null body as an outage instead of returning null', async () => {
+    respond(200, 'null');
+    expect((await failure(approvalRequest('/api/approvals/x/view'))).message).toContain('HTTP 200');
+  });
+
   it('does not blame the passkey when a page load fails with an unknown code', async () => {
     respond(500, '{"error":"SOMETHING_NEW"}');
     expect((await failure(approvalRequest('/api/controller/view'))).message).toBe('This page could not be loaded. Try again in a moment.');

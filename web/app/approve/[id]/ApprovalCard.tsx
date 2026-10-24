@@ -15,24 +15,32 @@ export default function ApprovalCard({ id }: { id: string }) {
   const [seconds, setSeconds] = useState(60);
   const [terms, setTerms] = useState({ installments: 2, firstPaymentPct: 50, durationDays: 30 });
   const base = `/api/approvals/${encodeURIComponent(id)}`;
-  const refresh = useCallback(async () => {
+  // Poll failures are kept apart from decision errors so a recovered poll can clear its own banner.
+  const [pollError, setPollError] = useState('');
+  const refresh = useCallback(async (isActive: () => boolean = () => true) => {
     const data = await approvalRequest(`${base}/view`);
+    if (!isActive()) return;
     setRow(data.escalation); setRegistered(data.registered);
     setSeconds(Math.max(0, Math.ceil((data.escalation.expiresAt - Date.now()) / 1000)));
   }, [base]);
   useEffect(() => {
     let active = true;
-    const stop = () => { active = false; clearInterval(timer); };
-    const poll = () => {
-      if (active) void refresh().catch(e => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // One request at a time: the next poll is scheduled only after the last one settles.
+    const poll = async () => {
+      try {
+        await refresh(() => active);
+        if (active) setPollError('');
+      } catch (e) {
         if (!active) return;
-        // A link that matches no request will not start matching later: stop the 1 s poll.
-        if (e instanceof ApprovalError && e.code === 'ESCALATION_NOT_FOUND') { stop(); setMissing(true); }
-        setError(e instanceof Error ? e.message : 'This request could not be loaded. Try again.');
-      });
+        // A link that matches no request will not start matching later: stop polling.
+        if (e instanceof ApprovalError && e.code === 'ESCALATION_NOT_FOUND') { active = false; setMissing(true); return; }
+        setPollError(e instanceof Error ? e.message : 'This request could not be loaded. Try again.');
+      }
+      if (active) timer = setTimeout(() => void poll(), 1000);
     };
-    const timer = setInterval(poll, 1000); poll();
-    return stop;
+    void poll();
+    return () => { active = false; clearTimeout(timer); };
   }, [refresh]);
   const decide = async (decision: ControllerDecision) => {
     setBusy(true); setError('');
@@ -52,7 +60,8 @@ export default function ApprovalCard({ id }: { id: string }) {
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: row?.currency ?? 'USD' }).format(cents / 100);
   const closed = row && row.status !== 'pending';
   const canDecide = !!row && !closed && seconds > 0 && registered && !busy;
-  const status = missing ? 'Request not found' : !row && error ? 'Request unavailable' : !row ? 'Loading request' :row.status === 'pending_owner' ? 'Follow-up needed'
+  const shownError = error || pollError;
+  const status = missing ? 'Request not found' : !row && shownError ? 'Request unavailable' : !row ? 'Loading request' : row.status === 'pending_owner' ? 'Follow-up needed'
     : row.status === 'pending' ? `Client waiting · ${seconds}s` : `Dana ${row.status === 'counter' ? 'countered' : row.status}`;
   return <main className={styles.page}>
     <div className={styles.sheet}>
@@ -60,11 +69,11 @@ export default function ApprovalCard({ id }: { id: string }) {
       <p className={styles.status} role="status">{busy ? 'Confirm with your passkey…' : status}</p>
       <h1>A decision<br />beyond the badge.</h1>
       <p className={styles.intro}>The collections clerk needs your review before agreeing to these terms.</p>
-      {missing ? <section className={styles.result} role="alert">
+      {missing ? <section className={styles.result}>
         <h2>This approval link does not match a request.</h2>
         <p>Nothing was approved or denied. Open the latest link from the clerk, or check the audit wall for the escalation.</p>
         <p><a href="/audit">Open the audit wall</a></p>
-      </section> : error && <div className={styles.error} role="alert">{error}<button onClick={() => { setError(''); void refresh().catch(e => setError(e instanceof Error ? e.message : 'This request could not be loaded. Try again.')); }}>Refresh request</button></div>}
+      </section> : shownError && <div className={styles.error} role="alert">{shownError}<button onClick={() => { setError(''); setPollError(''); void refresh().catch(e => setError(e instanceof Error ? e.message : 'This request could not be loaded. Try again.')); }}>Refresh request</button></div>}
       {row && <>
         <section className={styles.amount} aria-label="Invoice amount">
           <span>{row.invoiceId ? `Invoice ${row.invoiceId}` : row.taskId}</span>
