@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
@@ -8,6 +8,7 @@ import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../.
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
+import { tourProgress } from '../../lib/office/tour';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -21,6 +22,8 @@ function useReducedMotion() {
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
+/** Looks up the HTML tag element Office renders for an agent id. */
+export type AgentTagLookup = (agentId: string) => HTMLDivElement | undefined;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const deskIds = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
 // Office (in the initial bundle) requests on-demand frames through this bridge.
@@ -36,6 +39,19 @@ function ScreenLabel({ at, element }: { at: [number, number, number]; element: L
     if (!element.current) return;
     element.current.style.visibility = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 ? 'hidden' : 'visible';
     element.current.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -50%)`;
+  });
+  return null;
+}
+/** Projects the avatar's current head position onto its HTML tag on frames that are already rendering. */
+function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkMotion; element: AgentTagLookup }) {
+  const point = useRef(new Vector3());
+  useFrame(({ camera, size }) => {
+    const tag = element(agentId);
+    if (!tag) return;
+    point.current.set(motion.position[0], 1.95, motion.position[1]).project(camera);
+    const offscreen = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 || point.current.z > 1;
+    tag.style.visibility = offscreen ? 'hidden' : 'visible';
+    tag.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -100%)`;
   });
   return null;
 }
@@ -120,7 +136,9 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     </mesh>)}</group>
   </group>;
 }
-function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean }) {
+/** Tour moves start from wherever the camera is when the frame after a focus change renders. */
+interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number }
+function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: boolean; tour: boolean }) {
   const reduced = useReducedMotion();
   const { camera, size, invalidate } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
@@ -128,21 +146,40 @@ function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean })
   const orbiting = useRef(false);
   const target = useRef(new Vector3());
   const destination = useRef(new Vector3(13, 15, 17));
+  const tourMove = useRef<TourMove>({ startedAt: null, position: new Vector3(), target: new Vector3(), zoom: 1 });
   useEffect(() => {
     const center = focus ? OFFICE_ANCHORS[focus].center : [0, 0];
     target.current.set(center[0]!, 0.2, center[1]!);
     destination.current.copy(target.current).add(new Vector3(13, 15, 17));
+    tourMove.current.startedAt = null;
     moving.current = true;
     invalidate();
-  }, [focus, size, fixed, invalidate]);
+  }, [focus, size, fixed, tour, invalidate]);
   useFrame((state, delta) => {
     if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
     state.invalidate();
+    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
+    if (tour) {
+      const move = tourMove.current;
+      if (move.startedAt === null) {
+        move.startedAt = performance.now();
+        move.position.copy(camera.position);
+        move.target.copy(controls.current.target);
+        move.zoom = camera.zoom;
+      }
+      const progress = tourProgress(performance.now() - move.startedAt, reduced);
+      camera.position.lerpVectors(move.position, destination.current, progress);
+      controls.current.target.lerpVectors(move.target, target.current, progress);
+      camera.zoom = MathUtils.lerp(move.zoom, zoom, progress);
+      camera.updateProjectionMatrix();
+      controls.current.update();
+      if (progress >= 1) moving.current = false;
+      return;
+    }
     const alpha = cameraAlpha(delta, reduced);
     camera.position.lerp(destination.current, alpha);
     controls.current.target.lerp(target.current, alpha);
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
     camera.zoom = MathUtils.lerp(camera.zoom, zoom, alpha);
     camera.updateProjectionMatrix();
     controls.current.update();
@@ -170,9 +207,9 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, labels, onFailure, onRestored }: {
-  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
-  onFailure: () => void; onRestored: () => void;
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored }: {
+  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
+  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void;
 }) {
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
@@ -211,8 +248,11 @@ export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, l
     <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
     </group>}
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
-    {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />)}
+    {snapshot.agents.map(agent => <Fragment key={agent.id}>
+      <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />
+      {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
+    </Fragment>)}
     </Instances>
-    <CameraRig focus={focus} fixed={fixed} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
+    <CameraRig focus={focus} fixed={fixed} tour={tour} /><ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }

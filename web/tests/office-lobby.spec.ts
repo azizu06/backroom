@@ -59,3 +59,41 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
   await expect(ask.getByRole('alert')).toContainText('The audit chain is broken');
   await expect(ask.getByRole('alert')).toContainText('AUDIT_CHAIN_BROKEN');
 });
+
+test('office judge tour visits the rooms with agent tags and stops on any key', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const seats = await page.locator('.seat-statuses > div').count();
+  if (seats) await expect(page.locator('[data-agent-tag]')).toHaveCount(seats);
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('tour');
+  await expect(caption).toContainText('Tour');
+  await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Lobby', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Shift');
+  await expect(view).toHaveValue('tween');
+  await expect(caption).not.toContainText('Tour');
+  await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('office judge tour advances under reduced motion and stops on a click', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office');
+  await expect(page.locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const caption = page.locator('.office-caption');
+  await view.selectOption('tour');
+  await expect(caption).toContainText('Tour · 1 of');
+  await expect(caption).toContainText('Tour · 2 of', { timeout: 8000 });
+  const box = await page.getByTestId('office-viewport').boundingBox();
+  await page.mouse.click(box!.x + 8, box!.y + 8);
+  await expect(view).toHaveValue('tween');
+  await expect(caption).not.toContainText('Tour');
+  expect(errors).toEqual([]);
+});
