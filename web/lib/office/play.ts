@@ -12,7 +12,7 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
-import type { CoworkerSpot, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
+import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
 export { AGENT_RADIUS, DESK_RADIUS, DESK_SIZE, DOOR_RADIUS, PAYLINK_KIOSK, PAYLINK_RADIUS, SERVER_ROOM, TREASURY_DOOR };
@@ -195,14 +195,14 @@ export function targetKey(target: PlayTarget | null): string {
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
  * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
  */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = []): PlayCandidate[] {
-  const context = { agents, visible: new Set(rooms), coworkers };
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = [], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), handoffAgents, coworkers };
   return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 
 /**
  * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone.
- * A desk's general inspect prompt yields to an eligible agent; other targets still compete by distance.
+ * A desk's general inspect prompt yields to an eligible agent (including handoff actors); other targets still compete by distance.
  * Up close the cone widens to the candidate's angular size (asin(radius / distance)), so a target stays
  * picked while the crosshair is anywhere on it. Open doors require facing the swung leaf. Open leaves
  * yield to other targets; closed leaves compete by distance so targets behind them cannot take priority.
@@ -233,7 +233,7 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
       nonDesk = { target: candidate.target, distance };
     }
   }
-  if (best?.target.kind === "desk" && nonDesk?.target.kind === "agent") return nonDesk.target;
+  if (best?.target.kind === "desk" && (nonDesk?.target.kind === "agent" || nonDesk?.target.kind === "handoff")) return nonDesk.target;
   return best?.target ?? door?.target ?? null;
 }
 
@@ -244,8 +244,8 @@ export function headBob(distance: number, moving: boolean, reduced: boolean): nu
 export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;
 
 /** Display data for the interaction panel (from the target's registry module); null when the target is no longer in the snapshot. */
-export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget): PlayPanel | null {
-  return playTargetModule(target.kind).panel(snapshot, target);
+export function playPanel(snapshot: OfficeSnapshot, target: PlayTarget, handoffFor?: HandoffResolver): PlayPanel | null {
+  return playTargetModule(target.kind).panel(snapshot, target, handoffFor);
 }
 
 export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): string {

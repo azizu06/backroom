@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { MeshBasicMaterial, MeshStandardMaterial, type Group } from 'three';
 import { matchingDenial, type OfficeSnapshot } from '../../../lib/office/state';
-import { DENY_MOMENT_MS, TREASURY_DOOR, TREASURY_DOOR_INTERACTION, createDenyPose, denyPose, denyReceipt, type DenyReceipt } from '../../../lib/office/props/treasuryDeny';
+import { DENY_MOMENT_MS, ECHO_START, ECHO_WALK, TREASURY_DOOR, TREASURY_DOOR_INTERACTION, createDenyPose, denyPose, denyReceipt, type DenyReceipt } from '../../../lib/office/props/treasuryDeny';
+import { Bear, createBearRig, poseBear } from '../avatars/Bear';
 import { canvasTextLines } from '../../../lib/office/props/readability';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { useReducedMotion } from './useReducedMotion';
@@ -56,6 +57,7 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
   const root = useRef<Group>(null);
   const echo = useRef<Group>(null);
   const pose = useRef(createDenyPose());
+  const [echoRig] = useState(createBearRig);
   const ended = useRef(false);
   const [ring] = useState(() => new MeshStandardMaterial({ color: DENY_RED, emissive: DENY_RED, emissiveIntensity: 0, roughness: 0.6 }));
   const [sign] = useState(() => new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
@@ -97,6 +99,8 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
     if (echo.current) {
       echo.current.position.set(current.echo.x, 0, current.echo.z);
       echo.current.rotation.y = current.echo.heading;
+      const walked = ECHO_START[1] - current.echo.z;
+      poseBear(echoRig, walked, walked > 1e-6 && walked < ECHO_WALK - 1e-6, reduced);
     }
     if (!reduced) state.invalidate();
   });
@@ -111,11 +115,8 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
       <mesh position={[0, SIGN_Y, -0.02]} material={post}><boxGeometry args={[SIGN_W + 0.06, SIGN_H + 0.06, 0.03]} /></mesh>
       <mesh position={[0, SIGN_Y, 0]} material={sign}><planeGeometry args={[SIGN_W, SIGN_H]} /></mesh>
     </group>
-    <group ref={echo}>
-      <mesh position={[0, 0.83, 0]} material={ghost}><boxGeometry args={[0.43, 0.6, 0.28]} /></mesh>
-      <mesh position={[0, 1.3, 0]} material={ghost}><boxGeometry args={[0.34, 0.36, 0.32]} /></mesh>
-      <mesh position={[0, 0.3, 0]} material={ghost}><boxGeometry args={[0.36, 0.55, 0.22]} /></mesh>
-    </group>
+    {/* The denied agent's translucent bear turns away from the door. */}
+    <group ref={echo}><Bear color={receipt.color} seed={receipt.agentId} rig={echoRig} ghost={ghost} /></group>
   </group>;
 }
 
