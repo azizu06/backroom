@@ -76,17 +76,33 @@ export class SeatWorker {
         await store.createEscalation(lease, decision, this.now());
         await store.setAgentTarget(lease, `${decision.toHuman}_desk`, this.now()); return;
       }
+      // Code checks run first, even for a paused voice/model-dependent action.
+      const modelDependent = step.kind === 'dial' || step.requiresModel === true;
+      const modelSignal = store.llmSignal;
+      const pause = async () => {
+        await store.pauseTask(lease, this.now());
+        this.lease = undefined;
+      };
+      if (modelDependent && (!store.llmEnabled || modelSignal.aborted)) { await pause(); return; }
       const fingerprint = paymentFingerprint(step);
       const prior = step.kind === 'nessie'
         ? await store.reservePayment(lease, task.idempotencyKey!, fingerprint, this.now()) : undefined;
       await store.assertLease(lease, this.now());
       signal?.throwIfAborted();
       if (step.kind === 'dial') await store.setAgentState(lease, 'on_call', this.now());
-      const result = step.kind === 'nessie' && prior ? prior.result : await effects[step.kind]({
-        input: step.input, idempotencyKey: step.kind === 'nessie' ? task.idempotencyKey : undefined, signal });
+      if (modelDependent && (!store.llmEnabled || modelSignal.aborted)) { await pause(); return; }
+      const effectSignal = modelDependent ? AbortSignal.any([modelSignal, ...(signal ? [signal] : [])]) : signal;
+      let result;
+      try { result = step.kind === 'nessie' && prior ? prior.result : await effects[step.kind]({
+        input: step.input, idempotencyKey: step.kind === 'nessie' ? task.idempotencyKey : undefined, signal: effectSignal });
+      } catch (error) {
+        if (modelDependent && modelSignal.aborted) { await pause(); return; }
+        throw error;
+      }
+      if (modelDependent && modelSignal.aborted) { await pause(); return; }
       if (step.kind === 'nessie') await store.recordPayment(lease,
         { key: task.idempotencyKey!, fingerprint, result }, this.now());
-      await store.appendAudit({ ts: this.now(), actor: 'system', seat, action: `${step.kind}_completed`,
+      await store.appendAudit({ ts: this.now(), actor: store.llmEnabled ? 'system' : 'code', seat, action: `${step.kind}_completed`,
         ruleIds: decision.ruleIds, policyVersion: decision.policyVersion, refs: task.refs,
         route: 'external', latencyMs: 0, costUsd: 0 });
       await store.advanceTask(lease, this.now());

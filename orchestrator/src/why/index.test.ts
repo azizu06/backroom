@@ -6,7 +6,7 @@ import { askWhy, createAskWhyHandler, type WhyAuditEntry } from "./index.js";
 const entries = auditLog as WhyAuditEntry[];
 const question = answerKey[0]!.question;
 const valid = { answer: "Held as a duplicate [entry:212].", citations: ["212"] };
-const completion = (value: unknown) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(value) } }] }));
+const completion = (value: unknown) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ output: value, confidence: 1 }) } }], usage: { cost: 0 } }));
 const mockModel = (value: unknown = valid) => vi.fn<typeof fetch>(async () => completion(value));
 
 describe("askWhy", () => {
@@ -121,4 +121,15 @@ describe("HTTP adapter", () => {
     expect(response.status).toBe(status);
     expect(load).not.toHaveBeenCalled();
   });
+});
+
+it('uses cited deterministic evidence with zero requests while LLM OFF', async () => {
+  const { MemoryStateStore } = await import('../store');
+  const store = new MemoryStateStore();
+  const fetcher = mockModel();
+  await store.setLlmEnabled(false);
+  const answer = await askWhy(question, entries, { stateStore: store, apiKey: 'test', fetch: fetcher });
+  expect(answer.source).toBe('fallback');
+  expect(answer.citations).toEqual(['212', '213']);
+  expect(fetcher).not.toHaveBeenCalled();
 });

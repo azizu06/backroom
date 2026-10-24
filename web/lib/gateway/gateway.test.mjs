@@ -29,6 +29,15 @@ const request = (body, token = "test-secret") =>
   });
 
 describe("Cartesia tool gateway", () => {
+  it("records deterministic gateway decisions as code", async () => {
+    const store = new MemoryGatewayStore([seed()]);
+    const gateway = createGateway({ secret: () => "test-secret", store });
+    await gateway("verify_identity_result", request({ call_id: "call-1", webhook_request_id: "code-audit", result: "confirmed" }));
+    const entries = await store.transact("call-1", call => call.audits);
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.every(entry => entry.actor === "code")).toBe(true);
+  });
+
   it("rejects a bad bearer before looking up invoice context", async () => {
     const gateway = createGateway({
       secret: () => "test-secret",

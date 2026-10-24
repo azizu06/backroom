@@ -28,6 +28,7 @@ function audit(
   decision?: GatewayPolicyDecision,
 ): AuditEntry {
   const entry: AuditEntry = {
+    actor: "code",
     id: randomUUID(),
     action: input.tool,
     kind,

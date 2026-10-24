@@ -45,6 +45,7 @@ export interface PlanTerms {
   discountPct: number;
 }
 export interface AuditEntry {
+  actor: "code";
   id: string;
   action: string;
   kind: "ALLOW" | "DENY" | "ESCALATE" | "RECORDED";
