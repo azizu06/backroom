@@ -43,7 +43,7 @@ export const WHITEBOARD_INTERACTION: OfficePropInteraction = {
         { label: 'Inbox', value: String(stats.inbox) },
         { label: 'Agents', value: String(stats.agents) },
         { label: 'Connection', value: stats.connection },
-        ...stats.recent.map(row => ({ label: row.decision, value: row.summary })),
+        ...stats.recent.map(row => ({ label: row.decision === 'ESCALATE' ? 'Hold' : row.decision, value: row.summary })),
       ],
     };
   },
