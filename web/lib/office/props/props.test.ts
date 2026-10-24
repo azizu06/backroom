@@ -102,12 +102,12 @@ describe('office prop interactions', () => {
     expect(WHITEBOARD_INTERACTION.panel(full, now).rows).toContainEqual({ label: 'Deny', value: '1' });
   });
 
-  it('hide the whiteboard without payables and the clock without lobby or collections', () => {
-    expect(propInteractions(snapshot({ rooms: undefined })).map(prop => prop.id)).toEqual(['whiteboard', 'clock']);
+  it('hide the whiteboard without payables, the clock without lobby or collections and the Treasury door without treasury', () => {
+    expect(propInteractions(snapshot({ rooms: undefined })).map(prop => prop.id)).toEqual(['whiteboard', 'clock', 'treasury-door']);
     expect(propInteractions(withRooms()).map(prop => prop.id)).toEqual([]);
     expect(propInteractions(withRooms('payables')).map(prop => prop.id)).toEqual(['whiteboard']);
     expect(propInteractions(withRooms('lobby')).map(prop => prop.id)).toEqual(['clock']);
-    expect(propInteractions(withRooms('collections', 'treasury')).map(prop => prop.id)).toEqual(['clock']);
-    expect(propInteractions(withRooms('dana', 'treasury', 'vendor_onboarding')).map(prop => prop.id)).toEqual([]);
+    expect(propInteractions(withRooms('collections', 'treasury')).map(prop => prop.id)).toEqual(['clock', 'treasury-door']);
+    expect(propInteractions(withRooms('dana', 'treasury', 'vendor_onboarding')).map(prop => prop.id)).toEqual(['treasury-door']);
   });
 });
