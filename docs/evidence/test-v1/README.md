@@ -1,5 +1,9 @@
 # V1 rehearsal — October 24, 2026
 
+For the opt-in judge web host with real service adapters, see the newer
+[live web walkthrough](live/README.md). The original default/mock evidence below
+is retained as a dated receipt.
+
 Rehearsed main `cec603e`, then rebased to `c2ed83b` and recaptured the full
 browser walkthrough without dialing or using Aziz's Chrome.
 `pnpm demo:up` started owned local SpacetimeDB 2.13.0, production Next, seat workers
