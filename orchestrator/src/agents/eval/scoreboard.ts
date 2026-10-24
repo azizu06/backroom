@@ -163,7 +163,7 @@ for (const name of CONVERSATIONS) {
   conversations.push(run);
   if (!run.match) gaps.push({ id: `AR:${run.scenarioId}:${name}`, detail: `Scripted call through the Dispatcher missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 }
-gaps.push({ id: 'AR_RUNTIME', detail: 'Six AR conversations (C02, C06, C07, C08, C10, C12) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor. Caller lines and voice-agent tool choices are scripted; Cartesia speech, live phone and the other collections scenarios are not driven through the Dispatcher.' });
+gaps.push({ id: 'AR_RUNTIME', detail: `${conversations.length} AR conversations (${[...new Set(conversations.map(row => row.scenarioId))].join(', ')}) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.` });
 const metrics = score(observations);
 const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
 const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
@@ -250,7 +250,7 @@ const lines = [
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
-  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out) | ${display(rates.arConversations)} |`,
+  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
