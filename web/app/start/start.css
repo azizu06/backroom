@@ -1,0 +1,21 @@
+.start-page { box-sizing: border-box; min-height: calc(100svh - 40px); padding: 32px max(24px, calc((100% - 1080px) / 2)); background: #202620; color: #d0d6c6; font: 15px/1.5 Avenir, 'Segoe UI', sans-serif; color-scheme: dark; }
+.start-page * { box-sizing: border-box; }
+.start-page h1, .start-page h2, .start-page h3 { color: #f3dfb9; line-height: 1.25; }
+.start-page h1 { margin: 0 0 12px; font-size: clamp(26px, 4vw, 38px); }
+.start-page h2 { margin: 28px 0 16px; font-size: 22px; }
+.start-page h3 { margin: 8px 0 12px; font-size: 18px; }
+.start-page p { margin: 0 0 12px; }
+.start-pitch { max-width: 72ch; }
+.start-page a { color: #f3dfb9; text-underline-offset: 3px; }
+.start-page a:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 3px; }
+.start-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.start-cards li { min-width: 0; padding: 18px; background: #272f25; border: 1px solid #8b987b; border-radius: 6px; overflow-wrap: anywhere; }
+.start-page .start-time { margin: 0; font-size: 12px; }
+.start-page .start-outcome { margin-bottom: 0; padding-top: 12px; border-top: 1px solid #8b987b; }
+.start-real ul { padding-left: 20px; }
+.start-real li { margin: 8px 0; }
+.start-page footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #8b987b; color: #f3dfb9; font-weight: 600; }
+@media (max-width: 760px) {
+  .start-page { padding: 24px 16px; }
+  .start-cards { grid-template-columns: 1fr; gap: 12px; }
+}
