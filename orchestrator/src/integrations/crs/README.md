@@ -40,6 +40,12 @@ P06 Ch.7 discharged, P07 Ch.13 open, P08 lien + judgment, P13 synthetic identity
 `new CrsClient({ username, password, ...CRS_CALHACKS_SANDBOX })` enables both;
 business credit and OFAC stay unconfigured and fail before login.
 
+For wiring: `createCrsClientFromEnv()` returns a live sandbox client when `CRS_USERNAME` and
+`CRS_PASSWORD` are set, otherwise `undefined`. `createCrsFixtureClient()` runs the same client offline
+over `crsSandboxFixtureFetch`, which answers only exact persona bodies with CRS's published outcome
+(`CRS_SANDBOX_EXPECTED`; label it FAKE wherever shown). The counts cannot tell an open bankruptcy (P07)
+from a discharged one (P06).
+
 Live probe with only credentials (no module): `CRS_LIVE=1 CRS_USERNAME=… CRS_PASSWORD=…
 CRS_TEST_ID=6 pnpm --filter @backroom/orchestrator crs:live` runs public records then fraud
 risk and prints only evidence. Credentials come from the CRS email invite (a human signup);
