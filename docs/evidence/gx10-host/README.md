@@ -10,7 +10,9 @@ Mac browser → Tailscale / public HTTPS → GX10 web + seats + gateway + voice 
 Mac fallback → separate local SpacetimeDB + same live sandbox adapters/receiver
 ```
 
-The GX10 checkout is clean at the revision in [deployment.json](deployment.json).
+The initial clean GX10 deployment is recorded in [deployment.json](deployment.json).
+The later loopback correction is deployed as recorded in
+[deployment-loopback.json](deployment-loopback.json).
 Production `pnpm -r build` passed on Linux ARM64. Node 24.22.1, pnpm 12.14.0,
 cloudflared 2026.10.3 and SpacetimeDB CLI 2.13.0 are user-local. The detached
 supervisor survives SSH logout; no system/Ollama/other-user changes were made.
@@ -99,3 +101,38 @@ One later fresh-database publish took several minutes. Publication and successfu
 seed were confirmed before the final hosted launch. The earlier owned judge DB
 is retained too; no shared database was modified. These deployment delays make
 the already-warm Mac especially important.
+
+## Review correction: private voice bridge
+
+The original Tailscale-only web listener refused the bridge's hard-coded
+`127.0.0.1:3340` requests. This was reproduced as `ECONNREFUSED` on GX10; the
+original relay-health and unsigned-401 checks did not cover this hop.
+
+The same request handler/authentication now listens on Tailscale **and** IPv4
+loopback, with both listeners closed on shutdown. The default Mac bind remains
+one loopback listener. Startup checks both required addresses before launch.
+The local HTTP integration regression calls the actual exported voice bridge
+against a non-loopback listener, checks its private loopback admin/gateway calls,
+and proves both sockets close. All 7 focused host/bridge/listener tests pass;
+a fresh workspace production build passes.
+
+The [authenticated GX10 probe](voice-bridge.json) confirms:
+
+- Private client-stop read succeeds through loopback.
+- Private admin access through the Tailscale socket is still rejected with 403.
+- `bridge.gateway(get_invoice_context)` returns 200 `CONTEXT` for the seeded,
+  already-preverified synthetic invoice 1042. Amounts/contact details are not
+  printed. This records one synthetic delivery receipt, with no economic effect.
+- Signed public voice-tool callback rejects an unknown session with 404
+  `SESSION_NOT_FOUND`.
+
+The probe streams from the Mac into the existing clean deployed checkout; it
+never replaces live runtime source files. It makes no registration, dial,
+provider request, approval/payment or live-call mutation. The Mac standby was
+retained. The latency table above is the earlier snapshot, not a remeasurement
+of this listener-only correction.
+
+An additional unknown-call negative probe returned 500 `GATEWAY_ERROR` from the
+web gateway instead of its source adapter's 404. That separate error-mapping
+behavior is unchanged here; connectivity is verified using the successful
+synthetic context read. This is still not proof of an actual phone call.

@@ -461,10 +461,12 @@ inbox/audit rows only; it requires `MAC_PUBLIC_URL` / `GX10_PUBLIC_URL` for the
 same-origin decision endpoints. Page loads use direct host URLs. It performs
 no model inference, bank request, approval or dial.
 
-After a host/listener change, exercise the authenticated bridge as well as health:
+After a host/listener change, exercise the authenticated bridge as well as health.
+Run from the Mac repo root; the probe streams to the existing clean checkout
+without replacing runtime sources:
 
 ```sh
-ssh gx10 'cd ~/work/backroom-judge-host/app; PATH="$HOME/work/backroom-judge-host/.runtime/bin:$PATH" node --import ./orchestrator/node_modules/tsx/dist/loader.mjs tools/demo/voice-bridge-live.ts --confirm-owned-demo'
+ssh gx10 'cd ~/work/backroom-judge-host/app; PATH="$HOME/work/backroom-judge-host/.runtime/bin:$PATH" BACKROOM_ROOT="$PWD" node --import ./orchestrator/node_modules/tsx/dist/loader.mjs --input-type=module - --confirm-owned-demo' < tools/demo/voice-bridge-live.ts
 ```
 
 This calls the private loopback client-stop read and an authenticated

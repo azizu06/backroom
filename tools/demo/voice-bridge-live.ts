@@ -1,12 +1,13 @@
 /** Opt-in, no-dial synthetic context-read smoke. Records one gateway delivery; no provider request. */
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createDemoVoiceBridge } from '../../orchestrator/src/voice/demo-bridge';
 
 async function main() {
   if (!process.argv.includes('--confirm-owned-demo')) throw new Error('CONFIRM_OWNED_DEMO_REQUIRED');
-  const root = fileURLToPath(new URL('../../', import.meta.url)); process.chdir(root);
+  const root = process.env.BACKROOM_ROOT || fileURLToPath(new URL('../../', import.meta.url)); process.chdir(root);
+  const { createDemoVoiceBridge } = await import(pathToFileURL(join(root, 'orchestrator/src/voice/demo-bridge.ts')).href);
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   for (const file of ['.demo/private.env', '.demo/voice-private.env']) if (existsSync(file)) process.loadEnvFile(file);
   const owner = JSON.parse(readFileSync('.demo/process.json', 'utf8'));
