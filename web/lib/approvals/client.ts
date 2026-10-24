@@ -26,7 +26,9 @@ export async function approvalRequest(path: string, body?: unknown) {
     throw new ApprovalError('Backroom could not be reached. Check the connection and try again.', 'NETWORK');
   }
   // A proxy or crashed server can answer with HTML; never show a raw JSON parse error to Dana.
-  const result: unknown = await response.json().catch(() => undefined);
+  const parsed: unknown = await response.json().catch(() => undefined);
+  // Every route answers with a JSON object; anything else (HTML, null, a bare string) counts as an outage.
+  const result = typeof parsed === 'object' && parsed !== null ? parsed : undefined;
   const code = typeof result === 'object' && result !== null && typeof (result as { error?: unknown }).error === 'string'
     ? (result as { error: string }).error : undefined;
   if (!response.ok || result === undefined) {

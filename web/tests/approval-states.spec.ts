@@ -14,6 +14,19 @@ test('a bad approval link shows "not found" and stops polling', async ({ page })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('approval polling keeps going through a 502 and clears its banner when the server answers', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/api/approvals/*/view', route => ++calls === 1
+    ? route.fulfill({ status: 502, contentType: 'text/html', body: '<html><body>Bad gateway</body></html>' })
+    : route.continue());
+  await page.goto('/approve/does-not-exist-either');
+  await expect(page.locator('main').getByRole('alert')).toHaveText(/HTTP 502/);
+  // The next poll reaches the real server, which reports the link as unknown.
+  await expect(page.getByRole('heading', { name: 'This approval link does not match a request.' })).toBeVisible();
+  await expect(page.getByText(/HTTP 502/)).toHaveCount(0);
+  expect(calls).toBeGreaterThanOrEqual(2);
+});
+
 test('controller page waits for passkey status instead of flashing the enrollment form', async ({ page }) => {
   let release!: () => void;
   const answered = new Promise<void>(resolve => { release = resolve; });
