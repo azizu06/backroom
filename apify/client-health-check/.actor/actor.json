@@ -3,12 +3,12 @@
   "actorSpecification": 1,
   "name": "client-health-check",
   "title": "Client health check",
-  "description": "Typed public-company signals from a website probe and supplied Maps fields. Private build; not a public Store listing.",
+  "description": "Check a business website and normalize supplied Maps status and phone observations into typed signals with source URLs and timestamps.",
   "version": "0.0",
   "buildTag": "latest",
   "meta": {
     "templateId": "ts-empty",
-    "generatedBy": "Cursor"
+    "generatedBy": "Codex with GPT-6"
   },
   "inputSchema": "./input_schema.json",
   "outputSchema": "./output_schema.json",

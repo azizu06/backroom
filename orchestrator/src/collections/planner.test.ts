@@ -13,14 +13,14 @@ describe('routed pre-call planner', () => {
     const store = new MemoryStateStore();
     await store.setLlmEnabled(false);
     const http = vi.fn<typeof fetch>();
-    const cloud = createRouter({ stateStore: store, fetch: http, cloudApiKey: 'test' });
+    const cloud = createRouter({ stateStore: store, fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn();
     expect(await createCallPlanner({ cloudRoute: cloud.route, fallbackRoute }).draft(input)).toMatchObject({ kind: 'LLM_OFF', route: 'code' });
     expect(http).not.toHaveBeenCalled();
     expect(fallbackRoute).not.toHaveBeenCalled();
   });
   it('configures low reasoning and the router wrapper on the production GX10 fallback transport', async () => {
-    const cloud = createRouter({ fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status: 402 })), cloudApiKey: 'test' });
+    const cloud = createRouter({ fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status: 402 })), cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const http = vi.fn<typeof fetch>().mockResolvedValue(response());
     expect(await createCallPlanner({ cloudRoute: cloud.route, fallbackFetch: http }).draft(input)).toMatchObject({ route: 'gx10_fallback' });
     const body = JSON.parse(String(http.mock.calls[0]![1]!.body));
@@ -29,7 +29,7 @@ describe('routed pre-call planner', () => {
   });
   it.each([401, 429, 500])('does not downgrade HTTP %s errors to a local quality route', async status => {
     const http = vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status }));
-    const cloud = createRouter({ fetch: http, cloudApiKey: 'test' });
+    const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn();
     await expect(createCallPlanner({ cloudRoute: cloud.route, fallbackRoute }).draft(input)).rejects.toThrow('Call planner unavailable');
     expect(fallbackRoute).not.toHaveBeenCalled();
@@ -37,7 +37,7 @@ describe('routed pre-call planner', () => {
 
   it('keeps a successful Claude result on cloud and returns safe failure when both providers fail', async () => {
     const http = vi.fn<typeof fetch>().mockResolvedValueOnce(response()).mockResolvedValueOnce(new Response('', { status: 402 }));
-    const cloud = createRouter({ fetch: http, cloudApiKey: 'test' });
+    const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn(async () => { throw new Error('private transport payload'); });
     const planner = createCallPlanner({ cloudRoute: cloud.route, fallbackRoute });
     expect(await planner.draft(input)).toMatchObject({ output, route: 'cloud', model: 'anthropic/claude-sonnet-4.5' });
@@ -45,8 +45,8 @@ describe('routed pre-call planner', () => {
   });
   it('uses the cloud call_plan route and falls back to gpt-oss:120b only on HTTP 402', async () => {
     const http = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('', { status: 402 })).mockResolvedValueOnce(response());
-    const cloud = createRouter({ fetch: http, cloudApiKey: 'test', cloudBaseUrl: 'https://openrouter.example/v1' });
-    const fallback = createRouter({ fetch: http, cloudApiKey: 'ollama', cloudBaseUrl: 'http://gx10.example/v1', cloudModel: 'gpt-oss:120b', cloudInputUsdPerMillion: 0, cloudOutputUsdPerMillion: 0 });
+    const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test', cloudBaseUrl: 'https://openrouter.example/v1' });
+    const fallback = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'ollama', cloudBaseUrl: 'http://gx10.example/v1', cloudModel: 'gpt-oss:120b', cloudInputUsdPerMillion: 0, cloudOutputUsdPerMillion: 0 });
     const result = await createCallPlanner({ cloudRoute: cloud.route, fallbackRoute: fallback.route }).draft(input);
     expect(result).toMatchObject({ output, route: 'gx10_fallback', model: 'gpt-oss:120b', costUsd: 0 });
     expect(http.mock.calls.map(call => call[0])).toEqual(['https://openrouter.example/v1/chat/completions', 'http://gx10.example/v1/chat/completions']);

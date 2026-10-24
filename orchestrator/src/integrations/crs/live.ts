@@ -2,8 +2,8 @@
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CrsClient, CrsError, type CrsOptions } from './index.js';
-import { CRS_CALHACKS_SANDBOX, CRS_SANDBOX_IDENTITIES } from './sandbox.js';
+import { CrsClient, CrsError, type CrsOptions } from './index';
+import { CRS_CALHACKS_SANDBOX, CRS_SANDBOX_IDENTITIES } from './sandbox';
 
 const envPath = fileURLToPath(new URL('../../../../.env.local', import.meta.url));
 if (existsSync(envPath)) process.loadEnvFile(envPath);

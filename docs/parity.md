@@ -23,6 +23,11 @@ subscriber, and runs the same scenario. Every process it creates is closed in
 `finally`; no shared service is reset. Local scratch logs/configuration are
 ignored under `.t8-tools/office-parity-*` and never copied into evidence.
 
+Since #82 the lobby audit wall is operator-gated. The script generates a per-run
+operator code for its own web process, unlocks the wall the way an operator does,
+and then checks every `data-audit-id` receipt there. The read-only audit session
+POST is not counted as a renderer write.
+
 ## Closed/open audit comparison
 
 **10/10 canonical audit bodies are byte-identical.** Both original hash chains
@@ -84,7 +89,7 @@ red Treasury door. A subsequent server OFF write updates the displayed switch.
 | Floating badge / exact limits | matching `seat` + `badge` policy version |
 | Folder walk toward Dana | pending `escalation` from that agent + Dana target |
 | Red door | same agent/room/action in exact DENY `audit_entry` |
-| Audit wall line / DOM receipt | `audit_entry` ID |
+| Audit wall line / DOM receipt | `audit_entry` ID (operator-unlocked server read of the same store) |
 | Lobby intake receipt / folder stack | intake `audit_entry` receipts; private payloads stay private |
 | LLM OFF display | global `runtime_control` row |
 

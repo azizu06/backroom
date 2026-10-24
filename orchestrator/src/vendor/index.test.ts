@@ -21,7 +21,7 @@ async function setup() {
     return approvals.decide(id, challenge.challengeId, auth.assertion(challenge.options.challenge));
   };
   await state.registerAgent('vendor-seat', 'vendor_onboarding', 1000);
-  await state.enqueueTask({ id: 'task-1', seatId: 'vendor_onboarding', refs: [source.id], steps: [] });
+  await state.enqueueTask({ id: 'task-1', seatId: 'vendor_onboarding', refs: [source.id, 'resent-invoice-4480'], steps: [] });
   const lease = (await state.claimTask('vendor-seat', 1000, 12000))!;
   const checks = {
     business: vi.fn(async () => ({ verified: true, evidenceRef: 'crs-business-1' })),
@@ -138,4 +138,34 @@ it.each(['Counter', 'timeout'] as const)('holds the bank change on the shared co
   expect((await seat.apply(source.id)).status).toBe('held');
   expect((await state.getEscalation(proposal.escalationId!))?.status).toBe(outcome === 'Counter' ? 'counter' : 'pending_owner');
   expect((await repository.getVendor(vendor.id))?.accountId).toBe('bank-master:cedar');
+});
+
+it('recognizes the applied bank account on a resent inbox message without reopening approval', async () => {
+  const { seat, repository, decide, state, checks } = await setup();
+  const proposal = await seat.propose(change, source);
+  // A different source ID before approval is still a hold, never a no-op approval.
+  expect((await repository.getVendor(vendor.id))?.accountId).not.toBe(change.bankAccountId);
+  await decide(proposal.escalationId!);
+  await seat.apply(source.id);
+  const priorChecks = checks.business.mock.calls.length;
+  const result = await seat.propose(change, { ...source, id: 'resent-invoice-4480' });
+  expect(result.status).toBe('approved');
+  expect(result.decision.kind).toBe('ALLOW');
+  expect(await repository.hasPendingBankChange(vendor.id)).toBe(false);
+  expect((await repository.getVendor(vendor.id))?.revision).toBe(2);
+  expect(checks.business).toHaveBeenCalledTimes(priorChecks);
+  expect((await state.listAudit()).at(-1)?.action).toBe('bank_change_already_applied');
+});
+
+it.each(['sender', 'field-domain', 'pending', 'sanctioned'] as const)('does not recognize an applied account as approved when %s evidence differs', async mismatch => {
+  const { seat, repository, decide } = await setup();
+  const proposal = await seat.propose(change, source);
+  await decide(proposal.escalationId!); await seat.apply(source.id);
+  const current = (await repository.getVendor(vendor.id))!;
+  if (mismatch === 'pending') await repository.saveVendor({ ...current, pendingBankChange: true });
+  if (mismatch === 'sanctioned') await repository.saveVendor({ ...current, ofacHit: true });
+  const fields = mismatch === 'field-domain' ? { ...change, domain: 'cedarfre1ght.example' } : change;
+  const envelope = { ...source, id: 'resent-invoice-4480', ...(mismatch === 'sender' && { senderDomain: 'cedarfre1ght.example' }) };
+  expect((await seat.propose(fields, envelope)).decision.kind).not.toBe('ALLOW');
+  expect((await repository.getVendor(vendor.id))?.revision).toBe(2);
 });

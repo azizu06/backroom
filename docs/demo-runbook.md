@@ -94,7 +94,7 @@ audit receipts. See [live receipt scope and reproduction](evidence/live-run/READ
 - Dana: open public `/controller` on the passkey phone. Use the private
   `CONTROLLER_ENROLLMENT_SECRET` from `.env.local` or generated `.demo/private.env`;
   never display it. Complete registration before resetting for the pitch.
-- Audit operator: unlock `/audit` with the private `TOOL_GATEWAY_SECRET` from the
+- Audit operator: unlock `/audit` with the private `CONTROLLER_ENROLLMENT_SECRET` from the
   same source. Policy operator: use the separate `POLICY_DEMO_PIN`.
 - Network operator: hotspot/wired internet, charged backup phone, audible volume,
   both laptop and phone on the exact public HTTPS origin. Localhost belongs to

@@ -5,5 +5,6 @@
     "orchestrator/src/metrics/inbox-benchmark.ts": "6db6ef451c884b6c02210af04d43701c5e9c3dd1cf8ad7149f792c5bc2a51522",
     "orchestrator/src/metrics/inbox-live.ts": "501bda2cb8dfa6cc27097c2c61212c16e582d90e9b8c1ac8cec534a2c4f48e7d"
   },
-  "note": "Receipt sourceSha names a working tree. Applying this patch to patchBaseCommit reconstructs the exact runner used for measurement; subsequent changes only harden reporting and fix the default output path."
+  "note": "The original receipt sourceSha named a working tree. Applying this patch to patchBaseCommit reconstructs that exact baseline runner. Current receipt.json names a committed sourceSha and retains current code/input hashes.",
+  "appliesTo": "Original #81 receipt at commit 3353505, not the current receipt.json"
 }

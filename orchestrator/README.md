@@ -83,6 +83,36 @@ C3 across real process restarts.
 
 ## Model router
 
+Cloud routes use the first-party Anthropic Messages API by default and require
+`ANTHROPIC_API_KEY`. An OpenRouter key alone never enables cloud calls. The
+retained OpenRouter transport is inactive unless explicitly selected with
+`LLM_CLOUD_PROVIDER=openrouter` or `cloudProvider: 'openrouter'`.
+The default direct model is `claude-sonnet-5-5`. `ANTHROPIC_MODEL=claude-haiku-5-5`
+is a cheaper explicit override; both have token-based pricing in
+[`src/router/anthropic.ts`](src/router/anthropic.ts). Unknown direct model IDs
+fail before spending. `OPENROUTER_*` settings and `cloud*` router options still
+configure OpenRouter; `anthropicApiKey` / `anthropicModel` configure the direct
+provider. Missing Anthropic credentials fail closed; there is no automatic
+OpenRouter fallback. The direct endpoint is fixed so OpenRouter/GX10 base URL overrides
+cannot redirect an Anthropic credential. Provider errors fail closed; they do
+not trigger a second paid provider request.
+
+Keep the key server-side in repo-root `.env.local`, loaded by the existing
+runtime. For Aziz's local machine, import it without printing it:
+
+```sh
+# Append only when ANTHROPIC_API_KEY is absent; keep this file gitignored.
+printf '\nANTHROPIC_API_KEY=' >> .env.local
+security find-generic-password -s backroom-anthropic-key -w >> .env.local
+chmod 600 .env.local
+```
+
+Do not copy this personal key to the GX10 team env. The opt-in direct smoke
+(one call plan and one cited ask-why question, at most three requests) and
+usage receipts are documented in
+[docs/evidence/anthropic](../docs/evidence/anthropic/README.md).
+
+
 Import `createRouter`, `route`, and `TaskType` from `./src/router/index.js` (source entry; no bundled package yet). `route(taskType, input, schema?)` returns `{ output, route, model, latencyMs, costUsd }`. Copy the four audit fields onto the model-call audit entry. `latencyMs` includes local attempts and escalation, `costUsd` is zero for GX10 and provider-reported cost or a configurable token-rate estimate for cloud. Missing usage fails closed rather than reporting free cloud inference.
 
 ```ts
@@ -125,7 +155,7 @@ In-call conversation is Cartesia's runtime and is deliberately excluded. Confide
 
 `router.health()` exposes `{localAvailable,localEnabled,healthyPings,p50LatencyMs}` for the wall's offline banner. HTTP errors, missing configured model, a health ping over 5 s, or the rolling p50 of the last 20 local completions over 5 s disable local routing. A slow successful response is recorded as local; subsequent calls fall back. Three consecutive healthy pings restore availability and clear stale latency samples. Disabled local mode cannot be re-enabled by pings. With `createRouter`, call `start()` explicitly; the convenience singleton `route()` starts its timer lazily.
 
-Configuration uses existing `GX10_BASE_URL`, `OPENROUTER_BASE_URL`, and `OPENROUTER_API_KEY` environment variables; optional `GX10_MODEL`, `GX10_ENABLED=false`, and `OPENROUTER_MODEL` select models and deliberate cloud-only operation. Defaults: GX10 `gpt-oss:20b`, cloud `anthropic/claude-sonnet-4.5`. For cheap cloud development set `OPENROUTER_MODEL=google/gemini-2.5-flash`; update `cloudInputUsdPerMillion` and `cloudOutputUsdPerMillion` when changing models if the provider omits actual cost (default estimates 3/15 USD per million tokens for Sonnet). No key is needed for GX10 beyond the internal non-secret placeholder.
+OpenRouter-only configuration uses existing `GX10_BASE_URL`, `OPENROUTER_BASE_URL`, and `OPENROUTER_API_KEY` environment variables; optional `GX10_MODEL`, `GX10_ENABLED=false`, and `OPENROUTER_MODEL` select models and deliberate cloud-only operation. Defaults: GX10 `gpt-oss:20b`, optional OpenRouter `anthropic/claude-sonnet-4.5`. For cheap cloud development set `OPENROUTER_MODEL=google/gemini-2.5-flash`; update `cloudInputUsdPerMillion` and `cloudOutputUsdPerMillion` when changing models if the provider omits actual cost (default estimates 3/15 USD per million tokens for Sonnet). No key is needed for GX10 beyond the internal non-secret placeholder.
 
 Local calls request reasoning effort `none` for Qwen, `low` for GPT-OSS. Local timeout is 8 s; cloud timeout 30 s. `createRouter(options)` also accepts explicit endpoint/model/key/rate/timeout overrides, plus `fetch` and `now` for deterministic tests. Do not expose this module, keys, or its configuration to browser code.
 
