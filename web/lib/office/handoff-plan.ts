@@ -184,7 +184,11 @@ export interface ActorFrame {
   readonly stride: number;
   readonly returning: boolean;
 }
-export interface FolderFrame { readonly handoffId: string; readonly position: [number, number, number]; readonly failed: boolean; readonly correction: boolean }
+export interface FolderFrame {
+  readonly handoffId: string; readonly position: [number, number, number]; readonly failed: boolean; readonly correction: boolean;
+  /** Who holds it in front of them; absent while it is mid-pass. */
+  readonly carrier?: HandoffAgentId;
+}
 export interface HandoffFrame {
   readonly actors: readonly ActorFrame[];
   readonly folders: readonly FolderFrame[];
@@ -255,7 +259,7 @@ export function sampleHandoffs(plan: HandoffPlan, now: number, { reduced = false
     const failed = folder.failed && now >= folder.failAt;
     if (segment.kind === 'carry') {
       if (segment.actor === HUMAN && !human) continue;
-      folders.push({ handoffId: folder.handoffId, position: handOf(actors.get(segment.actor)!), failed, correction: folder.correction });
+      folders.push({ handoffId: folder.handoffId, position: handOf(actors.get(segment.actor)!), failed, correction: folder.correction, carrier: segment.actor });
     } else {
       const t = Math.min(1, Math.max(0, (now - segment.start) / Math.max(1e-9, segment.end - segment.start)));
       const ease = t * t * (3 - 2 * t);
