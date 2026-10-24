@@ -21,6 +21,7 @@ export async function createDemoRuntime() {
   let jobs: Promise<void>[] = [];
   let paths: Pick<DemoStatus, 'approvePath' | 'payPath'> = {};
   let failed = false;
+  let gatewayStore: MemoryGatewayStore;
   let collectionTail = Promise.resolve();
   async function collections<T>(work: () => Promise<T>): Promise<T> {
     const prior = collectionTail; let release!: () => void;
@@ -51,7 +52,7 @@ export async function createDemoRuntime() {
       receivable: { principalCents: invoice.principalCents, lateFeeCents: invoice.lateFeeCents },
       currency: 'USD', policyVersion: northfield.policyVersion, identityConfirmed: true,
       status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} };
-    const gatewayStore = new MemoryGatewayStore([call], state);
+    gatewayStore = new MemoryGatewayStore([call], state);
     installGatewayStore(gatewayStore);
     const gateway = createGateway({ store: gatewayStore, secret: () => 'demo-bootstrap-only',
       currentPolicy: () => state.getPolicy(), approvalBridge: createApprovalBridge(state) });
@@ -107,7 +108,20 @@ export async function createDemoRuntime() {
     })().catch(() => { if (!signal.aborted) { failed = true; abort.abort(); } }));
   }
   await reset();
-  return { reset, stop, health: () => services.health(), check: () => getStateStore().getPolicy(), status: (): DemoStatus => ({
+  return { reset, stop, health: () => services.health(),
+    clientStopped: () => gatewayStore.clientStopped('northfield-jordan'),
+    registerVoiceCall: async (sessionId: string) => {
+      // Trusted synthetic invoice only. HTTP cannot supply identity, plans or amounts.
+      if (!/^[a-f0-9-]{36}$/.test(sessionId)) throw new Error('INVALID_SESSION');
+      if (await gatewayStore.clientStopped('northfield-jordan')) throw new Error('CLIENT_STOPPED');
+      const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
+      await gatewayStore.registerCall({ callId: sessionId, agentId: 'voice:collections', invoiceId: invoice.id,
+        clientId: 'northfield-jordan', contactName: 'Jordan', companyName: northfield.company.name,
+        amountCents: invoice.principalCents + invoice.lateFeeCents,
+        receivable: { principalCents: invoice.principalCents, lateFeeCents: invoice.lateFeeCents },
+        currency: 'USD', policyVersion: (await getStateStore().getPolicy()).policyVersion,
+        identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} });
+    }, check: () => getStateStore().getPolicy(), status: (): DemoStatus => ({
     llmEnabled: getStateStore().llmEnabled, stateStore: mode, voice: process.env.DEMO_VOICE_RUNNING === '1',
     workersHealthy: !failed && !abort.signal.aborted, ...services.status(), ...paths,
   }) };

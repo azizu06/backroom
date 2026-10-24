@@ -82,6 +82,31 @@ SpacetimeDB server, run `pnpm demo:live --confirm-sandbox` after startup. It use
 scripted call turns and a software test passkey, never dials, and writes full
 audit receipts. See [live receipt scope and reproduction](evidence/live-run/README.md).
 
+## Maincloud state (opt-in; local fallback retained)
+
+The full module is published at <https://spacetimedb.com/backrooms-calhacks13>.
+The [Maincloud office parity](evidence/maincloud-parity/README.md) passes with
+20/20 network-inclusive request-to-frame samples below 1s (max 208 ms).
+Reproduce with `DEMO_SPACETIME=maincloud pnpm demo:parity` after a production
+web build and CLI browser login. `pnpm demo:parity` remains the local lane.
+Server processes use `STATE_STORE=spacetime`,
+`SPACETIMEDB_URI=wss://maincloud.spacetimedb.com`, and
+`SPACETIMEDB_DATABASE=backrooms-calhacks13`, plus the publisher's private
+`SPACETIMEDB_TOKEN`. Keep that token in ignored private configuration with mode
+0600 and transfer it privately. Browser subscribers receive only URI/database.
+
+Maincloud makes the office subscription reachable from the public HTTPS origin;
+confirm **State connected** on the actual judging device. It introduces network
+latency and an internet dependency. Describe the deployment as “web and
+orchestration on GX10; state hosted on SpacetimeDB Maincloud” when that is the
+actual topology. Do not claim all stack components run on GX10 in this mode.
+
+A seed is idempotent import and cannot reset completed work. Hosted rehearsals
+must publish fresh owned databases for clean takes; never delete or overwrite
+shared state to reset the demo. To return to local, stop this owned demo and
+restart with the local default after removing hosted state configuration;
+verify the connection indicator again. Keep the local CLI 2.13.0 installed.
+
 ## Phone / operator setup
 
 - Demo operator: big screen; use the printed **local** `/office` URL on the laptop

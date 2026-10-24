@@ -85,10 +85,10 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
           const session = data.sessions.find(s => s.providerCallId === body.call_id);
           if (!session) throw new HTTPError(503, 'CALL_BINDING_PENDING'); // Retried after dial response binds ID.
           if (body.type === 'call_turn') {
-            const turn = body.turn as { role?: string; text?: string; was_interrupted?: boolean; tool_calls?: unknown[] } | undefined;
+            const turn = body.turn as { role?: string; text?: string | null; was_interrupted?: boolean; tool_calls?: unknown[] } | undefined;
             // Cartesia omits text on assistant turns that contain only tool calls.
             // Acknowledge these lifecycle receipts without treating tool claims as speech.
-            const toolOnly = turn?.role === 'assistant' && turn.text === undefined && Array.isArray(turn.tool_calls) && turn.tool_calls.length > 0;
+            const toolOnly = turn?.role === 'assistant' && (turn.text === undefined || turn.text === null) && Array.isArray(turn.tool_calls) && turn.tool_calls.length > 0;
             if (!turn || (typeof turn.text !== 'string' && !toolOnly)) throw new HTTPError(400, 'INVALID_TURN');
             const text = turn.text ?? '';
             if (turn.role === 'assistant' && turn.was_interrupted === false && normalize(text).startsWith(normalize(session.welcome)) && !session.disclosureComplete) {
