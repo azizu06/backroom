@@ -1,0 +1,232 @@
+{
+  "measuredAt": "2026-10-24T09:20:39.386Z",
+  "services": {
+    "models": "GX10-only operator override; 120b hard tasks, 20b extraction",
+    "state": "real local SpacetimeDB",
+    "bank": "live Nessie sandbox; posted-deposit display is not settlement",
+    "voice": "scripted turns; no Cartesia dial",
+    "controller": "real verifier/software test authenticator",
+    "crs": "fake",
+    "apify": "fake"
+  },
+  "collection": {
+    "denial": {
+      "kind": "DENY",
+      "can_confirm": false,
+      "speak": "I cannot waive the late fee. Your policy says: “Late fees may not be waived unless the saved Collections policy explicitly permits it.”",
+      "rule_ids": [
+        "FEES_NON_WAIVABLE"
+      ],
+      "audit_id": "abcb2fac-118d-4efc-8c12-114a5fdfd25e"
+    },
+    "escalation": {
+      "kind": "ESCALATE",
+      "can_confirm": false,
+      "speak": "I need to check those terms with Dana. Please hold while I ask.",
+      "escalation_id": "1b47d4a4-3373-4341-9096-16c7d1facb26",
+      "rule_ids": [
+        "MAX_INSTALLMENTS"
+      ],
+      "audit_id": "6ffea3e0-31be-4090-8924-dc442d78e28f",
+      "approval_path": "/approve/1b47d4a4-3373-4341-9096-16c7d1facb26"
+    },
+    "targetAnchor": "Dana_desk",
+    "approval": {
+      "kind": "RECORDED",
+      "decision": {
+        "kind": "Deny"
+      },
+      "can_confirm": false,
+      "approval_status": "denied",
+      "speak": "Dana did not approve those terms."
+    },
+    "allowed": {
+      "kind": "ALLOW",
+      "can_confirm": true,
+      "speak": "Those terms are authorized. You may confirm this exact plan.",
+      "rule_ids": [
+        "IN_BADGE"
+      ],
+      "audit_id": "327dfd44-b654-41dc-afdf-ab9ce673e1c0",
+      "plan_id": "bc0feab1-3d75-4151-883a-9a8a21c70d7c",
+      "plan": {
+        "installments": 2,
+        "firstPaymentPct": 50,
+        "durationDays": 30,
+        "waiveFee": false,
+        "discountPct": 0,
+        "id": "bc0feab1-3d75-4151-883a-9a8a21c70d7c",
+        "auditId": "327dfd44-b654-41dc-afdf-ab9ce673e1c0",
+        "totalCents": 495000,
+        "firstPaymentCents": 247500
+      }
+    },
+    "amountCents": 247500,
+    "invoiceState": "partially_paid",
+    "balanceBeforeCents": 248100,
+    "balanceAfterCents": 248100
+  },
+  "controller": {
+    "status": "denied",
+    "method": "passkey"
+  },
+  "bankEvidence": [
+    {
+      "seq": 26,
+      "id": "31ed1bc9-aebd-47d4-8319-c9545f7cff1f",
+      "ts": 1792833646445,
+      "actor": "code",
+      "seat": "collections",
+      "action": "send_payment_link",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "demo-core-1042",
+        "1042",
+        "client-02"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "invoiceId": "1042",
+        "kind": "ALLOW",
+        "plan": {
+          "auditId": "327dfd44-b654-41dc-afdf-ab9ce673e1c0",
+          "discountPct": 0,
+          "durationDays": 30,
+          "firstPaymentCents": 247500,
+          "firstPaymentPct": 50,
+          "id": "bc0feab1-3d75-4151-883a-9a8a21c70d7c",
+          "installments": 2,
+          "totalCents": 495000,
+          "waiveFee": false
+        },
+        "webhookRequestId": "core-turn-9"
+      },
+      "prevHash": "67ef698a2d17f14f3a41fada29d242fa7483f70fa99fde95d8bda1a3d69b3c5d",
+      "hash": "1941810f61c284ff46131d4a8b91e1dbe80a02d460afc7a278c531049903423e"
+    },
+    {
+      "seq": 30,
+      "id": "audit:30",
+      "ts": 1792833647070,
+      "actor": "code",
+      "seat": "collections",
+      "action": "reconcile",
+      "ruleIds": [
+        "EXACT_PAYMENT_MATCH"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1042",
+        "5297ba7f-b2e6-4a08-854b-052855309c58",
+        "327dfd44-b654-41dc-afdf-ab9ce673e1c0"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "amountCents": 247500,
+        "depositId": "a5e129ef-dd1a-4edf-9aa5-0c9accb9a829",
+        "invoiceState": "partially_paid"
+      },
+      "prevHash": "d496683b662a63083543012ceefc5b6dd3b5fd86e62495277cfd079003019c61",
+      "hash": "5d2ffa46cb8596476ab1463aa1fa29731be2c03d0ef37fae9b99185230f69dca"
+    }
+  ],
+  "answer": {
+    "answer": "The fee waiver for invoice 1042 was denied because the policy rule FEES_NON_WAIVABLE applied, which does not allow waiving fees [entry:audit_18].",
+    "citations": [
+      "audit_18"
+    ],
+    "source": "model"
+  },
+  "traps": [
+    {
+      "llmOff": false,
+      "typedTrap": {
+        "rules": [
+          "LOOKALIKE_DOMAIN"
+        ],
+        "bankChangeRules": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "bankEffects": 0,
+        "modelRequests": 0
+      },
+      "extractedTraps": [
+        {
+          "id": "4419",
+          "status": "held",
+          "rules": [
+            "BANK_CHANGE_HOLD"
+          ]
+        },
+        {
+          "id": "4471",
+          "status": "held",
+          "rules": [
+            "LOOKALIKE_DOMAIN",
+            "BANK_CHANGE_HOLD"
+          ]
+        }
+      ]
+    },
+    {
+      "llmOff": true,
+      "typedTrap": {
+        "rules": [
+          "LOOKALIKE_DOMAIN"
+        ],
+        "bankChangeRules": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "bankEffects": 0,
+        "modelRequests": 0
+      },
+      "extractedTraps": [
+        {
+          "id": "4419",
+          "status": "held",
+          "rules": [
+            "INVALID_INPUT"
+          ]
+        },
+        {
+          "id": "4471",
+          "status": "held",
+          "rules": [
+            "INVALID_INPUT"
+          ]
+        }
+      ],
+      "offAnswer": {
+        "answer": "Recorded denied for invoice #1042; rules: FEES_NON_WAIVABLE. Requested installments: 4; recorded limit: 2. [entry:audit_18]\nRecorded escalated for invoice #1042; rules: MAX_INSTALLMENTS. Requested installments: 4; recorded limit: 2. [entry:audit_19]\nRecorded escalated for invoice #1042; rules: MAX_INSTALLMENTS. Requested installments: 4; recorded limit: 2. [entry:audit_20]",
+        "citations": [
+          "audit_18",
+          "audit_19",
+          "audit_20"
+        ],
+        "source": "fallback"
+      }
+    }
+  ],
+  "auditFiles": [
+    "docs/evidence/live-run/2026-10-24T09-20-39.386Z/collections.audit.json",
+    "docs/evidence/live-run/2026-10-24T09-20-39.386Z/inbox.audit.json",
+    "docs/evidence/live-run/2026-10-24T09-20-39.386Z/off.audit.json"
+  ],
+  "whyRetestAt": "2026-10-24T09:21:27.907Z",
+  "whyRetestReason": "Explicit inline citation guidance after citation-array-only live outputs; same collection DB, no bank replay"
+}

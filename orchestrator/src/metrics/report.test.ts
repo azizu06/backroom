@@ -52,3 +52,9 @@ it('does not mistake a code receipt with a cloud route for a completed model dec
     ruleIds: [], policyVersion: 1, refs: [], route: 'cloud', latencyMs: 0, costUsd: 0 });
   expect(auditMetrics([{ name: 'code', kind: 'live', entries: log.list() }]).models).toEqual([]);
 });
+
+it('does not claim production C2 attainment for operator-forced GX10 receipts', () => {
+  const result = auditMetrics([{ name: 'operator rehearsal', kind: 'live', routingOverride: true, entries: chain() }]);
+  expect(result.localShare).toContain('production C2 unverified');
+  expect(result.localShare).not.toContain('target ≥60%:');
+});

@@ -4,7 +4,7 @@ import { MemoryStateStore, SeatWorker, FakeEffects, routeInboxItem, createRouter
 import { northfield } from '../payables';
 import { askWhy, type WhyAuditEntry } from '../why';
 import type { AuditEntry, StateStore } from '../store';
-import { runPreCall, createCallPlanner, fakeCreditCheck, fakeHealthCheck } from '../collections';
+import { runPreCall, createCallPlanner, fakeCreditCheck, fakeHealthCheck, type CallPlanner } from '../collections';
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
 import { createApprovalBridge } from '../../../web/lib/approvals/gateway';
@@ -30,7 +30,8 @@ const requireThat: (condition: unknown, message: string) => asserts condition = 
 };
 export function verifyChain(entries: AuditEntry[]): boolean { return verifyAudit(entries).valid; }
 
-export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string; store?: StateStore } = {}) {
+export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string; bankLabel?: string; store?: StateStore; planner?: CallPlanner; now?: () => number } = {}) {
+  const NOW = options.now?.() ?? Date.parse('2026-10-24T18:00:00Z');
   const store = options.store ?? new MemoryStateStore();
   const gatewayStore = new MemoryGatewayStore([baseCall()], store);
   const gateway = createGateway({ secret: () => secret, store: gatewayStore,
@@ -55,7 +56,7 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
 
   await store.registerAgent('collections-demo', 'collections', NOW);
   await store.enqueueTask({ id: 'collect-1042', seatId: 'collections', refs: ['1042'], idempotencyKey: 'ar:1042:1', steps: [] });
-  const lease = await store.claimTask('collections-demo', NOW, 12000);
+  const lease = await store.claimTask('collections-demo', NOW, options.planner ? 60000 : 12000);
   requireThat(lease, 'collection lease missing');
   await store.insertInvoice({ id: '1042', kind: 'ar', state: 'overdue' });
   // Real #17 pipeline with explicit synthetic CRS/Apify/model transports.
@@ -74,19 +75,19 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
   const preCall = await runPreCall({ clientId: seedClient.id, invoiceId: '1042', testIdentityId: 7,
     company: { name: seedClient.name, website: 'https://example.com' }, context }, {
     credit: fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] }),
-    health: fakeHealthCheck({ signals: [] }), planner: createCallPlanner({ cloudRoute: fixtureRouter.route }),
-    audit: { appendAudit: entry => store.appendAudit(entry.action === 'call_plan'
+    health: fakeHealthCheck({ signals: [] }), planner: options.planner ?? createCallPlanner({ cloudRoute: fixtureRouter.route }),
+    audit: { appendAudit: entry => store.appendAudit(entry.action === 'call_plan' && !options.planner
       ? { ...entry, actor: 'system', route: 'test_stub' } : entry) },
     escalate: async decision => { await store.createEscalation(lease, decision, NOW); }, now: () => NOW,
   });
-  requireThat(preCall.status === 'ready', 'merged pre-call pipeline did not prepare the call');
+  requireThat(preCall.status === 'ready', `pre-call ${preCall.status}${preCall.status === 'ready' ? '' : ': ' + preCall.reason}${preCall.status === 'blocked' && preCall.decision ? ' [' + preCall.decision.ruleIds.join(',') + ']' : ''}`);
   // Recheck permission at the simulated dial boundary after preparation.
   const permit = evaluate('collections', { type: 'call_client' }, context);
   await audit('canCall', permit, { context });
   requireThat(permit.kind === 'ALLOW', 'call not permitted');
   const envelope = preCall.envelope;
   await audit('compute_envelope', permit, { envelope });
-  transcript.push(`canCall: ALLOW; envelope: ${JSON.stringify(envelope)}; call plan: SCRIPTED (no model).`);
+  transcript.push(`canCall: ALLOW; envelope: ${JSON.stringify(envelope)}; call plan: ${options.planner ? 'live injected planner' : 'SCRIPTED (no model)' }.`);
   await store.transitionInvoice(lease, '1042', 'overdue', 'in_collection', NOW);
   await store.setAgentState(lease, 'on_call', NOW);
   transcript.push('SCRIPTED AI/business/recording disclosure, then identity confirmation.');

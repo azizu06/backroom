@@ -32,7 +32,7 @@ async function main() {
       const saved = json(path);
       const entries = Array.isArray(saved) ? saved : saved.entries;
       if (!Array.isArray(entries)) throw new Error('Audit input must be an entry array or {kind, entries}');
-      runs.push({ name: relative(root, resolve(root, path)), kind: ['live', 'simulated'].includes(saved.kind) ? saved.kind : 'unknown', entries });
+      runs.push({ name: relative(root, resolve(root, path)), kind: ['live', 'simulated'].includes(saved.kind) ? saved.kind : 'unknown', routingOverride: saved.routingOverride === true, entries });
     }
   } else {
     const core = await runCoreDemo();
@@ -97,7 +97,7 @@ async function main() {
   const report = [
     '# Proof-it-works metrics', '', `Generated: ${new Date().toISOString()}`, `Source git SHA: \`${sha}\` (report/tool changes may be uncommitted at generation time).`,
     `Exact command (repository root): \`pnpm metrics${args.length ? ' ' + args.map(quote).join(' ') : ''}\``, '',
-    'Refs #29 #32; spec §7.2. Default command runs the current core-demo, scripted eval and frozen red-team replay offline. It never calls a model, bank or phone. Fresh policy/gateway/StateStore/crypto behavior is real; company, speech, sponsor transports, payment effects and software passkeys are simulated. Historical service receipts are labeled separately.', '',
+    files.length ? 'Refs #29 #32; spec §7.2. Saved-run mode verifies retained audit chains without network calls. Live service scope and simulation boundaries are documented in [receipt notes](evidence/live-run/README.md); the live-model sample uses an explicit GX10-only operator override. Historical service receipts are labeled separately.' : 'Refs #29 #32; spec §7.2. Default command runs the current core-demo, scripted eval and frozen red-team replay offline. It never calls a model, bank or phone. Fresh policy/gateway/StateStore/crypto behavior is real; company, speech, sponsor transports, payment effects and software passkeys are simulated. Historical service receipts are labeled separately.', '',
     table(rows), '', '## Live model route measurements', '', renderRoutes(metrics), '',
     'No samples means not measured, not zero latency/cost. Nearest-rank percentiles include all samples and outliers. Route rows count completed audited decisions, not underlying HTTP attempts. Scenario-suite C2 attainment is unverified even when an isolated live smoke succeeds.', '',
     '## Audit provenance', '', table(metrics.checked.map(run => [run.name, run.status.valid ? `${run.entries.length} entries; ${run.kind}` : `INVALID at ${run.status.firstBrokenSeq}: ${run.status.reason}`,
@@ -107,6 +107,7 @@ async function main() {
     '- Every invocation overwrites `docs/metrics.md` and prints this same Markdown. Saved-run mode skips fresh demo/eval/replay; historical receipt rows retain their original dates. Malformed inputs fail; invalid chains remain visible and are excluded.',
     '- The frozen red-team corpus was generated on GX10, but its generation calls are not office decisions and do not contribute to C2. Replay records multiple seams per case, so counts must not be added to eval or demo as unique scenarios.',
     '- Bad historical results remain in [red-team evidence](redteam.md): before the fixes, 20 failure cases and 10 mock violation cases. Current results do not erase those findings.',
+    '- Live rehearsal scope, operator routing override, sandbox idempotency and reproduction: [receipt notes](evidence/live-run/README.md). An operator-forced local sample does not establish production C2 attainment.',
     '- Sources: [answer key](../fixtures/answer-key/expected.json), [T1 voice](t1-cartesia.md), [pre-call receipt](../orchestrator/src/collections/live-receipt.json), [T10 router smoke](../fixtures/t10/router-smoke.json).', '',
     `Answer-key SHA-256: \`${hash('fixtures/answer-key/expected.json')}\``, `Corpus SHA-256: \`${hash('fixtures/redteam/corpus.jsonl')}\``, '',
     '<details><summary>Fresh policy-step eval details (not full final-state grading)</summary>', '', '```text', evalText, '```', '', '</details>', '',

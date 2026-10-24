@@ -95,3 +95,15 @@ describe('router public boundary', () => {
     await expect(router.route('in_call' as keyof typeof TASK_ROUTES,{})).rejects.toThrow('Cartesia');
   });
 });
+
+it('sends the complete response envelope schema, with the task schema nested under output', async () => {
+  const planSchema = { type: 'object', required: ['tone'], properties: { tone: { const: 'neutral' } } };
+  const network = vi.fn<typeof fetch>().mockResolvedValue(completion({ tone: 'neutral' }));
+  await createRouter({ fetch: network, cloudApiKey: 'mock' }).route('call_plan', {}, { parse: value => value, jsonSchema: planSchema });
+  const body = JSON.parse(String(network.mock.calls[0]?.[1]?.body));
+  const marker = 'Complete response JSON Schema: ';
+  const text: string = body.messages[0].content;
+  expect(text).toContain(marker);
+  const wireSchema = JSON.parse(text.split(marker)[1]!.split('\n')[0]!);
+  expect(wireSchema).toMatchObject({ required: ['output', 'confidence'], properties: { output: planSchema, confidence: { type: 'number', minimum: 0, maximum: 1 } } });
+});

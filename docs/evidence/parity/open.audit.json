@@ -2,7 +2,7 @@
   {
     "seq": 1,
     "id": "audit:1",
-    "ts": 1792832586272,
+    "ts": 1792833693020,
     "actor": "code",
     "seat": "payables",
     "action": "route_inbox_item",
@@ -22,12 +22,12 @@
       "scenario_source": "seed"
     },
     "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
-    "hash": "b81f676b4f6deb8a6a8fa1df37109333186019d4dec87d21142b69f713680ce7"
+    "hash": "594ce541c4d4a0b56e03b167f591d88ce5adb818d1f57e55dfc3cb2281aebdc8"
   },
   {
     "seq": 2,
     "id": "audit:2",
-    "ts": 1792832586274,
+    "ts": 1792833693021,
     "actor": "code",
     "seat": "payables",
     "action": "state.registerAgent",
@@ -42,13 +42,13 @@
     "inputs": {
       "id": "payables-demo"
     },
-    "prevHash": "b81f676b4f6deb8a6a8fa1df37109333186019d4dec87d21142b69f713680ce7",
-    "hash": "6ab0f9f1900f276ef07f8526acfadf2b57b3a72a344c1011f7d918d0c12d055a"
+    "prevHash": "594ce541c4d4a0b56e03b167f591d88ce5adb818d1f57e55dfc3cb2281aebdc8",
+    "hash": "55cbdfd10846a484bea8e5bc584c26bd92433c283fdf7b3b08f3d84f5ab824b5"
   },
   {
     "seq": 3,
     "id": "audit:3",
-    "ts": 1792832586276,
+    "ts": 1792833693023,
     "actor": "code",
     "seat": "controller",
     "action": "state.insertInvoice",
@@ -63,13 +63,13 @@
     "inputs": {
       "id": "4471"
     },
-    "prevHash": "6ab0f9f1900f276ef07f8526acfadf2b57b3a72a344c1011f7d918d0c12d055a",
-    "hash": "cdf536589476c4df9ebd861f9971248654dae05dd73410d7f5900a27832cc60e"
+    "prevHash": "55cbdfd10846a484bea8e5bc584c26bd92433c283fdf7b3b08f3d84f5ab824b5",
+    "hash": "2ea08fae85cb85986b9ba757ec7f7b25ba3ad32528419537613e6b8b2b31a348"
   },
   {
     "seq": 4,
     "id": "audit:4",
-    "ts": 1792832586278,
+    "ts": 1792833693025,
     "actor": "code",
     "seat": "payables",
     "action": "state.enqueueTask",
@@ -87,13 +87,13 @@
       "leaseToken": 0,
       "taskId": "trap-4471"
     },
-    "prevHash": "cdf536589476c4df9ebd861f9971248654dae05dd73410d7f5900a27832cc60e",
-    "hash": "9d226a0eb3acbfd4618bf84f5b4b63aa02fd981a77f9c1ae91d01f4bed47d89a"
+    "prevHash": "2ea08fae85cb85986b9ba757ec7f7b25ba3ad32528419537613e6b8b2b31a348",
+    "hash": "f13f49ad13f83d1e49cf6a1ecc3fad1c136ce77d8570d5f8a9c7a6cc32f36129"
   },
   {
     "seq": 5,
     "id": "audit:5",
-    "ts": 1792832586280,
+    "ts": 1792833693026,
     "actor": "code",
     "seat": "payables",
     "action": "state.claimTask",
@@ -108,13 +108,13 @@
     "inputs": {
       "id": "payables-demo"
     },
-    "prevHash": "9d226a0eb3acbfd4618bf84f5b4b63aa02fd981a77f9c1ae91d01f4bed47d89a",
-    "hash": "59ac1e1b006491739eb131ed496cd33a3924dc6c156ea467b9a830ae5ee7acaf"
+    "prevHash": "f13f49ad13f83d1e49cf6a1ecc3fad1c136ce77d8570d5f8a9c7a6cc32f36129",
+    "hash": "4a915cfb5a07d03705586764116d47c34f5a94c57f89d2264a3700134417d273"
   },
   {
     "seq": 6,
     "id": "audit:6",
-    "ts": 1792832586287,
+    "ts": 1792833693033,
     "actor": "code",
     "seat": "payables",
     "action": "pay_invoice",
@@ -169,13 +169,13 @@
       "taskId": "trap-4471",
       "workerId": "payables-demo"
     },
-    "prevHash": "59ac1e1b006491739eb131ed496cd33a3924dc6c156ea467b9a830ae5ee7acaf",
-    "hash": "289383c7c5f0f4eba47d7bf3fa4d5374fbe1e2edc0325e198987b8e57508476d"
+    "prevHash": "4a915cfb5a07d03705586764116d47c34f5a94c57f89d2264a3700134417d273",
+    "hash": "0cb32abb2f613279eb793cf4ae999928370d86e1dc64c3e6051fba066e4cabc8"
   },
   {
     "seq": 7,
     "id": "audit:7",
-    "ts": 1792832586289,
+    "ts": 1792833693035,
     "actor": "code",
     "seat": "payables",
     "action": "state.createEscalation",
@@ -193,13 +193,13 @@
       "leaseToken": 1,
       "taskId": "trap-4471"
     },
-    "prevHash": "289383c7c5f0f4eba47d7bf3fa4d5374fbe1e2edc0325e198987b8e57508476d",
-    "hash": "ef26e3eb848a59bce716ed554a037ea2499111670fd1abf37e5c1f9dffc41a81"
+    "prevHash": "0cb32abb2f613279eb793cf4ae999928370d86e1dc64c3e6051fba066e4cabc8",
+    "hash": "8776a86bb55fdc89e59c3db314e306aa976b7bbd812223e339afe47b2042434a"
   },
   {
     "seq": 8,
     "id": "audit:8",
-    "ts": 1792832586291,
+    "ts": 1792833693036,
     "actor": "code",
     "seat": "payables",
     "action": "state.setAgentTarget",
@@ -217,13 +217,13 @@
       "leaseToken": 1,
       "taskId": "trap-4471"
     },
-    "prevHash": "ef26e3eb848a59bce716ed554a037ea2499111670fd1abf37e5c1f9dffc41a81",
-    "hash": "2e2b51c6947c99965e9f4f5d624b8670ed7051a0a29053d9da775b9047eb46e3"
+    "prevHash": "8776a86bb55fdc89e59c3db314e306aa976b7bbd812223e339afe47b2042434a",
+    "hash": "31d25139ee6054c2e25d715ee49f1fb2a870fa4fac00b483b3d539c11fc3da89"
   },
   {
     "seq": 9,
     "id": "audit:9",
-    "ts": 1792832586295,
+    "ts": 1792833693040,
     "actor": "code",
     "seat": "payables",
     "action": "state.transitionInvoice",
@@ -241,13 +241,13 @@
       "leaseToken": 1,
       "taskId": "trap-4471"
     },
-    "prevHash": "2e2b51c6947c99965e9f4f5d624b8670ed7051a0a29053d9da775b9047eb46e3",
-    "hash": "d944f49975c65ab4091a9c8da42c0f2db772807c3e17d9ffd565bf464304d99c"
+    "prevHash": "31d25139ee6054c2e25d715ee49f1fb2a870fa4fac00b483b3d539c11fc3da89",
+    "hash": "de972a9d424c1e213fdea5e67200806bd6e663e61f26aa966e3d8e97bfcb32f4"
   },
   {
     "seq": 10,
     "id": "audit:10",
-    "ts": 1792832586301,
+    "ts": 1792833693047,
     "actor": "code",
     "seat": "payables",
     "action": "bank_change_defense_check",
@@ -278,7 +278,7 @@
       },
       "hypothetical": "sender corrected; bank change still pending"
     },
-    "prevHash": "d944f49975c65ab4091a9c8da42c0f2db772807c3e17d9ffd565bf464304d99c",
-    "hash": "1714056d284c96eedd9e3cd4f7147cb2fc3e108f0bea2158a4bf6ff9a07115ad"
+    "prevHash": "de972a9d424c1e213fdea5e67200806bd6e663e61f26aa966e3d8e97bfcb32f4",
+    "hash": "bb9cab9ddac65bf2a2f62ca86aca40caf4d340a77bf125db84c07280845abe51"
   }
 ]
