@@ -47,3 +47,7 @@
   .attack-trace li, .attack-decision { padding: 12px; }
   .attack-run { width: 100%; }
 }
+
+.attack-format { margin: 6px 0 10px; color: #d0d6c6; }
+.attack-format summary { cursor: pointer; color: #f3dfb9; }
+.attack-format pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #20261e; border: 1px solid #46513f; border-radius: 4px; padding: 8px; font-size: 12px; }
