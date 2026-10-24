@@ -6,6 +6,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
 import { probeDependencies, type DemoStatus } from './health';
 
@@ -32,7 +33,7 @@ function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string })
     'Policy editor': '/policy', Controller: '/controller', Approve: status.approvePath, Pay: status.payPath, 'Real vs simulated': '/real-vs-sim' })) {
     console.log(`${label}: ${status.publicUrl}${path || '/ (not seeded)'}`);
   }
-  console.log('STATE_STORE=memory; mock bank; synthetic preverified caller; LLM OFF by default. See docs/demo-runbook.md.');
+  console.log(`StateStore=${status.stateStore}; mock bank; synthetic preverified caller; LLM OFF by default. See docs/demo-runbook.md.`);
 }
 async function waitFor(check: () => Promise<boolean>, ms: number) {
   const deadline = Date.now() + ms;
@@ -49,14 +50,18 @@ async function supervise() {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   closeSync(openSync(lockFile, 'wx', 0o600));
   const token = randomBytes(32).toString('hex');
-  const env = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'memory',
+  const env = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'spacetime',
     BACKROOM_DEMO: '1', BACKROOM_APPROVAL_DEMO: '0', BACKROOM_PAYMENT_DEMO: '0', DEMO_CONTROL_SECRET: token };
   const children = new OwnedProcesses(root, env);
   let stopping = false;
   let base = '', publicUrl = '';
+  const database = localSpacetime(root, env, children);
+  let stateConfig: Awaited<ReturnType<typeof database.publish>> | undefined;
+  let resetting = false;
   const queryWeb = async (action: string) => {
     const response = await fetch(`${base}/__demo/${action}`, { method: action === 'reset' ? 'POST' : 'GET',
-      headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(25000) });
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      ...(action === 'reset' ? { body: JSON.stringify(stateConfig || {}) } : {}), signal: AbortSignal.timeout(25000) });
     if (!response.ok) throw new Error('DEMO_WEB_UNAVAILABLE');
     return response.json() as Promise<DemoStatus>;
   };
@@ -66,8 +71,16 @@ async function supervise() {
     try {
       if (req.url === '/down' && req.method === 'POST') { res.end('{}'); void stop(); return; }
       if ((req.url === '/status' && req.method === 'GET') || (req.url === '/reset' && req.method === 'POST')) {
-        const status = await queryWeb(req.url === '/reset' ? 'reset' : 'status');
-        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, publicUrl, localUrl: base })); return;
+        if (req.url === '/reset') {
+          if (resetting) { res.writeHead(409).end(); return; }
+          resetting = true;
+          try { if (env.STATE_STORE === 'spacetime') stateConfig = await database.publish(); }
+          catch { resetting = false; throw new Error('DEMO_PUBLISH_FAILED'); }
+        }
+        let status: DemoStatus;
+        try { status = await queryWeb(req.url === '/reset' ? 'reset' : 'status'); }
+        finally { if (req.url === '/reset') resetting = false; }
+        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
       }
       res.writeHead(404).end();
     } catch { res.writeHead(503).end(); }
@@ -80,7 +93,7 @@ async function supervise() {
   }
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { void stop(); });
   try {
-    if (env.STATE_STORE !== 'memory') throw new Error('DEMO_SPACETIME_REQUIRES_15: use STATE_STORE=memory until the shared adapter lands');
+    if (!['memory', 'spacetime'].includes(env.STATE_STORE)) throw new Error('DEMO_INVALID_STATE_STORE');
     const port = Number(env.DEMO_PORT || 3000), voicePort = Number(env.VOICE_PORT || 8788);
     await available(port); base = `http://127.0.0.1:${port}`;
     if (env.DEMO_VOICE === '1') await available(voicePort);
@@ -88,8 +101,16 @@ async function supervise() {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('DEMO_CONTROL_BIND');
     writeFileSync(recordFile, JSON.stringify({ port: address.port, token, pid: process.pid }), { mode: 0o600 });
+    if (env.STATE_STORE === 'spacetime') {
+      await available(database.port); await database.start();
+      await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${database.port}/v1/ping`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
+      stateConfig = await database.publish();
+      env.SPACETIMEDB_URI = stateConfig.uri; env.SPACETIMEDB_DATABASE = stateConfig.database; env.SPACETIMEDB_TOKEN = stateConfig.token;
+    }
     // Each owned process gets separate logs. Never forward provider output into shared status.
+    const stateMode = env.STATE_STORE; env.STATE_STORE = 'memory';
     await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
+    env.STATE_STORE = stateMode;
     publicUrl = `http://localhost:${port}`;
     if (env.DEMO_TUNNEL !== '0') {
       const log = join(dir, 'tunnel.log'); writeFileSync(log, '', { mode: 0o600 });
@@ -119,7 +140,7 @@ async function supervise() {
     }
     children.start(process.execPath, ['--import', loader, 'web/demo-server.ts'], join(dir, 'web.log'));
     await waitFor(async () => { try { return !!await queryWeb('status'); } catch { return false; } }, 30000);
-    console.log('Ready. Mock bank; process-local state. No call placed.');
+    console.log(`Ready. Mock bank; ${env.STATE_STORE} state. No call placed.`);
   } catch (error) {
     const message = error instanceof Error && error.message.startsWith('DEMO_') ? error.message : 'DEMO_START_FAILED';
     console.error(message); await stop();

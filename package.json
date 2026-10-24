@@ -19,7 +19,8 @@
     "demo:up": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts up",
     "demo:reset": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts reset",
     "demo:down": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts down",
-    "demo:health": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts health"
+    "demo:health": "pnpm --filter @backroom/orchestrator exec tsx ../tools/demo/cli.ts health",
+    "metrics": "pnpm --filter @backroom/orchestrator exec tsx src/metrics/cli.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3"
