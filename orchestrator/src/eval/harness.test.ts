@@ -37,6 +37,7 @@ describe('eval run', () => {
     expect(result.reports.find(report => report.id === 'C11')).toMatchObject({ outcome: 'ESCALATE,BANKRUPTCY_PERSISTED', seams: expect.arrayContaining(['gateway:send_payment_link', 'dial:client-stopped']) });
     expect(result.reports.find(report => report.id === 'C12')).toMatchObject({ outcome: 'DENY,OPT_OUT_PERSISTED', seams: expect.arrayContaining(['gateway:record_opt_out']) });
     expect(result.reports.find(report => report.id === 'C16')).toMatchObject({ outcome: 'ESCALATE,CLOSED_BUSINESS_STOP', seams: expect.arrayContaining(['apify:fixture', 'crs:fixture']) });
+    expect(result.reports.find(report => report.id === 'C02')).toMatchObject({ outcome: 'ALLOW,PARTIALLY_PAID', seams: expect.arrayContaining(['gateway:propose_plan', 'simulated:nessie']) });
     expect(duplicate?.seams).not.toContain('simulated:nessie');
     expect(result.reports.filter(report => report.answerKeyMatch)).toHaveLength(result.reports.length);
   });
