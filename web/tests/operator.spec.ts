@@ -12,6 +12,7 @@ test('OFF cannot clear a pending proof action and failed proof output stays visi
   });
   await page.route('**/api/operator/llm_off', route => route.fulfill({ json: { result: { llmEnabled: false } } }));
   await page.goto('/operator');
+  await page.getByText('Advanced', { exact: true }).click();
   await page.getByRole('button', { name: 'Run scripted eval', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Run scripted eval…');
   await page.getByRole('button', { name: 'Turn models OFF', exact: true }).click();
@@ -52,4 +53,23 @@ test('x402 buttons label each rail, explain an unavailable testnet and show the 
   await page.getByRole('button', { name: 'Try blocked x402 invoice · SIMULATED', exact: true }).click();
   await expect(facts).toContainText('ESCALATE · OVER_LIMIT');
   await expect(facts).toContainText('0 signatures · 0 vendor requests');
+});
+
+test('demo steps are visible in order and diagnostics stay collapsed', async ({ page }) => {
+  await page.route('**/api/operator/session', route => route.fulfill({ json: { authorized: true } }));
+  await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
+  await page.route('**/api/operator/reset', route => route.fulfill({ json: { result: { publicUrl: 'https://demo.example', stateStore: 'memory' }, auditHref: '/audit?entry=r1' } }));
+  await page.goto('/operator');
+  await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveText(
+    ['Reset company', 'Start the call', 'Dana’s controller', 'Payment link', 'Pay a vendor (x402)', 'Show the guardrails']);
+  await expect(page.locator('[data-operator-slot="x402"]')).toBeVisible();
+  for (const name of ['Run preflight', 'Run scripted eval', 'Turn models OFF', 'Preview month burst']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeHidden();
+  }
+  await expect(page.getByRole('link', { name: 'Open the office' })).toHaveAttribute('href', '/office');
+  await page.getByRole('button', { name: 'Reset company', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm reset company' }).click();
+  await expect(page.getByRole('link', { name: 'https://demo.example/controller' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /Dana's controller/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Reload the office' })).toBeVisible();
 });
