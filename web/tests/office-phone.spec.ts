@@ -32,12 +32,12 @@ test('collections desk phone plays a mock callback and keeps call requests unava
   const calls: { url: string; type: string }[] = [];
   page.on('request', request => calls.push({ url: request.url(), type: request.resourceType() }));
   if (shots) {
-    await page.goto('/office?calls=mock&callsSpeed=slow');
+    await page.goto('/office?calls=mock&callsSpeed=slow&view=overview');
     await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
     await page.waitForTimeout(300);
     await page.screenshot({ path: '/tmp/br-3d/phone-overview.png' });
   }
-  await page.goto('/office?calls=mock&callsSpeed=fast');
+  await page.goto('/office?calls=mock&callsSpeed=fast&view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });
