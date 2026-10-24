@@ -1,0 +1,27 @@
+{
+  "policyVersion": 1,
+  "owner": "Northfield Studio",
+  "toHuman": "Dana",
+  "badges": {
+    "collections": {
+      "actions": ["read_ar", "get_invoice_context", "verify_identity_result", "call_client", "propose_plan", "send_payment_link", "disclose_invoice", "record_opt_out", "mark_dispute", "report_already_paid", "request_human"],
+      "rooms": ["collections"],
+      "limits": { "maxInstallments": 2, "minFirstPct": 50, "maxPlanDays": 30, "feesWaivable": false, "maxDiscountPct": 0 }
+    },
+    "payables": {
+      "actions": ["read_invoices", "read_pos", "pay_invoice", "request_human"],
+      "rooms": ["payables"],
+      "maxPaymentCents": 200000,
+      "account": "operating"
+    },
+    "vendor_onboarding": {
+      "actions": ["run_crs", "run_apify", "propose_vendor", "propose_bank_change", "request_human"],
+      "rooms": ["vendor_onboarding"]
+    }
+  },
+  "callWindow": { "weekdays": [1, 2, 3, 4, 5], "startHour": 9, "endHour": 18 },
+  "signalAdjustments": {
+    "elevated_risk": { "maxInstallments": 1, "minFirstPct": 100, "maxPlanDays": 0 },
+    "health_check_pending": {}
+  }
+}
