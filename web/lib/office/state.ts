@@ -1,55 +1,66 @@
 export const OFFICE_ANCHORS = {
-  collections: { name: "Collections", position: [-3, -1] as const },
-  dana: { name: "Dana’s desk", position: [3, -1] as const },
+  lobby: { name: "Lobby", position: [-5, 3] as const, center: [-5, 2.9] as const, color: "#8c9c87" },
+  collections: { name: "Collections", position: [-5, -1.8] as const, center: [-5, -3] as const, color: "#a9bc8f" },
+  payables: { name: "Payables", position: [0, -1.8] as const, center: [0, -3] as const, color: "#bdac89" },
+  vendor_onboarding: { name: "Vendor Desk", position: [5, -1.8] as const, center: [5, -3] as const, color: "#b2a3bb" },
+  dana: { name: "Dana’s desk", position: [0, 2.2] as const, center: [0, 3.4] as const, color: "#cc9c7d" },
+  treasury: { name: "Treasury", position: [5, 0.6] as const, center: [5, 3.4] as const, color: "#788b85" },
 } as const;
-
 export type AnchorId = keyof typeof OFFICE_ANCHORS;
+export type SeatId = "collections" | "payables" | "vendor_onboarding";
 export type FloorPosition = readonly [x: number, z: number];
-
-/** Projection of an agent row, not an authority to change it. */
 export interface OfficeAgent {
   readonly id: string;
   readonly name: string;
-  readonly seatId: string;
+  readonly seatId: SeatId;
   readonly targetAnchor: AnchorId;
-  /** Last server position; used when first mounting/catching up. */
   readonly pos: FloorPosition;
+  readonly state: string;
+  readonly escalationId?: string;
 }
-
+export interface OfficeBadge {
+  readonly seatId: SeatId;
+  readonly policyVersion: number;
+  readonly actions: readonly string[];
+  readonly rooms: readonly string[];
+  readonly limits: Readonly<Record<string, unknown>>;
+}
+export interface OfficeAudit {
+  readonly id: string;
+  readonly agentId: string;
+  readonly seatId: SeatId;
+  readonly action: string;
+  readonly decision: "ALLOW" | "DENY" | "ESCALATE";
+  readonly ruleIds: readonly string[];
+  readonly room?: AnchorId;
+  readonly summary: string;
+}
+export interface OfficeDenial {
+  readonly room: AnchorId;
+  readonly agentId: string;
+  readonly auditId: string;
+  readonly at: number;
+}
 export interface OfficeSnapshot {
-  readonly agent: OfficeAgent;
+  readonly agents: readonly OfficeAgent[];
+  readonly badges: readonly OfficeBadge[];
+  readonly audit: readonly OfficeAudit[];
+  readonly denials: readonly OfficeDenial[];
+  readonly connection: "preview" | "connecting" | "live" | "disconnected";
+  readonly llmEnabled: boolean | null;
+  readonly inboxCount: number;
 }
-
-/** A T8 adapter caches immutable snapshots and notifies after row changes. */
+/** Immutable cached row projection. No reducers, policy evaluation or business writes. */
 export interface OfficeState {
   getSnapshot: () => OfficeSnapshot;
   subscribe: (listener: () => void) => () => void;
 }
-
-export const INITIAL_OFFICE: OfficeSnapshot = {
-  agent: {
-    id: "collections-clerk", name: "Alex", seatId: "collections",
-    targetAnchor: "collections", pos: OFFICE_ANCHORS.collections.position,
-  },
-};
-
-/** Demo-only producer. The renderer receives only the read-only OfficeState. */
-export function createMockOfficeState() {
-  let snapshot = INITIAL_OFFICE;
-  const listeners = new Set<() => void>();
-  const source: OfficeState = {
-    getSnapshot: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => { listeners.delete(listener); };
-    },
-  };
-  return {
-    source,
-    setTargetAnchor(targetAnchor: AnchorId) {
-      if (targetAnchor === snapshot.agent.targetAnchor) return;
-      snapshot = { agent: { ...snapshot.agent, targetAnchor } };
-      listeners.forEach((listener) => listener());
-    },
-  };
+/** A door may flash only for the exact server denial's matching audit receipt. */
+export function matchingDenial(snapshot: OfficeSnapshot, room: AnchorId) {
+  return snapshot.denials.findLast(denial => denial.room === room && snapshot.audit.some(entry =>
+    entry.id === denial.auditId && entry.agentId === denial.agentId && entry.room === room &&
+    entry.action === "request_room_entry" && entry.decision === "DENY"));
 }
+export const INITIAL_OFFICE: OfficeSnapshot = {
+  agents: [], badges: [], audit: [], denials: [], connection: "connecting", llmEnabled: null, inboxCount: 0,
+};

@@ -6,13 +6,13 @@ import { useState } from 'react';
  * Keep the server's bearer secret out of client props and NEXT_PUBLIC variables.
  */
 export function LlmToggle({ llmEnabled, onToggle }: {
-  llmEnabled: boolean;
+  llmEnabled: boolean | null;
   onToggle: (enabled: boolean) => Promise<void>;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   async function toggle() {
-    if (pending) return;
+    if (pending || llmEnabled === null) return;
     setPending(true);
     setError(undefined);
     try { await onToggle(!llmEnabled); }
@@ -20,9 +20,9 @@ export function LlmToggle({ llmEnabled, onToggle }: {
     finally { setPending(false); }
   }
   return <span>
-    <button type="button" role="switch" aria-label="Enable language models" aria-checked={llmEnabled}
-      disabled={pending} onClick={toggle}>
-      {pending ? 'Updating…' : llmEnabled ? 'LLM ON' : 'LLM OFF'}
+    <button type="button" role="switch" aria-label="Enable language models" aria-checked={llmEnabled ?? false}
+      disabled={pending || llmEnabled === null} onClick={toggle}>
+      {pending ? 'Updating…' : llmEnabled === null ? 'LLM status unavailable' : llmEnabled ? 'LLM ON' : 'LLM OFF'}
     </button>
     {error && <span role="alert">{error}</span>}
   </span>;

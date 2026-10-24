@@ -19,7 +19,7 @@ export class WalkMotion {
       this.moving = false;
       return;
     }
-    // The clear aisle keeps the avatar out of the two desk footprints.
+    // The central aisle keeps walks clear of the room furniture footprints.
     this.route = [[this.position[0], 0.6], [destination[0], 0.6], destination];
     this.moving = true;
   }
