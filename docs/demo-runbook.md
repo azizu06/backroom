@@ -75,8 +75,19 @@ passkeys and policy/audit authentication; use that origin consistently.
 For a fully offline, phone-free rehearsal:
 
 ```sh
-STATE_STORE=memory DEMO_TUNNEL=0 DEMO_PORT=3300 pnpm demo:up
+DEMO_AGENTS=0 STATE_STORE=memory DEMO_TUNNEL=0 DEMO_PORT=3300 pnpm demo:up
 ```
+
+The existing agent team narrates accepted `/inbox` submissions by default on the
+demo host (`BACKROOM_DEMO=1`). `DEMO_AGENTS=0` disables it; change the flag by
+stopping/starting this owned host. `DEMO_AGENTS=1 DEMO_LLM=on` explicitly enables
+narration with the Mac host's own `ANTHROPIC_API_KEY`. Keep that key Mac-only.
+Global LLM OFF still prevents all SDK queries. Narration can hold, never pay or
+approve, and cannot change the inbox receipt. Existing vendor guards can end the
+chain early (Northfield vendor CRS identities are currently unmapped); this is a
+hold, not vendor clearance. See [agent host wiring and tests](agents.md#judge-inbox-host).
+The demo case cap is $0.50 and the persistent ledger hard stop is $40. The mocked
+five-role chain reports $0.002 in synthetic receipts with $0 actual spend.
 
 The state mode defaults to `STATE_STORE=spacetime`. The supervisor owns a loopback
 SpacetimeDB instance on port 3115 (`DEMO_STATE_PORT` overrides it), a private CLI
@@ -169,8 +180,8 @@ approval/pay scenario through public gateway/reducer APIs. No reducer changes,
 SQL deletes, clear-database flags, or fixture edits are involved. Old local and
 hosted databases remain for inspection; this is a clean **active run**, not data
 erasure. The runtime integration seam remains `/__demo/reset` with
-`{uri,database,token}`; autonomous runtime hosts must call their existing
-`AgentCaseStore.stopCase(caseId, 'cancelled', 'DEMO_RESET')` and drain active
+`{uri,database,token}`. The inbox agent host calls its existing
+`AgentCaseStore.stopCase(caseId, 'cancelled', 'DEMO_RESET')` and drains active
 queries before switching the installed store. See [agents.md](agents.md).
 This command does not stop independent agent runtime processes or clear separate voice/usage journals. Preserve the
 real `FileUsageLedger` at `.env.agents/usage-ledger.json`: resetting the demo must

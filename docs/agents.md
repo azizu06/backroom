@@ -41,7 +41,48 @@ The demo runs two chains:
 
 It uses the merged role modules on synthetic Northfield fixtures, with a fake GX10, bank, CRS and Apify. The reconciler is a stand-in: the real one binds the host's Collections task lease (`roles/reconciler.md`). The live key comes from macOS Keychain service `backroom-anthropic-key` and goes into the child env only.
 
-Server wiring: build `createRoleRegistry` with real deps and pass the shared `getStateStore()` as `control`. Use `SpacetimeHandoffStore(transport)` in durable mode.
+## Judge inbox host
+
+`web/lib/demo/agents.ts` wires the production `Dispatcher`, `ClaudeAgentRuntime` and
+`createRoleRegistry` into `/api/inbox` after its deterministic decision is recorded.
+It defaults ON under `BACKROOM_DEMO=1`; `DEMO_AGENTS=0` disables narration for an
+offline rehearsal. Other hosts require explicit `DEMO_AGENTS=1`. The shared
+StateStore remains the OFF/generation control, including in-flight cancellation.
+
+Recognized documents enter intake → extractor → vendor → payables → auditor,
+subject to each role's existing hold/correction guards. Unrecognized documents
+hold at intake. Intake keeps `source: judge`; only this trusted narration host
+opts into judge extraction. Extractor revalidates the router candidate already
+recorded in the immutable inbox audit and cites that receipt. It cannot alter the
+fields, re-upload bytes or trigger another unledgered cloud fallback. The inbox's
+original router still chooses local/GX10 or cloud extraction as before.
+
+Payables has a policy-only assessment port and a separate hold-only request port:
+even ALLOW cannot pay. Controller access only requests review; no approval writer,
+bank adapter or voice dialer is supplied. Vendor checks use the configured CRS
+client with fixture-owned identity mappings; unmapped/unavailable identities hold.
+Paid Apify checks have zero narration allowance and report `skipped_budget`.
+
+SpacetimeDB mode shares the demo runtime's exact transport, so the existing
+`agent_handoff_public` subscription receives the rows. Memory mode uses
+`MemoryHandoffStore` and its subscription feed; the office remains labeled preview.
+The Mac host reads its own `ANTHROPIC_API_KEY` at activation time. No key is copied
+to GX10 or a team env file. The repo-root `FileUsageLedger` persists across reset:
+$0.50 per demo case, $0.02 Haiku/$0.08 Sonnet activation reservations, $40 hard stop
+($25 warning; demo may use the $35–$40 reserve). Reset/stop aborts and fences open
+cases with `DEMO_RESET`, drains queries, then replaces the StateStore/transport.
+Narration failures cannot replace or delay the recorded inbox HTTP response.
+
+Verification (mocked QueryFn; no paid calls):
+
+```sh
+pnpm --filter @backroom/web exec vitest run lib/demo/agents.test.ts lib/inbox/http.test.ts lib/demo/runtime.test.ts
+pnpm --filter @backroom/web test:agents:state # real agent_* reducers on local WASM; office rows
+```
+
+The full five-role mocked case reports **$0.002** in synthetic SDK receipts
+(5 × $0.0004); actual provider spend is **$0**. This is accounting evidence,
+not a live-provider cost measurement.
 
 ## Office projection (Diego)
 
