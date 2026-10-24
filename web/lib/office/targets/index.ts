@@ -6,6 +6,7 @@ import { agentTarget } from "./agent";
 import { coworkerTarget } from "./coworker";
 import { deskTarget } from "./desk";
 import { handoffTarget } from "./handoff";
+import { inboxTarget } from "./inbox";
 import { paylinkTarget } from "./paylink";
 import { phoneTarget } from "./phone";
 import { serverTarget } from "./server";
@@ -21,6 +22,7 @@ export const PLAY_TARGETS = [
   phoneTarget,
   serverTarget,
   coworkerTarget,
+  inboxTarget,
 ] as const;
 
 type TargetOf<M> = M extends PlayTargetModule<infer T> ? T : never;

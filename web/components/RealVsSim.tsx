@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, panelExpanded, toggledPanel, type DemoStatus } from '../lib/real-vs-sim';
+import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, panelExpanded, toggledPanel, type DemoStatus, type DisclosureItem } from '../lib/real-vs-sim';
 import './RealVsSim.css';
 
 function useMediaQuery(query: string, serverValue: boolean) {
@@ -11,6 +11,18 @@ function useMediaQuery(query: string, serverValue: boolean) {
     media.addEventListener('change', onChange);
     return () => media.removeEventListener('change', onChange);
   }, () => window.matchMedia(query).matches, () => serverValue);
+}
+
+export function DisclosureRow({ item, status, detailed, now }: { item: DisclosureItem; status: DemoStatus | null; detailed: boolean; now?: number }) {
+  const state = getDisclosureStatus(item, status, now);
+  return <li>
+    <div className="real-sim-row">
+      <span>{item.label}</span>
+      <span className={`real-sim-status real-sim-${state.tone}`}>{state.label}</span>
+    </div>
+    {state.detail && <p className="real-sim-detail-line" title={state.detail}>{state.detail}</p>}
+    {detailed && <p>{item.description}</p>}
+  </li>;
 }
 
 export function RealVsSim(props: { detailed?: boolean }) {
@@ -90,23 +102,14 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
           <section key={kind} aria-label={kind === 'real' ? 'Real integrations' : 'Sandbox and simulated'}>
             <h3>{kind === 'real' ? 'Real' : 'Sandbox / simulated'}</h3>
             <ul>
-              {disclosureItems.filter(item => item.kind === kind).map(item => {
-                const state = getDisclosureStatus(item, status);
-                return <li key={item.id}>
-                  <div className="real-sim-row">
-                    <span>{item.label}</span>
-                    <span className={`real-sim-status real-sim-${state.tone}`}>{state.label}</span>
-                  </div>
-                  {detailed && <p>{item.description}</p>}
-                </li>;
-              })}
+              {disclosureItems.filter(item => item.kind === kind).map(item => <DisclosureRow key={item.id} item={item} status={status} detailed={detailed} />)}
             </ul>
           </section>
         ))}
       </div>
       </div>
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
-      {detailed && <p className="real-sim-note">Status refreshes every 10 seconds. GX10 health and LLM control reflect this server process; separate processes need the shared state adapter. Unverified means no fresh observation is available. Not probed in this process means this server never checks that service, so no status is claimed.</p>}
+      {detailed && <p className="real-sim-note">Status refreshes every 10 seconds; service probes are cached for about 45 seconds. Verified means a fresh live probe or a committed receipt (its time is shown). Simulated means a fixture stands in for the service. Unreachable means the probe failed. Unverified means no fresh evidence is available. LLM control reflects this server process; separate processes need the shared state adapter.</p>}
     </aside>
     </>
   );
