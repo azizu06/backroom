@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "c7e9d29b14beeb26eb605b89d1da54d92c4c91e6",
+    "baseCommit": "e2c5efd3c6edb29c265941c620c5d90ffc34ff35",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
@@ -12,6 +12,7 @@
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
+      "orchestrator/src/agents/eval/call-button.ts": "b4c4b7df803fac52fb740d105c680e6fb012d5512c932d3556385c1a886cac58",
       "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
@@ -20,7 +21,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "4734f59146a234b6661ba18bad6c45469732d78a868f8c24db0035a35238159f"
+      "orchestrator/src/agents/eval/scoreboard.ts": "9380edb70d2476d836b24194ce1df912caba79eb1b044b4cba4993171794bca1"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -66,6 +67,7 @@
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
     "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
+    "callButton": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "approvalExpiry": "Production ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore on a synthetic call. APPROVAL_WINDOW_MS is pinned to the five-minute default for this run and restored afterward. A live escalation stays pending at 60s and becomes expired with may_reask at that window; the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expires another propose_plan is ESCALATION_RETRY_USED. A passkey challenge taken while the row is pending is rejected by decide after the window, before any status poll, with no decide_escalation audit; voice cannot approve. A worker row with no callId stays pending through 59.999s and closes at 60s as pending_owner when ControllerApprovals reads it. Software passkey and fixture call only; Cartesia, email, phone, and a human tap are not executed.",
@@ -166,6 +168,11 @@
       "percent": 100
     },
     "precallStops": {
+      "numerator": 6,
+      "denominator": 6,
+      "percent": 100
+    },
+    "callButton": {
       "numerator": 6,
       "denominator": 6,
       "percent": 100
@@ -14551,6 +14558,56 @@
       "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
     }
   ],
+  "callButton": {
+    "match": true,
+    "checks": {
+      "blocked": true,
+      "invalid": true,
+      "ready": true,
+      "cooldown": true,
+      "foreign": true,
+      "loopback": true
+    },
+    "passed": 6,
+    "total": 6,
+    "networkCalls": 0,
+    "blocked": {
+      "status": 409,
+      "error": "PRECALL_BLOCKED",
+      "providerAttempts": 0,
+      "admin": {
+        "status": 409,
+        "body": "PRECALL_BLOCKED:Credit/OFAC check unavailable"
+      },
+      "audit": {
+        "outcome": "refused",
+        "code": "PRECALL_BLOCKED",
+        "detail": "Credit/OFAC check unavailable"
+      },
+      "adminAudit": {
+        "action": "CALL_BLOCKED_PRECALL",
+        "ruleIds": [],
+        "reason": "Credit/OFAC check unavailable"
+      }
+    },
+    "invalid": {
+      "status": 400,
+      "error": "INVALID_REQUEST",
+      "providerAttempts": 0,
+      "relayCalls": 0
+    },
+    "ready": {
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "audit": {
+        "outcome": "accepted",
+        "code": "DIAL_ACCEPTED"
+      },
+      "providerAttempts": 1
+    },
+    "scope": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia."
+  },
   "approvalExpiry": {
     "match": true,
     "checks": {
