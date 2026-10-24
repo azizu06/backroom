@@ -21,7 +21,7 @@ describe('eval run', () => {
     const lead = result.reports.find(report => report.id === 'C01');
     const payable = result.reports.find(report => report.id === 'P01');
     const duplicate = result.reports.find(report => report.id === 'P02');
-    expect(lead).toMatchObject({ outcome: 'ALLOW', answerKeyMatch: true, seams: expect.arrayContaining(['gateway:payment_link', 'state:audit']) });
+    expect(lead).toMatchObject({ outcome: 'ALLOW,PAID_AFTER_IDENTITY', answerKeyMatch: true, seams: expect.arrayContaining(['gateway:payment_link', 'state:audit', 'gateway:identity', 'simulated:nessie']) });
     expect(payable?.seams).toEqual(expect.arrayContaining(['state:audit', 'simulated:nessie']));
     expect(duplicate?.outcome).toBe('ESCALATE');
     expect(result.reports.find(report => report.id === 'C06')).toMatchObject({ outcome: 'EXACT_PAYMENT_MATCH', seams: expect.arrayContaining(['reconciliation:fixture-feed']) });
