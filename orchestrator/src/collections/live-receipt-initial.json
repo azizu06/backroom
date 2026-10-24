@@ -1,0 +1,192 @@
+{
+  "measuredAt": "2026-10-24T08:00:18.719Z",
+  "services": {
+    "model": "live",
+    "crs": "fake",
+    "apify": "fake",
+    "dial": "none"
+  },
+  "latencyMs": 13803.255958,
+  "result": {
+    "status": "blocked",
+    "reason": "Call planner unavailable"
+  },
+  "audit": [
+    {
+      "ts": 1792828804916,
+      "actor": "code",
+      "seat": "collections",
+      "action": "can_call",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "policyVersion": 1
+        }
+      },
+      "seq": 1,
+      "id": "audit:1",
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "c933353bf47fa0b2700775a1a3a4e7c02d68fd08b2c33a57ddb3e38c67388ec8"
+    },
+    {
+      "ts": 1792828804917,
+      "actor": "code",
+      "seat": "collections",
+      "action": "credit_check",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1"
+      ],
+      "route": "code",
+      "latencyMs": 1,
+      "costUsd": 0,
+      "inputs": {
+        "label": "SANDBOX: test identity #7",
+        "ofacStatus": "clear",
+        "evidence": []
+      },
+      "seq": 2,
+      "id": "audit:2",
+      "prevHash": "c933353bf47fa0b2700775a1a3a4e7c02d68fd08b2c33a57ddb3e38c67388ec8",
+      "hash": "df1578c35302f4be4852f6ad0a13329f44b58b8d8b033f12a0ff076aab71bdcf"
+    },
+    {
+      "ts": 1792828804917,
+      "actor": "code",
+      "seat": "collections",
+      "action": "health_check",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2"
+      ],
+      "route": "code",
+      "latencyMs": 1,
+      "costUsd": 0,
+      "inputs": {
+        "status": "complete",
+        "signals": []
+      },
+      "seq": 3,
+      "id": "audit:3",
+      "prevHash": "df1578c35302f4be4852f6ad0a13329f44b58b8d8b033f12a0ff076aab71bdcf",
+      "hash": "3cf8759b894a14fceda04d4b3f9608b375d59d9bc6a18a767b02945ee0285989"
+    },
+    {
+      "ts": 1792828804917,
+      "actor": "code",
+      "seat": "collections",
+      "action": "pre_call_permit",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "policyVersion": 1
+        }
+      },
+      "seq": 4,
+      "id": "audit:4",
+      "prevHash": "3cf8759b894a14fceda04d4b3f9608b375d59d9bc6a18a767b02945ee0285989",
+      "hash": "b91361b5d2510efbc4733a790328cd550bd48b4a209882685e432eb594a54d85"
+    },
+    {
+      "ts": 1792828804917,
+      "actor": "code",
+      "seat": "collections",
+      "action": "envelope",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3",
+        "audit:4"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "envelope": {
+          "maxInstallments": 2,
+          "minFirstPct": 50,
+          "maxPlanDays": 30,
+          "feesWaivable": false,
+          "maxDiscountPct": 0,
+          "payInFull": true
+        }
+      },
+      "seq": 5,
+      "id": "audit:5",
+      "prevHash": "b91361b5d2510efbc4733a790328cd550bd48b4a209882685e432eb594a54d85",
+      "hash": "137787a5bf0139d8347509785cac988013c97c0578b1734aada6f092d0027768"
+    },
+    {
+      "ts": 1792828818718,
+      "actor": "code",
+      "seat": "collections",
+      "action": "call_plan",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "synthetic-client",
+        "synthetic-invoice",
+        "audit:1",
+        "audit:2",
+        "audit:3",
+        "audit:4",
+        "audit:5"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "DENY",
+      "inputs": {
+        "reason": "Call planner unavailable"
+      },
+      "seq": 6,
+      "id": "audit:6",
+      "prevHash": "137787a5bf0139d8347509785cac988013c97c0578b1734aada6f092d0027768",
+      "hash": "5d2c79391e869c685620460fb83b506b0a7dfa1a25e9e775734ec04eff8f0e01"
+    }
+  ]
+}
