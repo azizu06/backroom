@@ -9,8 +9,8 @@ const MONO_FONT = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mo
 const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: '#a9bc8f', deny: '#ed6252', escalate: '#e0b365', recorded: '#8c9c87' };
 const LINE_COLORS = { agent: '#e8efe4', away: '#c9d4c3', folder: '#e0b365', idle: '#7f8c80', awaiting: '#e8efe4', escalation: '#c9d4c3' } as const;
 const TEX_W = 256, TEX_H = 144, FACE_W = 0.66, FACE_H = 0.36;
-/** Desk-local screen spot: 1-2 mm in front of whatever face scene.tsx draws at z -0.18 (+0.0075 half depth). */
-const SCREEN_AT = [-0.35, 1.18, -0.165] as const;
+/** Desk-local screen spot: 1.5 mm in front of the face scene.tsx draws at z -0.18 (front at -0.1725). */
+const SCREEN_AT = [-0.35, 1.18, -0.171] as const;
 const MONITORS = Object.fromEntries(MONITOR_DESKS.map(room => [room, monitorInteraction(room)])) as Record<MonitorDesk, ReturnType<typeof monitorInteraction>>;
 
 function drawScreen(ctx: CanvasRenderingContext2D, screen: MonitorScreen, accent: string) {

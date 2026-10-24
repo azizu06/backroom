@@ -67,9 +67,12 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
   await expect(ask.getByRole('alert')).toContainText('AUDIT_CHAIN_BROKEN');
 });
 
-/** Screen position of a world point under the scene's Payables focus camera (orthographic, target + (13, 15, 17), zoom min(w/10, h/8)). */
-function projectPayablesFocus([px, py, pz]: readonly [number, number, number], width: number, height: number): [number, number] {
-  const [tx, ty, tz] = [0, 0.2, -3], zoom = Math.min(width / 10, height / 8);
+/** Room centres (OFFICE_ANCHORS[room].center) the focus camera targets. */
+const PAYABLES = [0, -3] as const, COLLECTIONS = [-5, -3] as const;
+
+/** Screen position of a world point under the scene's room focus camera (orthographic, target + (13, 15, 17), zoom min(w/10, h/8)). */
+function projectFocus([px, py, pz]: readonly [number, number, number], width: number, height: number, [cx, cz]: readonly [number, number] = PAYABLES): [number, number] {
+  const [tx, ty, tz] = [cx, 0.2, cz], zoom = Math.min(width / 10, height / 8);
   const len = Math.hypot(13, 15, 17), forward = [-13 / len, -15 / len, -17 / len] as const;
   const rightLen = Math.hypot(17, 13), right = [17 / rightLen, 0, -13 / rightLen] as const;
   const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]] as const;
@@ -79,9 +82,9 @@ function projectPayablesFocus([px, py, pz]: readonly [number, number, number], w
 }
 
 /** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
-async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number]): Promise<number> {
+async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number] = PAYABLES): Promise<number> {
   const box = (await canvas.boundingBox())!;
-  const [x, y] = projectPayablesFocus(point, box.width, box.height);
+  const [x, y] = projectFocus(point, box.width, box.height, focus);
   const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
   return page.evaluate(async src => {
     const image = new Image();
@@ -120,16 +123,21 @@ test('office props render in the 3D scene', async ({ page }) => {
 test('office desk monitors survive the Collections escalation preview', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
   await page.goto('/office');
-  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  const viewport = page.getByTestId('office-viewport');
+  const canvas = viewport.locator('canvas');
   await expect(canvas).toBeVisible();
-  const toggle = page.getByRole('button', { name: 'Preview escalation' });
-  if (await toggle.count()) {
-    await toggle.click();
-    await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
-  }
-  await page.waitForTimeout(500);
-  await expect(canvas).toBeVisible();
+  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Preview escalation' }).click();
+  await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Collections', exact: true }).click();
+  // Once the focus camera settles, the empty right strip of the Collections screen shows the panel's #1d2420 (min channel 29),
+  // not the bright accent face (#a9bc8f) behind it, while the lit desk top beside it stays bright.
+  await expect.poll(() => patchBrightness(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
+  await expect.poll(() => patchBrightness(page, canvas, [-5.074, 1.135, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(60);
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
+  await expect(viewport.locator('.floor-plan')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
