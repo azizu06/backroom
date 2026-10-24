@@ -25,6 +25,11 @@ export interface CallRequestOptions {
   secret: () => string | undefined;
   /** Deployment origin, never derived from Host/X-Forwarded-Host. */
   origin: () => string | undefined;
+  /**
+   * This host's own office, `http://127.0.0.1:<DEMO_PORT>`. Accepted in addition to
+   * `origin`. A public or foreign origin still has to match `origin` exactly.
+   */
+  loopbackOrigin?: () => string | undefined;
   /** Private loopback voice relay; undefined when voice is not running on this host. */
   relay: () => { url: string; secret: string } | undefined;
   /** The desk phone's current call, from the read-only projection. */
@@ -36,9 +41,10 @@ export interface CallRequestOptions {
 }
 
 /**
- * The office button's only path to a phone call. A click by a signed-in operator on this
- * origin is the go for exactly one dial of the relay's server-configured scenario and
- * allowlisted number; the request body cannot name a destination, amount or client.
+ * The office button's only path to a phone call. A click by a signed-in operator on the
+ * deployment origin, or on this host's own loopback office, is the go for exactly one
+ * dial of the relay's server-configured scenario and allowlisted number; the request
+ * body cannot name a destination, amount or client.
  */
 export function createCallRequestHTTP(options: CallRequestOptions) {
   const now = options.now ?? Date.now, send = options.fetch ?? fetch, cooldownMs = options.cooldownMs ?? 20_000;
@@ -68,23 +74,27 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
     try { const body: unknown = JSON.parse(raw || '{}'); return body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : undefined; }
     catch { return undefined; }
   };
-  const sameOrigin = (request: Request, origin: string) => request.headers.get('origin') === origin
+  const matches = (request: Request, candidate: string | undefined) => !!candidate && request.headers.get('origin') === candidate
     && ['same-origin', null].includes(request.headers.get('sec-fetch-site'));
+  // Public origin stays an exact match. Loopback is only the host's own office, so the
+  // desk phone can dial where its state socket is allowed to connect.
+  const acceptedOrigin = (request: Request, origin: string) => matches(request, origin) || matches(request, options.loopbackOrigin?.());
 
   return async (action: 'session' | 'request', request: Request): Promise<Response> => {
     if (request.method !== 'POST') return json({ ok: false, error: 'METHOD_NOT_ALLOWED', message: 'Use POST.' }, 405);
     const secret = options.secret(), origin = options.origin();
     if (action === 'session') {
       if (!secret || !origin) return json({ ok: false, error: 'CALLS_NOT_CONFIGURED', message: 'Office calls are not configured on this host.' }, 503);
-      if (!sameOrigin(request, origin)) return json({ ok: false, error: 'ORIGIN_REJECTED', message: 'Origin rejected.' }, 403);
+      if (!acceptedOrigin(request, origin)) return json({ ok: false, error: 'ORIGIN_REJECTED', message: 'Origin rejected.' }, 403);
       const body = await readJSON(request, 4096);
       if (!body || typeof body.code !== 'string' || !equal(body.code, secret)) return json({ ok: false, error: 'OPERATOR_CODE_REJECTED', message: 'Operator code rejected.' }, 403);
       const expires = String(now() + SESSION_MS);
+      const sent = request.headers.get('origin') ?? '';
       return json({ ok: true, message: 'Office calls unlocked for 12 hours on this browser.' }, 200, { 'Set-Cookie':
-        `${CALL_SESSION_COOKIE}=${expires}.${sign(secret, expires)}; Path=/api/calls; HttpOnly; SameSite=Strict${origin.startsWith('https:') ? '; Secure' : ''}; Max-Age=${SESSION_MS / 1000}` });
+        `${CALL_SESSION_COOKIE}=${expires}.${sign(secret, expires)}; Path=/api/calls; HttpOnly; SameSite=Strict${sent.startsWith('https:') ? '; Secure' : ''}; Max-Age=${SESSION_MS / 1000}` });
     }
     if (!secret || !origin) return refuse(503, 'CALLS_NOT_CONFIGURED', 'Office calls are not configured on this host.', undefined, true);
-    if (!sameOrigin(request, origin)) return refuse(403, 'ORIGIN_REJECTED', 'Open the office from its public address to place calls.', undefined, true);
+    if (!acceptedOrigin(request, origin)) return refuse(403, 'ORIGIN_REJECTED', 'Open the office from its public address to place calls.', undefined, true);
     if (!operator(request, secret)) return refuse(401, 'OPERATOR_SESSION_REQUIRED', UNLOCK, undefined, true);
     const body = await readJSON(request, 1024);
     // The destination, scenario and amounts are server configuration; reject anything else.

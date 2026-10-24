@@ -30,8 +30,8 @@ export default function PayCard({ linkId }: { linkId: string }) {
   return <main className={styles.page}><article className={styles.card}>
     <p className={styles.business}>Northfield Studio</p>
     <h1>Invoice payment</h1>
-    <p className={styles.notice}>Nessie = sandbox bank; simulated card.</p>
     {view ? <>
+      <p className={styles.notice}>{view.balance.cardNotice}</p>
       <dl className={styles.details}><div><dt>Invoice</dt><dd>#{view.invoiceId}</dd></div>
         <div><dt>Installment</dt><dd>{view.installment}</dd></div>
         <div><dt>Amount due</dt><dd className={styles.amount}>{money(view.amountCents / 100)}</dd></div></dl>
@@ -44,10 +44,10 @@ export default function PayCard({ linkId }: { linkId: string }) {
         : payment.status === 'exception' ? 'Deposit needs review. Your invoice has not been cleared.'
         : payment.status === 'paid' ? 'Payment matched. Invoice paid.' : 'Payment matched. Invoice partially paid.'}</p>}
       {payment && <p className={styles.reference}>Deposit reference: {payment.depositId}</p>}
-      <section className={styles.balance} aria-label="Nessie sandbox readback"><h2>{view.balance.label}</h2>
+      <section className={styles.balance} aria-label={view.balance.readbackLabel}><h2>{view.balance.label}</h2>
         <p className={styles.amount}>{money(view.balance.displayTotal)}</p>
         <p>Account balance: {money(view.balance.accountBalance)}<br />Posted deposits: {money(view.balance.postedDepositsTotal)}</p>
-        <p>Read from Nessie. This labeled sandbox display is not available funds or proof of settlement.</p></section>
+        <p>{view.balance.readNote}</p></section>
     </> : !error && <p role="status">Loading payment link…</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}
     <button className={styles.refresh} disabled={pending} onClick={() => void load()}>Refresh payment status</button>

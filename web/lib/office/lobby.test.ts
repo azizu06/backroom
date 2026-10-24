@@ -6,6 +6,7 @@ import { AskWhyVoice, askWhyErrorMessage } from '../../components/AskWhyVoice';
 import { AuditWall, type AuditSnapshot } from '../../components/AuditWall';
 import { LiveOffice } from '../../app/office/LiveOffice';
 import { MockOffice, Office } from '../../app/office/Office';
+import { RoomInspector } from '../../app/office/RoomInspector';
 import { createMockOfficeState } from './preview';
 
 vi.mock('react', async importOriginal => {
@@ -50,7 +51,19 @@ describe('office lobby', () => {
     expect(html).toContain('class="office-footer"');
     expect(html).toContain('class="seat-statuses"');
     expect(html).toContain('class="mock-controls"');
+    expect(html).toContain('href="/operator"');
+    expect(html).toContain('href="/inbox"');
+    expect(html).toContain('Receipts there are not synced into this static scene.');
     expectLobby(html);
+  });
+
+  it('links the standalone judge inbox from the preview inspector', () => {
+    const snapshot = createMockOfficeState().source.getSnapshot();
+    const html = renderToStaticMarkup(createElement(RoomInspector, { room: 'lobby', snapshot, close: () => {} }));
+    expect(html).toContain('data-office-mount="inbox-inspector"');
+    expect(html).toContain('href="/inbox"');
+    expect(html).toContain('not synced into this static scene');
+    expect(html).not.toContain('href="#office-inbox-tray"');
   });
 
   it('mounts the live audit wall and ask-why in the live office, beside the inbox tray', () => {

@@ -14,6 +14,7 @@ import { CarryFolder } from './CarryFolder';
 import { InboxTrayMount } from './InboxTrayMount';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
+import { RoomDetail } from './RoomDetail';
 import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
@@ -28,6 +29,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'lobby-counter', instanced: true, Component: LobbyCounter },
   { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
   { id: 'plants', instanced: true, Component: Plants },
+  { id: 'room-detail', instanced: false, Component: RoomDetail },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'audit-wall', instanced: false, Component: AuditWallMount },
   { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },

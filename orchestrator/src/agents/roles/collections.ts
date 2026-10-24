@@ -11,15 +11,20 @@ export interface CallRecordView {
   plans: { id: string }[];
   escalations: { id: string; status: string }[];
   links: { id: string }[];
+  /** 'judge' when a judge supplied the scenario live; absent means seeded. */
+  scenarioSource?: 'judge' | 'seed';
 }
 export interface CallOutcomes { read(sessionId: string): Promise<CallRecordView | undefined> }
 
 export type CallOutcome = 'opt_out' | 'human_requested' | 'dispute' | 'already_paid' | 'payment_link_sent'
-  | 'plan_approved' | 'approval_pending' | 'no_agreement';
+  | 'plan_approved' | 'approval_pending' | 'no_agreement' | 'unrecognized';
 export type PostCallRoute = { kind: 'handoff'; to: 'reconciler' } | { kind: 'terminal'; result: 'done' | 'held' };
 
-/** Stops dominate, then evidence the reconciler can act on. Pure code: the model never picks this. */
+const KNOWN_STATUSES: readonly string[] = ['active', 'disputed', 'opted_out', 'human_requested', 'already_paid'];
+/** Stops dominate, then evidence the reconciler can act on. Pure code: the model never picks this.
+ * A call status this code does not know is never routed onward: it escalates to a human. */
 export function classifyCall(call: CallRecordView): CallOutcome {
+  if (!KNOWN_STATUSES.includes(call.status)) return 'unrecognized';
   if (call.status === 'opted_out') return 'opt_out';
   if (call.status === 'human_requested') return 'human_requested';
   if (call.status === 'disputed') return 'dispute';
@@ -33,7 +38,7 @@ export function routeOutcome(outcome: CallOutcome): PostCallRoute {
   switch (outcome) {
     case 'already_paid': case 'payment_link_sent': case 'plan_approved': return { kind: 'handoff', to: 'reconciler' };
     case 'opt_out': return { kind: 'terminal', result: 'done' }; // permanent stop, nobody follows up by phone
-    default: return { kind: 'terminal', result: 'held' }; // dispute, bankruptcy/human, pending approval, no agreement
+    default: return { kind: 'terminal', result: 'held' }; // dispute, bankruptcy/human, pending approval, no agreement, unrecognized
   }
 }
 /** Refs the post-call handoff may cite. The store validates them again. */
@@ -113,10 +118,13 @@ export async function runCollectionsPostCall(runtime: AgentRuntime, ctx: ToolCon
   const route = routeOutcome(outcome);
   const refs = outcomeRefs(caseId, call);
   const c = await deps.cases.load(caseId);
-  const audit = (action: string, inputs: Record<string, unknown>) => deps.audit.appendAudit({ ts: (deps.now ?? Date.now)(), actor: 'code', seat: 'collections',
-    action, ruleIds: [], policyVersion: 0, refs: [c.precall.clientId, c.precall.invoiceId, ...refs], route: 'code', latencyMs: 0, costUsd: 0, inputs });
+  const scenario_source = call.scenarioSource ?? 'seed';
+  const audit = (action: string, inputs: Record<string, unknown>, held = false) => deps.audit.appendAudit({ ts: (deps.now ?? Date.now)(), actor: 'code', seat: 'collections',
+    action, ruleIds: held ? [`CALL_${outcome.toUpperCase()}`] : [], policyVersion: 0, refs: [c.precall.clientId, c.precall.invoiceId, ...refs], route: 'code', latencyMs: 0, costUsd: 0,
+    // A held stop is a human escalation, never a pass.
+    ...(held && { decision: 'ESCALATE' as const }), inputs: { ...inputs, scenario_source } });
   if (route.kind === 'terminal') {
-    await audit('collections_postcall_terminal', { outcome, result: route.result });
+    await audit('collections_postcall_terminal', { outcome, result: route.result }, route.result === 'held');
     return { kind: route.result, artifactRefs: refs, usage: zeroUsage(ctx.activation.activationId) };
   }
   const result = await runtime.run(createCollectionsPostCallSpecialist(deps), ctx, { outcome });
