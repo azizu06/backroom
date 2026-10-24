@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { MeshBasicMaterial, type Group, type Material, type Texture } from 'three';
 import type { SceneMountProps } from './types';
+import { bakedArtRequested } from '../../../lib/office/baked-art';
+
+export { bakedArtRequested };
 
 /**
  * Opt-in Blender layer (`/office?art=baked`): baked, bevelled room shells from tools/bake, drawn over the
@@ -12,11 +15,6 @@ import type { SceneMountProps } from './types';
 const ROOMS = [{ id: 'lobby', url: '/office-art/lobby.glb' }] as const;
 /** Pieces that block the overview camera; kept for first-person Play, hidden when the camera is orthographic. */
 const HIDDEN_IN_OVERVIEW = new Set(['ceiling', 'wall_near']);
-
-/** True for `?art=baked`. Pure so it is testable. */
-export function bakedArtRequested(search: string): boolean {
-  return new URLSearchParams(search).get('art') === 'baked';
-}
 
 function BakedRoom({ url, overview }: { url: string; overview: boolean }) {
   const invalidate = useThree(state => state.invalidate);
