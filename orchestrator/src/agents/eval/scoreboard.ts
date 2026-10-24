@@ -103,10 +103,11 @@ for (const invoice of northfield.arInvoices) {
 }
 const legacy = await runEval({ persona: scriptedPersona });
 const recoveryRuns = [];
-for (const lateCancel of [false, true]) {
-  const run = await runRecovery({ lateCancel });
+for (const variant of [{ lateCancel: false }, { lateCancel: true }, { checkpoint: 'before_provider' as const }]) {
+  const run = await runRecovery(variant);
   recoveryRuns.push(run);
-  if (run.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') gaps.push({ id: `P11:memory:${lateCancel ? 'late-cancel' : 'late-tool'}`,
+  const name = variant.checkpoint === 'before_provider' ? 'pre-provider' : variant.lateCancel ? 'late-cancel' : 'late-tool';
+  if (run.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') gaps.push({ id: `P11:memory:${name}`,
     detail: 'Expired memory activation recovery failed; see retained recovery observation.' });
 }
 const badgeAttack = await runBadgeAttack();
@@ -168,7 +169,7 @@ const report = {
     extraction: 'Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.',
     providers: 'Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.',
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
-    payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt, not an OS kill or durable restart. P12 failover remains a legacy gap.',
+    payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 failover remains a legacy gap.',
     recovery: recoveryRuns[0]!.scope,
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
@@ -205,7 +206,7 @@ const lines = [
   `| Authoritative AP decision rule agreement | ${display(rates.exactAPRules)} |`,
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
-  `| P11 expired memory activation recovery (late tool/cancel variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
+  `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
   `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,

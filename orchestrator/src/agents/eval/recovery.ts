@@ -9,7 +9,8 @@ import type { Trace } from './chain';
 
 /** An abandoned scripted query, not a killed OS process. The retained memory repository
  * has already persisted the mock provider receipt; ambiguous in-flight debits are not retried. */
-export async function runRecovery(options: { lateCancel?: boolean } = {}) {
+export async function runRecovery(options: { lateCancel?: boolean; checkpoint?: 'after_receipt' | 'before_provider' } = {}) {
+  const checkpoint = options.checkpoint ?? 'after_receipt';
   let now = 1000;
   const state = new MemoryStateStore();
   const repository = await createNorthfieldRepository();
@@ -19,6 +20,8 @@ export async function runRecovery(options: { lateCancel?: boolean } = {}) {
   const providerRequests: string[] = [];
   const debits = new Set<string>();
   const trace: Trace[] = [];
+  const requesting = new Set<string>();
+  let providerRequestsBeforeReplacement = -1;
   const controller = { request: async () => 'mock:P11-human' };
   const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'nessie',
     nessie: { payInvoice: async payment => {
@@ -26,7 +29,13 @@ export async function runRecovery(options: { lateCancel?: boolean } = {}) {
       debits.add(payment.idempotencyKey);
       return { id: 'mock:P11-receipt', status: 'completed' };
     } }, bankChangeRisk: { check: async () => ({ score: 0, label: 'FAKE: synthetic fraud risk (not checked)' }) } });
-  const roles = createRoleRegistry({ payables: { seat, repository, controller, loadCase: async () => ({ fields, source }) },
+  const roles = createRoleRegistry({ payables: { seat, repository, controller, loadCase: async ctx => {
+    if (checkpoint === 'before_provider' && ctx.activation.leaseOwner === 'abandoned' && requesting.has(ctx.activation.activationId)) {
+      reportDebit(); // signal the pre-I/O checkpoint, without a provider request
+      await parked;
+    }
+    return { fields, source };
+  } },
     auditor: { store: state, loadCase: async () => ({ refs: ['P11', source.id, '4401'],
       correctionCount: auditorCorrections((await store.getCase('P11'))!) }),
       loadReceipt: async id => id === 'mock:P11-receipt' ? { id, status: 'completed' } : undefined } });
@@ -37,6 +46,12 @@ export async function runRecovery(options: { lateCancel?: boolean } = {}) {
   const runtime = mockRuntime(store, async (spec, ctx, invoke) => {
     if (spec.role === 'payables') {
       await invoke('evaluate_invoice');
+      if (checkpoint === 'before_provider' && ctx.activation.leaseOwner === 'replacement') {
+        release();
+        await pending;
+        providerRequestsBeforeReplacement = providerRequests.length;
+      }
+      requesting.add(ctx.activation.activationId);
       const payment = await invoke('request_payment');
       if (ctx.activation.leaseOwner === 'abandoned') {
         reportDebit();
@@ -88,17 +103,20 @@ export async function runRecovery(options: { lateCancel?: boolean } = {}) {
   const audits = await state.listAudit();
   const recoveryAudits = audits.filter(row => row.action === 'agent_activation_recovered').length;
   const rejectedWrites = audits.filter(row => row.action === 'agent_activation_write_rejected').length;
+  const fencedPayments = audits.filter(row => row.action === 'payment_fenced').map(row => String(row.inputs?.stage));
   const auditValid = (await state.verifyAuditChain()).valid;
   const activeActivations = final.activations.filter(row => row.status === 'active').length;
   const sameCase = original.caseId === request.caseId && replacement.caseId === request.caseId;
-  const match = sameCase && paymentPersistedBeforeAbandon && replacement.status === 'done' && original.status === 'failed' &&
+  const checkpointValid = checkpoint === 'after_receipt' ? paymentPersistedBeforeAbandon
+    : !paymentPersistedBeforeAbandon && providerRequestsBeforeReplacement === 0 && fencedPayments.join() === 'reservation';
+  const match = sameCase && checkpointValid && replacement.status === 'done' && original.status === 'failed' &&
     replacementToken > abandonedToken && providerRequests.length === 1 && debits.size === 1 && invoiceStatus === 'paid' &&
     final.status === 'done' && activeActivations === 0 && recoveryAudits === 1 && rejectedWrites > 0 && auditValid;
   const compact = (row: CaseResult) => ({ status: row.status, reason: row.reason, roles: row.activations.map(a => a.role) });
   return { id: 'P11', outcome: match ? 'RECOVERED_ONE_MOCK_DEBIT' : 'RECOVERY_FAILED', sameCase, abandonedToken,
-    replacementToken, paymentPersistedBeforeAbandon, providerRequests, mockDebits: debits.size, invoiceStatus,
+    replacementToken, checkpoint, providerRequestsBeforeReplacement, fencedPayments, paymentPersistedBeforeAbandon, providerRequests, mockDebits: debits.size, invoiceStatus,
     caseStatus: final.status, activeActivations, recoveryAudits, rejectedWrites, auditValid,
     original: compact(original), replacement: compact(replacement), lateCancel: options.lateCancel ?? false,
     tools: trace.map(row => `${row.role}.${row.tool}`),
-    scope: 'Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned after the mock receipt was persisted, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.' };
+    scope: 'Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.' };
 }

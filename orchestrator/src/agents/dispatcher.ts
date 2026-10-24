@@ -122,6 +122,12 @@ export class Dispatcher {
           if (!control.llmEnabled || control.llmSignal !== modelSignal) throw new Error('LLM_OFF');
           await store.assertActive(activation);
         },
+        // Only stores that support takeover can have a stale runner, and those offer a sync check.
+        ...(store.assertActiveNow && { fence() {
+          if (activation.signal.aborted) throw new Error(typeof activation.signal.reason === 'string' ? activation.signal.reason : 'CANCELLED');
+          if (!control.llmEnabled || control.llmSignal !== modelSignal) throw new Error('LLM_OFF');
+          store.assertActiveNow!(activation);
+        } }),
       };
       activeContext = ctx;
       this.options.onEvent?.({ type: 'activation_started', caseId: request.caseId, activationId: activation.activationId, role: activation.role });

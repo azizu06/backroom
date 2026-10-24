@@ -21,3 +21,15 @@ it.each([false, true])('recovers P11 with one mock debit and fences the abandone
   expect(run.rejectedWrites).toBeGreaterThan(0);
   expect(run.auditValid).toBe(true);
 });
+
+it('fences an old query parked in loadCase before payment I/O, then lets only its replacement pay', async () => {
+  vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
+  const run = await runRecovery({ checkpoint: 'before_provider' });
+  expect(run.providerRequestsBeforeReplacement).toBe(0);
+  expect(run.fencedPayments).toEqual(['reservation']);
+  expect(run.mockDebits).toBe(1);
+  expect(run.outcome).toBe('RECOVERED_ONE_MOCK_DEBIT');
+  expect(run.original.status).toBe('failed');
+  expect(run.replacement.status).toBe('done');
+  expect(run.providerRequests).toEqual(['ap:papertrail:4401']);
+});

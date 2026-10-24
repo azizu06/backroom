@@ -62,3 +62,37 @@ it('lets a replacement dispatcher drive an expired case but leaves a live runner
   expect(await dispatcher.recoverCase(request)).toMatchObject({ status: 'done', activations: [{ role: 'collections', kind: 'done' }] });
   expect((await store.getCase(request.caseId))?.status).toBe('done');
 });
+
+it('a failed recovery audit leaves the case retryable and the expired runner still fenced', async () => {
+  let now = 1000;
+  const audit = new MemoryStateStore();
+  const store = new MemoryHandoffStore({ audit, now: () => now, activationLeaseMs: 100 });
+  await store.openCase({ caseId: 'audit-fail', role: 'payables', artifactRefs: ['invoice:4401'] });
+  const first = await store.startActivation('audit-fail', 'dead-runner');
+  const activation = { ...first.activation, taskId: 'audit-fail', caseId: 'audit-fail', leaseOwner: 'dead-runner',
+    leaseToken: first.activation.leaseToken!, llmGeneration: 1, signal: new AbortController().signal, credentialOwnerId: 'offline' };
+  now = 1100;
+  const append = audit.appendAudit.bind(audit);
+  audit.appendAudit = async () => { throw new Error('AUDIT_DOWN'); };
+  await expect(store.recoverExpired('audit-fail')).rejects.toThrow('AUDIT_DOWN');
+  expect(() => store.assertActiveNow(activation)).toThrow('AGENT_LEASE_EXPIRED');
+  audit.appendAudit = append;
+  expect(await store.recoverExpired('audit-fail')).toBe(true);
+  expect(() => store.assertActiveNow(activation)).toThrow('AGENT_ACTIVATION_NOT_ACTIVE');
+  expect((await audit.listAudit()).filter(row => row.action === 'agent_activation_recovered')).toHaveLength(1);
+  const second = await store.startActivation('audit-fail', 'replacement');
+  expect(() => store.assertActiveNow({ ...activation, activationId: second.activation.activationId, leaseOwner: 'replacement',
+    leaseToken: second.activation.leaseToken! })).not.toThrow();
+});
+
+it('a store without takeover gets no effect fence, so payments keep the existing path', async () => {
+  const control = new MemoryStateStore();
+  const memory = new MemoryHandoffStore({ audit: control });
+  const store = Object.assign(Object.create(memory), { assertActiveNow: undefined }) as MemoryHandoffStore;
+  let fence: unknown = 'unset';
+  const runtime = { run: async (_spec: unknown, ctx: ToolContext) => { fence = ctx.fence; return { kind: 'failed' as const, reason: 'TEST' }; } };
+  const request = { caseId: 'no-sync', role: 'collections' as const, artifactRefs: ['invoice:1042'], input: {}, credentialOwnerId: 'offline' };
+  await new Dispatcher({ runtime, store, ledger: new MemoryUsageLedger(), control, runnerId: 'runner',
+    roles: { collections: { role: 'collections', model: 'claude-haiku-5-5', prompt: 'Test.', tools: [], allowedNext: [] } } }).runCase(request);
+  expect(fence).toBeUndefined();
+});

@@ -11,15 +11,15 @@
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
-      "orchestrator/src/agents/eval/recovery.ts": "ff918649d918a00304412eff16574da989eba212cd93ba2b2e3a6e95aeb29a0b",
+      "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "4ee30904393ead07b7f933e44af8bd22df5ff422d3310eb42f9a2efd35cd6a4b"
+      "orchestrator/src/agents/eval/scoreboard.ts": "fc22a264c14a6dd505b148214d3f786545072ecd5f96662bbe72daac90b23307"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
-      "orchestrator/src/agents/handoff-store.ts": "70b411a58a6843efadfa033856c45d41f01ea65a5c36cd233200cf2fedddba91",
-      "orchestrator/src/agents/dispatcher.ts": "cfbd739372f1a04f5975f4acf68537d80828a0d2223f7ad24ef4d83cf8950a83"
+      "orchestrator/src/agents/handoff-store.ts": "b963299b3a356a2e5dba32746af5c02f4518904196d3b5c06927bde072eeecc7",
+      "orchestrator/src/agents/dispatcher.ts": "64690fe5c34675e5202d715ffad9cf4fc439b29e1407892b9aca2f328c88984e"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
@@ -52,8 +52,8 @@
     "extraction": "Oracle-fed fixture mock; schema and evidence fidelity only. 8 equally weighted fields per AP item; lineItems is one exact-match field; absent optional adjustment matches absent.",
     "providers": "Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.",
     "fraudDefinition": "Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.",
-    "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt, not an OS kill or durable restart. P12 failover remains a legacy gap.",
-    "recovery": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned after the mock receipt was persisted, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.",
+    "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 failover remains a legacy gap.",
+    "recovery": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
@@ -119,8 +119,8 @@
       "percent": 100
     },
     "dispatcherMemoryRecovery": {
-      "numerator": 2,
-      "denominator": 2,
+      "numerator": 3,
+      "denominator": 3,
       "percent": 100
     },
     "runtimeBadgeIsolation": {
@@ -12284,6 +12284,9 @@
       "sameCase": true,
       "abandonedToken": 1,
       "replacementToken": 4,
+      "checkpoint": "after_receipt",
+      "providerRequestsBeforeReplacement": -1,
+      "fencedPayments": [],
       "paymentPersistedBeforeAbandon": true,
       "providerRequests": [
         "ap:papertrail:4401"
@@ -12321,7 +12324,7 @@
         "auditor.record_case_summary",
         "payables.request_payment"
       ],
-      "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned after the mock receipt was persisted, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
+      "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
     },
     {
       "id": "P11",
@@ -12329,6 +12332,9 @@
       "sameCase": true,
       "abandonedToken": 1,
       "replacementToken": 4,
+      "checkpoint": "after_receipt",
+      "providerRequestsBeforeReplacement": -1,
+      "fencedPayments": [],
       "paymentPersistedBeforeAbandon": true,
       "providerRequests": [
         "ap:papertrail:4401"
@@ -12365,7 +12371,56 @@
         "auditor.verify_chain",
         "auditor.record_case_summary"
       ],
-      "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned after the mock receipt was persisted, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
+      "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
+    },
+    {
+      "id": "P11",
+      "outcome": "RECOVERED_ONE_MOCK_DEBIT",
+      "sameCase": true,
+      "abandonedToken": 1,
+      "replacementToken": 4,
+      "checkpoint": "before_provider",
+      "providerRequestsBeforeReplacement": 0,
+      "fencedPayments": [
+        "reservation"
+      ],
+      "paymentPersistedBeforeAbandon": false,
+      "providerRequests": [
+        "ap:papertrail:4401"
+      ],
+      "mockDebits": 1,
+      "invoiceStatus": "paid",
+      "caseStatus": "done",
+      "activeActivations": 0,
+      "recoveryAudits": 1,
+      "rejectedWrites": 1,
+      "auditValid": true,
+      "original": {
+        "status": "failed",
+        "reason": "AGENT_ACTIVATION_NOT_ACTIVE",
+        "roles": [
+          "payables"
+        ]
+      },
+      "replacement": {
+        "status": "done",
+        "roles": [
+          "payables",
+          "auditor"
+        ]
+      },
+      "lateCancel": false,
+      "tools": [
+        "payables.evaluate_invoice",
+        "payables.evaluate_invoice",
+        "payables.request_payment",
+        "payables.request_payment",
+        "payables.handoff",
+        "auditor.read_audit",
+        "auditor.verify_chain",
+        "auditor.record_case_summary"
+      ],
+      "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
     }
   ],
   "badgeAttack": {

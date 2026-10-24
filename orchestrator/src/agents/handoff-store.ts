@@ -13,6 +13,9 @@ export interface AgentCaseStore extends HandoffStore {
   openCase(input: { caseId: string; role: Role; artifactRefs: string[]; displayId?: string }): Promise<CaseState>;
   startActivation(caseId: string, leaseOwner: string): Promise<StartedActivation>;
   assertActive(activation: Activation): Promise<void>;
+  /** Synchronous check against the last committed state, for effect fences. Required with
+   * `recoverExpired`; a store without takeover has no stale runner to fence (fence: not_applicable). */
+  assertActiveNow?(activation: Activation): void;
   recordArtifacts(ctx: ToolContext, refs: string[]): Promise<void>;
   /** Throws HandoffRejectedError after persisting the rejected row; ownership stays with the source. */
   commit(ctx: ToolContext, request: HandoffRequest): Promise<HandoffRecord>;
@@ -75,6 +78,12 @@ export class MemoryHandoffStore implements AgentCaseStore {
     }
   }
   async assertActive(a: Activation) { await this.fenced(a, 'assert', () => this.apply(a.caseId, s => { engine.assertActive(s, claim(a), this.now()); })); }
+  /** `apply` commits each op synchronously, so this sees every takeover already made. */
+  assertActiveNow(a: Activation) {
+    const state = this.cases.get(a.caseId);
+    if (!state) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
+    engine.assertActive(state, claim(a), this.now());
+  }
   recordArtifacts(ctx: ToolContext, refs: string[]) { return this.fenced(ctx.activation, 'record_artifacts', () => this.apply(ctx.activation.caseId, s => {
     engine.assertActive(s, claim(ctx.activation), this.now());
     engine.recordArtifacts(s, claim(ctx.activation), refs);
@@ -107,11 +116,22 @@ export class MemoryHandoffStore implements AgentCaseStore {
   }
   resumeCase(caseId: string) { return this.apply(caseId, s => engine.resumeCase(s)); }
   async recoverExpired(caseId: string): Promise<boolean> {
-    const recovered = await this.apply(caseId, s => engine.recoverExpiredActivation(s, this.now()));
-    if (recovered) await this.options.audit?.appendAudit({ ts: this.now(), actor: 'code', seat: 'controller',
-      action: 'agent_activation_recovered', ruleIds: ['LEASE_EXPIRED'], policyVersion: 0, refs: [caseId, recovered.expiredActivationId],
-      route: 'code', latencyMs: 0, costUsd: 0, inputs: recovered });
-    return !!recovered;
+    const current = this.cases.get(caseId);
+    if (!current) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
+    const draft = structuredClone(current);
+    const recovered = engine.recoverExpiredActivation(draft, this.now());
+    if (!recovered) return false;
+    this.cases.set(caseId, draft); // fences the old token at once
+    try {
+      await this.options.audit?.appendAudit({ ts: this.now(), actor: 'code', seat: 'controller',
+        action: 'agent_activation_recovered', ruleIds: ['LEASE_EXPIRED'], policyVersion: 0, refs: [caseId, recovered.expiredActivationId],
+        route: 'code', latencyMs: 0, costUsd: 0, inputs: recovered });
+    } catch (error) {
+      // Unaudited takeover is undone so a retry can recover; lease expiry alone still fences the old runner.
+      if (this.cases.get(caseId) === draft) this.cases.set(caseId, current);
+      throw error;
+    }
+    return true;
   }
   async getCase(caseId: string) { const s = this.cases.get(caseId); return s && structuredClone(s); }
   async listPublic(sinceSequence = 0) {
