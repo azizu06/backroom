@@ -92,9 +92,24 @@ VOICE_DIAL_GO=yes node orchestrator/src/voice/run.mjs dial
 T1_DIAL_GO=yes node --env-file=.env.local orchestrator/src/voice/t1.mjs dial
 ```
 
+Under `demo:up` with `DEMO_VOICE=1`, the office desk phone's **Request call** button
+is the in-app path: see [`web/lib/calls/README.md`](../../../web/lib/calls/README.md).
+That click is the operator's go for one dial; every other path keeps `VOICE_DIAL_GO`.
+
 Let the disclosure finish; answer the Jordan identity question naturally. The M4
 local controller endpoint authenticates a separate admin secret, uses only the
 server's configured synthetic scenario/target, and persists consent before dial.
+`admin-dial.ts` gates it: one dial in flight and one call on the line (held until
+the journal stops it, 10 minutes at most; an unconfirmed provider request holds
+90 s and is never redialed). It then reads the host's `/__demo/status` pre-call
+through the bridge and dials only on `ready`, passing that result's `signals` into
+`DialInput.signals` so `evaluate` re-checks stops and narrows the envelope. A
+`blocked` result returns `409 PRECALL_BLOCKED:<reason>`; `not_prepared`, `paused`,
+malformed or unreachable status also refuses. Each refusal appends
+`CALL_BLOCKED_PRECALL` to `.env.voice/audit.jsonl` with no provider request. Mock
+`demo:up` (no `DEMO_LIVE=1`) never prepares a pre-call, so it never dials. After
+each committed `call_started`/`call_completed`/`call_failed` the relay posts the
+lifecycle (session id and event only) to the host's loopback `/__demo/voice-call-event`.
 Use `DEMO_OVERRIDE=true` for the weekend demo; the server prints the visible
 indicator and stores the permit rule. A prior persisted client stop refuses new
 calls. Do not clear a real opt-out just to rerun a test.

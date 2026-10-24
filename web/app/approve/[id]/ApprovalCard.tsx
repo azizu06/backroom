@@ -5,7 +5,8 @@ import type { ControllerDecision, Escalation } from '@backroom/orchestrator';
 import { ApprovalError, approvalRequest } from '../../../lib/approvals/client';
 import styles from './approval.module.css';
 
-export default function ApprovalCard({ id }: { id: string }) {
+/** `embedded` drops the page chrome so the live controller inbox can raise the same card in place. */
+export default function ApprovalCard({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const [row, setRow] = useState<Escalation>();
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState('');
@@ -61,13 +62,11 @@ export default function ApprovalCard({ id }: { id: string }) {
   const closed = row && row.status !== 'pending';
   const canDecide = !!row && !closed && seconds > 0 && registered && !busy;
   const shownError = error || pollError;
-  const status = missing ? 'Request not found' : !row && shownError ? 'Request unavailable' : !row ? 'Loading request' : row.status === 'pending_owner' ? 'Follow-up needed'
+  const status = missing ? 'Request not found' : !row && shownError ? 'Request unavailable' : !row ? 'Loading request' : row.status === 'expired' ? 'Request expired' : row.status === 'pending_owner' ? 'Follow-up needed'
     : row.status === 'pending' ? `Client waiting · ${seconds}s` : `Dana ${row.status === 'counter' ? 'countered' : row.status}`;
-  return <main className={styles.page}>
-    <div className={styles.sheet}>
-      <header className={styles.header}><a href="/">Backroom</a><span>Dana’s desk</span></header>
+  const body = <>
       <p className={styles.status} role="status">{busy ? 'Confirm with your passkey…' : status}</p>
-      <h1>A decision<br />beyond the badge.</h1>
+      {embedded ? <h2 className={styles.cardTitle}>Approval needed</h2> : <h1>A decision<br />beyond the badge.</h1>}
       <p className={styles.intro}>The collections clerk needs your review before agreeing to these terms.</p>
       {missing ? <section className={styles.result}>
         <h2>This approval link does not match a request.</h2>
@@ -98,8 +97,8 @@ export default function ApprovalCard({ id }: { id: string }) {
           <details><summary>Evidence references</summary><ul>{row.evidenceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul></details>
         </section>
         {closed ? <section className={styles.result} aria-live="polite">
-          <h2>{row.status === 'pending_owner' ? 'Dana will confirm by email today.' : 'Your decision is recorded.'}</h2>
-          <p>{row.method === 'passkey' ? 'Confirmed with Dana’s passkey. The clerk can now relay your decision on the call.' : 'The call’s 60-second review window ended. No terms were approved.'}</p>
+          <h2>{row.status === 'pending_owner' ? 'Dana will confirm by email today.' : row.status === 'expired' ? 'This request expired.' : 'Your decision is recorded.'}</h2>
+          <p>{row.method === 'passkey' ? 'Confirmed with Dana’s passkey. The clerk can now relay your decision on the call.' : row.status === 'expired' ? 'No terms were approved.' : 'The review window ended. No terms were approved.'}</p>
           {row.decision?.kind === 'Counter' && <p>{row.decision.terms.installments} payments · {row.decision.terms.firstPaymentPct}% first · {row.decision.terms.durationDays} days</p>}
         </section> : <section className={styles.section}>
           {!registered && <p className={styles.error}>Dana’s passkey is not set up. <a href="/controller">Set up the controller passkey</a> before reviewing requests.</p>}
@@ -121,6 +120,11 @@ export default function ApprovalCard({ id }: { id: string }) {
           <p className={styles.note}>Only you can authorize this decision. Spoken instructions cannot approve it.</p>
         </section>}
       </>}
+  </>;
+  return embedded ? <article className={styles.card} aria-label="Approval request">{body}</article> : <main className={styles.page}>
+    <div className={styles.sheet}>
+      <header className={styles.header}><a href="/">Backroom</a><span>Dana’s desk</span></header>
+      {body}
       <footer className={styles.footer}>Northfield Studio · Controller review</footer>
     </div>
   </main>;

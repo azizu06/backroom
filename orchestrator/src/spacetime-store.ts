@@ -4,12 +4,14 @@ import { DbConnection } from './spacetime-client';
 import { consumeVerifiedApproval, type VerifiedApproval } from './approvals/verified';
 import type { ReducerEngine } from './reducer-engine';
 import type { StateStore } from './store';
+import { bankTxnPayload, type BankTxnRow } from './payments/bank-feed';
 
 export interface ControlSnapshot { enabled: boolean; generation: bigint; connected: boolean }
 /** Network seam; offline tests drive the real reducers through the WASM harness. */
 export interface StateTransport {
   ready: Promise<void>;
   invoke(method: string, values: unknown[]): Promise<unknown>;
+  recordBankTxn?(row: BankTxnRow): Promise<void>;
   onControl(listener: (control: ControlSnapshot) => void): () => void;
   close(): void;
 }
@@ -99,6 +101,10 @@ export class SpacetimeTransport implements StateTransport {
     }
   }
   async seedCompany(seed: unknown) { await this.ready; await this.connection.reducers.seedCompany({ payload: JSON.stringify(seed) }); }
+  async recordBankTxn(row: BankTxnRow): Promise<void> {
+    await this.ready;
+    await this.connection.reducers.recordBankTxn({ payload: bankTxnPayload(row) });
+  }
   close() {
     this.closed = true;
     clearInterval(this.timer);
@@ -129,6 +135,11 @@ export class SpacetimeStateStore implements StateStore {
   }
   get llmEnabled() { return this.enabled; }
   get llmSignal() { return this.controller.signal; }
+  async recordBankTxn(row: BankTxnRow): Promise<void> {
+    await this.ready;
+    if (!this.transport.recordBankTxn) throw new Error('BANK_TXN_TRANSPORT_REQUIRED');
+    await this.transport.recordBankTxn(row);
+  }
   async close() { this.unsubscribe(); this.enabled = false; this.controller.abort('SPACETIME_CLOSED'); this.transport.close(); }
   private async call<K extends keyof StateStore>(method: string, values: unknown[]): Promise<Awaited<ReturnType<Extract<StateStore[K], (...args: never[]) => unknown>>>> {
     const wire = [...values];

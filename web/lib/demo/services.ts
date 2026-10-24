@@ -16,8 +16,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   if (live && !env.NESSIE_API_KEY) throw new Error('DEMO_NESSIE_KEY_REQUIRED');
   const claims = new FileClaims(resolve(env.NESSIE_CLAIMS_DIR || '.nessie-state/claims'));
   const deposits: unknown[] = [], mockClaims = new Set<string>();
-  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, claims, fetch: http, readAttempts: 1, timeoutMs: 5000 } : {
-    apiKey: 'mock-no-network', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } },
+  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, surface: 'nessie_sandbox', claims, fetch: http, readAttempts: 1, timeoutMs: 5000 } : {
+    apiKey: 'mock-no-network', surface: 'mock', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } },
     fetch: async (url, init) => {
       if (init?.method === 'POST') {
         const row = { ...JSON.parse(String(init.body)), _id: `mock-deposit-${deposits.length + 1}` };
@@ -58,7 +58,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
     })();
   }
   const status = () => ({ live, bank: live ? 'nessie_sandbox' as const : 'mock' as const,
-    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
+    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}),
+      ...(preCall.status === 'ready' ? { signals: preCall.signals } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
       nessie: { mode: live ? 'sandbox' : 'mock' }, apify: { ...apify },
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
   return { bank, accountId, status,

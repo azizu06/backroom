@@ -1,3 +1,16 @@
+/* Overlay tokens. These mirror web/lib/office/palette.ts (PALETTE); lib/office/overlay-contrast.test.ts checks every text/plate pair used is >= 4.5:1. */
+:root {
+  --office-cream: #FFF7EC;
+  --office-peach: #F6D3B8;
+  --office-blush: #FFC9D9;
+  --office-lavender: #D9CCFF;
+  --office-aqua: #9EF2FB;
+  --office-navy: #4A5A7A;
+  --office-slate: #7C88A6;
+  --office-coral: #E8727A;
+  --office-plate-shadow: 0 2px 8px rgba(124, 136, 166, 0.35);
+}
+
 /* Lobby audit wall + ask-why, constrained inside the office footer. */
 .office-shell:has(.office-lobby) { height: auto; min-height: 100dvh; }
 .office-shell:has(.office-lobby) .office-viewport { height: 58dvh; flex: none; }
