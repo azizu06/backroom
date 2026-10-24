@@ -7,9 +7,10 @@ import { serverRoomReadout, type Gx10Status } from '../../lib/gx10/server-room';
 import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import PaymentLinkPanel from '../../components/PaymentLinkPanel';
+import { PlayMinimap } from './PlayMinimap';
 import './play.css';
 
-export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
+export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
 export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
@@ -225,6 +226,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
 
   const prompt = target && !panel ? targetLabel(snapshot, target) : '';
   return <div className='play-hud'>
+    <PlayMinimap snapshot={snapshot} hud={hud} />
     <div ref={hud} className='play-surface' tabIndex={0} role='application' data-touch={touch || undefined}
       aria-label='First-person office. W A S D or arrow keys to move, left and right arrows turn, E to interact, Escape to exit Play.'
       onKeyDown={onKeyDown} onKeyUp={onKeyUp} onBlur={() => { input.clear(); requestSceneFrame(); }}
