@@ -82,43 +82,48 @@ function projectFocus([px, py, pz]: readonly [number, number, number], width: nu
   return [width / 2 + zoom * dot(right), height / 2 - zoom * dot(up)];
 }
 
-/** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
-async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number] = PAYABLES): Promise<number> {
+/**
+ * RGBA pixels of a 6x6 screenshot patch around a world point projected under a room's focus camera.
+ * Page layout or a click can scroll the page, so scroll the canvas back into view first and fail
+ * clearly if the patch is not inside both the canvas and the viewport.
+ */
+async function samplePatch(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number]): Promise<number[]> {
+  await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
   const [x, y] = projectFocus(point, box.width, box.height, focus);
-  const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
+  const view = page.viewportSize()!;
+  const clip = { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 };
+  const where = `world (${point.join(', ')}) -> clip (${clip.x.toFixed(1)}, ${clip.y.toFixed(1)}); canvas box (${box.x.toFixed(1)}, ${box.y.toFixed(1)}, ${box.width.toFixed(1)} x ${box.height.toFixed(1)}); viewport ${view.width} x ${view.height}`;
+  expect(x >= 3 && y >= 3 && x <= box.width - 3 && y <= box.height - 3, `sample patch is outside the canvas: ${where}`).toBe(true);
+  expect(clip.x >= 0 && clip.y >= 0 && clip.x + 6 <= view.width && clip.y + 6 <= view.height, `sample patch is outside the viewport: ${where}`).toBe(true);
+  const png = await page.screenshot({ clip });
   return page.evaluate(async src => {
     const image = new Image();
     image.src = src;
     await image.decode();
     const ctx = document.createElement('canvas').getContext('2d')!;
     ctx.drawImage(image, 0, 0);
-    const { data } = ctx.getImageData(0, 0, image.width, image.height);
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) sum += Math.min(data[i]!, data[i + 1]!, data[i + 2]!);
-    return sum / (data.length / 4);
+    return Array.from(ctx.getImageData(0, 0, image.width, image.height).data);
   }, `data:image/png;base64,${png.toString('base64')}`);
+}
+
+/** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
+async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number] = PAYABLES): Promise<number> {
+  const data = await samplePatch(page, canvas, point, focus);
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) sum += Math.min(data[i]!, data[i + 1]!, data[i + 2]!);
+  return sum / (data.length / 4);
 }
 
 const TREASURY = [5, 3.4] as const;
 
 /** Mean RGB of a 6x6 screenshot patch around a world point projected under a room's focus camera. */
 async function patchColor(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number]): Promise<[number, number, number]> {
-  const box = (await canvas.boundingBox())!;
-  const [x, y] = projectFocus(point, box.width, box.height, focus);
-  const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
-  return page.evaluate(async src => {
-    const image = new Image();
-    image.src = src;
-    await image.decode();
-    const ctx = document.createElement('canvas').getContext('2d')!;
-    ctx.drawImage(image, 0, 0);
-    const { data } = ctx.getImageData(0, 0, image.width, image.height);
-    const sum = [0, 0, 0];
-    for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c]! += data[i + c]!;
-    const n = data.length / 4;
-    return [sum[0]! / n, sum[1]! / n, sum[2]! / n] as [number, number, number];
-  }, `data:image/png;base64,${png.toString('base64')}`);
+  const data = await samplePatch(page, canvas, point, focus);
+  const sum = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c]! += data[i + c]!;
+  const n = data.length / 4;
+  return [sum[0]! / n, sum[1]! / n, sum[2]! / n];
 }
 
 /** How far the red channel stands above the other two (the DENY sign's #ed6252 is about 140). */
@@ -268,6 +273,8 @@ test('office Treasury denial preview plays the door moment without breaking the 
   expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
   await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
   const clicked = Date.now();
+  // The preview button sits below the scene, so clicking it can scroll the canvas out of view.
+  await canvas.scrollIntoViewIfNeeded();
   await page.waitForTimeout(1000);
   expect(await patchRedness(page, canvas, sign)).toBeGreaterThan(80);
   await page.waitForTimeout(Math.max(0, clicked + DENY_MOMENT_MS + 1000 - Date.now()));
