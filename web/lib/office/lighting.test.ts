@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LIGHTING } from './lighting';
+import { ROLES } from './palette';
 
 function rgb(hex: string) {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -15,6 +16,34 @@ describe('office lighting', () => {
     expect(key.r).toBeGreaterThan(key.b);
     expect(fill.b).toBeGreaterThan(fill.r);
     expect(OFFICE_LIGHTING.fill.intensity).toBeLessThan(OFFICE_LIGHTING.key.intensity);
+  });
+
+  it('takes every colour from the cozy palette roles: butter key, aqua fill, cream/slate bounce, navy vault', () => {
+    expect(OFFICE_LIGHTING.key.color).toBe(ROLES.lampLight);
+    expect(OFFICE_LIGHTING.fill.color).toBe(ROLES.fillLight);
+    expect(OFFICE_LIGHTING.hemisphere).toMatchObject({ skyColor: ROLES.ceiling, groundColor: ROLES.shadow });
+    expect(OFFICE_LIGHTING.contactShadows.color).toBe(ROLES.shadow);
+    expect(OFFICE_LIGHTING.vault.color).toBe(ROLES.frame);
+  });
+
+  it('keeps the aqua fill at low strength so the warm key still reads', () => {
+    expect(OFFICE_LIGHTING.fill.intensity).toBeLessThanOrEqual(OFFICE_LIGHTING.key.intensity * 0.25);
+    expect(OFFICE_LIGHTING.fill.intensity).toBeGreaterThan(0);
+  });
+
+  it('tints shadows slate, never pure black, and keeps them soft on the pastel floor', () => {
+    const shadow = rgb(OFFICE_LIGHTING.contactShadows.color);
+    expect(Math.min(shadow.r, shadow.g, shadow.b)).toBeGreaterThan(64);
+    expect(shadow.b).toBeGreaterThan(shadow.r);
+    expect(OFFICE_LIGHTING.contactShadows.opacity).toBeLessThanOrEqual(0.4);
+    const ground = rgb(OFFICE_LIGHTING.hemisphere.groundColor);
+    expect(Math.min(ground.r, ground.g, ground.b)).toBeGreaterThan(64);
+  });
+
+  it('keeps total light low enough that cream walls do not clip to white', () => {
+    const { key, fill, hemisphere } = OFFICE_LIGHTING;
+    // Irradiance on an upward face in three's physical units (directional / pi), as a multiple of albedo.
+    expect((key.intensity + fill.intensity) / Math.PI + hemisphere.intensity / Math.PI).toBeLessThan(1.4);
   });
 
   it('configures exactly one shadow caster, the key light', () => {
