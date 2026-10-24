@@ -7,7 +7,7 @@ import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } 
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import type { MotionRegistry } from '../../lib/office/motion';
 import {
-  EYE_HEIGHT, PLAYER_RADIUS, SPAWN, applyLook, headBob, interactCandidates, moveIntent, movePlayer, officeColliders,
+  EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, headBob, interactCandidates, moveIntent, movePlayer, officeColliders,
   pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
@@ -32,7 +32,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
   const reduced = useRef(false);
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
-  const colliders = useMemo(() => officeColliders(rooms), [roomsKey]);
+  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
 
