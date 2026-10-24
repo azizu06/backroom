@@ -1,4 +1,7 @@
 import { FLOOR } from './play';
+import type { DbConnection } from '@backroom/orchestrator/spacetime-client';
+import type { OfficePresence } from '@backroom/orchestrator/spacetime-client/types';
+import type { OfficeSnapshot } from './state';
 
 export interface PresencePeer { viewerId: string; name: string; color: string; x: number; z: number; yaw: number; mode: 'overview' | 'play' | 'tour'; at: number }
 export interface PresenceTransport { publish(self: PresencePeer): void; subscribe(onPeers: (peers: PresencePeer[]) => void): () => void; close(): void }
@@ -69,5 +72,52 @@ export function createBroadcastPresence(channelName: string, channel?: ChannelLi
   return { publish(self) { selfId = self.viewerId; target?.postMessage(self); }, subscribe(onPeers) { listener = onPeers; onPeers(read()); return () => { listener = undefined; }; }, close() { target?.removeEventListener('message', onMessage); target?.close(); } };
 }
 export function createNoopPresence(): PresenceTransport { return { publish() {}, subscribe(callback) { callback([]); return () => {}; }, close() {} }; }
-// TODO(spacetime office_presence): replace this factory slot with a SpacetimeDB transport when the table lands.
-export const createSpacetimePresence = createNoopPresence;
+export interface PresenceSource { getPresenceConnection?: () => DbConnection | undefined }
+export function presenceTransportKind(mode: OfficeSnapshot['connection'], connection?: DbConnection): 'spacetime' | 'broadcast' {
+  return mode === 'live' && connection?.db.officePresence && typeof connection.reducers.officePresenceUpsert === 'function'
+    && typeof connection.reducers.officePresenceLeave === 'function' ? 'spacetime' : 'broadcast';
+}
+/** Public rows contain no color or identity: color is derived locally from the random viewer id. */
+export function spacetimePresencePeers(rows: readonly OfficePresence[], selfId: string, now: number): PresencePeer[] {
+  return presencePeers(rows.map(row => ({ ...row, at: Number(row.at), color: viewerColor(row.viewerId) })), selfId, now);
+}
+/** Optional display-only subscription on the office's existing anonymous connection. */
+export function createSpacetimePresence(connection: DbConnection, viewerId: string, clock: PresenceClock = Date.now): PresenceTransport {
+  const table = connection.db.officePresence;
+  const listeners = new Set<(peers: PresencePeer[]) => void>();
+  let applied = false, closed = false, suspended = false, joined = false;
+  let lastAt: number | undefined;
+  const refresh = () => {
+    if (closed) return;
+    const peers = applied ? spacetimePresencePeers([...table.iter()], viewerId, clock()) : [];
+    listeners.forEach(listener => listener(peers));
+  };
+  const leave = () => {
+    if (!joined) return;
+    joined = false;
+    void connection.reducers.officePresenceLeave({ viewerId }).catch(() => {}); // TTL also handles a lost socket.
+  };
+  const hide = () => { suspended = true; leave(); };
+  const show = () => { suspended = false; lastAt = undefined; };
+  table.onInsert(refresh); table.onUpdate(refresh); table.onDelete(refresh);
+  const subscription = connection.subscriptionBuilder().onApplied(() => { applied = true; refresh(); })
+    .onError(() => { applied = false; refresh(); }).subscribe('SELECT * FROM office_presence');
+  if (typeof window !== 'undefined') { window.addEventListener('pagehide', hide); window.addEventListener('pageshow', show); }
+  return {
+    publish(self) {
+      const now = clock();
+      if (closed || suspended || !applied || !connection.isActive || self.viewerId !== viewerId || (lastAt !== undefined && now - lastAt < PRESENCE_RATE)) return;
+      lastAt = now; joined = true;
+      const { name, x, z, yaw, mode } = self;
+      void connection.reducers.officePresenceUpsert({ viewerId, name, x, z, yaw, mode }).catch(() => {});
+    },
+    subscribe(listener) { listeners.add(listener); refresh(); return () => { listeners.delete(listener); }; },
+    close() {
+      if (closed) return;
+      closed = true; leave(); listeners.clear();
+      table.removeOnInsert(refresh); table.removeOnUpdate(refresh); table.removeOnDelete(refresh);
+      subscription.unsubscribe();
+      if (typeof window !== 'undefined') { window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show); }
+    },
+  };
+}

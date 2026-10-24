@@ -16,6 +16,7 @@ import { OfficeLobby } from './OfficeLobby';
 import { StoryMode } from './StoryMode';
 import { useStoryMode } from './useStoryMode';
 import type { StoryChapter } from '../../lib/office/story';
+import { SoundToggle } from './SoundToggle';
 import { PresenceChip } from './PresenceChip';
 import { usePresence } from './usePresence';
 import { FloorPlan } from './FloorPlan';
@@ -55,7 +56,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
-  const presence = usePresence({ mode, hud: play.hud });
+  const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
   function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
@@ -146,6 +147,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
     </nav>
     <div ref={viewportRef} className='office-viewport' data-testid='office-viewport'>
+      <SoundToggle snapshot={snapshot} />
       <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
