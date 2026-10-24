@@ -107,3 +107,49 @@ it('sends the complete response envelope schema, with the task schema nested und
   const wireSchema = JSON.parse(text.split(marker)[1]!.split('\n')[0]!);
   expect(wireSchema).toMatchObject({ required: ['output', 'confidence'], properties: { output: planSchema, confidence: { type: 'number', minimum: 0, maximum: 1 } } });
 });
+
+it('guides local generation with the full envelope and reports both rejected attempts before escalation', async () => {
+  const failures = vi.fn();
+  const taskSchema = { type: 'object', properties: { seat: { type: 'string' } }, required: ['seat'], additionalProperties: false };
+  const network = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{"seat":"ap"}' } }] }))
+    .mockResolvedValueOnce(completion({ bad: true }))
+    .mockResolvedValueOnce(completion());
+  await createRouter({ fetch: network, cloudApiKey: 'test', onFailure: failures }).route('field_extraction', {}, { ...schema, jsonSchema: taskSchema });
+  const body = JSON.parse(String(network.mock.calls[0]?.[1]?.body));
+  expect(body.response_format).toEqual({ type: 'json_object' });
+  const wireSchema = JSON.parse(body.messages[0].content.split('Complete response JSON Schema: ')[1].split('\n')[0]);
+  expect(wireSchema).toMatchObject({ additionalProperties: false, required: ['output', 'confidence'], properties: { output: taskSchema } });
+  expect(failures.mock.calls.map(([failure]) => failure.kind)).toEqual(['envelope', 'schema']);
+  expect(JSON.parse(String(network.mock.calls[1]?.[1]?.body)).messages[0].content).toContain('Previous attempt failed: envelope');
+  expect(network).toHaveBeenCalledTimes(3);
+});
+
+it('reports HTTP failures separately and does not allow diagnostic callbacks to change fallback', async () => {
+  const failures: string[] = [];
+  const network = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('', {status: 503})).mockResolvedValueOnce(completion());
+  const router = createRouter({fetch: network, cloudApiKey: 'test', onFailure: failure => { failures.push(`${failure.kind}:${failure.status}`); throw new Error('observer broke'); }});
+  expect((await router.route('field_extraction', {}, schema)).route).toBe('cloud_fallback');
+  expect(failures).toEqual(['http:503']);
+});
+
+it('reports a bounded timeout separately from transport failures', async () => {
+  vi.useFakeTimers();
+  const failures = vi.fn();
+  const network = vi.fn<typeof fetch>().mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+    init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), {once: true});
+  })).mockResolvedValueOnce(completion());
+  // AbortSignal.timeout uses the host timer; keep it deterministic in this unit test.
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    const control = new AbortController();
+    setTimeout(() => control.abort(new DOMException('Timed out', 'TimeoutError')), ms);
+    return control.signal;
+  });
+  try {
+    const pending = createRouter({fetch: network, cloudApiKey: 'test', timeoutMs: 8, onFailure: failures}).route('field_extraction', {}, schema);
+    await vi.advanceTimersByTimeAsync(8);
+    expect((await pending).route).toBe('cloud_fallback');
+    expect(failures.mock.calls.map(([failure]) => failure.kind)).toEqual(['timeout']);
+    expect(network).toHaveBeenCalledTimes(2);
+  } finally { vi.mocked(AbortSignal.timeout).mockRestore(); }
+});

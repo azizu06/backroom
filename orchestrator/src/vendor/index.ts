@@ -26,6 +26,17 @@ export class VendorSeat {
         return previous.result;
       }
       const vendor = await repo.getVendor(fields.vendorId);
+      // A resend is not a new change when it names the current approved master.
+      // Only apply() can install a changed account after the bound passkey decision.
+      if (fields.kind === 'bank_change' && vendor?.approved && vendor.inMaster !== false && !vendor.ofacHit &&
+          fields.bankAccountId === vendor.accountId && domain(source.senderDomain) === domain(vendor.domain) &&
+          domain(fields.domain) === domain(vendor.domain) && !await repo.hasPendingBankChange(vendor.id)) {
+        const result: SeatResult = { status: 'approved', decision: { kind: 'ALLOW', ruleIds: ['IN_BADGE'],
+          policyVersion: DEFAULT_POLICY.policyVersion }, evidenceRefs: [source.id] };
+        await audit(this.options, 'vendor_onboarding', 'bank_change_already_applied', source, result.decision, [],
+          { vendorId: vendor.id, vendorRevision: vendor.revision, bankChanged: false });
+        return result;
+      }
       let decision = fields.kind === 'bank_change'
         ? vendor ? evaluate('vendor_onboarding', { type: 'propose_bank_change', emailDomain: source.senderDomain }, {
           vendor: { id: vendor.id, knownDomain: vendor.domain, inMaster: vendor.inMaster ?? true, approved: vendor.approved, pendingBankChange: true },

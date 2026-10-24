@@ -19,7 +19,7 @@ processInbox(email/invoice)
   envelope metadata, never an extracted authority field. Unsupported/invalid
   documents, missing sender domains, router failures, and unknown classifications
   produce `ESCALATE`; audit inputs include `scenario_source: judge`. A paused
-  router (`LLM_OFF`) also escalates without making network calls; typed seat
+  router (`LLM_OFF`) also escalates incomplete raw text without making network calls; typed seat
   policy checks continue to work. Preserve the existing `routeInboxItem` API for
   queue selection; `processInbox` handles full AP/vendor extraction and execution.
 - `PayablesSeat({ repository, state, controller, nessie? }).process(fields, source)`
@@ -111,3 +111,17 @@ It uses the router's real GX10 configuration and prints only routing metrics and
 an exact-answer check. The implementation run did not complete this live check;
 no successful live extraction or cloud fallback is claimed. Provider-specific
 live scripts remain owned by their existing integration modules.
+
+## Complete structured invoice fallback
+
+`processInbox` uses `structured-invoice.ts` when models are OFF, unavailable or
+cannot classify/extract. Only the complete, single attachment transcription
+format is supported; absent fields, conflicting blocks and invalid totals stay
+held. No vendor/PO/bank facts are inferred from “approved” or “unchanged” prose.
+The parsed fields still enter the ordinary PayablesSeat master, domain, PO,
+duplicate, sanctions, limit and payment checks. Extraction is audited as code.
+
+VendorSeat treats a matching current approved account as already applied, only
+when both domains match and there is no pending change or sanctions signal.
+A different account still needs verification and the bound controller passkey
+workflow; resending an approved change does not reopen that workflow.
