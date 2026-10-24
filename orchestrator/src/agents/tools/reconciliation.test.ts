@@ -108,3 +108,41 @@ it('records a model exception without exposing document instructions on the publ
   expect(JSON.stringify(await job.store.listAudit())).not.toContain('private-injected-instructions');
   expect(await job.store.getPayment('ar:inv:1')).toBeUndefined();
 });
+
+/** Dispatcher host: activation ids/tokens come from the handoff store, not the Collections task lease. */
+async function dispatcherHosted(feed: Transaction[], pairedWith: string | undefined, mutate: (row: any) => void = () => {}) {
+  const job = await setup(feed);
+  Object.assign(job.ctx.activation, { taskId: 'case:a2', activationId: 'case:a2', leaseOwner: 'dispatcher-runner', leaseToken: 2 });
+  const load = job.dependencies.loadCase;
+  job.dependencies.loadCase = async ctx => { const row: any = { ...await load(ctx), ...(pairedWith !== undefined && { activationId: pairedWith }) }; mutate(row); return row; };
+  return job;
+}
+
+it('runs under a Dispatcher activation through the host-declared pairing', async () => {
+  const job = await dispatcherHosted([deposit], 'case:a2');
+  expect(await createReconciler(job.dependencies, job.ctx)).toMatchObject({ role: 'reconciler' });
+  expect(await job.request()).toMatchObject({ decision: 'ALLOW', status: 'paid', next: 'auditor' });
+});
+
+it.each([
+  ['no pairing (token equality still required)', undefined, () => {}],
+  ['a pairing to a different activation', 'case:a3', () => {}],
+  ['a lease for a different invoice', 'case:a2', (row: any) => { row.lease = { ...row.lease, refs: ['other-invoice'] }; }],
+  ['an invoice ref the activation was not handed', 'case:a2', (row: any) => { row.invoiceRef = 'case:other-invoice'; }],
+  ['a different case', 'case:a2', (row: any) => { row.caseId = 'other-case'; }],
+])('refuses %s before reading bank evidence', async (_name, pairedWith, mutate) => {
+  let reads = 0;
+  const job = await dispatcherHosted([deposit], pairedWith, mutate);
+  job.dependencies.bank.listDeposits = async () => { reads++; return [deposit]; };
+  await expect(job.request()).rejects.toThrow('RECONCILIATION_CASE_MISMATCH');
+  await expect(createReconciler(job.dependencies, job.ctx)).rejects.toThrow('RECONCILIATION_CASE_MISMATCH');
+  expect(reads).toBe(0);
+  expect(await job.store.getPayment('ar:inv:1')).toBeUndefined();
+});
+
+it('still requires a live Collections task lease when paired', async () => {
+  const job = await dispatcherHosted([deposit], 'case:a2', row => { row.lease = { ...row.lease, leaseToken: row.lease.leaseToken + 1 }; });
+  job.ctx.assertCurrent = async () => {};
+  await expect(job.request()).rejects.toThrow();
+  expect(await job.store.getPayment('ar:inv:1')).toBeUndefined();
+});
