@@ -2,7 +2,7 @@ import * as React from 'react';
 // @ts-ignore -- react-dom ships no types and @types/react-dom is not a workspace dependency.
 import * as ReactDOMServer from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DemoPill } from '../components/DemoPill';
+import { DemoPill, NavDisclosure } from '../components/DemoPill';
 import { DisclosureRow } from '../components/RealVsSim';
 import { demoPillText, disclosureItems, getDisclosureStatus, NOT_PROBED_LABEL, probedServices, unprobedServices, type DemoStatus, type ServiceId } from './real-vs-sim';
 
@@ -184,14 +184,19 @@ describe('demo pill', () => {
     expect(demoPillText(nessie('unverified'), NOW + 60_000)).toBe('Demo · synthetic company · sandbox money');
   });
 
-  it('server-renders one slim disclosure; the office nav carries the What’s real link', () => {
+  const render = (node: React.ReactNode) => {
     // Vitest compiles the component's JSX with the classic runtime; harmless if that ever changes.
     vi.stubGlobal('React', React);
-    let html: string;
-    try { html = renderToString(React.createElement(DemoPill)); } finally { vi.unstubAllGlobals(); }
-    expect(html).toMatch(/<aside class="demo-pill" aria-label="Demo disclosure">/);
-    expect(html).toContain('Demo · synthetic company · sandbox money');
-    expect(html).not.toContain('href="/real-vs-sim"');
+    try { return renderToString(node); } finally { vi.unstubAllGlobals(); }
+  };
+
+  it('server-renders one slim note for the site nav', () => {
+    const html = render(React.createElement(NavDisclosure));
+    expect(html).toMatch(/<span class="demo-pill" role="note" aria-label="Demo disclosure">Demo · synthetic company · sandbox money<\/span>/);
     expect(html).not.toContain('real-sim-toggle');
+  });
+
+  it('draws no fixed pill where the site nav already carries the disclosure', () => {
+    expect(render(React.createElement(DemoPill))).not.toContain('Demo disclosure');
   });
 });

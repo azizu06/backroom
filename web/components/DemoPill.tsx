@@ -7,27 +7,36 @@ import { siteNavHidden } from '../lib/site-nav';
 import { useDemoStatus } from './RealVsSim';
 import './DemoPill.css';
 
-/** The one disclosure every page carries: never presents simulated as live. Links to the full breakdown where the site nav is hidden. */
-export function DemoPill() {
-  return <Suspense fallback={null}><DemoPillContent /></Suspense>;
+function useReplay() {
+  const pathname = usePathname() ?? '';
+  return useSearchParams().has('replay') && (pathname === '/office' || pathname === '/audit');
 }
 
-function DemoPillContent() {
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const replay = params.has('replay') && (pathname === '/office' || pathname === '/audit');
+/** Inline disclosure for the site nav: never presents simulated as live. Replays show their own label instead. */
+export function NavDisclosure() {
+  const replay = useReplay();
   // A replay makes no network requests, including this status poll.
   const status = useDemoStatus(!replay);
-  if (replay) return <aside className="demo-pill" aria-label="Replay disclosure">
+  if (replay) return null;
+  return <span className="site-nav-note"><span className="demo-pill" role="note" aria-label="Demo disclosure">{demoPillText(status)}</span></span>;
+}
+
+/** Fixed disclosure for a replay, and for pages without the site nav (customer /pay/*, embeds). */
+export function DemoPill() {
+  return <Suspense fallback={null}><FixedDisclosure /></Suspense>;
+}
+
+function FixedDisclosure() {
+  const pathname = usePathname() ?? '';
+  const embed = useSearchParams().get('embed');
+  const replay = useReplay();
+  const shown = !replay && siteNavHidden(pathname, embed, 'office');
+  const status = useDemoStatus(shown);
+  if (replay) return <aside className="demo-pill demo-pill-fixed" aria-label="Replay disclosure">
     <strong>REPLAY</strong> · saved synthetic run · no live call or money movement
   </aside>;
-  const officeView = pathname === '/' || pathname.startsWith('/office');
-  return <>
-    {/* Keeps the last controls of a scrolling page clear of the fixed pill. */}
-    {!officeView && <div aria-hidden="true" className="demo-pill-spacer" />}
-    <aside className="demo-pill" aria-label="Demo disclosure">
-      {demoPillText(status)}
-      {siteNavHidden(pathname, params.get('embed'), 'office') && <> · <a href="/real-vs-sim">What&rsquo;s real</a></>}
-    </aside>
-  </>;
+  if (!shown) return null;
+  return <aside className="demo-pill demo-pill-fixed" aria-label="Demo disclosure">
+    {demoPillText(status)} · <a href="/real-vs-sim">What&rsquo;s real</a>
+  </aside>;
 }
