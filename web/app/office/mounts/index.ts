@@ -1,0 +1,29 @@
+/**
+ * Scene mount registry (lazy scene bundle only). A new piece of the 3D office adds one file in this
+ * folder (a component taking SceneMountProps) and one entry below. Order is draw order.
+ */
+import { OfficeProps } from '../props/OfficeProps';
+import { AuditWallMount } from './AuditWallMount';
+import { Desks } from './Desks';
+import { Doors } from './Doors';
+import { InboxTrayMount } from './InboxTrayMount';
+import { LobbyCounter } from './LobbyCounter';
+import { Plants } from './Plants';
+import { Performance } from './Performance';
+import { ServerRoomMount } from './ServerRoomMount';
+import { TreasuryVault } from './TreasuryVault';
+import type { SceneMount } from './types';
+
+export type { SceneMount, SceneMountProps } from './types';
+export const SCENE_MOUNTS: readonly SceneMount[] = [
+  { id: 'doors', instanced: true, Component: Doors },
+  { id: 'desks', instanced: true, Component: Desks },
+  { id: 'lobby-counter', instanced: true, Component: LobbyCounter },
+  { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
+  { id: 'plants', instanced: true, Component: Plants },
+  { id: 'server-room', instanced: false, Component: ServerRoomMount },
+  { id: 'audit-wall', instanced: false, Component: AuditWallMount },
+  { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },
+  { id: 'props', instanced: false, Component: OfficeProps },
+  { id: 'performance', instanced: false, Component: Performance },
+];

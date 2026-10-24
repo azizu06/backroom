@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PITCH_LIMIT, PLAYER_RADIUS, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
+  DESK_RADIUS, DESK_SIZE, EYE_HEIGHT, INTERACT_RANGE, PAYLINK_KIOSK, PAYLINK_RADIUS, PITCH_LIMIT, PLAYER_RADIUS, SERVER_ROOM, SERVER_ROOM_BOX, SPAWN, TREASURY_DOOR, PlayInput, applyLook, headBob, insideAny,
   interactCandidates, moveIntent, movePlayer, officeColliders, pickTarget, playPanel, targetKey, targetLabel, turnIntent,
   type PlayCandidate, type Vec2,
 } from "./play";
@@ -84,6 +84,19 @@ describe("collisions", () => {
     expect(withRoom).toHaveLength(colliders.length + 1);
     const stopped = walk([4, 0.5], [1, 0], 3.5, withRoom);
     expect(stopped[0]).toBeLessThanOrEqual(extra.minX - PLAYER_RADIUS + 1e-6);
+  });
+  it("makes the GX10 server room solid at its footprint", () => {
+    for (const [key, value] of Object.entries({ minX: 6.5, maxX: 7.7, minZ: -1.325, maxZ: -0.275 })) {
+      expect(SERVER_ROOM_BOX[key as keyof typeof SERVER_ROOM_BOX]).toBeCloseTo(value, 9);
+    }
+    const withServer = officeColliders(ALL, [SERVER_ROOM_BOX]);
+    expect(insideAny(SPAWN.position, withServer, PLAYER_RADIUS)).toBe(false);
+    const fromFront = walk([7.1, 0.4], [0, -1], 2, withServer);
+    expect(fromFront[1]).toBeCloseTo(SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS, 3);
+    const fromWest = walk([6.1, -0.8], [1, 0], 2, withServer);
+    expect(fromWest[0]).toBeCloseTo(SERVER_ROOM_BOX.minX - PLAYER_RADIUS, 3);
+    // Without the extra footprint the same walk passes through.
+    expect(walk([6.1, -0.8], [1, 0], 2)[0]).toBeGreaterThan(SERVER_ROOM_BOX.maxX);
   });
   it("drops colliders for rooms that are not visible", () => {
     const withoutTreasury = officeColliders(ALL.filter(room => room !== "treasury"));
@@ -209,8 +222,18 @@ describe("targets", () => {
   it("offers the Treasury door only when the room is visible", () => {
     const visible = interactCandidates([], ALL);
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
-    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections"]);
+    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server"]);
     expect(pickTarget([5, 0.6], Math.PI, visible)).toEqual({ kind: "treasury" });
+  });
+
+  it("picks the GX10 server when standing in front of it facing it", () => {
+    const candidates = interactCandidates([], ALL);
+    expect(candidates).toContainEqual({ target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 });
+    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server"]);
+    const front: Vec2 = [SERVER_ROOM.position[0], SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS + 0.1];
+    expect(pickTarget(front, 0, candidates)).toEqual({ kind: "server" });
+    expect(pickTarget(front, Math.PI, candidates)).not.toEqual({ kind: "server" });
+    expect(pickTarget([0, 0.4], -Math.PI / 2, candidates)).toBeNull();
   });
 
   it("offers the Treasury door where the browser test stands and where the barrier stops you, not from afar", () => {
@@ -221,6 +244,22 @@ describe("targets", () => {
     expect(pickTarget(stop, Math.PI, visible)).toEqual({ kind: "treasury" });
     expect(pickTarget([5, 3.0], 0, visible)).toBeNull();
     expect(pickTarget([5, -1], Math.PI, visible)).toBeNull();
+  });
+
+  it("offers the payment link kiosk only when the lobby is visible", () => {
+    const kiosk = interactCandidates([], ALL).filter(c => c.target.kind === "paylink");
+    expect(kiosk).toEqual([{ target: { kind: "paylink" }, position: PAYLINK_KIOSK, radius: PAYLINK_RADIUS }]);
+    expect(interactCandidates([], ALL.filter(room => room !== "lobby")).some(c => c.target.kind === "paylink")).toBe(false);
+    expect(targetKey({ kind: "paylink" })).toBe("paylink");
+  });
+
+  it("picks the kiosk when facing it within range, from outside its counter", () => {
+    const candidates = interactCandidates([], ["lobby"]);
+    const eye: Vec2 = [-4.4, 1.9];
+    expect(insideAny(eye, colliders, PLAYER_RADIUS)).toBe(false);
+    expect(pickTarget(eye, Math.PI, candidates)).toEqual({ kind: "paylink" });
+    expect(pickTarget(eye, 0, candidates)).toBeNull();
+    expect(pickTarget([-4.4, -1], Math.PI, candidates)).toBeNull();
   });
 });
 
@@ -267,5 +306,18 @@ describe("panels", () => {
     const denied = playPanel(mock.source.getSnapshot(), { kind: "treasury" })!;
     expect(denied.denial).toMatchObject({ id: "preview-denial-0", decision: "DENY", ruleIds: ["NOT_IN_BADGE"] });
     expect(targetLabel(mock.source.getSnapshot(), { kind: "treasury" })).toBe("Treasury door");
+  });
+
+  it("describes the payment link kiosk with no audit entries", () => {
+    const snapshot = createMockOfficeState().source.getSnapshot();
+    expect(playPanel(snapshot, { kind: "paylink" })).toEqual({ kind: "paylink", title: "Payment link kiosk", entries: [] });
+    expect(targetLabel(snapshot, { kind: "paylink" })).toBe("Scan to pay · payment link kiosk");
+  });
+
+  it("describes the GX10 server without snapshot data", () => {
+    const snapshot = createMockOfficeState().source.getSnapshot();
+    expect(targetKey({ kind: "server" })).toBe("server");
+    expect(targetLabel(snapshot, { kind: "server" })).toBe("Check GX10 server");
+    expect(playPanel(snapshot, { kind: "server" })).toEqual({ kind: "server", title: "GX10 server", entries: [] });
   });
 });
