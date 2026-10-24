@@ -15,14 +15,21 @@ it('reads OFF with no network requests and no secret or control exposure', async
   vi.stubGlobal('fetch', fetch);
   const response = GET();
   expect(response.headers.get('Cache-Control')).toBe('no-store');
-  expect(await response.json()).toEqual({ measuredAt: expect.any(String), llmEnabled: false, gx10: null });
+  const body = await response.json();
+  expect(body).toEqual({ measuredAt: expect.any(String), llmEnabled: false, notProbed: ['phone', 'claude', 'apify', 'policy', 'spacetime'], gx10: null });
+  expect(JSON.stringify(body)).not.toMatch(/https?:|key|token|secret|password/i);
   expect(fetch).not.toHaveBeenCalled();
 });
 
 it('publishes only the health allowlist', async () => {
   runtime.llmEnabled = true;
   runtime.health = { localEnabled: true, localAvailable: false, checkedAt: '2026-10-24T08:00:00.000Z', privateField: 'must-not-leak' };
-  expect(await GET().json()).toEqual({ measuredAt: expect.any(String), llmEnabled: true, gx10: {
+  expect(await GET().json()).toEqual({ measuredAt: expect.any(String), llmEnabled: true, notProbed: expect.any(Array), gx10: {
     localEnabled: true, localAvailable: false, checkedAt: '2026-10-24T08:00:00.000Z',
   } });
+});
+
+it('never labels a service both probed and not probed', async () => {
+  const { notProbed } = await GET().json() as { notProbed: string[] };
+  expect(notProbed).not.toContain('gx10');
 });
