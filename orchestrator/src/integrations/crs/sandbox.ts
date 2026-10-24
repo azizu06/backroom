@@ -101,7 +101,7 @@ export function createCrsClientFromEnv(env: Record<string, string | undefined> =
   return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: env.CRS_USERNAME, password: env.CRS_PASSWORD, fetch: fetchImpl });
 }
 
-/** Offline client over crsSandboxFixtureFetch; label results FAKE wherever they are shown. */
+/** Offline client over crsSandboxFixtureFetch. Its evidence is source crs_fixture with a FAKE label. */
 export function createCrsFixtureClient(): CrsClient {
-  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: 'fixture', password: 'fixture', fetch: crsSandboxFixtureFetch });
+  return new CrsClient({ ...CRS_CALHACKS_SANDBOX, username: 'fixture', password: 'fixture', fetch: crsSandboxFixtureFetch, fixture: true });
 }
