@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRouter, MemoryStateStore } from '@backroom/orchestrator';
+import { ControllerApprovals, createRouter, MemoryStateStore } from '@backroom/orchestrator';
+import { TestAuthenticator } from '../../../orchestrator/src/approvals/testing/authenticator';
+import { createApprovalHTTP } from '../approvals/http';
 import { createInboxHTTP } from './http';
 import { inboxPresets } from './presets';
+import { readInboxBankChange } from './proposals';
 
 function submission(values: Record<string, string> = {}, file?: File, url = 'http://localhost/api/inbox', origin: string | null = 'http://localhost') {
   const form = new FormData();
@@ -146,15 +149,84 @@ describe('judge inbox HTTP boundary', () => {
   });
 
   it.each([
-    ['4419', 'DUPLICATE_INVOICE'], ['4481', 'NO_PO'], ['4482', 'OVER_LIMIT'],
-    ['4483', 'OFAC_STOP'], ['4484', 'PAYEE_NOT_IN_MASTER'], ['bc-legitimate', 'INVALID_INPUT'],
+    ['4419', 'DUPLICATE_INVOICE'], ['4471', 'LOOKALIKE_DOMAIN'], ['4481', 'NO_PO'], ['4482', 'OVER_LIMIT'],
+    ['4483', 'OFAC_STOP'], ['4484', 'PAYEE_NOT_IN_MASTER'],
   ])('holds frozen trap %s with %s and never claims a completed payment', async (id, rule) => {
     const preset = inboxPresets.find(row => row.id === id)!;
     const result = await (await createInboxHTTP({ store: () => new MemoryStateStore() })(submission({ ...preset, presetId: id }))).json();
     expect(result.decision.kind).toBe('ESCALATE');
     expect(result.decision.ruleIds).toContain(rule);
+    if (id === '4471') expect(result.decision.ruleIds).toContain('BANK_CHANGE_HOLD');
     expect(result.status).not.toBe('paid');
+    expect(result.status).not.toBe('approved');
     expect(result.receiptId).toBeUndefined();
+  });
+
+  it('opens Dana’s card for the simulated Cedar change and applies it only after her passkey', async () => {
+    const origin = 'http://localhost:3020';
+    const state = new MemoryStateStore();
+    const preset = inboxPresets.find(row => row.id === 'bc-legitimate')!;
+    const handler = createInboxHTTP({ store: () => state, origin: () => 'http://localhost' });
+    const opened = await (await handler(submission({ ...preset, presetId: preset.id }))).json();
+    expect(opened.decision).toMatchObject({ kind: 'ESCALATE', ruleIds: ['BANK_CHANGE_HOLD'] });
+    expect(opened.decision.ruleIds).not.toContain('INVALID_INPUT');
+    expect(opened.status).toBe('awaiting_controller');
+    expect(opened.notice).toContain('simulated');
+    expect(opened.evidenceRefs).toEqual(expect.arrayContaining(['simulated:crs:cedar', 'simulated:ofac:cedar', 'simulated:apify:cedar']));
+    expect(opened.approvalHref).toBe(`/approve/${encodeURIComponent(opened.escalationId)}`);
+    expect(await readInboxBankChange(opened.escalationId)).toMatchObject({ status: 'awaiting_controller', accountId: 'bank-master:cedar', verified: true });
+    const approvals = new ControllerApprovals(state, { origin, rpID: 'localhost', enrollmentSecret: 'test-enrollment' });
+    const card = createApprovalHTTP(() => approvals, () => origin);
+    const view = await (await card('approval', opened.escalationId, 'view', new Request(`${origin}/view`))).json();
+    expect(view.escalation).toMatchObject({ status: 'pending', ruleIds: ['BANK_CHANGE_HOLD'], toHuman: 'Dana' });
+    expect(view.escalation.quote.text).toContain('bank change');
+    const auth = new TestAuthenticator();
+    const enrolled = await approvals.registrationOptions('test-enrollment');
+    await approvals.register('test-enrollment', enrolled.challengeId, auth.registration(enrolled.options.challenge));
+    const forged = await card('approval', opened.escalationId, 'decide', new Request(`${origin}/decide`, { method: 'POST',
+      headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId: 'fake', response: { verified: true, method: 'passkey' } }) }));
+    expect(forged.status).toBe(403);
+    expect(await readInboxBankChange(opened.escalationId)).toMatchObject({ accountId: 'bank-master:cedar' });
+    const options = await (await card('approval', opened.escalationId, 'options', new Request(`${origin}/options`, { method: 'POST',
+      headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: { kind: 'Approve' } }) }))).json();
+    const decided = await (await card('approval', opened.escalationId, 'decide', new Request(`${origin}/decide`, { method: 'POST',
+      headers: { origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeId: options.challengeId, response: auth.assertion(options.options.challenge) }) }))).json();
+    expect(decided.escalation).toMatchObject({ status: 'approved', method: 'passkey' });
+    expect(decided.bankChange).toMatchObject({ status: 'approved', accountId: 'SYNTHETIC-CEDAR-8822', ruleIds: ['BANK_CHANGE_HOLD'] });
+    expect(await readInboxBankChange(opened.escalationId)).toBeUndefined();
+  });
+
+  it('a passkey denial does not replace the approved Cedar account', async () => {
+    const origin = 'http://localhost:3020';
+    const state = new MemoryStateStore();
+    const preset = inboxPresets.find(row => row.id === 'bc-legitimate')!;
+    const opened = await (await createInboxHTTP({ store: () => state, origin: () => 'http://localhost' })(submission({ ...preset, presetId: preset.id }))).json();
+    const approvals = new ControllerApprovals(state, { origin, rpID: 'localhost', enrollmentSecret: 'test-enrollment' });
+    const card = createApprovalHTTP(() => approvals, () => origin);
+    const auth = new TestAuthenticator();
+    const enrolled = await approvals.registrationOptions('test-enrollment');
+    await approvals.register('test-enrollment', enrolled.challengeId, auth.registration(enrolled.options.challenge));
+    const options = await (await card('approval', opened.escalationId, 'options', new Request(`${origin}/options`, { method: 'POST',
+      headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: { kind: 'Deny' } }) }))).json();
+    const decided = await (await card('approval', opened.escalationId, 'decide', new Request(`${origin}/decide`, { method: 'POST',
+      headers: { origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeId: options.challengeId, response: auth.assertion(options.options.challenge) }) }))).json();
+    expect(decided.escalation).toMatchObject({ status: 'denied', method: 'passkey' });
+    expect(decided.bankChange).toMatchObject({ status: 'rejected', accountId: 'bank-master:cedar' });
+  });
+
+  it('live mode does not treat a missing CRS, OFAC, or Apify result as verified', async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const preset = inboxPresets.find(row => row.id === 'bc-legitimate')!;
+    const result = await (await createInboxHTTP({ store: () => new MemoryStateStore(), env: { DEMO_LIVE: '1' }, fetch: fetchImpl })(submission({ ...preset, presetId: preset.id }))).json();
+    expect(result.status).toBe('held');
+    expect(result.decision.ruleIds).toContain('INVALID_INPUT');
+    expect(result.decision.ruleIds).not.toContain('BANK_CHANGE_HOLD');
+    expect(result.notice).not.toContain('simulated');
+    expect(result.evidenceRefs.join(' ')).not.toContain('simulated:');
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(await readInboxBankChange(result.escalationId)).toBeUndefined();
   });
 
 });

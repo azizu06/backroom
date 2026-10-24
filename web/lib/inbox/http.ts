@@ -3,15 +3,18 @@ import { createNorthfieldRepository, getStateStore, PayablesSeat, processInbox, 
   type InboxOptions, type InvoiceFields, type StateStore, type VendorFields } from '@backroom/orchestrator';
 
 import { narrateInbox, type InboxNarration } from '../demo/agents';
+import { noteEscalation } from '../approvals/inbox';
 
+import { createInboxVendorGate } from './checks';
 import { matchPreset, presetFields } from './presets';
+import { rememberInboxProposal } from './proposals';
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 const LIMIT = 4 * 1024 * 1024;
 
-/** Public synthetic judge intake: no payment adapter, approval writes, or live vendor checks. */
-export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>; origin?: () => string | undefined } = {}) {
+/** Public synthetic judge intake. No payment adapter. Vendor checks follow DEMO_LIVE; a passkey applies a bank change. */
+export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>; origin?: () => string | undefined; env?: Record<string, string | undefined>; fetch?: typeof fetch } = {}) {
   const origin = options.origin ?? (() => process.env.DEMO_PUBLIC_URL || process.env.WEBAUTHN_ORIGIN);
   return async (request: Request) => {
     // Compare the browser Origin with the deployment origin. Next rewrites request.url
@@ -57,11 +60,8 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       const repository = await createNorthfieldRepository();
       const shared = { state, controller, repository };
       const payables = new PayablesSeat(shared);
-      const vendor = new VendorSeat({ ...shared, checks: {
-        business: async () => ({ verified: false, evidenceRef: 'unconfigured:crs' }),
-        ofac: async () => ({ status: 'unknown', evidenceRef: 'unconfigured:ofac' }),
-        footprint: async () => ({ websiteReachable: false, listingOperating: false, domain: 'unknown.invalid', evidenceRef: 'unconfigured:apify' }),
-      } });
+      const gate = createInboxVendorGate(options.env ?? process.env, options.fetch);
+      const vendor = new VendorSeat({ ...shared, checks: gate.checks, bankChangeRisk: gate.risk });
       const preset = !file && matchPreset(form.get('presetId'), String(kind), sender, text);
       if (preset && preset.id === '4419') {
         // P02's frozen precondition isolates the duplicate from Acme's independent bank-change trap.
@@ -77,6 +77,10 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
         payables: { process: async (value, source) => { fields = value; seat = 'payables'; return payables.process(value, source); } },
         vendor: { propose: async (value, source) => { fields = value; seat = 'vendor_onboarding'; return vendor.propose(value, source); } },
       });
+      if (result.escalationId && result.status === 'awaiting_controller' && fields?.kind === 'bank_change') {
+        noteEscalation(result.escalationId);
+        rememberInboxProposal(result.escalationId, { seat: vendor, repository, vendorId: fields.vendorId, proposalId: id });
+      }
       const attachment = file ? { name: file.name.slice(0, 200), type: file.type, size: file.size,
         sha256: createHash('sha256').update(fileBytes!).digest('hex') } : null;
       const entry = await state.appendAudit({ ts: Date.now(), actor: 'code', seat, action: 'judge_inbox_decision',
@@ -94,8 +98,11 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
         extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
         notice: file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. No bank debit is configured. File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
-          : 'Synthetic Northfield company. No bank debit or live vendor verification is configured. Approvals require the controller’s passkey.',
-        auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay` });
+          : gate.simulated
+            ? 'Synthetic Northfield company. CRS, OFAC, and Apify checks are simulated fixtures. No bank debit. A bank-account change is applied only after Dana’s passkey.'
+            : 'CRS, OFAC, and Apify use the configured live clients. An unknown or missing check is not verified. No bank debit. A bank-account change is applied only after Dana’s passkey.',
+        auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay`,
+        ...(result.escalationId ? { approvalHref: `/approve/${encodeURIComponent(result.escalationId)}` } : {}) });
     } catch { return json({ error: 'Intake could not record a decision. Try again; no payment was submitted.' }, 503); }
   };
 }
