@@ -3,7 +3,7 @@ import type { CreditCheck, CreditEvidence, HealthCheck, PublicCompany } from './
 
 /** Structural subset of the CRS worker's exported client API; no endpoint is guessed here. */
 interface CrsEvidenceForPreCall {
-  source: 'crs_sandbox'; product: 'businessCredit' | 'ofac'; testIdentityId: number;
+  source: 'crs_sandbox' | 'crs_fixture'; product: 'businessCredit' | 'ofac'; testIdentityId: number;
   label: string; checkedAt: string; responseHash: string;
   summary: { creditScore?: number; ofacStatus?: 'clear' | 'hit' | 'unknown' };
 }
@@ -23,7 +23,7 @@ export function createCrsCreditCheck(client: CrsClientApi, scoreSignals: (score:
       const valid = (result: PromiseSettledResult<CrsEvidenceForPreCall>, product: CrsEvidenceForPreCall['product']) => {
         if (result.status !== 'fulfilled') return;
         const value = result.value;
-        if (value.source !== 'crs_sandbox' || value.testIdentityId !== testIdentityId || value.product !== product
+        if (value.label.startsWith('FAKE') || value.source !== 'crs_sandbox' || value.testIdentityId !== testIdentityId || value.product !== product
           || !/^[a-f0-9]{64}$/.test(value.responseHash) || !Number.isFinite(Date.parse(value.checkedAt))) return;
         return value;
       };
