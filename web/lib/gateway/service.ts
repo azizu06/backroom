@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import type { Invocation } from "./parser";
 import {
   decidePlan,
@@ -187,12 +187,17 @@ export function executeTool(
       };
     }
     const existing = call.links.find((link) => link.planId === plan.id);
+    if (existing?.expiresAt !== undefined && Date.now() >= existing.expiresAt)
+      return deny("PAYMENT_LINK_EXPIRED", "That payment code has expired. Please check a new plan before creating another link.");
     const link = existing ?? {
       id: randomUUID(),
       planId: plan.id,
       auditId: entry.id,
       amountCents: plan.firstPaymentCents,
       path: "",
+      shortCode: randomBytes(5).toString("hex").toUpperCase(),
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 15 * 60_000,
     };
     if (!existing) {
       link.path = `/pay/${link.id}`;
@@ -206,6 +211,8 @@ export function executeTool(
       speak: "The payment link is queued for delivery.",
       link_path: link.path,
       amount_cents: link.amountCents,
+      short_code: link.shortCode,
+      expires_at: link.expiresAt,
     };
   }
   if (input.tool === "propose_plan") {
