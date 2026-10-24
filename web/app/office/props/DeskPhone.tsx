@@ -30,6 +30,8 @@ function useReducedMotion() {
 
 export function DeskPhone({ snapshot }: { snapshot: OfficeSnapshot }) {
   const call = useSyncExternalStore(callStore.subscribe, callStore.getSnapshot, callStore.getServerSnapshot);
+  const visible = visibleRooms(snapshot).includes('collections');
+  const ringing = visible && call.status === 'ringing';
   const invalidate = useThree(state => state.invalidate);
   const reduced = useReducedMotion();
   const handset = useRef<Mesh>(null);
@@ -37,7 +39,12 @@ export function DeskPhone({ snapshot }: { snapshot: OfficeSnapshot }) {
   const phase = useRef(0);
   useEffect(() => { invalidate(); }, [call, invalidate]);
   useEffect(() => {
-    if (call.status !== 'ringing' || !soundEnabled()) return;
+    if (handset.current) handset.current.rotation.z = 0.1;
+    if (light.current) light.current.emissiveIntensity = 0.7;
+    invalidate();
+  }, [ringing, reduced, invalidate]);
+  useEffect(() => {
+    if (!ringing || !soundEnabled()) return;
     let context: AudioContext | undefined;
     let oscillator: OscillatorNode | undefined;
     let gain: GainNode | undefined;
@@ -45,6 +52,7 @@ export function DeskPhone({ snapshot }: { snapshot: OfficeSnapshot }) {
       context = new AudioContext(); oscillator = context.createOscillator(); gain = context.createGain();
       oscillator.frequency.value = 440; gain.gain.value = 0; oscillator.connect(gain); gain.connect(context.destination);
       oscillator.start();
+      void context.resume().catch(() => {});
       const now = context.currentTime;
       // Two brief bursts followed by silence, repeated as a conventional ring cadence.
       for (let cycle = 0; cycle < 8; cycle++) {
@@ -55,19 +63,21 @@ export function DeskPhone({ snapshot }: { snapshot: OfficeSnapshot }) {
         gain.gain.setValueAtTime(0.025, start + 0.61);
         gain.gain.setValueAtTime(0, start + 1.01);
       }
-    } catch { oscillator?.stop(); }
-    return () => { try { oscillator?.stop(); void context?.close(); } catch { /* Audio is optional. */ } };
-  }, [call.status]);
+    } catch { /* Audio is optional. */ }
+    return () => {
+      try { oscillator?.stop(); } catch { /* Audio is optional. */ }
+      void context?.close().catch(() => {});
+    };
+  }, [ringing]);
   useFrame((_, delta) => {
-    if (call.status !== 'ringing') return;
+    if (!ringing) return;
     phase.current += delta;
-    if (handset.current) handset.current.rotation.z = reduced ? 0 : Math.sin(phase.current * 18) * 0.035;
+    if (handset.current) handset.current.rotation.z = reduced ? 0.1 : 0.1 + Math.sin(phase.current * 18) * 0.035;
     if (light.current) light.current.emissiveIntensity = reduced ? 1.4 : 0.8 + (Math.sin(phase.current * 10) + 1) * 0.5;
     if (!reduced) invalidate();
   });
   const color = call.status === 'live' ? '#5ed07b' : call.status === 'ringing' ? '#e8bd52' : call.status === 'ended' ? '#a74c42' : '#253028';
   const liveLabel = call.status === 'live' ? call.agentName ?? 'Collections' : '';
-  const visible = visibleRooms(snapshot).includes('collections');
   if (!visible) return null;
   return <group name='prop:desk-phone' position={[0, 0, 0]}>
     <group position={[PHONE_X, 0, PHONE_Z]}>
