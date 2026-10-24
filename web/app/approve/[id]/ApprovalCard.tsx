@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { startAuthentication } from '@simplewebauthn/browser';
 import type { ControllerDecision, Escalation } from '@backroom/orchestrator';
-import { approvalRequest } from '../../../lib/approvals/client';
+import { ApprovalError, approvalRequest } from '../../../lib/approvals/client';
 import styles from './approval.module.css';
 
 export default function ApprovalCard({ id }: { id: string }) {
@@ -10,6 +10,7 @@ export default function ApprovalCard({ id }: { id: string }) {
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [counter, setCounter] = useState(false);
   const [seconds, setSeconds] = useState(60);
   const [terms, setTerms] = useState({ installments: 2, firstPaymentPct: 50, durationDays: 30 });
@@ -21,9 +22,17 @@ export default function ApprovalCard({ id }: { id: string }) {
   }, [base]);
   useEffect(() => {
     let active = true;
-    const poll = () => { if (active) void refresh().catch(e => { if (active) setError(e.message); }); };
-    poll(); const timer = setInterval(poll, 1000);
-    return () => { active = false; clearInterval(timer); };
+    const stop = () => { active = false; clearInterval(timer); };
+    const poll = () => {
+      if (active) void refresh().catch(e => {
+        if (!active) return;
+        // A link that matches no request will not start matching later: stop the 1 s poll.
+        if (e instanceof ApprovalError && e.code === 'ESCALATION_NOT_FOUND') { stop(); setMissing(true); }
+        setError(e instanceof Error ? e.message : 'This request could not be loaded. Try again.');
+      });
+    };
+    const timer = setInterval(poll, 1000); poll();
+    return stop;
   }, [refresh]);
   const decide = async (decision: ControllerDecision) => {
     setBusy(true); setError('');
@@ -43,7 +52,7 @@ export default function ApprovalCard({ id }: { id: string }) {
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: row?.currency ?? 'USD' }).format(cents / 100);
   const closed = row && row.status !== 'pending';
   const canDecide = !!row && !closed && seconds > 0 && registered && !busy;
-  const status = !row ? 'Loading request' : row.status === 'pending_owner' ? 'Follow-up needed'
+  const status = missing ? 'Request not found' : !row && error ? 'Request unavailable' : !row ? 'Loading request' :row.status === 'pending_owner' ? 'Follow-up needed'
     : row.status === 'pending' ? `Client waiting · ${seconds}s` : `Dana ${row.status === 'counter' ? 'countered' : row.status}`;
   return <main className={styles.page}>
     <div className={styles.sheet}>
@@ -51,7 +60,11 @@ export default function ApprovalCard({ id }: { id: string }) {
       <p className={styles.status} role="status">{busy ? 'Confirm with your passkey…' : status}</p>
       <h1>A decision<br />beyond the badge.</h1>
       <p className={styles.intro}>The collections clerk needs your review before agreeing to these terms.</p>
-      {error && <div className={styles.error} role="alert">{error}<button onClick={() => { setError(''); void refresh().catch(e => setError(e.message)); }}>Refresh request</button></div>}
+      {missing ? <section className={styles.result} role="alert">
+        <h2>This approval link does not match a request.</h2>
+        <p>Nothing was approved or denied. Open the latest link from the clerk, or check the audit wall for the escalation.</p>
+        <p><a href="/audit">Open the audit wall</a></p>
+      </section> : error && <div className={styles.error} role="alert">{error}<button onClick={() => { setError(''); void refresh().catch(e => setError(e instanceof Error ? e.message : 'This request could not be loaded. Try again.')); }}>Refresh request</button></div>}
       {row && <>
         <section className={styles.amount} aria-label="Invoice amount">
           <span>{row.invoiceId ? `Invoice ${row.invoiceId}` : row.taskId}</span>
