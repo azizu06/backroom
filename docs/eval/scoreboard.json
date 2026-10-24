@@ -4,12 +4,12 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "831c3919e66799aab70018bea69cc8b8914de5ed",
+    "baseCommit": "ae9d164a34b8b9ca5bd36672c5a98316c00ca23e",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
       "orchestrator/src/agents/eval/conversation.ts": "405f533151f8fab92f53be87b882d80415e3700a4ea9fb52aeccaad0f4d43dfc",
-      "orchestrator/src/agents/eval/inbox-team.ts": "64cadaa532e6e579e2a6ecb34c01a4d8d58d59d060f6623570081a489e165ed3",
+      "orchestrator/src/agents/eval/inbox-team.ts": "32be9ae90c120f93be8362a912547c48b9f90bbede270c158fb9ce8fc2250312",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
       "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
@@ -19,7 +19,7 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "27e5e145b03fc9380a41adf77d8d52334740b72e21b2d7e6d1f864308ffd91f9"
+      "orchestrator/src/agents/eval/scoreboard.ts": "8d27c80d75ded270b5bc3bb40f3b064d74d8c271a738b144167dcf0a13e454be"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -63,7 +63,7 @@
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
     "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
-    "inboxTeam": "Production createInboxAgents (Dispatcher, role registry, memory handoff store) with a scripted QueryFn. An ALLOW seat decision is narrated and request_payment stays held; no Nessie debit. DEMO_AGENTS=0 on the demo host submits the inbox with no agent case. No provider call, phone, or live CRS.",
+    "inboxTeam": "Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
     "falseHoldDefinition": "Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.",
@@ -14305,11 +14305,18 @@
     "match": true,
     "checks": {
       "fiveRoles": true,
+      "syntheticCost": true,
+      "idempotentCase": true,
       "officeHandoffs": true,
+      "ledgerSpend": true,
+      "judgeMetadata": true,
+      "allowAssessment": true,
       "holdOnly": true,
       "decisionStands": true,
+      "flagMatrix": true,
       "agentsOff": true,
-      "auditChain": true
+      "auditChain": true,
+      "noNetwork": true
     },
     "roles": [
       "intake",
@@ -14318,21 +14325,57 @@
       "payables",
       "auditor"
     ],
-    "handoffs": 4,
+    "caseStatus": "done",
+    "reason": null,
+    "handoffs": [
+      {
+        "fromRole": "intake",
+        "toRole": "extractor",
+        "status": "completed"
+      },
+      {
+        "fromRole": "extractor",
+        "toRole": "vendor",
+        "status": "completed"
+      },
+      {
+        "fromRole": "vendor",
+        "toRole": "payables",
+        "status": "completed"
+      },
+      {
+        "fromRole": "payables",
+        "toRole": "auditor",
+        "status": "completed"
+      }
+    ],
+    "assessment": "ALLOW",
     "payment": {
       "status": "held",
       "verdict": "ESCALATE",
       "ruleIds": [
         "INVALID_INPUT"
-      ],
-      "policyVersion": 1,
-      "policySentence": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
-      "evidenceRefs": [
-        "judge:sample",
-        "audit:1"
       ]
     },
-    "scope": "Production createInboxAgents (Dispatcher, role registry, memory handoff store) with a scripted QueryFn. An ALLOW seat decision is narrated and request_payment stays held; no Nessie debit. DEMO_AGENTS=0 on the demo host submits the inbox with no agent case. No provider call, phone, or live CRS."
+    "seatDecision": "ALLOW",
+    "syntheticCostUsd": 0.002,
+    "providerRequests": 0,
+    "optOut": {
+      "narrated": false,
+      "hostCreated": false,
+      "httpStatus": 200,
+      "agentAudits": 0,
+      "responseRules": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ],
+      "recordedDecision": "ESCALATE",
+      "recordedRules": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ]
+    },
+    "scope": "Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0."
   },
   "legacy": {
     "signoff": "approved",
