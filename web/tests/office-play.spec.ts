@@ -96,6 +96,8 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
   const prompt = page.getByText('E · Talk to Alex');
   await holdUntil(page, 'w', () => prompt.isVisible());
   await expect(prompt).toBeVisible();
+  // Name tags from the judge tour stay on in Play: Alex is right ahead.
+  await expect(viewport.locator('[data-agent-tag]', { hasText: 'Alex' })).toBeVisible();
   const moved = await player(page);
   expect(moved.z).toBeLessThan(start.z - 0.1);
   expect(Math.abs(moved.x - start.x)).toBeLessThan(0.05);

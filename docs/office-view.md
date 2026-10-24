@@ -32,7 +32,9 @@ the canvas, floor plan, badges, lobby audit receipts, and inbox receipt summarie
   on the wall without replaying a fresh flash when the view reconnects.
 - The physical audit-wall lines and inbox folder stack also project audit/intake
   rows. The DOM wall shows the last 20 subscribed receipts, including lifecycle
-  rows labeled RECORDED. The full authenticated inspector remains at `/audit`.
+  rows labeled RECORDED. When the lobby `AuditWall` is mounted, preview/replay
+  receipts render in a separate `Preview audit receipts` section beside it. The
+  full authenticated inspector remains at `/audit`.
 - The lobby mounts `InboxTray` for human submissions through `/api/inbox`.
   Subscribed intake summaries come from `submit_inbox_item`, `route_inbox_item`,
   and `judge_inbox_decision` audit receipts. The displayed count is receipt count,

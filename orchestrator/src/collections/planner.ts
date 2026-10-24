@@ -22,7 +22,7 @@ export function createCallPlanner(options: CallPlannerOptions = {}): CallPlanner
   // Zero rates identify local inference honestly; this never changes global router settings.
   const fallbackRoute = options.fallbackRoute ?? createRouter({
     cloudBaseUrl: process.env.GX10_BASE_URL ?? 'http://100.117.44.20:11434/v1',
-    cloudApiKey: 'ollama', cloudModel: 'gpt-oss:120b', localEnabled: false,
+    cloudProvider: 'openrouter', cloudApiKey: 'ollama', cloudModel: 'gpt-oss:120b', localEnabled: false,
     cloudInputUsdPerMillion: 0, cloudOutputUsdPerMillion: 0, timeoutMs: 30_000,
     fetch: gx10Fetch,
   }).route;

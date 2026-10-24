@@ -100,8 +100,11 @@ indicator and stores the permit rule. A prior persisted client stop refuses new
 calls. Do not clear a real opt-out just to rerun a test.
 
 T1 evidence and the phone-free WebSocket smoke command are in
-[`docs/t1-cartesia.md`](../../../docs/t1-cartesia.md). Phone retest is still
-pending; firstmate authorized implementation/PR delivery before that retest.
+[`docs/t1-cartesia.md`](../../../docs/t1-cartesia.md). The coordinated phone retest
+reached the phone but failed at the tool path; see the evidence and diagnosis there. A new call still requires fresh firstmate go.
+`serve` records private redacted request/result timing in `.env.voice/http-evidence.jsonl`;
+evidence failures never interrupt webhook responses. Do not add HTTP monkeypatch
+preloads to the live receiver.
 
 ## Checks
 

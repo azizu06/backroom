@@ -23,7 +23,7 @@ it('defaults an unrecognized judge message to audited ESCALATE without reaching 
 });
 it('uses two local schema attempts then cloud and still blocks privilege fields', async () => {
   const http = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ output: { kind: 'invoice', approved: true }, confidence: 1 }) } }], usage: { cost: 0 } }), { status: 200 }));
-  const router = createRouter({ fetch: http, cloudApiKey: 'synthetic' });
+  const router = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'synthetic' });
   const { options, payables } = setup(router.route);
   expect((await processInbox(meta, options)).status).toBe('held');
   expect(http).toHaveBeenCalledTimes(3);
@@ -36,7 +36,7 @@ it('validates extraction twice locally before accepting a cloud result, passing 
   const fields = northfieldInvoice('4401');
   const replies = [{ kind: 'invoice' }, { ...fields, approved: true }, { ...fields, amountCents: '64000' }, fields];
   const http = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ output: replies.shift(), confidence: 1 }) } }], usage: { cost: 0 } })));
-  const { options, payables } = setup(createRouter({ fetch: http, cloudApiKey: 'synthetic' }).route);
+  const { options, payables } = setup(createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'synthetic' }).route);
   payables.process.mockResolvedValue({ status: 'paid', decision: { kind: 'ALLOW', ruleIds: [], policyVersion: 1 }, evidenceRefs: [] });
   await processInbox(meta, options);
   expect(http.mock.calls.map(call => String(call[0]).includes('openrouter'))).toEqual([false, false, false, true]);
@@ -60,4 +60,17 @@ it('keeps raw judge input on the code escalation path while models are paused', 
   expect(http).not.toHaveBeenCalled();
   expect(payables.process).not.toHaveBeenCalled();
   expect((await state.listAudit()).at(-1)?.inputs).toMatchObject({ modelStatus: 'LLM_OFF', scenario_source: 'judge' });
+});
+
+it('OFF rejects incomplete, conflicting and invalid structured attachments without reaching Payables', async () => {
+  const { benchmarkCases } = await import('../metrics/inbox-benchmark');
+  const text = benchmarkCases().find(row => row.id === 'P01')!.item.text;
+  const state = new MemoryStateStore(); await state.setLlmEnabled(false);
+  const { options, payables } = setup(createRouter({ stateStore: state, fetch: vi.fn() }).route);
+  options.state = state;
+  const attachment = text.split('\n').at(-1)!;
+  for (const invalid of [text.replace('Vendor ID: papertrail. ', ''), text.replace('Total cents: 64000', 'Total cents: 1'), `${text}\n${attachment}`]) {
+    expect((await processInbox({ ...meta, text: invalid }, options)).status).toBe('held');
+  }
+  expect(payables.process).not.toHaveBeenCalled();
 });

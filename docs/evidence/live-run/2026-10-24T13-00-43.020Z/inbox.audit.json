@@ -1,0 +1,528 @@
+{
+  "kind": "live",
+  "routingOverride": true,
+  "services": {
+    "state": "local_spacetime",
+    "model": "GX10_only",
+    "bank": "Nessie_sandbox",
+    "voice": "scripted_no_dial",
+    "controller": "software_test_authenticator",
+    "crs": "fake",
+    "apify": "fake"
+  },
+  "entries": [
+    {
+      "seq": 1,
+      "id": "audit:1",
+      "ts": 1792846857414,
+      "actor": "code",
+      "seat": "payables",
+      "action": "route_inbox_item",
+      "ruleIds": [
+        "INBOX_ROUTING"
+      ],
+      "policyVersion": 0,
+      "refs": [
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "kind": "bank_change",
+        "routedSeat": "payables",
+        "scenario_source": "seed"
+      },
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "02cc49994983b640aa1e820785dd8b5975dcb331f96b8e03c7736bd50fbe130c"
+    },
+    {
+      "seq": 2,
+      "id": "audit:2",
+      "ts": 1792846857430,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.registerAgent",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "payables-demo"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "payables-demo"
+      },
+      "prevHash": "02cc49994983b640aa1e820785dd8b5975dcb331f96b8e03c7736bd50fbe130c",
+      "hash": "aaeeb7b98d5ef22cb27845fef3808b8271f5fd3255a8688bbbb208550f61a07c"
+    },
+    {
+      "seq": 3,
+      "id": "audit:3",
+      "ts": 1792846857439,
+      "actor": "code",
+      "seat": "controller",
+      "action": "state.insertInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "4471"
+      },
+      "prevHash": "aaeeb7b98d5ef22cb27845fef3808b8271f5fd3255a8688bbbb208550f61a07c",
+      "hash": "4e81f56fd4b0a4c88b15315764ecbf58ec62538588ba2b9c4b1e1c52c46cfa40"
+    },
+    {
+      "seq": 4,
+      "id": "audit:4",
+      "ts": 1792846857445,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.enqueueTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 0,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "4e81f56fd4b0a4c88b15315764ecbf58ec62538588ba2b9c4b1e1c52c46cfa40",
+      "hash": "23fb98abd6a6817844910800e6fbc1e20a7354bf2b3d04a6609e4d261554da45"
+    },
+    {
+      "seq": 5,
+      "id": "audit:5",
+      "ts": 1792846857452,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.claimTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "payables-demo"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "payables-demo"
+      },
+      "prevHash": "23fb98abd6a6817844910800e6fbc1e20a7354bf2b3d04a6609e4d261554da45",
+      "hash": "9f4b863bf1ba98e892621cad4320c6193570ed103ff3d78f6dfd28a4d4954413"
+    },
+    {
+      "seq": 6,
+      "id": "audit:6",
+      "ts": 1792846857480,
+      "actor": "code",
+      "seat": "payables",
+      "action": "pay_invoice",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "4471",
+        "acme-supp1y.com",
+        "acme-supply.com"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "action": {
+          "type": "pay_invoice"
+        },
+        "cursor": 0,
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-020",
+            "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+          },
+          "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN"
+          ],
+          "toHuman": "Dana"
+        },
+        "effectInput": {
+          "invoice": {
+            "account": "operating",
+            "amountCents": 89000,
+            "id": "4471",
+            "lineItems": [
+              {
+                "description": "September packing bench supplies",
+                "quantity": 1,
+                "unitPriceCents": 89000
+              }
+            ],
+            "poMatched": true,
+            "vendorId": "acme"
+          }
+        },
+        "leaseToken": 1,
+        "taskId": "trap-4471",
+        "workerId": "payables-demo"
+      },
+      "prevHash": "9f4b863bf1ba98e892621cad4320c6193570ed103ff3d78f6dfd28a4d4954413",
+      "hash": "6fac5b58d3cac44357da214905a3ffd4bace7b22f228b04b14a0269c3a0ab0d1"
+    },
+    {
+      "seq": 7,
+      "id": "audit:7",
+      "ts": 1792846857488,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.createEscalation",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 1,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "6fac5b58d3cac44357da214905a3ffd4bace7b22f228b04b14a0269c3a0ab0d1",
+      "hash": "75e6ab016a5134a137f0771cf0c2fbcdf6850bc782870963739ce28af47a116f"
+    },
+    {
+      "seq": 8,
+      "id": "audit:8",
+      "ts": 1792846857495,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.setAgentTarget",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 1,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "75e6ab016a5134a137f0771cf0c2fbcdf6850bc782870963739ce28af47a116f",
+      "hash": "dc805f74297fc2f21acc9f9052a476e5c7f44f85928a7f13bc45a35cc468ec66"
+    },
+    {
+      "seq": 9,
+      "id": "audit:9",
+      "ts": 1792846857510,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.transitionInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 1,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "dc805f74297fc2f21acc9f9052a476e5c7f44f85928a7f13bc45a35cc468ec66",
+      "hash": "79ab29a8ce1652b0762bb9c87bde30e217c8d443c6c35bf501c736d4871f4f54"
+    },
+    {
+      "seq": 10,
+      "id": "audit:10",
+      "ts": 1792846857544,
+      "actor": "code",
+      "seat": "payables",
+      "action": "bank_change_defense_check",
+      "ruleIds": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-019",
+            "text": "A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey."
+          },
+          "reason": "Dana must verify and approve this bank change before payment. Your policy says: “A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey.”",
+          "ruleIds": [
+            "BANK_CHANGE_HOLD"
+          ],
+          "toHuman": "Dana"
+        },
+        "hypothetical": "sender corrected; bank change still pending"
+      },
+      "prevHash": "79ab29a8ce1652b0762bb9c87bde30e217c8d443c6c35bf501c736d4871f4f54",
+      "hash": "e1a5adf991bb31fe1cc9d4f36e938ca9b39c65eb5b5e592449fa2423933904d2"
+    },
+    {
+      "seq": 11,
+      "id": "audit:11",
+      "ts": 1792846863891,
+      "actor": "local_model",
+      "seat": "payables",
+      "action": "inbox_classified",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4419"
+      ],
+      "route": "local",
+      "latencyMs": 6324.063749999999,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "classification": "invoice",
+        "model": "gpt-oss:20b",
+        "scenario_source": "judge"
+      },
+      "prevHash": "e1a5adf991bb31fe1cc9d4f36e938ca9b39c65eb5b5e592449fa2423933904d2",
+      "hash": "3b220e7edded4e3e433418f240a630e7c82741586ba555bf759002b26433d1d6"
+    },
+    {
+      "seq": 12,
+      "id": "audit:12",
+      "ts": 1792846867852,
+      "actor": "local_model",
+      "seat": "payables",
+      "action": "fields_extracted",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4419"
+      ],
+      "route": "local",
+      "latencyMs": 3955.4703340000015,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "model": "gpt-oss:20b",
+        "scenario_source": "judge"
+      },
+      "prevHash": "3b220e7edded4e3e433418f240a630e7c82741586ba555bf759002b26433d1d6",
+      "hash": "098a1b53043c02ab685daeae3f022833a6dfc3fe3def0bbf24a90628c2d4be23"
+    },
+    {
+      "seq": 13,
+      "id": "audit:13",
+      "ts": 1792846867874,
+      "actor": "code",
+      "seat": "payables",
+      "action": "pay_invoice",
+      "ruleIds": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4419",
+        "4419"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "bankChanged": false,
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-019",
+            "text": "A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey."
+          },
+          "reason": "Dana must verify and approve this bank change before payment. Your policy says: “A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey.”",
+          "ruleIds": [
+            "BANK_CHANGE_HOLD"
+          ],
+          "toHuman": "Dana"
+        },
+        "invoiceId": "4419",
+        "scenario_source": "judge",
+        "senderDomain": "acme-supply.com",
+        "vendorDomain": "acme-supply.com",
+        "vendorId": "acme"
+      },
+      "prevHash": "098a1b53043c02ab685daeae3f022833a6dfc3fe3def0bbf24a90628c2d4be23",
+      "hash": "e52f81c06ce261b4ab9d0b398fe857ff2e94310a369a8126c84ad5a260965f06"
+    },
+    {
+      "seq": 14,
+      "id": "audit:14",
+      "ts": 1792846867881,
+      "actor": "code",
+      "seat": "payables",
+      "action": "create_escalation",
+      "ruleIds": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "live-inbox:judge-4419",
+        "judge-4419",
+        "4419"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {},
+      "prevHash": "e52f81c06ce261b4ab9d0b398fe857ff2e94310a369a8126c84ad5a260965f06",
+      "hash": "8601bdbe65d9181bc468aa93cc808b4e46ca314444e704419ea54b9dc764eca9"
+    },
+    {
+      "seq": 15,
+      "id": "audit:15",
+      "ts": 1792846869032,
+      "actor": "local_model",
+      "seat": "payables",
+      "action": "inbox_classified",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4471"
+      ],
+      "route": "local",
+      "latencyMs": 1142.2959580000024,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "classification": "invoice",
+        "model": "gpt-oss:20b",
+        "scenario_source": "judge"
+      },
+      "prevHash": "8601bdbe65d9181bc468aa93cc808b4e46ca314444e704419ea54b9dc764eca9",
+      "hash": "4bafcc395f45f4050ecfee0a625feb968d3cdd533cc37e31812f20635e309a7f"
+    },
+    {
+      "seq": 16,
+      "id": "audit:16",
+      "ts": 1792846871255,
+      "actor": "local_model",
+      "seat": "payables",
+      "action": "fields_extracted",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4471"
+      ],
+      "route": "local",
+      "latencyMs": 2216.907374999999,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "model": "gpt-oss:20b",
+        "scenario_source": "judge"
+      },
+      "prevHash": "4bafcc395f45f4050ecfee0a625feb968d3cdd533cc37e31812f20635e309a7f",
+      "hash": "749131343136fe8270279667a78761cafc881e77c782e3ce945377a7fa6f4d18"
+    },
+    {
+      "seq": 17,
+      "id": "audit:17",
+      "ts": 1792846871263,
+      "actor": "code",
+      "seat": "payables",
+      "action": "pay_invoice",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4471",
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "bankChanged": true,
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-020",
+            "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+          },
+          "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN",
+            "BANK_CHANGE_HOLD"
+          ],
+          "toHuman": "Dana"
+        },
+        "invoiceId": "4471",
+        "scenario_source": "judge",
+        "senderDomain": "acme-supp1y.com",
+        "vendorDomain": "acme-supply.com",
+        "vendorId": "acme"
+      },
+      "prevHash": "749131343136fe8270279667a78761cafc881e77c782e3ce945377a7fa6f4d18",
+      "hash": "92d8011a9a7418fe036529389abcb95a2ae179d4e78dcb4805fcc3f2d644e77b"
+    },
+    {
+      "seq": 18,
+      "id": "audit:18",
+      "ts": 1792846871271,
+      "actor": "code",
+      "seat": "payables",
+      "action": "create_escalation",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "live-inbox:judge-4471",
+        "judge-4471",
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {},
+      "prevHash": "92d8011a9a7418fe036529389abcb95a2ae179d4e78dcb4805fcc3f2d644e77b",
+      "hash": "8d6ab4bfd8bb3324b1a7cd3274e01d869114694124ff934ab329642ee50a19ec"
+    }
+  ]
+}

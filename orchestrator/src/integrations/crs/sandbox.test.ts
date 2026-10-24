@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CrsClient } from './index.js';
-import { CRS_CALHACKS_PERSONAS, CRS_CALHACKS_SANDBOX, CRS_SANDBOX_IDENTITIES } from './sandbox.js';
+import { CrsClient } from './index';
+import { CRS_CALHACKS_PERSONAS, CRS_CALHACKS_SANDBOX, CRS_SANDBOX_EXPECTED, CRS_SANDBOX_IDENTITIES, createCrsClientFromEnv, createCrsFixtureClient, crsSandboxFixtureFetch } from './sandbox';
 
 // Product responses are shaped from the CRS guides (PitchPoint XML-named counts, AtData risk.score);
 // they are NOT recorded vendor responses. A live probe (pnpm crs:live) is still required for T3.
@@ -63,5 +63,46 @@ describe('Fraud Finder risk', () => {
     await expect(client(network).checkOfac(1)).rejects.toMatchObject({ code: 'CONFIGURATION' });
     await expect(client(network).getFraudRisk(21)).rejects.toMatchObject({ code: 'CONFIGURATION' });
     expect(network).not.toHaveBeenCalled();
+  });
+});
+
+describe('offline sandbox fixture', () => {
+  it('returns every persona\'s published counts and score through the real client', async () => {
+    const client = createCrsFixtureClient();
+    for (const { testIdentityId } of CRS_CALHACKS_PERSONAS) {
+      const { bankruptcies, judgments, liens, fraudRiskScore } = CRS_SANDBOX_EXPECTED[testIdentityId]!;
+      expect((await client.getPublicRecords(testIdentityId)).summary).toEqual({ bankruptcies, judgments, liens });
+      expect((await client.getFraudRisk(testIdentityId)).summary).toEqual({ fraudRiskScore });
+    }
+    expect(await client.getPublicRecords(7)).toMatchObject({ source: 'crs_fixture', label: 'FAKE: CRS fixture, test identity #7' });
+    expect(CRS_SANDBOX_EXPECTED[7]).toMatchObject({ bankruptcies: 1 });
+    expect(CRS_SANDBOX_EXPECTED[13]).toMatchObject({ fraudRiskScore: 88 });
+  });
+
+  it('agrees with the expected text CRS published for each persona', () => {
+    for (const persona of CRS_CALHACKS_PERSONAS) {
+      const expected = CRS_SANDBOX_EXPECTED[persona.testIdentityId]!;
+      expect(persona.expectedFraudRisk).toMatch(new RegExp(`^risk\\.score ${expected.fraudRiskScore} `));
+      expect(persona.expectedPublicRecords.includes('0/0/0')).toBe(expected.bankruptcies + expected.judgments + expected.liens === 0);
+    }
+  });
+
+  it('answers only exact persona bodies, like the real sandbox', async () => {
+    const response = await crsSandboxFixtureFetch('https://api-sandbox.stitchcredit.com/api/fraud-finder/fraud-finder', { method: 'POST', body: JSON.stringify({ email: 'someone@real.example' }) });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe('createCrsClientFromEnv', () => {
+  it('stays off without credentials and makes no call', () => {
+    expect(createCrsClientFromEnv({})).toBeUndefined();
+    expect(createCrsClientFromEnv({ CRS_USERNAME: ' ', CRS_PASSWORD: 'p' })).toBeUndefined();
+  });
+
+  it('builds a sandbox client that logs in with the given credentials', async () => {
+    const network = vi.fn<typeof fetch>(crsSandboxFixtureFetch);
+    const client = createCrsClientFromEnv({ CRS_USERNAME: 'user', CRS_PASSWORD: 'secret#1' }, network);
+    expect(await client!.getPublicRecords(7)).toMatchObject({ source: 'crs_sandbox', label: 'SANDBOX: test identity #7', summary: { bankruptcies: 1, judgments: 0, liens: 0 } });
+    expect(JSON.parse(String(network.mock.calls[0]?.[1]?.body))).toEqual({ username: 'user', password: 'secret#1' });
   });
 });

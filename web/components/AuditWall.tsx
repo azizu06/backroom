@@ -131,7 +131,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
           {!entries.length && <p>No actions recorded yet. Run the core loop in the connected server to see its decisions here.</p>}
           <ol className="audit-entries">{[...entries].reverse().map(row => {
             const quote = policyQuote(row, entries);
-            return <li key={row.id}><button className="audit-entry" aria-pressed={selected === row.id} onClick={() => openEntry(row.id)}>
+            return <li key={row.id} data-audit-id={row.id}><button className="audit-entry" aria-pressed={selected === row.id} onClick={() => openEntry(row.id)}>
               <span className="audit-entry-top"><span className="audit-id">#{row.seq} · {row.id}</span><span className={`audit-outcome audit-${row.decision?.toLowerCase() ?? 'recorded'}`}>{row.decision ?? 'RECORDED'}</span></span>
               <strong>{row.action.replaceAll('_', ' ')}</strong>
               <span>{row.actor} · {row.seat.replaceAll('_', ' ')} · {new Date(row.ts).toLocaleTimeString()}</span>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
-import { Instance, Instances, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
@@ -10,6 +10,8 @@ import type { PlayBridge } from '../../lib/office/play';
 import { PlayRig } from './play';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
+import { tourProgress } from '../../lib/office/tour';
+import { OFFICE_LIGHTING } from '../../lib/office/lighting';
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -23,8 +25,11 @@ function useReducedMotion() {
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
+/** Looks up the HTML tag element Office renders for an agent id. */
+export type AgentTagLookup = (agentId: string) => HTMLDivElement | undefined;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const deskIds = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
+const { key: keyLight, fill: fillLight, hemisphere, contactShadows, base, screen, vault } = OFFICE_LIGHTING;
 // Office (in the initial bundle) requests on-demand frames through this bridge.
 registerSceneFrameRequester(invalidate);
 
@@ -41,6 +46,19 @@ function ScreenLabel({ at, element }: { at: [number, number, number]; element: L
   });
   return null;
 }
+/** Projects the avatar's current head position onto its HTML tag on frames that are already rendering. */
+function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkMotion; element: AgentTagLookup }) {
+  const point = useRef(new Vector3());
+  useFrame(({ camera, size }) => {
+    const tag = element(agentId);
+    if (!tag) return;
+    point.current.set(motion.position[0], 1.95, motion.position[1]).project(camera);
+    const offscreen = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 || point.current.z > 1;
+    tag.style.visibility = offscreen ? 'hidden' : 'visible';
+    tag.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -100%)`;
+  });
+  return null;
+}
 function Desk({ room }: { room: typeof deskIds[number] }) {
   const [x, z] = OFFICE_ANCHORS[room].center;
   const accent = OFFICE_ANCHORS[room].color;
@@ -49,7 +67,12 @@ function Desk({ room }: { room: typeof deskIds[number] }) {
     <Block at={[0, 0.83, 0]} size={[2.25, 0.16, 1.05]} color='#bcaa8c' />
     {[-0.9, 0.9].map(x => <Block key={x} at={[x, 0.4, 0]} size={[0.13, 0.8, 0.8]} color='#485049' />)}
     <Block at={[-0.35, 1.18, -0.23]} size={[0.78, 0.5, 0.08]} color='#343d36' />
-    <Block at={[-0.35, 1.18, -0.18]} size={[0.67, 0.37, 0.015]} color={accent} />
+    {/* A plain mesh, not an instance, so the screen gets its own glossy material. */}
+    <mesh position={[-0.35, 1.18, -0.18]} castShadow receiveShadow>
+      <boxGeometry args={[0.67, 0.37, 0.015]} />
+      <meshPhysicalMaterial color={accent} emissive={accent} emissiveIntensity={screen.emissiveIntensity} roughness={screen.roughness}
+        metalness={screen.metalness} clearcoat={screen.clearcoat} clearcoatRoughness={screen.clearcoatRoughness} />
+    </mesh>
     <Block at={[-0.35, 0.96, -0.23]} size={[0.1, 0.22, 0.1]} color='#485049' />
     <Block at={[0.65, 0.95, 0.1]} size={[0.4, 0.06, 0.5]} color='#e7ddc5' rotation={-0.12} />
     <Block at={[0.05, 0.45, -0.9]} size={[0.65, 0.14, 0.6]} color={accent} />
@@ -122,7 +145,9 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     </mesh>)}</group>
   </group>;
 }
-function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean }) {
+/** Tour moves start from wherever the camera is when the frame after a focus change renders. */
+interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number }
+function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: boolean; tour: boolean }) {
   const reduced = useReducedMotion();
   const { camera, size, invalidate } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
@@ -130,21 +155,40 @@ function CameraRig({ focus, fixed }: { focus: AnchorId | null; fixed: boolean })
   const orbiting = useRef(false);
   const target = useRef(new Vector3());
   const destination = useRef(new Vector3(13, 15, 17));
+  const tourMove = useRef<TourMove>({ startedAt: null, position: new Vector3(), target: new Vector3(), zoom: 1 });
   useEffect(() => {
     const center = focus ? OFFICE_ANCHORS[focus].center : [0, 0];
     target.current.set(center[0]!, 0.2, center[1]!);
     destination.current.copy(target.current).add(new Vector3(13, 15, 17));
+    tourMove.current.startedAt = null;
     moving.current = true;
     invalidate();
-  }, [focus, size, fixed, invalidate]);
+  }, [focus, size, fixed, tour, invalidate]);
   useFrame((state, delta) => {
     if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
     state.invalidate();
+    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
+    if (tour) {
+      const move = tourMove.current;
+      if (move.startedAt === null) {
+        move.startedAt = performance.now();
+        move.position.copy(camera.position);
+        move.target.copy(controls.current.target);
+        move.zoom = camera.zoom;
+      }
+      const progress = tourProgress(performance.now() - move.startedAt, reduced);
+      camera.position.lerpVectors(move.position, destination.current, progress);
+      controls.current.target.lerpVectors(move.target, target.current, progress);
+      camera.zoom = MathUtils.lerp(move.zoom, zoom, progress);
+      camera.updateProjectionMatrix();
+      controls.current.update();
+      if (progress >= 1) moving.current = false;
+      return;
+    }
     const alpha = cameraAlpha(delta, reduced);
     camera.position.lerp(destination.current, alpha);
     controls.current.target.lerp(target.current, alpha);
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
     camera.zoom = MathUtils.lerp(camera.zoom, zoom, alpha);
     camera.updateProjectionMatrix();
     controls.current.update();
@@ -172,18 +216,29 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, labels, onFailure, onRestored, play }: {
-  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
-  onFailure: () => void; onRestored: () => void; play?: PlayBridge;
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play }: {
+  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
+  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge;
 }) {
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
     <color attach='background' args={['#202620']} />
-    <ambientLight intensity={1.7} />
-    <directionalLight position={[2, 12, 6]} intensity={2.5} castShadow shadow-mapSize={[1024, 1024]}
-      shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={10} shadow-camera-bottom={-10} />
+    <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
+    <directionalLight position={keyLight.position} color={keyLight.color} intensity={keyLight.intensity} castShadow={keyLight.castShadow}
+      shadow-mapSize={[keyLight.shadow.mapSize, keyLight.shadow.mapSize]} shadow-bias={keyLight.shadow.bias}
+      shadow-camera-near={keyLight.shadow.near} shadow-camera-far={keyLight.shadow.far}
+      shadow-camera-left={keyLight.shadow.left} shadow-camera-right={keyLight.shadow.right} shadow-camera-top={keyLight.shadow.top} shadow-camera-bottom={keyLight.shadow.bottom} />
+    <directionalLight position={fillLight.position} color={fillLight.color} intensity={fillLight.intensity} castShadow={fillLight.castShadow} />
+    {/* frames={Infinity} (default) re-bakes on every frame, but with frameloop='demand' that is only frames
+        something else requested (walking agents, door flashes, camera moves), so avatars stay grounded while
+        they walk and the scene never loops on its own. Each such frame also pays a second shadow-map pass.
+        Scale and color are module constants so drei's render targets are not reallocated on re-render.
+        Bases exactly at y=0 (desk legs, walls) sit below the plane and get no blob; raised undersides
+        (desktops, torsos, feet) do. */}
+    <ContactShadows position={contactShadows.position} near={contactShadows.near} scale={contactShadows.scale} resolution={contactShadows.resolution}
+      blur={contactShadows.blur} opacity={contactShadows.opacity} far={contactShadows.far} color={contactShadows.color} />
     <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
-    <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={0.9} />
+    <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
     <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color='#535c4e' />
     <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color='#828976' />
     <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color='#747e6a' />
@@ -209,12 +264,18 @@ export function OfficeScene({ snapshot, motions, fixed, paused = false, focus, l
     </group>}
     {visibleRooms(snapshot).includes('treasury') && <group>
     <Block at={[5, 0.7, 4]} size={[1.8, 1.4, 1.25]} color='#3d4e47' />
-    <Block at={[5, 0.7, 3.35]} size={[1.4, 1.05, 0.08]} color='#718176' />
+    <mesh position={[5, 0.7, 3.35]} castShadow receiveShadow>
+      <boxGeometry args={[1.4, 1.05, 0.08]} />
+      <meshStandardMaterial color={vault.color} roughness={vault.roughness} metalness={vault.metalness} />
+    </mesh>
     <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
     </group>}
     <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
-    {snapshot.agents.map(agent => <Avatar key={agent.id} agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />)}
+    {snapshot.agents.map(agent => <Fragment key={agent.id}>
+      <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />
+      {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
+    </Fragment>)}
     </Instances>
-    {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
+    {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
