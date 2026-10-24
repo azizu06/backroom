@@ -1,0 +1,161 @@
+'use client';
+
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import type { AskWhyVoiceResult } from '../lib/why-voice/types';
+
+/** Unmounted: the wall/office owns placement and optional citation selection. */
+export function AskWhyVoice({ onAnswer }: { onAnswer?: (answer: AskWhyVoiceResult) => void }) {
+  const [phase, setPhase] = useState<'idle' | 'arming' | 'recording' | 'thinking'>('idle');
+  const [question, setQuestion] = useState('');
+  const [result, setResult] = useState<AskWhyVoiceResult>();
+  const [error, setError] = useState<string>();
+  const held = useRef(false);
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const request = useRef<AbortController | null>(null);
+  const playback = useRef<HTMLAudioElement | null>(null);
+
+  function release() {
+    held.current = false;
+    clearTimeout(timer.current);
+    if (recorder.current?.state === 'recording') recorder.current.stop();
+    stream.current?.getTracks().forEach(track => track.stop());
+  }
+  useEffect(() => {
+    mounted.current = true;
+    const blur = () => release();
+    const hide = () => { if (document.hidden) release(); };
+    window.addEventListener('blur', blur);
+    document.addEventListener('visibilitychange', hide);
+    return () => {
+      mounted.current = false;
+      if (recorder.current) recorder.current.onstop = null;
+      release();
+      request.current?.abort();
+      window.removeEventListener('blur', blur);
+      document.removeEventListener('visibilitychange', hide);
+    };
+  }, []);
+  useEffect(() => {
+    if (result?.audio) void playback.current?.play().catch(() => { /* Native controls allow a user gesture. */ });
+  }, [result]);
+
+  async function send(body: BodyInit, voice: boolean) {
+    setPhase('thinking');
+    setError(undefined);
+    setResult(undefined);
+    request.current = new AbortController();
+    try {
+      const response = await fetch(voice ? '/api/why/voice' : '/api/why', {
+        method: 'POST', body, headers: voice ? undefined : { 'Content-Type': 'application/json' },
+        signal: request.current.signal,
+      });
+      if (!response.ok) throw new Error('REQUEST_FAILED');
+      const answer: AskWhyVoiceResult = await response.json();
+      if (!mounted.current) return;
+      setResult(answer);
+      setQuestion(answer.question);
+      onAnswer?.(answer);
+    } catch {
+      if (mounted.current) setError(voice ? 'Voice is unavailable. Type your question below.' : 'Could not answer. Try again.');
+    } finally {
+      busy.current = false;
+      if (mounted.current) setPhase('idle');
+    }
+  }
+  async function start() {
+    if (busy.current) return;
+    busy.current = true;
+    held.current = true;
+    setError(undefined);
+    setPhase('arming');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') throw new Error('NO_MIC');
+      playback.current?.pause();
+      setResult(undefined);
+      const media = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 }, video: false });
+      if (!mounted.current || !held.current) {
+        media.getTracks().forEach(track => track.stop());
+        busy.current = false;
+        if (mounted.current) setPhase('idle');
+        return;
+      }
+      stream.current = media;
+      const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'].find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error('NO_AUDIO_FORMAT');
+      const recording = new MediaRecorder(media, { mimeType, audioBitsPerSecond: 64000 });
+      recorder.current = recording;
+      const chunks: Blob[] = [];
+      recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      recording.onerror = () => {
+        recording.onstop = null;
+        release();
+        busy.current = false;
+        setPhase('idle');
+        setError('Recording failed. Type your question below.');
+      };
+      recording.onstop = () => {
+        release();
+        recorder.current = null;
+        if (!mounted.current) return;
+        const body = new FormData();
+        body.set('audio', new Blob(chunks, { type: mimeType }), 'question');
+        void send(body, true);
+      };
+      recording.start();
+      setPhase('recording');
+      timer.current = setTimeout(release, 15_000);
+    } catch {
+      release();
+      busy.current = false;
+      if (mounted.current) {
+        setPhase('idle');
+        setError('Microphone unavailable. Type your question below.');
+      }
+    }
+  }
+  function keyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+      event.preventDefault();
+      void start();
+    }
+  }
+  function keyUp(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); release(); }
+  }
+  return <section aria-label="Ask why">
+    <p>AI answers from the audit log. Voice audio is sent to Cartesia.</p>
+    <button type="button" disabled={phase === 'thinking'} aria-pressed={phase === 'recording'}
+      style={{ touchAction: 'none' }}
+      onPointerDown={event => {
+        if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        void start();
+      }} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}
+      onKeyDown={keyDown} onKeyUp={keyUp} onBlur={release}>
+      {phase === 'recording' ? 'Release to ask' : phase === 'arming' ? 'Opening microphone…' : 'Hold to ask why'}
+    </button>
+    <form onSubmit={event => {
+      event.preventDefault();
+      if (busy.current || !question.trim()) return;
+      busy.current = true;
+      playback.current?.pause();
+      void send(JSON.stringify({ question: question.trim() }), false);
+    }}>
+      <label>Question <input value={question} maxLength={1000} disabled={phase !== 'idle'}
+        onChange={event => setQuestion(event.target.value)} /></label>
+      <button type="submit" disabled={phase !== 'idle' || !question.trim()}>Ask why</button>
+    </form>
+    <span role="status">{phase === 'thinking' ? 'Checking the audit log…' : phase === 'recording' ? 'Recording (15 seconds maximum)' : ''}</span>
+    {error && <p role="alert">{error}</p>}
+    {result && <div>
+      <p>{result.answer}</p>
+      {result.audio ? <audio ref={playback} controls preload="auto"
+        src={`data:${result.audio.mimeType};base64,${result.audio.base64}`} />
+        : <p>Audio unavailable; the answer is shown above.</p>}
+    </div>}
+  </section>;
+}
