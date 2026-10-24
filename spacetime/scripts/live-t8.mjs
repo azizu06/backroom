@@ -14,14 +14,10 @@ const run = (...args) => execFileSync(cli, [...prefix, ...args, "--server", serv
 const call = (name, ...args) => run("call", database, name, ...args);
 const sql = () => run("sql", database, "SELECT * FROM agent");
 const before = sql();
-let rejected = false;
-try { call("request_room_entry", "collections-1", "payables"); }
-catch (error) {
-  rejected = String(error.stderr).includes("DENY:NOT_IN_BADGE");
-  if (!rejected) throw new Error("Expected policy rejection, got a different reducer failure");
-}
-if (!rejected || sql() !== before) throw new Error("Disallowed write was accepted or changed the row");
-console.log("PASS: policy rejects forbidden room; entire agent row unchanged");
+call("request_room_entry", "collections-1", "payables");
+const denied = run("sql", database, "SELECT * FROM audit_entry WHERE action = 'request_room_entry' AND decision = 'DENY'");
+if (sql() !== before || !denied.includes("NOT_IN_BADGE")) throw new Error("Disallowed room changed the agent or omitted DENY evidence");
+console.log("PASS: policy refuses forbidden room; agent unchanged, DENY audit committed");
 
 const unauthorized = await fetch(`${server}/v1/database/${database}/call/set_agent_target`, {
   method: "POST", headers: { "Content-Type": "application/json" },

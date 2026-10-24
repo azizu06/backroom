@@ -193,9 +193,15 @@ importers:
       '@backroom/policy':
         specifier: workspace:*
         version: link:../policy
+      '@noble/hashes':
+        specifier: 2.0.1
+        version: 2.0.1
       '@simplewebauthn/server':
         specifier: ^14.0.3
         version: 14.0.3
+      spacetimedb:
+        specifier: 2.13.0
+        version: 2.13.0(react@19.3.1)
     devDependencies:
       '@types/node':
         specifier: 20.19.39
@@ -221,6 +227,9 @@ importers:
 
   spacetime:
     dependencies:
+      '@backroom/orchestrator':
+        specifier: workspace:*
+        version: link:../orchestrator
       '@backroom/policy':
         specifier: workspace:*
         version: link:../policy
@@ -228,6 +237,12 @@ importers:
         specifier: 2.13.0
         version: 2.13.0(react@19.3.1)
     devDependencies:
+      '@types/node':
+        specifier: 20.19.39
+        version: 20.19.39
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -695,6 +710,10 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@noble/hashes@2.0.1':
+    resolution: {integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==}
+    engines: {node: '>= 20.19.0'}
 
   '@peculiar/asn1-android@2.11.0':
     resolution: {integrity: sha512-llW/qjavL+tOxt5i9whUv4wsbsLpUwI6k/DrvKsdA/H7A/TB/6CosMFgvei28fcJ8ncD0c5lig1oBBlo4KGMCw==}
@@ -1854,6 +1873,8 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@16.4.3':
     optional: true
+
+  '@noble/hashes@2.0.1': {}
 
   '@peculiar/asn1-android@2.11.0':
     dependencies:
