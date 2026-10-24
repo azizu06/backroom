@@ -1,0 +1,157 @@
+{
+  "measuredAt": "2026-10-24T07:20:21.963Z",
+  "base": "http://100.117.44.20:11434/v1",
+  "method": "Sequential requests from Mac over Tailscale; wall-clock latency includes queue, prefill and output; tokens/s is completion tokens / wall-clock seconds (not decode-only). No warmup excluded. Qwen reasoning_effort=none; GPT-OSS reasoning_effort=low. Explicit invoice.schema.json in prompt; validated keys/types/currency/date patterns/nonnegative amounts locally.",
+  "results": [
+    {
+      "model": "qwen3:8b",
+      "run": 1,
+      "latencyMs": 2908,
+      "completionTokens": 101,
+      "tokensPerSecond": 34.73,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "qwen3:8b",
+      "run": 2,
+      "latencyMs": 2449,
+      "completionTokens": 101,
+      "tokensPerSecond": 41.24,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "qwen3:8b",
+      "run": 3,
+      "latencyMs": 2462,
+      "completionTokens": 101,
+      "tokensPerSecond": 41.02,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "qwen3:8b",
+      "run": 4,
+      "latencyMs": 2451,
+      "completionTokens": 101,
+      "tokensPerSecond": 41.2,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "qwen3:8b",
+      "run": 5,
+      "latencyMs": 2464,
+      "completionTokens": 101,
+      "tokensPerSecond": 40.98,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "run": 1,
+      "latencyMs": 2063,
+      "completionTokens": 96,
+      "tokensPerSecond": 46.52,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "run": 2,
+      "latencyMs": 1854,
+      "completionTokens": 96,
+      "tokensPerSecond": 51.77,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "run": 3,
+      "latencyMs": 1851,
+      "completionTokens": 96,
+      "tokensPerSecond": 51.86,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "run": 4,
+      "latencyMs": 1885,
+      "completionTokens": 96,
+      "tokensPerSecond": 50.93,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "run": 5,
+      "latencyMs": 1892,
+      "completionTokens": 96,
+      "tokensPerSecond": 50.74,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:120b",
+      "run": 1,
+      "latencyMs": 4718,
+      "completionTokens": 183,
+      "tokensPerSecond": 38.79,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:120b",
+      "run": 2,
+      "latencyMs": 4275,
+      "completionTokens": 183,
+      "tokensPerSecond": 42.8,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:120b",
+      "run": 3,
+      "latencyMs": 4311,
+      "completionTokens": 183,
+      "tokensPerSecond": 42.45,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:120b",
+      "run": 4,
+      "latencyMs": 4448,
+      "completionTokens": 183,
+      "tokensPerSecond": 41.15,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    },
+    {
+      "model": "gpt-oss:120b",
+      "run": 5,
+      "latencyMs": 4651,
+      "completionTokens": 183,
+      "tokensPerSecond": 39.35,
+      "schemaValid": true,
+      "exactMatch": true,
+      "output": "{\"vendor\":\"NORTHSTAR PAPER LLC\",\"customer\":\"Acme Studio LLC\",\"invoiceId\":\"NP--2026/0091\",\"purchaseOrder\":\"PO-88-19\",\"currency\":\"USD\",\"issuedDate\":\"2026-10-01\",\"dueDate\":\"2026-10-31\",\"subtotal\":171.5,\"tax\":12.01,\"total\":183.51}"
+    }
+  ]
+}
