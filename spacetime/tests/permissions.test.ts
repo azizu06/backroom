@@ -9,9 +9,10 @@ test("stored collections badge rejects payables room and permits collections", (
   harness.withReducerTx(auth, ctx => moduleExports.init(ctx, {}));
   const before = harness.db.agent.id.find("collections-1");
 
-  expect(() => harness.withReducerTx(auth, ctx => moduleExports.request_room_entry(ctx, {
+  harness.withReducerTx(auth, ctx => moduleExports.request_room_entry(ctx, {
     agentId: "collections-1", room: "payables",
-  }))).toThrow("DENY:NOT_IN_BADGE");
+  }));
+  expect([...harness.db.audit_entry.iter()][0]).toMatchObject({ decision: "DENY", ruleIds: ["NOT_IN_BADGE"] });
   expect(harness.db.agent.id.find("collections-1")).toEqual(before);
 
   harness.withReducerTx(auth, ctx => moduleExports.request_room_entry(ctx, {

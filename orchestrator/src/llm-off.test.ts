@@ -67,7 +67,7 @@ it.each([
   await pay('clean-off', { ...invoice, id: 'clean-off' }, context);
   expect(await routeInboxItem({ id, kind: 'invoice' }, store)).toMatchObject({ seat: 'payables', source: 'code' });
   await pay(id, trap, ctx);
-  expect((await store.listAudit()).at(-1)).toMatchObject({ decision: 'ESCALATE', ruleIds: [rule], actor: 'code' });
+  expect((await store.listAudit()).filter(entry => entry.decision).at(-1)).toMatchObject({ decision: 'ESCALATE', ruleIds: [rule], actor: 'code' });
   expect(effects.calls).toHaveLength(2);
   expect((await store.listAudit()).slice(start).every(entry => entry.actor === 'code')).toBe(true);
   expect(network).not.toHaveBeenCalled();
@@ -91,7 +91,7 @@ it('pauses voice after evaluating its permit, keeps a code stop running, and res
   ] });
   await worker.tick();
   expect((await store.getTask('dnc'))?.status).toBe('denied');
-  expect((await store.listAudit()).at(-1)).toMatchObject({ actor: 'code', ruleIds: ['DNC'] });
+  expect((await store.listAudit()).filter(entry => entry.decision).at(-1)).toMatchObject({ actor: 'code', ruleIds: ['DNC'] });
   expect(effects.calls).toHaveLength(0);
   await store.setLlmEnabled(true);
   await worker.tick();

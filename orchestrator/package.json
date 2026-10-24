@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@backroom/policy": "workspace:*",
+    "@backroom/nessie": "workspace:*",
+    "@noble/hashes": "2.0.1",
     "@simplewebauthn/server": "^14.0.3",
-    "@backroom/nessie": "workspace:*"
+    "spacetimedb": "2.13.0"
   },
   "devDependencies": {
     "@types/node": "20.19.39",
@@ -28,5 +30,11 @@
   "types": "src/index.ts",
   "engines": {
     "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./reducer": "./src/reducer-engine.ts",
+    "./spacetime-client": "./src/spacetime-client/index.ts",
+    "./spacetime-client/types": "./src/spacetime-client/types.ts"
   }
 }

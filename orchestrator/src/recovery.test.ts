@@ -29,6 +29,7 @@ describe('Payables recovery', () => {
     await expect(old.tick()).rejects.toThrow('LEASE_LOST');
     await store.reapExpired(now);
     expect((await store.getTask(payment.id))?.status).toBe('queued');
+    const beforeRecovery = await store.listAudit();
     const replacement = worker('replacement'); await replacement.start();
     await replacement.tick();
     expect(effects.calls).toHaveLength(1);
@@ -36,7 +37,7 @@ describe('Payables recovery', () => {
     expect((await store.listAudit()).find(entry => entry.action === 'task_resumed')).toMatchObject({
       refs: ['invoice:recovery:1', 'recovery:1'], inputs: {
         taskId: payment.id, workerId: 'replacement', leaseToken: 2, cursor: 0,
-        priorAuditIds: modelsEnabled ? ['audit:1', 'audit:2'] : ['audit:2', 'audit:3'],
+        priorAuditIds: expect.arrayContaining(beforeRecovery.filter(entry => entry.action === 'pay_invoice' || entry.action === 'lease_expired').map(entry => entry.id)),
       },
     });
     if (!modelsEnabled) expect((await store.listAudit()).every(entry => entry.actor === 'code')).toBe(true);

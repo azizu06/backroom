@@ -6,13 +6,18 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:contract": "vitest run --config vitest.contract.config.ts",
+    "test:live": "tsx scripts/live-store.ts"
   },
   "dependencies": {
+    "@backroom/orchestrator": "workspace:*",
     "@backroom/policy": "workspace:*",
     "spacetimedb": "2.13.0"
   },
   "devDependencies": {
+    "@types/node": "20.19.39",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "3.2.7"
   }
