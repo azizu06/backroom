@@ -31,6 +31,29 @@ test('the Enter key starts first person from the splash', async ({ page }) => {
   await expect(surface(page)).toBeFocused();
 });
 
+test('the splash traps Tab at both ends and Escape still opens the overview', async ({ page }) => {
+  await page.goto('/office');
+  const gate = splash(page);
+  const enter = gate.getByRole('button', { name: 'Enter', exact: true });
+  const overview = gate.getByRole('button', { name: 'Overview (map view)' });
+  await expect(enter).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(overview).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(enter).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(overview).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(enter).toBeFocused();
+  // Focus that already escaped is pulled back in by the next Tab.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Tab');
+  await expect(gate.locator(':focus')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(gate).toHaveCount(0);
+  await expect(page.getByLabel('Office view')).toHaveValue('walk');
+});
+
 test('choosing the overview is remembered for the next visit', async ({ page }) => {
   await page.goto('/office');
   await splash(page).getByRole('button', { name: 'Overview (map view)' }).click();
