@@ -7,7 +7,7 @@
     "requiredOwner": "triumph!",
     "signedAt": "2026-10-24T08:58:00Z",
     "evidenceRef": "https://github.com/azizu06/backrooms/issues/1#issuecomment-6382284534",
-    "note": "triumph! approved this seed in chat for eval run #1. Issue checkboxes stay open. Outside authorship is still 0/34. Integration steps are not executed, so the run grades policy decisions only."
+    "note": "triumph! approved this seed in chat for eval run #1. Issue checkboxes stay open. Outside authorship is still 0/34. Planted bank-feed cases and the spoken-approval rejection are executed and graded against plantedRule. Other integration steps are not executed."
   },
   "payables": {
     "P01": {
