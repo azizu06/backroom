@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `f31af7f4f81cf45652b53ad9a1382a74f580fbf5`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `52c80bcf8b34364553d0c65e045ba9bc43a6cd8b`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -25,7 +25,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | Collections pre-call permit agreement | 8/8 (100%) |
 | Keyed bank-feed reconciliation agreement | 4/4 (100%) |
 | P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | 3/3 (100%) |
-| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out) | 6/6 (100%) |
+| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | 9/9 (100%) |
 | Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | 6/6 (100%) |
 | P10 Collections dispatcher tool isolation (not policy rule agreement) | 1/1 (100%) |
 | P04 dispatcher bank-change application (software passkey, fixture providers) | 1/1 (100%) |
@@ -76,7 +76,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **C15**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C17**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C21**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
-- **AR_RUNTIME**: Six AR conversations (C02, C06, C07, C08, C10, C12) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor. Caller lines and voice-agent tool choices are scripted; Cartesia speech, live phone and the other collections scenarios are not driven through the Dispatcher.
+- **AR_RUNTIME**: 9 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.
 
 ## Keyed AP items
 

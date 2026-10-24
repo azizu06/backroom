@@ -4,11 +4,11 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "f31af7f4f81cf45652b53ad9a1382a74f580fbf5",
+    "baseCommit": "52c80bcf8b34364553d0c65e045ba9bc43a6cd8b",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "43befa9ccb698838405497d48b5099214d72431a221dc00c6f355f337b23e228",
+      "orchestrator/src/agents/eval/conversation.ts": "405f533151f8fab92f53be87b882d80415e3700a4ea9fb52aeccaad0f4d43dfc",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
       "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
       "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
@@ -18,7 +18,7 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/provenance.ts": "ee052df2f10592ac057dfe0a9db042b3d58cc7b261f1e8047a0e33b18829be66",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "ad1d1fae3f7cade5473cd7fb87c303dee208d898c46b9fa2de421fcef3885275"
+      "orchestrator/src/agents/eval/scoreboard.ts": "a91c68fa350ae775cb99dc6257b259161c191eb8acfd914d82c2c7116c1dc284"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -151,8 +151,8 @@
       "percent": 100
     },
     "arConversations": {
-      "numerator": 6,
-      "denominator": 6,
+      "numerator": 9,
+      "denominator": 9,
       "percent": 100
     },
     "precallStops": {
@@ -14008,6 +14008,125 @@
         "collections.next-call.can_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    },
+    {
+      "id": "hostile",
+      "scenarioId": "C05",
+      "invoiceId": "1042",
+      "match": true,
+      "checks": {
+        "dialedOnce": true,
+        "callStatus": true,
+        "caseStatus": true,
+        "roles": true,
+        "cleared": true,
+        "noLeakBeforeIdentity": true,
+        "auditChain": true,
+        "noOfferAfterStop": true,
+        "humanHoldRecorded": true,
+        "nextCallRefused": true
+      },
+      "callStatus": "human_requested",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "roles": [
+        "collections"
+      ],
+      "cleared": false,
+      "reconRules": [],
+      "gatewayTools": [
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:CONTEXT",
+        "request_human:RECORDED"
+      ],
+      "tools": [
+        "collections.planner.get_invoice_context",
+        "collections.planner.can_call",
+        "collections.planner.run_precall",
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call"
+      ],
+      "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    },
+    {
+      "id": "human_request",
+      "scenarioId": "C09",
+      "invoiceId": "1042",
+      "match": true,
+      "checks": {
+        "dialedOnce": true,
+        "callStatus": true,
+        "caseStatus": true,
+        "roles": true,
+        "cleared": true,
+        "noLeakBeforeIdentity": true,
+        "auditChain": true,
+        "noOfferAfterStop": true,
+        "humanHoldRecorded": true,
+        "nextCallRefused": true
+      },
+      "callStatus": "human_requested",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "roles": [
+        "collections"
+      ],
+      "cleared": false,
+      "reconRules": [],
+      "gatewayTools": [
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:CONTEXT",
+        "request_human:RECORDED"
+      ],
+      "tools": [
+        "collections.planner.get_invoice_context",
+        "collections.planner.can_call",
+        "collections.planner.run_precall",
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call"
+      ],
+      "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    },
+    {
+      "id": "voicemail",
+      "scenarioId": "C21",
+      "invoiceId": "1042",
+      "match": true,
+      "checks": {
+        "dialedOnce": true,
+        "callStatus": true,
+        "caseStatus": true,
+        "roles": true,
+        "cleared": true,
+        "noLeakBeforeIdentity": true,
+        "auditChain": true,
+        "noDetailsWithoutIdentity": true,
+        "nextCallAllowed": true
+      },
+      "callStatus": "active",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "roles": [
+        "collections"
+      ],
+      "cleared": false,
+      "reconRules": [],
+      "gatewayTools": [
+        "get_invoice_context:DENY"
+      ],
+      "tools": [
+        "collections.planner.get_invoice_context",
+        "collections.planner.can_call",
+        "collections.planner.run_precall",
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call",
+        "collections.next-call.run_precall",
+        "collections.next-call.start_call"
+      ],
+      "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     }
   ],
   "precallStops": [
@@ -14700,7 +14819,7 @@
     },
     {
       "id": "AR_RUNTIME",
-      "detail": "Six AR conversations (C02, C06, C07, C08, C10, C12) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor. Caller lines and voice-agent tool choices are scripted; Cartesia speech, live phone and the other collections scenarios are not driven through the Dispatcher."
+      "detail": "9 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     }
   ]
 }
