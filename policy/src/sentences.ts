@@ -27,6 +27,7 @@ export const POLICY_SENTENCES = {
   "NF-025": "Signals may narrow the saved Collections limits or reorder options, and may never widen authority.",
   "NF-026": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
   "NF-027": "The first payment link must equal the code-computed first installment of the invoice principal and non-waived late fees after any permitted principal discount.",
+  "NF-028": "A CRS fraud risk score of 70 or higher puts bank changes and payments on hold for Dana; a lower score never approves a bank change.",
 } as const;
 
 export const RULE_SENTENCES = {
@@ -39,6 +40,7 @@ export const RULE_SENTENCES = {
   BANK_CHANGE_HOLD: "NF-019", LOOKALIKE_DOMAIN: "NF-020", DUPLICATE_INVOICE: "NF-021",
   PAYEE_NOT_IN_MASTER: "NF-022", OPERATING_ACCOUNT_ONLY: "NF-023",
   IDENTITY_REQUIRED: "NF-024", SIGNALS_ONLY_NARROW: "NF-025", INVALID_INPUT: "NF-026",
+  FRAUD_RISK_HOLD: "NF-028",
   LINK_AMOUNT: "NF-027",
 } as const;
 export type RuleId = keyof typeof RULE_SENTENCES;

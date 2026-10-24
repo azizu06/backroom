@@ -4,6 +4,7 @@ import { boundedHealthCheck, boundedCreditCheck } from './checks';
 import type { AuditInput } from '../store';
 import type { PreCallInput, PreCallDependencies, PreCallResult } from './types';
 export type * from './types';
+export { createPreCallCreditCheck, createCrsPublicRecordsCheck } from './crs';
 export { createCallPlanner } from './planner';
 export { createCrsCreditCheck, createApifyHealthCheck } from './adapters';
 export { createApifyRunner, createPreCallHealthCheck, APIFY_DEMO_COMPANY } from './apify';
@@ -40,7 +41,8 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   const [credit, health] = await Promise.all([
     boundedCreditCheck(deps.credit, input.testIdentityId).then(async result => {
       await audit('credit_check', { latencyMs: now() - creditStart, inputs: {
-        label: `SANDBOX: test identity #${input.testIdentityId}`, ofacStatus: result?.ofacStatus ?? 'unknown',
+        label: deps.credit.label === 'CRS sandbox' ? `CRS sandbox: test identity #${input.testIdentityId}` : deps.credit.label ?? 'provided (source unverified)',
+        ...(deps.credit.label === 'CRS sandbox' ? { ofacAvailability: 'not available in sandbox' } : {}), ofacStatus: result?.ofacStatus ?? 'unknown',
         evidence: result?.evidence ?? [],
       } });
       return result;
@@ -52,6 +54,7 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   ]);
   const context: Context = { ...input.context, signals: {
     ...input.context.signals,
+    bankruptcy: input.context.signals?.bankruptcy === true || credit?.bankruptcy === true,
     ofacHit: input.context.signals?.ofacHit === true || credit?.ofacStatus === 'hit',
     closedBusiness: input.context.signals?.closedBusiness === true || !!health?.signals.some(signal => signal.type === 'maps_status' && signal.value === 'permanently_closed'),
     active: [...new Set([...(input.context.signals?.active ?? []), ...(credit?.activeSignals ?? []), ...(!health ? ['health_check_pending'] : [])])],
