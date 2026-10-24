@@ -3,6 +3,7 @@
  * Run: node tools/demo/rehearse.mjs
  */
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { parseEnv } from 'node:util';
@@ -32,7 +33,7 @@ async function control(action) {
 const initial = await control('status');
 const live = process.argv.includes('--live');
 assert.equal(initial.bank, live ? 'nessie_sandbox' : 'mock', 'Host bank must match explicit walkthrough mode');
-assert.equal(initial.llmEnabled, live, 'Host LLM mode must match walkthrough mode');
+if (!process.argv.includes('--paylink')) assert.equal(initial.llmEnabled, live, 'Host LLM mode must match walkthrough mode');
 const out = resolve(live ? 'docs/evidence/test-v1/live' : 'docs/evidence/test-v1', new Date().toISOString().replaceAll(':', '-'));
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -44,6 +45,56 @@ const steps = [];
 async function shot(name, detail) {
   await page.screenshot({ path: resolve(out, `${name}.png`), fullPage: true });
   steps.push({ name, detail }); console.log(`PASS ${name}`);
+}
+if (process.argv.includes('--paylink')) {
+  try {
+    // Synthetic call registration; no Cartesia session or phone dial.
+    const callId = randomUUID();
+    const auth = { authorization: `Bearer ${owner.token}`, 'content-type': 'application/json' };
+    const register = { method: 'POST', headers: auth, body: JSON.stringify({ sessionId: callId }) };
+    assert.equal((await fetch(`${initial.localUrl}/__demo/voice-call`, { ...register, headers: { 'content-type': 'application/json' } })).status, 401);
+    assert.equal((await fetch(`${initial.publicUrl}/__demo/voice-call`, register)).status, 403);
+    assert((await fetch(`${initial.localUrl}/__demo/voice-call`, register)).ok);
+    const tool = async (name, args = {}) => {
+      const response = await fetch(`${initial.localUrl}/api/tools/${name}`, { method: 'POST',
+        headers: { authorization: `Bearer ${controls.TOOL_GATEWAY_SECRET}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ call_id: callId, webhook_request_id: randomUUID(), ...args }) });
+      assert(response.ok); return response.json();
+    };
+    assert.deepEqual((await tool('get_invoice_context')).rule_ids, ['IDENTITY_REQUIRED']);
+    await tool('verify_identity_result', { result: 'confirmed' });
+    const plan = await tool('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+    assert.equal(plan.kind, 'ALLOW');
+    const link = await tool('send_payment_link', { plan_id: plan.plan_id });
+    assert.equal(link.amount_cents, 247500);
+    await page.goto(`${initial.publicUrl}/payment-link`);
+    await expect(page.getByText(link.short_code, { exact: true })).toBeVisible();
+    await page.addScriptTag({ path: require.resolve('jsqr/dist/jsQR.js') });
+    const decoded = await page.evaluate(async () => {
+      const image = document.querySelector('img[alt="Scan to open your authorized payment page"]');
+      await image.decode();
+      const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      return window.jsQR(data.data, data.width, data.height)?.data;
+    });
+    assert.equal(decoded, `${initial.publicUrl}/p/${link.short_code}`);
+    await shot('paylink-01-qr', 'Decoded the rendered QR pixels into the public HTTPS short URL');
+    await page.goto(decoded);
+    await expect(page.getByRole('button', { name: 'Pay $2,475.00 with simulated card', exact: true })).toBeVisible();
+    assert(page.url().endsWith(link.link_path));
+    await page.getByRole('button', { name: 'Pay $2,475.00 with simulated card', exact: true }).click();
+    await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
+    await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
+    await shot('paylink-02-reconciled', live ? 'Real Nessie sandbox deposit and exact reducer reconciliation; receipt survives reload' : 'Mock Nessie HTTP and exact reducer reconciliation; receipt survives reload');
+    assert.deepEqual(errors, []);
+    writeFileSync(resolve(out, 'paylink.json'), JSON.stringify({ at: new Date().toISOString(), bank: initial.bank, phoneDialed: false,
+      qrDecoded: true, amountCents: 247500, status: 'partially_paid', privateRegistration: true, steps }, null, 2));
+    console.log(`PASS paylink: ${initial.bank}; QR -> short URL -> authorized pay -> deposit -> reconciliation`);
+  } finally { await browser.close(); }
+  process.exit(0);
 }
 try {
   let whyResult;
