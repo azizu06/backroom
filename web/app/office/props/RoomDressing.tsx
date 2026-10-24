@@ -5,7 +5,7 @@ import { Instance, Instances } from '@react-three/drei';
 import { OFFICE_ANCHORS, visibleRooms, type OfficeSnapshot } from '../../../lib/office/state';
 import {
   DRESSING_INSTANCE_LIMIT, PLANT_FOLIAGE_Y, PLANT_RADIUS, SIGN_DEPTH, SIGN_FACE_HEIGHT, SIGN_FACE_WIDTH,
-  dressingBoxes, dressingFor, type Dressing, type DressingPlant, type DressingSign,
+  dressingBoxes, dressingFor, type Dressing, type DressingBox, type DressingPlant, type DressingSign,
 } from '../../../lib/office/props/dressing';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 
@@ -39,13 +39,22 @@ function Foliage({ plant }: { plant: DressingPlant }) {
   </mesh>;
 }
 
+/** One instanced unit box per batch; floor paint is its own batch so it never casts. */
+function BoxInstances({ boxes, castShadow }: { boxes: readonly DressingBox[]; castShadow: boolean }) {
+  return <Instances limit={DRESSING_INSTANCE_LIMIT} castShadow={castShadow} receiveShadow frustumCulled={false}>
+    <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={0.9} />
+    {boxes.map((box, i) => <Instance key={i} position={box.position} rotation={[0, box.rotationY, 0]} scale={box.size} color={box.color} />)}
+  </Instances>;
+}
+
 const DressingMeshes = memo(function DressingMeshes({ dressing }: { dressing: Dressing }) {
-  const boxes = useMemo(() => dressingBoxes(dressing), [dressing]);
+  const [solid, paint] = useMemo(() => {
+    const boxes = dressingBoxes(dressing);
+    return [boxes.filter(box => box.kind !== 'paint'), boxes.filter(box => box.kind === 'paint')];
+  }, [dressing]);
   return <group name='prop:dressing'>
-    <Instances limit={DRESSING_INSTANCE_LIMIT} castShadow receiveShadow frustumCulled={false}>
-      <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={0.9} />
-      {boxes.map((box, i) => <Instance key={i} position={box.position} rotation={[0, box.rotationY, 0]} scale={box.size} color={box.color} />)}
-    </Instances>
+    <BoxInstances boxes={solid} castShadow />
+    <BoxInstances boxes={paint} castShadow={false} />
     {dressing.plants.map(plant => <Foliage key={`${plant.x},${plant.z}`} plant={plant} />)}
     {dressing.signs.map(sign => <Sign key={sign.room} sign={sign} />)}
   </group>;
