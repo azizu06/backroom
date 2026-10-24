@@ -97,3 +97,9 @@ for their live acceptance gates.
 402 → `gpt-oss:120b`, with a code-validated plan. `live-receipt-initial.json` preserves
 the initial safe failure before the fallback request was tightened. CRS/Apify in
 both receipts are explicitly synthetic. These single samples are not a p50 SLA.
+
+Live Apify is separately opt-in via `PRECALL_APIFY=live`; otherwise the demo
+health check remains `FAKE`. Run `pnpm --filter @backroom/orchestrator apify:live`
+with that switch for a website-only Actor smoke without a live model, phone, or
+bank. See `docs/evidence/apify/README.md` for the receipt, limits, schema boundary,
+and provenance labels. Actor implementation/publication remains stream D's scope.

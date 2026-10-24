@@ -9,6 +9,10 @@ import type { DemoBank } from './bank';
 
 async function main() {
   const args = process.argv.slice(2);
+  if (process.env.PRECALL_APIFY === 'live') {
+    const env = new URL('../../../.env.local', import.meta.url);
+    if (existsSync(env)) process.loadEnvFile(fileURLToPath(env));
+  }
   const recordIndex = args.indexOf('--record');
   const recordName = recordIndex >= 0 ? args[recordIndex + 1] : undefined;
   const remaining = args.filter((_, index) => index !== recordIndex && (recordIndex < 0 || index !== recordIndex + 1));
@@ -19,7 +23,7 @@ async function main() {
   let bank: DemoBank | undefined;
   let accountId: string | undefined;
   if (args.includes('--live')) {
-    const env = new URL('../../../../.env.local', import.meta.url);
+    const env = new URL('../../../.env.local', import.meta.url);
     if (existsSync(env)) process.loadEnvFile(fileURLToPath(env));
     if (!process.env.NESSIE_API_KEY) throw new Error('LIVE_NESSIE_KEY_REQUIRED: --live needs NESSIE_API_KEY');
     const module = await import('@backroom/nessie');
@@ -28,7 +32,7 @@ async function main() {
     bank = client;
     accountId = process.env.NESSIE_ACCOUNT_ID;
     if (!accountId) accountId = (await module.seedNorthfield(client, claims)).account._id;
-    console.log('LIVE Nessie sandbox ONLY. Card, call, controller authenticator and external pre-call checks remain simulated.');
+    console.log('LIVE Nessie sandbox ONLY. Card, call, controller authenticator and CRS remain simulated; Apify requires its separate PRECALL_APIFY=live opt-in.');
   }
   console.log('MOMENT 1 | 3D closed | policy + gateway + payment service + reconciliation + StateStore real; external transports fake by default');
   const stores: SpacetimeStateStore[] = [];
@@ -43,7 +47,7 @@ async function main() {
     return recorder ? recorder.attach(store ?? new MemoryStateStore(), phase) : store;
   };
   try {
-    const run = await runCoreDemo({ store: recordedState('collections-1042'), bank, accountId, ...(bank && { bankLabel: 'live_nessie_sandbox' }) });
+    const run = await runCoreDemo({ ...(process.env.PRECALL_APIFY === 'live' && !recordName ? { apify: 'live' as const } : {}), store: recordedState('collections-1042'), bank, accountId, ...(bank && { bankLabel: 'live_nessie_sandbox' }) });
     for (const line of run.transcript) console.log(line);
     console.log(`AUDIT chain valid=${run.chainValid}; gateway IDs retained in refs; why IDs audit_N alias audit:N`);
     for (const entry of run.entries) console.log(JSON.stringify(entry));
