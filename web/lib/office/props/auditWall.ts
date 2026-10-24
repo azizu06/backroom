@@ -14,12 +14,15 @@ export interface AuditWallRow {
   summary: string;
 }
 export interface AuditWallView {
-  /** Set when the snapshot is not the live audit log; the wall then paints this instead of rows. */
-  notice?: string;
   rows: readonly AuditWallRow[];
   total: number;
   connection: OfficeSnapshot['connection'];
+  /** Set when the feed is not the audit log, so no rows are painted (and nothing is presented as verified). */
+  notice?: string;
 }
+/** Preview and replay snapshots are fixtures or derived copies, not `/api/audit/entries`; only the live feed carries real receipt ids. */
+export const AUDIT_WALL_UNVERIFIED_FEEDS: readonly OfficeSnapshot['connection'][] = ['preview', 'replay'];
+export const AUDIT_WALL_NOTICE = 'Preview feed: no audit entries. Live receipts appear here; see /audit.';
 
 /** Keeps both ends of a long id so neighbouring receipts stay distinguishable. */
 export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
@@ -28,24 +31,15 @@ export function shortReceipt(id: string, max = RECEIPT_ID_MAX): string {
   return `${id.slice(0, head)}…${id.slice(id.length - tail)}`;
 }
 
-const NOTICES: Record<Exclude<OfficeSnapshot['connection'], 'live'>, string> = {
-  preview: 'Preview · simulated state, not the audit log',
-  replay: 'Replay · not the live audit log',
-  connecting: 'Connecting to the audit log…',
-  disconnected: 'Audit log disconnected',
-};
-
-/**
- * Newest first. Only the live feed paints rows (its ids are the /api/audit/entries ids); preview, replay and
- * offline snapshots are not that log, so they get a notice instead of rows that look like receipts.
- */
+/** Newest first, from the live snapshot's audit rows (the same ids as `/api/audit/entries`); nothing for preview or replay feeds. */
 export function auditWallView(snapshot: OfficeSnapshot, max = AUDIT_WALL_MAX_ROWS): AuditWallView {
-  const live = snapshot.connection === 'live';
+  if (AUDIT_WALL_UNVERIFIED_FEEDS.includes(snapshot.connection)) {
+    return { total: 0, connection: snapshot.connection, rows: [], notice: AUDIT_WALL_NOTICE };
+  }
   return {
-    ...(live ? {} : { notice: NOTICES[snapshot.connection] }),
-    total: live ? snapshot.audit.length : 0,
+    total: snapshot.audit.length,
     connection: snapshot.connection,
-    rows: !live ? [] : snapshot.audit.slice(-max).reverse().map(row => ({
+    rows: snapshot.audit.slice(-max).reverse().map(row => ({
       receipt: shortReceipt(row.id), decision: row.decision, summary: truncateSummary(row.summary, AUDIT_WALL_SUMMARY_MAX),
     })),
   };
@@ -53,7 +47,6 @@ export function auditWallView(snapshot: OfficeSnapshot, max = AUDIT_WALL_MAX_ROW
 
 /** Plain-text mirror of the canvas, for assistive tech and tests. */
 export function auditWallText(view: AuditWallView): string {
-  if (view.notice) return view.notice;
   return view.rows.map(row => `${row.receipt} ${row.decision} ${row.summary}`).join('\n');
 }
 

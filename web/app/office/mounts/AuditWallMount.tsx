@@ -22,14 +22,17 @@ function drawWall(ctx: CanvasRenderingContext2D, view: AuditWallView) {
   ctx.textAlign = 'right';
   ctx.fillStyle = '#9fae9a';
   ctx.font = `500 20px ${PROP_FONT}`;
-  ctx.fillText(view.notice ? view.connection : `${view.total} receipts · live`, TEX_W - 22, 42);
+  ctx.fillText(view.notice ? view.connection : `${view.total} receipts · ${view.connection}`, TEX_W - 22, 42);
   ctx.fillStyle = '#3a4a3f';
   ctx.fillRect(22, 54, TEX_W - 44, 2);
   ctx.textAlign = 'left';
   if (!view.rows.length) {
     ctx.fillStyle = '#9fae9a';
     ctx.font = `500 24px ${PROP_FONT}`;
-    ctx.fillText(view.notice ?? 'No receipts yet', 22, ROW_TOP + 36);
+    // Preview and replay feeds are not the audit log: say so on two lines instead of painting their rows.
+    const [first, second] = view.notice ? ['Preview feed: no audit entries.', 'Live receipts appear here; see /audit.'] : ['No receipts yet', ''];
+    ctx.fillText(first, 22, ROW_TOP + 36);
+    if (second) ctx.fillText(second, 22, ROW_TOP + 72);
     return;
   }
   view.rows.forEach((row, i) => {
@@ -56,7 +59,7 @@ function Wall({ snapshot }: SceneMountProps) {
   // The wall is pixels, so mirror its text onto the canvas element: aria-description for assistive tech, data attribute for tests.
   useEffect(() => {
     canvas.dataset.auditWall = text;
-    canvas.setAttribute('aria-description', `Lobby audit wall, newest first:\n${text || 'no receipts yet'}`);
+    canvas.setAttribute('aria-description', `Lobby audit wall, newest first:\n${text || view.notice || 'no receipts yet'}`);
     return () => { delete canvas.dataset.auditWall; canvas.removeAttribute('aria-description'); };
   }, [canvas, text]);
   const { width, height, faceWidth, faceHeight, bottom } = AUDIT_WALL;
