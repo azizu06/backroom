@@ -187,13 +187,24 @@ describe("targets", () => {
     expect(pickTarget([0, -0.7], 1.3, [alex])).toBeNull();
   });
 
-  it("prefers the nearest and agents on ties", () => {
+  it("prefers the nearest agent and agents over desks on ties", () => {
     const desk: PlayCandidate = { target: { kind: "desk", room: "payables" }, position: [0, -1.2], radius: DESK_RADIUS };
     const far: PlayCandidate = { target: { kind: "agent", id: "far" }, position: [0, -1.5], radius: 0.45 };
     expect(pickTarget([0, 0], 0, [desk, alex])).toEqual(alex.target);
     expect(pickTarget([0, 0], 0, [far, alex])).toEqual(alex.target);
-    const nearDesk: PlayCandidate = { ...desk, position: [0, -1] };
-    expect(pickTarget([0, 0], 0, [far, nearDesk])).toEqual(nearDesk.target);
+  });
+
+  it("keeps an agent ahead of the player targeted when a surrounding desk has a nearer centre", () => {
+    const desk: PlayCandidate = { target: { kind: "desk", room: "collections" }, position: [0, -1], radius: DESK_RADIUS };
+    for (const candidates of [[desk, alex], [alex, desk]]) {
+      const target = pickTarget([0, 0], 0, candidates);
+      expect(target).toEqual(alex.target);
+      // Looking back at the desk leaves the agent behind the player.
+      expect(pickTarget([0, -1.1], Math.PI, candidates)).toEqual(desk.target);
+    }
+    // A nearer closed leaf still blocks talking through the door.
+    const closed: PlayCandidate = { target: { kind: "door", room: "collections" }, position: [0, -1.1], radius: 0.3, blocksInteraction: true };
+    expect(pickTarget([0, 0], 0, [desk, alex, closed])).toEqual(desk.target);
   });
 
   it("offers open doors only when deliberately facing the leaf by the frame", () => {
