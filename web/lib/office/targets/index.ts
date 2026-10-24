@@ -5,6 +5,7 @@
 import { agentTarget } from "./agent";
 import { deskTarget } from "./desk";
 import { paylinkTarget } from "./paylink";
+import { phoneTarget } from "./phone";
 import { serverTarget } from "./server";
 import { treasuryTarget } from "./treasury";
 import { propTarget } from "./props";
@@ -15,6 +16,7 @@ export const PLAY_TARGETS = [
   deskTarget,
   treasuryTarget,
   paylinkTarget,
+  phoneTarget,
   serverTarget,
   propTarget,
 ] as const;

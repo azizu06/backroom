@@ -263,6 +263,51 @@ test('play mode presses E at the whiteboard and reads its snapshot panel', async
   await expect(dialog).toBeHidden();
   await expect(surface(page)).toBeFocused();
   expect(errors).toEqual([]);
+test('play mode walks with a gamepad left stick and A does nothing when facing nothing', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  // Resource 401s from unauthenticated app endpoints are unrelated to the pad; script errors count.
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) consoleErrors.push(message.text()); });
+  await page.addInitScript(() => {
+    const pad = {
+      id: 'Fake standard pad', index: 0, connected: true, mapping: 'standard', timestamp: 0,
+      axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    };
+    const fake = window as unknown as { __pad: typeof pad; __padConnected: boolean };
+    fake.__pad = pad;
+    fake.__padConnected = false;
+    Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value: () => (fake.__padConnected ? [fake.__pad] : []) });
+  });
+  const errors = await startPlay(page);
+  const start = await player(page);
+  await page.evaluate(() => {
+    (window as unknown as { __padConnected: boolean }).__padConnected = true;
+    window.dispatchEvent(new Event('gamepadconnected'));
+  });
+
+  await page.evaluate(() => { (window as unknown as { __pad: { axes: number[] } }).__pad.axes[1] = -1; });
+  await page.waitForFunction(z => Number(document.querySelector<HTMLElement>('[data-player-z]')?.dataset.playerZ) < z - 0.1, start.z, { polling: 'raf' });
+  await page.evaluate(() => { (window as unknown as { __pad: { axes: number[] } }).__pad.axes[1] = 0; });
+  const moved = await player(page);
+  expect(moved.z).toBeLessThan(start.z - 0.1);
+  expect(Math.abs(moved.x - start.x)).toBeLessThan(0.05);
+  // Stick released: the player stops.
+  await page.waitForTimeout(300);
+  const stopped = await player(page);
+  await page.waitForTimeout(300);
+  expect((await player(page)).z).toBe(stopped.z);
+
+  const prompt = page.getByTestId('office-viewport').locator('.play-prompt');
+  await expect(prompt).toHaveText('');
+  const setA = (pressed: boolean) => page.evaluate(value => {
+    (window as unknown as { __pad: { buttons: { pressed: boolean }[] } }).__pad.buttons[0]!.pressed = value;
+  }, pressed);
+  await setA(true);
+  await page.waitForTimeout(300);
+  await setA(false);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(surface(page)).toBeVisible();
+  expect(errors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
 });
 
 test.describe('play mode on a phone', () => {
@@ -288,4 +333,44 @@ test.describe('play mode on a phone', () => {
     await expect(page.locator('.play-touch-hint')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+});
+
+test('play settings change speed and invert Y, persist per viewer and return focus to the play surface', async ({ page }) => {
+  const errors = await startPlay(page);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Play settings' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("slider", { name: /Look sensitivity/ })).toBeFocused();
+  await expect(dialog).toContainText('Movement speed 1×');
+
+  await dialog.getByRole("slider", { name: /Movement speed/ }).fill('2');
+  await dialog.getByRole("checkbox", { name: /Invert Y/ }).check();
+  await expect(dialog).toContainText('Movement speed 2×');
+  const stored = await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'));
+  expect(JSON.parse(stored ?? '{}')).toEqual({ sensitivity: 1, invertY: true, speed: 2 });
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
+
+  // Walking still works after closing the panel (speed scaling itself is covered by the unit test).
+  const start = await player(page);
+  await page.keyboard.down('w');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('w');
+  const moved = await player(page);
+  expect(start.z - moved.z).toBeGreaterThan(0.3);
+
+  // Leaving and re-entering Play keeps the saved values.
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeFocused();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(dialog).toContainText('Movement speed 2×');
+  await expect(dialog.getByRole("checkbox", { name: /Invert Y/ })).toBeChecked();
+  await dialog.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(dialog).toContainText('Movement speed 1×');
+  expect(await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'))).toBeNull();
+  expect(errors).toEqual([]);
 });

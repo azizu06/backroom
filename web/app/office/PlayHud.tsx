@@ -4,8 +4,12 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type Keyboard
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { playOfficeCue } from '../../lib/office/sound-events';
-import { LOOK_SENSITIVITY, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
+import { playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
+import {
+  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
+} from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
 import { RoomEntryLabel } from './RoomEntryLabel';
@@ -47,6 +51,35 @@ function focusAskWhy() {
   field?.focus({ preventScroll: true });
 }
 
+/** localStorage can be missing or throw (private windows, blocked site data). */
+function viewerStorage(): Storage | null {
+  try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
+}
+
+function PlaySettingsDialog({ settings, change, close }: { settings: PlaySettings; change: (next: PlaySettings) => void; close: () => void }) {
+  const headingId = useId();
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => { first.current?.focus(); }, []);
+  return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+    if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
+  }}>
+    <header><h2 id={headingId}>Play settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
+    <label className='play-setting'><span>Look sensitivity <output>{formatMultiplier(settings.sensitivity)}</output></span>
+      <input ref={first} aria-label='Look sensitivity' type='range' min={SENSITIVITY_RANGE.min} max={SENSITIVITY_RANGE.max} step={SENSITIVITY_RANGE.step} value={settings.sensitivity}
+        onChange={event => change({ ...settings, sensitivity: Number(event.target.value) })} />
+    </label>
+    <label className='play-setting'><span>Movement speed <output>{formatMultiplier(settings.speed)}</output></span>
+      <input aria-label='Movement speed' type='range' min={SPEED_RANGE.min} max={SPEED_RANGE.max} step={SPEED_RANGE.step} value={settings.speed}
+        onChange={event => change({ ...settings, speed: Number(event.target.value) })} />
+    </label>
+    <label className='play-setting play-setting-check'>
+      <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked })} /> Invert Y (look)
+    </label>
+    <p className='play-settings-note'>Saved in this browser only.</p>
+    <button className='play-settings-reset' onClick={() => change(DEFAULT_PLAY_SETTINGS)}>Reset to defaults</button>
+  </section>;
+}
+
 function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: () => void }) {
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -80,6 +113,10 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
 }) {
   const touch = useTouch();
   const [panel, setPanel] = useState<PlayTarget | null>(null);
+  const [settings, setSettings] = useState<PlaySettings>(() => loadPlaySettings(viewerStorage()));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const knob = useRef<HTMLSpanElement>(null);
   const targetRef = useRef(target);
@@ -95,6 +132,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
       requestSceneFrame();
     };
   }, [hud, input]);
+  useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
   useEffect(() => {
     if (panel && !playPanel(snapshot, panel)) { setPanel(null); hud.current?.focus(); }
   }, [panel, snapshot, hud]);
@@ -102,12 +140,29 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
   function interact() {
     const current = targetRef.current;
     if (!current) return;
+    setSettingsOpen(false);
     releaseStick();
     input.clear();
     releasePointer();
     requestSceneFrame();
     setPanel(current);
     playOfficeCue('interact');
+  }
+  function openSettings() {
+    releaseStick();
+    input.clear();
+    releasePointer();
+    requestSceneFrame();
+    setPanel(null);
+    setSettingsOpen(true);
+  }
+  function closeSettings() {
+    setSettingsOpen(false);
+    hud.current?.focus();
+  }
+  function changeSettings(next: PlaySettings) {
+    setSettings(next);
+    savePlaySettings(viewerStorage(), next);
   }
   function closePanel() {
     setPanel(null);
@@ -160,7 +215,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
   function onSurfacePointerMove(event: PointerEvent<HTMLDivElement>) {
     const last = drag.current;
     if (!last || last.id !== event.pointerId) return;
-    input.look(-(event.clientX - last.x) * LOOK_SENSITIVITY * 2, -(event.clientY - last.y) * LOOK_SENSITIVITY * 2);
+    input.look(...lookDelta(event.clientX - last.x, event.clientY - last.y, settingsRef.current, 2));
     drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
     requestSceneFrame();
   }
@@ -183,6 +238,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     requestSceneFrame();
   }
 
+  useGamepad({ input, enabled: true, move: !panel, onInteract: panel ? undefined : interact, onExit: panel ? closePanel : onExit });
+
   const prompt = target && !panel ? targetLabel(snapshot, target) : '';
   return <div className='play-hud'>
     <PlayMinimap snapshot={snapshot} hud={hud} />
@@ -192,7 +249,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
       onClick={event => requestLook(event.currentTarget)}
       onMouseMove={event => {
         if (!locked(event.currentTarget)) return;
-        input.look(-event.movementX * LOOK_SENSITIVITY, -event.movementY * LOOK_SENSITIVITY);
+        input.look(...lookDelta(event.movementX, event.movementY, settingsRef.current));
         requestSceneFrame();
       }}
       onPointerDown={onSurfacePointerDown} onPointerMove={onSurfacePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} />
@@ -200,6 +257,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <p className='play-prompt' aria-live='polite'>{prompt && `E · ${prompt}`}</p>
     <button className='play-exit' onClick={onExit}>Exit Play</button>
+    <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     {touch && <>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
         onPointerMove={event => { if (event.currentTarget.hasPointerCapture?.(event.pointerId)) steer(event); }} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
@@ -207,6 +265,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
       </div>
       {prompt && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
+    {settingsOpen && <PlaySettingsDialog settings={settings} change={changeSettings} close={closeSettings} />}
     {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} />}
   </div>;
 }

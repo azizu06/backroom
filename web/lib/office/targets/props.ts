@@ -3,7 +3,9 @@ import { INITIAL_OFFICE } from '../state';
 import { defineTarget } from './types';
 
 // Treasury already has a dedicated target and denial panel.
-const props = OFFICE_PROP_INTERACTIONS.filter(prop => prop.id !== 'treasury-door');
+// The Treasury door and the desk phone have their own Play targets and panels.
+const DEDICATED = new Set(['treasury-door', 'desk-phone']);
+const props = OFFICE_PROP_INTERACTIONS.filter(prop => !DEDICATED.has(prop.id));
 
 export const propTarget = defineTarget<{ kind: 'prop'; id: string }>({
   id: 'prop',
