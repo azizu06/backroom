@@ -12,6 +12,7 @@ import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
 import { runBadgeAttack } from './badge-attack';
+import { runApprovalExpiry } from './approval-expiry';
 import { evaluatorSourceHash } from './provenance';
 import { score, type Observation } from './score';
 
@@ -151,6 +152,8 @@ for (const row of legacy.reports) {
   }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
+const approvalExpiry = await runApprovalExpiry();
+if (!approvalExpiry.match) gaps.push({ id: 'approval-expiry', detail: `Approval expiry missed: ${Object.entries(approvalExpiry.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const precallStops = [];
 for (const id of PRECALL_STOPS) {
   const run = await runPrecallStop(id);
@@ -185,6 +188,7 @@ const rates = {
   arConversations: fraction(conversations.filter(row => row.match).length, conversations.length),
   precallStops: fraction(precallStops.filter(row => row.match).length, precallStops.length),
   bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
+  approvalExpiry: fraction(Object.values(approvalExpiry.checks).filter(Boolean).length, Object.values(approvalExpiry.checks).length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
 };
@@ -192,7 +196,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'pdf-extraction.ts', 'precall.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'pdf-extraction.ts', 'precall.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -215,6 +219,7 @@ const report = {
     precallStops: `${precallStops[0]?.scope ?? 'not run'} Scenarios: ${precallStops.map(row => row.id).join(', ')}.`,
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
+    approvalExpiry: approvalExpiry.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
     unscored: 'The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy.' },
   coverage: { apRuntimeErrors: invoiceRuns.filter(row => row.actual === 'ERROR').map(row => row.id),
@@ -226,7 +231,7 @@ const report = {
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
     after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
-  failover: failoverRuns, conversations, precallStops, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  failover: failoverRuns, conversations, precallStops, approvalExpiry, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;
@@ -255,6 +260,7 @@ const lines = [
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
   `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,
+  `| Live-call approval expiry and one re-escalation per call (injected clock; no-callId row closes at 60s) | ${display(rates.approvalExpiry)} |`,
   `| P12 GX10 cut: same outcome with audited cloud_fallback (mock transport) | ${display(rates.gx10Failover)} |`,
   `| Existing eval answer-key checks (partial execution permitted) | ${display(rates.legacyKeyChecks)} |`,
   `| Existing eval scenarios with no unexecuted integration step | ${display(rates.legacyCompleteScenarios)} |`, '',
@@ -274,4 +280,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match)) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !approvalExpiry.match) process.exitCode = 1;
