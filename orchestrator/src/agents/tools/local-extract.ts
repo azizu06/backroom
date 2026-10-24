@@ -1,10 +1,49 @@
+import { z } from 'zod';
 import { renderInvoiceDocument, type InvoiceAttachment } from '../../payables/document';
 import { documentMessages } from '../../router/document';
 import { invoiceSchema, vendorSchema } from '../../payables/schemas';
+import type { LlmOffResult, ModelRoute, OutputSchema, RouteResult } from '../../router';
 import type { Json } from '../contracts';
 
 export interface ExtractorDocument { text: string; attachment?: InvoiceAttachment }
 export interface LocalExtraction { fields: Json; confidence: number; model: string }
+/** The production router's `route` (or a test double with the same contract). */
+export interface ExtractionRouter {
+  route(taskType: 'field_extraction', input: unknown, schema: OutputSchema<Json>): Promise<RouteResult<Json> | LlmOffResult>;
+}
+/** `confidence` is absent on a routed result: the router already enforced its threshold. */
+export interface RoutedExtraction { fields: Json; confidence?: number; model: string; route: ModelRoute; latencyMs: number; costUsd: number }
+
+/** Candidate-only contract for the router. Any JSON passes here; validate_extraction stays the gate. */
+export const EXTRACTION_SCHEMA: OutputSchema<Json> = {
+  parse: value => z.json().parse(value),
+  jsonSchema: { anyOf: [invoiceSchema.jsonSchema, vendorSchema.jsonSchema] },
+};
+const productionRouter: ExtractionRouter = {
+  async route(taskType, input, schema) { return (await import('../../router')).route(taskType, input, schema); },
+};
+// Bad local output is a model answer, not an outage; it keeps today's retry path.
+const unavailable = (error: unknown) => !(error instanceof SyntaxError) && !(error instanceof Error && error.message === 'INVALID_LOCAL_ENVELOPE');
+
+/** GX10 first, unchanged. Only when GX10 is unreachable does this same call go once through the
+ * production router (`field_extraction` -> Claude, route `cloud_fallback`) with the document text
+ * and extraction schema alone: never attachment bytes, refs, case data or prior model output. */
+export async function extractWithFallback(document: ExtractorDocument, signal: AbortSignal,
+  options: { fetch?: typeof fetch; router?: ExtractionRouter; now?: () => number } = {}): Promise<RoutedExtraction> {
+  const now = options.now ?? (() => performance.now());
+  const started = now();
+  try {
+    const local = await localExtract(document, signal, options.fetch);
+    return { ...local, route: 'local', latencyMs: Math.round(now() - started), costUsd: 0 };
+  } catch (error) {
+    signal.throwIfAborted();
+    if (!unavailable(error) || !document.text.trim()) throw error;
+  }
+  const routed = await (options.router ?? productionRouter).route('field_extraction', document.text, EXTRACTION_SCHEMA);
+  signal.throwIfAborted();
+  if ('kind' in routed) throw new Error('LLM_OFF');
+  return { fields: routed.output, model: routed.model, route: routed.route, latencyMs: Math.round(now() - started), costUsd: routed.costUsd };
+}
 /** Read-only local eyes. No Anthropic credential, cloud fallback, tools or retry loop. */
 export async function localExtract(document: ExtractorDocument, signal: AbortSignal, http: typeof fetch = fetch): Promise<LocalExtraction> {
   signal.throwIfAborted();
