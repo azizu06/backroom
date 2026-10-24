@@ -14,8 +14,8 @@ export async function installPaymentDemo() {
   const state = new MemoryStateStore();
   const call = approvalDemoCall('payment-demo');
   call.receivable = { principalCents: invoice.principalCents, lateFeeCents: invoice.lateFeeCents };
-  const gatewayStore = new MemoryGatewayStore([call], state);
-  const gateway = createGateway({ store: gatewayStore, secret: () => 'local-offline-demo' });
+  const bootstrapStore = new MemoryGatewayStore([call], state);
+  const gateway = createGateway({ store: bootstrapStore, secret: () => 'local-offline-demo' });
   const tool = async (name: string, args: object) => {
     const response = await gateway(name, new Request(`http://demo.invalid/api/tools/${name}`, { method: 'POST',
       headers: { authorization: 'Bearer local-offline-demo', 'content-type': 'application/json' },
@@ -25,7 +25,16 @@ export async function installPaymentDemo() {
   };
   const plan = await tool('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
   await tool('send_payment_link', { plan_id: plan.plan_id });
-  await gatewayStore.transact(call.callId, row => { row.links[0]!.id = 'payment-demo-1042'; row.links[0]!.path = '/pay/payment-demo-1042'; });
+  // Finalize fixture capabilities before installing the store; never rename a committed code owner.
+  const seededCall = await bootstrapStore.transact(call.callId, row => row);
+  const link = seededCall.links[0]!;
+  const generatedId = link.id;
+  link.id = 'payment-demo-1042';
+  link.path = '/pay/payment-demo-1042';
+  for (const delivery of seededCall.outbox) {
+    if (delivery.type === 'send_payment_link' && delivery.linkId === generatedId) delivery.linkId = link.id;
+  }
+  const gatewayStore = new MemoryGatewayStore([seededCall], state);
   installGatewayStore(gatewayStore);
   await state.registerAgent('payment-demo-bookkeeper', 'collections', Date.now());
   await state.insertInvoice({ id: invoice.id, kind: 'ar', state: 'promised' });
