@@ -68,7 +68,9 @@ export class PayablesSeat {
       : evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, context);
     return { canReevaluate, policyInvoice, bankChanged, history, context, decision };
   }
-  async process(unchecked: InvoiceFields, envelope: InboxSource): Promise<SeatResult> {
+  /** `effect.fence` is the caller's synchronous ownership check. It runs immediately before the
+   * reservation write and immediately before the provider call, with no await in between. */
+  async process(unchecked: InvoiceFields, envelope: InboxSource, effect: { fence?(): void } = {}): Promise<SeatResult> {
     const fields = invoiceSchema.parse(unchecked), source = sourceSchema.parse(envelope);
     const repo = this.options.repository;
     return repo.withVendorLock(`vendor:${fields.vendorId}`, async () => {
@@ -103,6 +105,7 @@ export class PayablesSeat {
       const row: InvoiceRecord = { source, fields, policyInvoice, fingerprint, result, vendorRevision: vendor?.revision ?? null, paymentAttempted: false };
       await audit(this.options, 'payables', 'pay_invoice', source, decision, evidenceRefs.slice(1), {
         invoiceId: fields.invoiceId, vendorId: fields.vendorId, bankChanged, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie',
+        fence: effect.fence ? 'checked' : 'not_applicable',
         senderDomain: domain(source.senderDomain), vendorDomain: vendor?.domain,
         relatedInvoiceId: duplicate?.fields.invoiceId, amountDelta: duplicate ? (fields.amountCents - duplicate.fields.amountCents) / 100 : undefined,
       });
@@ -112,11 +115,27 @@ export class PayablesSeat {
         if (!prior || canReevaluate) await repo.saveInvoice(row);
         return result;
       }
+      const fenced = async (stage: 'reservation' | 'provider', error: unknown) => {
+        await audit(this.options, 'payables', 'payment_fenced', source, hold('INVALID_INPUT'), [fields.invoiceId],
+          { stage, error: error instanceof Error ? error.message.slice(0, 80) : 'FENCED', paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' });
+        return error;
+      };
+      const stale = () => { try { effect.fence?.(); return undefined; } catch (error) { return error ?? new Error('FENCED'); } };
+      let fence = stale();
+      if (fence) throw await fenced('reservation', fence);
       // Persist reservation BEFORE network I/O. A crash or ambiguous response stays held.
       row.paymentAttempted = true;
       row.result.decision = hold('INVALID_INPUT');
       await repo.saveInvoice(row);
+      fence = stale();
+      if (fence) {
+        // Fenced under the vendor lock before any provider request: no debit can exist, so release it.
+        row.paymentAttempted = false;
+        await repo.saveInvoice(row);
+        throw await fenced('provider', fence);
+      }
       try {
+        // No await between the fence above and starting this request.
         const receipt = await this.payment!.payInvoice({ idempotencyKey: `ap:${encodeURIComponent(fields.vendorId)}:${encodeURIComponent(fields.invoiceId)}`,
           invoiceId: fields.invoiceId, vendorId: vendor!.id, amountCents: fields.amountCents,
           sourceAccount: policyInvoice.account, destinationAccountId: vendor!.accountId });

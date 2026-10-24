@@ -25,6 +25,10 @@ export interface HandoffRecord extends HandoffRequest {
 export interface ToolContext {
   activation: Activation; // server-created; never parsed from model args
   assertCurrent(): Promise<void>; // lease, OFF/generation, capability and fresh state
+  /** Synchronous ownership check for the instant before an external effect (payment
+   * reservation, provider request). Never awaits, so no takeover can land between the
+   * check and the effect. Throws when this activation is no longer current. */
+  fence?(): void;
 }
 /** A plain function the runtime exposes as one MCP tool. Enforce policy inside `execute`. */
 export interface DomainTool<I, O> {
