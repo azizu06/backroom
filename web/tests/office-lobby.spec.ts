@@ -91,53 +91,69 @@ function projectFocus([px, py, pz]: readonly [number, number, number], width: nu
   return [width / 2 + zoom * dot(right), height / 2 - zoom * dot(up)];
 }
 
-/** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
-async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number] = PAYABLES): Promise<number> {
-  // Clicking HUD buttons can scroll the page; keep the canvas in the viewport so the clip lands on it.
+type Point = readonly [number, number, number];
+
+/**
+ * RGBA pixels of a 6x6 patch around each world point projected under a room's focus camera, all from one screenshot.
+ * Page layout or a click can scroll the page, so scroll the canvas back into view first and fail
+ * clearly if a patch is not inside both the canvas and the viewport. One screenshot per call keeps
+ * sampling cheap while the scene animates, when every page round trip slows down.
+ */
+async function samplePatches(page: Page, canvas: Locator, points: readonly Point[], focus: readonly [number, number]): Promise<number[][]> {
   await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
-  const [x, y] = projectFocus(point, box.width, box.height, focus);
-  const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
-  return page.evaluate(async src => {
+  const view = page.viewportSize()!;
+  const corners = points.map(point => {
+    const [x, y] = projectFocus(point, box.width, box.height, focus);
+    const left = Math.round(box.x + x - 3), top = Math.round(box.y + y - 3);
+    const where = `world (${point.join(', ')}) -> patch (${left}, ${top}); canvas box (${box.x.toFixed(1)}, ${box.y.toFixed(1)}, ${box.width.toFixed(1)} x ${box.height.toFixed(1)}); viewport ${view.width} x ${view.height}`;
+    expect(x >= 3 && y >= 3 && x <= box.width - 3 && y <= box.height - 3, `sample patch is outside the canvas: ${where}`).toBe(true);
+    expect(left >= 0 && top >= 0 && left + 6 <= view.width && top + 6 <= view.height, `sample patch is outside the viewport: ${where}`).toBe(true);
+    return [left, top] as const;
+  });
+  const left = Math.min(...corners.map(([x]) => x)), top = Math.min(...corners.map(([, y]) => y));
+  const width = Math.max(...corners.map(([x]) => x)) + 6 - left, height = Math.max(...corners.map(([, y]) => y)) + 6 - top;
+  const png = await page.screenshot({ clip: { x: left, y: top, width, height } });
+  return page.evaluate(async ({ src, patches }) => {
     const image = new Image();
     image.src = src;
     await image.decode();
-    const ctx = document.createElement('canvas').getContext('2d')!;
+    const surface = document.createElement('canvas');
+    surface.width = image.width;
+    surface.height = image.height;
+    const ctx = surface.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
-    const { data } = ctx.getImageData(0, 0, image.width, image.height);
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) sum += Math.min(data[i]!, data[i + 1]!, data[i + 2]!);
-    return sum / (data.length / 4);
-  }, `data:image/png;base64,${png.toString('base64')}`);
+    return patches.map(([x, y]) => Array.from(ctx.getImageData(x, y, 6, 6).data));
+  }, { src: `data:image/png;base64,${png.toString('base64')}`, patches: corners.map(([x, y]) => [x - left, y - top] as const) });
+}
+
+/** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
+async function patchBrightness(page: Page, canvas: Locator, point: Point, focus: readonly [number, number] = PAYABLES): Promise<number> {
+  const [data] = await samplePatches(page, canvas, [point], focus);
+  let sum = 0;
+  for (let i = 0; i < data!.length; i += 4) sum += Math.min(data![i]!, data![i + 1]!, data![i + 2]!);
+  return sum / (data!.length / 4);
 }
 
 const TREASURY = [5, 3.4] as const;
 
-/** Mean RGB of a 6x6 screenshot patch around a world point projected under a room's focus camera. */
-async function patchColor(page: Page, canvas: Locator, point: readonly [number, number, number], focus: readonly [number, number]): Promise<[number, number, number]> {
-  // Clicking HUD buttons can scroll the page; keep the canvas in the viewport so the clip lands on it.
-  await canvas.scrollIntoViewIfNeeded();
-  const box = (await canvas.boundingBox())!;
-  const [x, y] = projectFocus(point, box.width, box.height, focus);
-  const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
-  return page.evaluate(async src => {
-    const image = new Image();
-    image.src = src;
-    await image.decode();
-    const ctx = document.createElement('canvas').getContext('2d')!;
-    ctx.drawImage(image, 0, 0);
-    const { data } = ctx.getImageData(0, 0, image.width, image.height);
-    const sum = [0, 0, 0];
-    for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c]! += data[i + c]!;
-    const n = data.length / 4;
-    return [sum[0]! / n, sum[1]! / n, sum[2]! / n] as [number, number, number];
-  }, `data:image/png;base64,${png.toString('base64')}`);
+/** How far the mean red channel of RGBA pixels stands above the other two (the DENY sign's #ed6252 is about 140). */
+function redness(data: readonly number[]): number {
+  const sum = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c]! += data[i + c]!;
+  const n = data.length / 4;
+  return (sum[0]! - Math.max(sum[1]!, sum[2]!)) / n;
 }
 
-/** How far the red channel stands above the other two (the DENY sign's #ed6252 is about 140). */
-async function patchRedness(page: Page, canvas: Locator, point: readonly [number, number, number]): Promise<number> {
-  const [r, g, b] = await patchColor(page, canvas, point, TREASURY);
-  return r - Math.max(g, b);
+/**
+ * Red margins of the DENY sign board (centred (6.35, 1.1, 0.55), 1.6 x 0.72, facing +z), right half only:
+ * clear of the 'DENIED' and rule text, whose position on screen shifts with the canvas size, and of the door ring and flash.
+ */
+const SIGN_MARGINS = [[6.95, 0.84, 0.56], [7.0, 1.38, 0.56], [6.7, 0.82, 0.56], [6.95, 1.1, 0.56]] as const;
+
+/** Redness at every sign margin point under the Treasury focus camera. */
+async function signRedness(page: Page, canvas: Locator): Promise<number[]> {
+  return (await samplePatches(page, canvas, SIGN_MARGINS, TREASURY)).map(redness);
 }
 
 test('office props render in the 3D scene', async ({ page }) => {
@@ -293,17 +309,24 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const treasury = page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: /^Treasury/ });
   await treasury.click();
   await expect(treasury).toHaveAttribute('aria-pressed', 'true');
-  // A red part of the DENY sign board (right of the 'DENIED' line), on the aisle side of the door.
-  const sign = [6.95, 1.2, 0.56] as const;
-  // Let the focus camera settle: the sign's spot stops changing and is not red before the denial.
+  // The margin points must fit the focus view for both the lobby's canvas (1440 x 580) and a taller one (1440 x 1000).
+  for (const [width, height] of [[1440, 580], [1440, 1000]] as const) {
+    for (const point of SIGN_MARGINS) {
+      const [x, y] = projectFocus(point, width, height, TREASURY);
+      expect(x >= 3 && y >= 3 && x <= width - 3 && y <= height - 3, `sign point (${point.join(', ')}) projects to (${x.toFixed(1)}, ${y.toFixed(1)}), outside a ${width} x ${height} canvas`).toBe(true);
+    }
+  }
+  // Let the focus camera settle: no sign margin point is red before the denial.
   await page.waitForTimeout(2500);
-  expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
+  const before = await signRedness(page, canvas);
+  expect(Math.max(...before), `redness before the preview: ${before.join(', ')}`).toBeLessThan(40);
   await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
-  const clicked = Date.now();
-  await page.waitForTimeout(1000);
-  expect(await patchRedness(page, canvas, sign)).toBeGreaterThan(80);
-  await page.waitForTimeout(Math.max(0, clicked + DENY_MOMENT_MS + 1000 - Date.now()));
-  expect(await patchRedness(page, canvas, sign)).toBeLessThan(40);
+  // The preview button sits below the scene, so clicking it can scroll the canvas out of view.
+  await canvas.scrollIntoViewIfNeeded();
+  // Poll rather than sample at a fixed time: under load the first frame of the moment can land late.
+  const maxRedness = async () => Math.max(...await signRedness(page, canvas));
+  await expect.poll(maxRedness, { message: 'max sign redness during the moment', timeout: DENY_MOMENT_MS - 500, intervals: [100] }).toBeGreaterThan(80);
+  await expect.poll(maxRedness, { message: 'max sign redness after the moment', timeout: DENY_MOMENT_MS + 4000 }).toBeLessThan(40);
   // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
