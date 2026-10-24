@@ -198,6 +198,25 @@ test('office desk monitors survive the Collections escalation preview', async ({
   expect(errors).toEqual([]);
 });
 
+test('office ambience renders a still scene under reduced motion', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office');
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+  const viewport = page.getByTestId('office-viewport');
+  const canvas = viewport.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
+  // With the ambient ticker off, the static pose still has to reach the screen: the focused Payables board draws.
+  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
+  await expect.poll(() => patchBrightness(page, canvas, [1.74, 1.47, -5.349]), { timeout: 10_000 }).toBeGreaterThan(170);
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
+  await expect(viewport.locator('.floor-plan')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('office judge tour visits the rooms with agent tags and stops on any key', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
