@@ -38,7 +38,7 @@ describe('real policy/effect binding', () => {
     await worker.tick();
     const decision = evaluate('payables', { type: 'pay_invoice', ...input }, taskContext);
     expect(decision.kind).toBe(kind);
-    expect((await store.listAudit())[0]).toMatchObject({ decision: kind, policyVersion: 1,
+    expect((await store.listAudit()).find(entry => entry.decision)).toMatchObject({ decision: kind, policyVersion: 1,
       inputs: { action: { type: 'pay_invoice' }, effectInput: input, decision } });
     expect(effects.calls).toHaveLength(kind === 'ALLOW' ? 1 : 0);
     if (kind === 'ESCALATE') expect(await store.getAgent('payables')).toMatchObject({ state: 'walking', targetAnchor: 'Dana_desk' });

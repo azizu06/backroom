@@ -1,3 +1,4 @@
+import { createStateStoreFromEnv, getStateStore, SpacetimeStateStore } from '../index';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { runNorthfieldPayables } from './northfield';
@@ -22,20 +23,29 @@ async function main() {
     console.log('LIVE Nessie sandbox ONLY. Card, call, controller authenticator and external pre-call checks remain simulated.');
   }
   console.log('MOMENT 1 | 3D closed | policy + gateway + payment service + reconciliation + StateStore real; external transports fake by default');
-  const run = await runCoreDemo({ bank, accountId, ...(bank && { bankLabel: 'live_nessie_sandbox' }) });
-  for (const line of run.transcript) console.log(line);
-  console.log(`AUDIT chain valid=${run.chainValid}; gateway IDs retained in refs; why IDs audit_N alias audit:N`);
-  for (const entry of run.entries) console.log(JSON.stringify(entry));
-  for (const [index, answer] of run.answers.entries()) console.log(`ASK WHY ${index + 1} (${answer.source}): ${answer.answer}`);
-  for (const llmOff of [false, true]) {
-    const trap = await runInboxTrap({ llmOff });
-    console.log(`MOMENT 2 | LLM ${llmOff ? 'OFF' : 'ON (no model needed)'} | #4471 lookalike + bank-change hold`);
-    console.log(JSON.stringify(trap));
-    if (!trap.chainValid) throw new Error('CORE_DEMO: invalid trap audit chain');
-  }
-  const ap = await runNorthfieldPayables();
-  console.log('NORTHFIELD AP | ' + JSON.stringify(ap));
-  if (!run.chainValid) throw new Error('CORE_DEMO: invalid collection audit chain');
+  const stores: SpacetimeStateStore[] = [];
+  const demoStore = (suffix = '') => {
+    if (process.env.STATE_STORE !== 'spacetime') return undefined;
+    const store = suffix ? createStateStoreFromEnv({ ...process.env, SPACETIMEDB_DATABASE: `${process.env.SPACETIMEDB_DATABASE}${suffix}` }) : getStateStore();
+    if (store instanceof SpacetimeStateStore) stores.push(store);
+    return store;
+  };
+  try {
+    const run = await runCoreDemo({ store: demoStore(), bank, accountId, ...(bank && { bankLabel: 'live_nessie_sandbox' }) });
+    for (const line of run.transcript) console.log(line);
+    console.log(`AUDIT chain valid=${run.chainValid}; gateway IDs retained in refs; why IDs audit_N alias audit:N`);
+    for (const entry of run.entries) console.log(JSON.stringify(entry));
+    for (const [index, answer] of run.answers.entries()) console.log(`ASK WHY ${index + 1} (${answer.source}): ${answer.answer}`);
+    for (const llmOff of [false, true]) {
+      const trap = await runInboxTrap({ llmOff, store: demoStore(llmOff ? '-off' : '-on') });
+      console.log(`MOMENT 2 | LLM ${llmOff ? 'OFF' : 'ON (no model needed)'} | #4471 lookalike + bank-change hold`);
+      console.log(JSON.stringify(trap));
+      if (!trap.chainValid) throw new Error('CORE_DEMO: invalid trap audit chain');
+    }
+    const ap = await runNorthfieldPayables({ state: demoStore('-ap') });
+    console.log('NORTHFIELD AP | ' + JSON.stringify(ap));
+    if (!run.chainValid) throw new Error('CORE_DEMO: invalid collection audit chain');
+  } finally { await Promise.all(stores.map(store => store.close())); }
   console.log('PASS: core loop, both bank-change traps, LLM OFF and audit chains. Synthetic run; phone/human-passkey/T4 live gates remain separate.');
 }
 main().catch(error => {

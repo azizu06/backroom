@@ -1,7 +1,7 @@
 /** Offline AP proof on the frozen company. Sponsor checks and bank debits are explicit fakes. */
 import type { Decision } from '@backroom/policy';
 import expected from '../../../fixtures/answer-key/expected.json';
-import { MemoryStateStore } from '../store';
+import { MemoryStateStore, type StateStore } from '../store';
 import { ControllerApprovals } from '../approvals';
 import { TestAuthenticator } from '../approvals/testing/authenticator';
 import { PayablesSeat, controllerForLease, createNorthfieldRepository, northfield, northfieldChange,
@@ -10,9 +10,8 @@ import { VendorSeat } from '../vendor';
 import { inspectPaymentEvidence } from '../payments';
 import { paymentMemo } from '@backroom/nessie';
 
-export async function runNorthfieldPayables() {
+export async function runNorthfieldPayables({ state = new MemoryStateStore() }: { state?: StateStore } = {}) {
   const now = Date.parse(northfield.snapshotAt);
-  const state = new MemoryStateStore();
   const repository = await createNorthfieldRepository();
   const payments: Parameters<PayablesClient['payInvoice']>[0][] = [];
   const ap = new PayablesSeat({ repository, state, now: () => now,
