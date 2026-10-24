@@ -1,0 +1,8 @@
+{
+  "revision": "6d219bd8af09e1c1c848c6a066c7f23ba207c00f",
+  "database": "backrooms-gx10-judge-1792851602",
+  "uri": "wss://maincloud.spacetimedb.com",
+  "trackedCheckoutClean": true,
+  "privateFilesMode": "0600",
+  "anthropicSeparateFromAppAndTeamEnv": true
+}
