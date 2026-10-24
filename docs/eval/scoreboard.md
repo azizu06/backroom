@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `3094f8a16e1d8d91af0015ec886f2b429a3b0c92`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `6ede37a2ae7190b58175fea6757f5809590d96fa`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -69,6 +69,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 
 ## Disagreements and unexecuted evidence
 
+- **AR_RUNTIME**: 10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.
 - **P01**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P07**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P11**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
@@ -79,9 +80,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **C13**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C14**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C15**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
-- **C17**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C21**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
-- **AR_RUNTIME**: 10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.
 
 ## Keyed AP items
 
