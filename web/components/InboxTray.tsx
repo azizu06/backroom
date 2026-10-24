@@ -205,7 +205,8 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
           </>}
           <p className="inbox-notice">{receipt.notice}</p>
           <a className="inbox-audit-link" href={receipt.auditHref}>View audit entry {receipt.auditId} →</a>
-          {receipt.escalationId && <p className="inbox-help">Controller review requested. This form cannot approve or change a bank account.</p>}
+          {receipt.escalationId && <p className="inbox-help">{receipt.approvalHref
+            ? <a href={receipt.approvalHref}>Open Dana’s approval card</a> : 'Controller review requested.'} This form cannot approve or change a bank account.</p>}
         </>}
       </section>
     </div>
