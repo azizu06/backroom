@@ -1,4 +1,5 @@
 import { ModelFailure } from './failure';
+import type { AnthropicContent } from './document';
 
 /** Direct, server-only Messages transport. No SDK retries or provider failover. */
 export interface AnthropicMessage {
@@ -30,7 +31,7 @@ const tokens = (value: number): number => {
 
 export async function completeAnthropic(options: {
   http: typeof fetch; apiKey: string; model: string; signal: AbortSignal;
-  system: string; input: string;
+  system: string; input: string | AnthropicContent[];
 }) {
   rates(options.model); // Fail before spending if the configured model cannot be priced.
   let response: Response;
