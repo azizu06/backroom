@@ -1,5 +1,5 @@
 import { createBankChangeRiskCheck, assessBankChangeRisk } from '../vendor/crs';
-import { x402Payables, X402_LABEL } from '../x402';
+import { x402Payables, X402_LABEL, type X402Label } from '../x402';
 import { createHash } from 'node:crypto';
 import { evaluate, type APInvoice, type Context, type Decision, type LineItem } from '@backroom/policy';
 import { audit, domain, hold } from './decisions';
@@ -18,10 +18,14 @@ function items(lines: readonly LineItem[]) {
 export class PayablesSeat {
   private readonly payment?: PayablesClient;
   private readonly rail: 'nessie' | 'x402';
-  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient; x402?: PayablesClient; paymentRail?: string }) {
+  private readonly label: 'nessie' | X402Label;
+  /** `x402Label` only names an injected client's rail in results and audits. */
+  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient; x402?: PayablesClient; paymentRail?: string; x402Label?: X402Label }) {
     const rail = options.paymentRail ?? process.env.PAYMENT_RAIL ?? 'nessie';
     if (rail !== 'nessie' && rail !== 'x402') throw new Error('UNKNOWN_PAYMENT_RAIL');
     this.rail = rail;
+    if (options.x402Label && options.x402Label !== X402_LABEL && (rail !== 'x402' || !options.x402)) throw new Error('X402_SIMULATION_NEEDS_CLIENT');
+    this.label = rail === 'x402' ? options.x402Label ?? X402_LABEL : 'nessie';
     this.payment = rail === 'x402' ? options.x402 ?? x402Payables(options) : options.nessie;
     this.risk = options.bankChangeRisk ?? createBankChangeRiskCheck();
   }
@@ -79,7 +83,7 @@ export class PayablesSeat {
       const vendor = await repo.getVendor(fields.vendorId);
       if (prior?.fingerprint === fingerprint && prior.paymentAttempted) {
         await audit(this.options, 'payables', 'pay_invoice_replay', source, prior.result.decision, [fields.invoiceId],
-          { paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie', receiptId: prior.result.receiptId });
+          { paymentRail: this.label, receiptId: prior.result.receiptId });
         return prior.result;
       }
       const { canReevaluate, policyInvoice, bankChanged, history, context, decision: first } =
@@ -101,10 +105,10 @@ export class PayablesSeat {
         evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, { ...context, priorInvoices: [row.policyInvoice] }).ruleIds.includes('DUPLICATE_INVOICE')) ?? prior : undefined;
       const refs = [source.id, fields.invoiceId];
       const evidenceRefs = [...refs, ...(duplicate ? [duplicate.fields.invoiceId] : []), ...(risk?.refs ?? [])];
-      const result: SeatResult = { status: 'held', decision, evidenceRefs, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' };
+      const result: SeatResult = { status: 'held', decision, evidenceRefs, paymentRail: this.label };
       const row: InvoiceRecord = { source, fields, policyInvoice, fingerprint, result, vendorRevision: vendor?.revision ?? null, paymentAttempted: false };
       await audit(this.options, 'payables', 'pay_invoice', source, decision, evidenceRefs.slice(1), {
-        invoiceId: fields.invoiceId, vendorId: fields.vendorId, bankChanged, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie',
+        invoiceId: fields.invoiceId, vendorId: fields.vendorId, bankChanged, paymentRail: this.label,
         fence: effect.fence ? 'checked' : 'not_applicable',
         senderDomain: domain(source.senderDomain), vendorDomain: vendor?.domain,
         relatedInvoiceId: duplicate?.fields.invoiceId, amountDelta: duplicate ? (fields.amountCents - duplicate.fields.amountCents) / 100 : undefined,
@@ -117,7 +121,7 @@ export class PayablesSeat {
       }
       const fenced = async (stage: 'reservation' | 'provider', error: unknown) => {
         await audit(this.options, 'payables', 'payment_fenced', source, hold('INVALID_INPUT'), [fields.invoiceId],
-          { stage, error: error instanceof Error ? error.message.slice(0, 80) : 'FENCED', paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' });
+          { stage, error: error instanceof Error ? error.message.slice(0, 80) : 'FENCED', paymentRail: this.label });
         return error;
       };
       const stale = () => { try { effect.fence?.(); return undefined; } catch (error) { return error ?? new Error('FENCED'); } };
@@ -148,9 +152,9 @@ export class PayablesSeat {
         result.escalationId = await this.options.controller.request(uncertain, refs);
       }
       await repo.saveInvoice(row);
-      const completedAction = this.rail === 'x402' ? 'x402_testnet_completed' : 'nessie_completed';
+      const completedAction = `${this.label.replace(' ', '_')}_completed`;
       await audit(this.options, 'payables', result.status === 'paid' ? completedAction : 'payment_uncertain', source,
-        result.decision, [fields.invoiceId], { receiptId: result.receiptId, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' });
+        result.decision, [fields.invoiceId], { receiptId: result.receiptId, paymentRail: this.label });
       return result;
     });
   }

@@ -6,18 +6,42 @@ import styles from './operator.module.css';
 
 type Receipt = { result?: unknown; error?: string; auditHref?: string; requestId?: string };
 type Links = { approvePath?: string; payPath?: string; stateStore?: string; bank?: string; llmEnabled?: boolean; publicUrl?: string };
+type X402Receipt = { rail: string; note?: string; scenario: string; status: string; reason?: string; replay?: boolean; vendor?: string; invoiceId?: string; amount?: string;
+  asset?: string; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string }; transaction?: string; explorer?: string;
+  holdId?: string; proof?: { vendorRequests: number; signatures: number }; paymentAuditHref?: string };
+const isX402 = (value: unknown): value is X402Receipt => !!value && typeof value === 'object' && 'rail' in value && typeof value.rail === 'string' && value.rail.startsWith('x402');
+function X402Summary({ receipt }: { receipt: X402Receipt }) {
+  return <dl className={styles.facts} aria-label='x402 payment result'>
+    <dt>Rail</dt><dd><strong>{receipt.rail.toUpperCase()}</strong>{receipt.note && ` · ${receipt.note}`}</dd>
+    <dt>Status</dt><dd>{receipt.status}{receipt.replay ? ' (replay of the earlier receipt; nothing paid again)' : ''}{receipt.reason && ` · ${receipt.reason}`}</dd>
+    {receipt.amount && <><dt>Amount</dt><dd>{receipt.amount} · {receipt.asset} · {receipt.vendor} invoice {receipt.invoiceId}</dd></>}
+    {receipt.recipient && <><dt>Recipient</dt><dd><code>{receipt.recipient}</code> (approved vendor-master wallet)</dd></>}
+    {receipt.policy && <><dt>Policy</dt><dd>{receipt.policy.decision}{receipt.policy.ruleIds.length ? ` · ${receipt.policy.ruleIds.join(', ')}` : ''}{receipt.policy.reason && ` · ${receipt.policy.reason}`}</dd></>}
+    {receipt.proof && <><dt>Signing</dt><dd>{receipt.proof.signatures} signature{receipt.proof.signatures === 1 ? '' : 's'} · {receipt.proof.vendorRequests} vendor request{receipt.proof.vendorRequests === 1 ? '' : 's'}</dd></>}
+    {receipt.transaction && <><dt>Transaction</dt><dd>{receipt.explorer ? <a href={receipt.explorer} target='_blank' rel='noreferrer'>View on Base Sepolia basescan</a>
+      : <><code>{receipt.transaction}</code> (simulated hash, not on any chain)</>}</dd></>}
+    {receipt.holdId && <><dt>Hold</dt><dd>{receipt.holdId} · held on this console, not paid</dd></>}
+    {receipt.paymentAuditHref && <><dt>Audit</dt><dd><a href={receipt.paymentAuditHref}>Open payment audit</a></dd></>}
+  </dl>;
+}
 export default function OperatorPage() {
   const [authorized, setAuthorized] = useState(false), [busy, setBusy] = useState('');
   const [offBusy, setOffBusy] = useState(false);
   const [error, setError] = useState(''), [receipt, setReceipt] = useState<Receipt>();
   const [links, setLinks] = useState<Links>({}), [confirm, setConfirm] = useState<OperatorAction>();
-  useEffect(() => { void fetch('/api/operator/session', { cache: 'no-store' }).then(response => setAuthorized(response.ok)); }, []);
+  const [testnet, setTestnet] = useState<{ available: boolean; reason?: string }>();
+  async function session() {
+    const response = await fetch('/api/operator/session', { cache: 'no-store' });
+    setAuthorized(response.ok);
+    if (response.ok) setTestnet((await response.json() as { x402Testnet?: { available: boolean; reason?: string } }).x402Testnet);
+  }
+  useEffect(() => { void session(); }, []);
   async function unlock() {
     setBusy('session'); setError('');
     try {
       const response = await fetch('/__operator/session', { method: 'POST' });
       if (!response.ok) throw new Error('Unlock is available only at http://127.0.0.1:<demo port>/operator on the host. Public links cannot unlock controls.');
-      setAuthorized(true);
+      await session();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Console unavailable.'); }
     finally { setBusy(''); }
   }
@@ -38,8 +62,9 @@ export default function OperatorPage() {
   }
   function button(action: OperatorAction) {
     const [label, detail] = operatorActions[action];
-    return <div className={styles.action} key={action}><div><strong>{label}</strong><p>{detail}</p></div>
-      <button disabled={action === 'llm_off' ? offBusy : !!busy || offBusy} onClick={() => action === 'reset' || action === 'llm_on' || action === 'warm' || action === 'burst' ? setConfirm(action) : void run(action)}>{busy === action || action === 'llm_off' && offBusy ? 'Running…' : label}</button></div>;
+    const unavailable = action === 'x402_testnet' && testnet && !testnet.available ? testnet.reason || 'Testnet is off on this host.' : undefined;
+    return <div className={styles.action} key={action}><div><strong>{label}</strong><p>{detail}</p>{unavailable && <p role='note'>Unavailable: {unavailable}</p>}</div>
+      <button disabled={action === 'llm_off' ? offBusy : !!busy || offBusy || !!unavailable} onClick={() => action === 'reset' || action === 'llm_on' || action === 'warm' || action === 'burst' || action === 'x402_testnet' ? setConfirm(action) : void run(action)}>{busy === action || action === 'llm_off' && offBusy ? 'Running…' : label}</button></div>;
   }
   return <main className={styles.page}><div className={styles.content}>
     <header><a href='/office'>Back to office</a><a href='/real-vs-sim'>Real vs simulated</a></header>
@@ -60,8 +85,11 @@ export default function OperatorPage() {
       <section><h2>Scenarios and proof</h2><p>These runs are isolated from the office. Synthetic calls, bank effects and software authenticators remain labeled in the output.</p>
         {(['core', 'eval', 'metrics', 'scoreboard', 'burst_plan'] as const).map(button)}</section>
       <section><h2>Model controls</h2>{(['llm_off', 'llm_on', 'warm', 'burst'] as const).map(button)}</section>
+      <section><h2>Pay a vendor invoice with x402</h2><p>Northfield pays its vendor through PayablesSeat and the x402 adapter. Policy must ALLOW twice, the rail caps at $2,000 and pins chain, token and recipient. The signer never leaves the host.</p>
+        {(['x402_simulated', 'x402_testnet', 'x402_blocked'] as const).map(button)}</section>
       <section><h2>Authorized call payment</h2><PaymentLinkPanel /></section>
       {receipt && <section aria-label='Latest action receipt'><h2>Latest receipt</h2>{receipt.auditHref && <p><a href={receipt.auditHref}>Open action audit</a></p>}
+        {isX402(receipt.result) && <X402Summary receipt={receipt.result} />}
         {!!receipt.result && typeof receipt.result === 'object' && 'exitCode' in receipt.result && typeof receipt.result.exitCode === 'number'
           && <p>Exit status: {receipt.result.exitCode} · {receipt.result.exitCode === 0 ? 'passed' : 'failed'}</p>}
         <pre>{receipt.result && typeof receipt.result === 'object' && 'output' in receipt.result && typeof receipt.result.output === 'string'
