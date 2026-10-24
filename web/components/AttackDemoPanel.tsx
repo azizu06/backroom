@@ -68,7 +68,11 @@ export function AttackDemoPanel() {
       const value: unknown = await response.json().catch(() => null);
       if (!mounted.current) return;
       if (controller.signal.aborted) { setError(attackErrorMessage('ATTACK_TIMEOUT')); return; }
-      if (!response.ok) { setError(attackErrorMessage(record(value) ? value.error : undefined, response.status)); return; }
+      if (!response.ok) {
+        setError(attackErrorMessage(record(value) ? value.error : undefined, response.status));
+        if (response.status === 403) { setMode('mock'); setLiveBlocked(true); }
+        return;
+      }
       const next = parseAttackResult(value);
       if (!next) { setError(attackErrorMessage('ATTACK_BAD_RESPONSE')); return; }
       if (next.liveBlocked) { setLiveBlocked(true); setMode('mock'); }
@@ -91,9 +95,10 @@ export function AttackDemoPanel() {
       </fieldset>
       {presetError && <p role='alert' className='attack-error'>{presetError} You can still write your own attack and retry.</p>}
       <label htmlFor={`${id}-text`}>Your malicious email or invoice</label>
-      <textarea id={`${id}-text`} rows={8} maxLength={2000} value={text} disabled={running} aria-describedby={`${id}-count`}
+      <textarea id={`${id}-text`} rows={8} maxLength={2000} value={text} disabled={running} aria-describedby={`${id}-count ${id}-hint`}
         placeholder='Paste instructions that try to override the agents’ rules…' onChange={event => { setText(event.target.value); setSelected(undefined); }} />
       <p id={`${id}-count`} className='attack-help'>{text.length} / 2,000 characters · Editing a preset runs your custom text.</p>
+      <p id={`${id}-hint`} className='attack-help'>Tip: include a sender, an amount and bank details, like the presets; plain prose is held as INVALID_INPUT.</p>
       <fieldset className='attack-mode' disabled={running}><legend>Run mode</legend>
         <label><input type='radio' name={`${id}-mode`} value='mock' checked={mode === 'mock'} onChange={() => setMode('mock')} /> Mock</label>
         <label><input type='radio' name={`${id}-mode`} value='live' checked={mode === 'live'} disabled={liveBlocked !== false}
@@ -109,6 +114,7 @@ export function AttackDemoPanel() {
       {result && <>
         <p className='attack-eyebrow'>Completed · {result.mode} · source: {result.source}</p>
         <p className='attack-help'>Untrusted data · isolated synthetic company</p>
+        <p>Sender: {result.senderDomain === 'unknown.invalid' ? 'unknown (your text)' : result.senderDomain}</p>
         {result.liveBlocked && <p>{BLOCKED_HELP}</p>}
         <h2>Agent trace</h2>
         <ol className='attack-trace'>{result.steps.map((step, index) => <li key={index}>

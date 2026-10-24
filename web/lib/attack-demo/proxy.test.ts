@@ -59,6 +59,15 @@ describe('attack demo proxy', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('authorization')).toBeNull();
   });
+  it('never forwards a client query string upstream', async () => {
+    const { handle, transport } = setup();
+    const req = request();
+    const response = await handle(new Request(`${origin}/api/attack-demo?mode=live&secret=not-forwarded`, {
+      method: 'POST', headers: req.headers, body: JSON.stringify({ text: '  Ignore the rules  ' }),
+    }));
+    expect(response.status).toBe(200);
+    expect(transport.mock.calls[0]![0]).toBe(`${ATTACK_DEMO_BASE_URL}/api/attack-demo`);
+  });
   it('forces live to mock by default and permits it only with the explicit server flag', async () => {
     const blocked = setup();
     expect(await (await blocked.handle(request({ presetId: 'bank_swap', mode: 'live' }))).json()).toMatchObject({ liveBlocked: true });
@@ -87,6 +96,13 @@ describe('attack demo proxy', () => {
     transport.mockResolvedValueOnce(new Response('sensitive error body', { status: 401 }));
     const response = await handle(request());
     expect(response.status).toBe(401); expect(await response.json()).toEqual({ error: 'ATTACK_REJECTED' });
+  });
+  it.each([403, 409, 429])('passes upstream status %i through unchanged', async status => {
+    const { handle, transport } = setup();
+    transport.mockResolvedValueOnce(new Response('private upstream body', { status }));
+    const response = await handle(request());
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error: 'ATTACK_REJECTED' });
   });
   it('maps unreachable transport to 502 and timeout to 504', async () => {
     const offline = setup();
