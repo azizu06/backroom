@@ -1,0 +1,994 @@
+{
+  "kind": "live",
+  "services": {
+    "state": "local_spacetime",
+    "model": "GX10_only",
+    "bank": "Nessie_sandbox",
+    "voice": "scripted_no_dial",
+    "controller": "software_test_authenticator",
+    "crs": "fake",
+    "apify": "fake"
+  },
+  "entries": [
+    {
+      "seq": 1,
+      "id": "audit:1",
+      "ts": 1792833640699,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.registerAgent",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collections-demo"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "collections-demo"
+      },
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "266f06340f37592430bdb1af06d641b8aa3f8babb98d7f6d4435cc2ff9a82794"
+    },
+    {
+      "seq": 2,
+      "id": "audit:2",
+      "ts": 1792833640705,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.enqueueTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 0,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "266f06340f37592430bdb1af06d641b8aa3f8babb98d7f6d4435cc2ff9a82794",
+      "hash": "e3be5db6cd18be706368226de7e99a3336deeda3fdb8b9986436b95de63d6a26"
+    },
+    {
+      "seq": 3,
+      "id": "audit:3",
+      "ts": 1792833640715,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.claimTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collections-demo"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "collections-demo"
+      },
+      "prevHash": "e3be5db6cd18be706368226de7e99a3336deeda3fdb8b9986436b95de63d6a26",
+      "hash": "669afb23342b1e4041dae9340bce6319180d650391affc2a6e556d721087a1bb"
+    },
+    {
+      "seq": 4,
+      "id": "audit:4",
+      "ts": 1792833640727,
+      "actor": "code",
+      "seat": "controller",
+      "action": "state.insertInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "1042"
+      },
+      "prevHash": "669afb23342b1e4041dae9340bce6319180d650391affc2a6e556d721087a1bb",
+      "hash": "867d3347d2f26cd81adcc8440f0d188c6d6b297742b9340743bcd397856d60e7"
+    },
+    {
+      "seq": 5,
+      "id": "audit:5",
+      "ts": 1792833640736,
+      "actor": "system",
+      "seat": "collections",
+      "action": "fake_pre_call_signals",
+      "ruleIds": [
+        "DEMO_FIXTURE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1042"
+      ],
+      "route": "test_stub",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "context": {
+          "client": {
+            "consent": {
+              "number": "+12025550102",
+              "source": "synthetic-contract:client-02",
+              "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+              "timestamp": "2026-07-01T17:00:00Z"
+            },
+            "crsIdentityMapping": {
+              "sandboxIdentityId": null,
+              "status": "unmapped"
+            },
+            "dialable": false,
+            "dnc": false,
+            "id": "client-02",
+            "localHour": 11,
+            "localWeekday": 6,
+            "name": "Summit Design Partners",
+            "phoneNumber": "+12025550102",
+            "publicCompanyUrl": null,
+            "timezone": "America/Los_Angeles",
+            "type": "business"
+          },
+          "demoOverride": {
+            "logged": true,
+            "visible": true
+          },
+          "signals": {}
+        },
+        "simulated": true
+      },
+      "prevHash": "867d3347d2f26cd81adcc8440f0d188c6d6b297742b9340743bcd397856d60e7",
+      "hash": "da6df2fe01e27bdbc4265d2797791f5056a6ea2a515ec012059786a39b428107"
+    },
+    {
+      "seq": 6,
+      "id": "audit:6",
+      "ts": 1792833640752,
+      "actor": "code",
+      "seat": "collections",
+      "action": "can_call",
+      "ruleIds": [
+        "IN_BADGE",
+        "DEMO_OVERRIDE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE",
+            "DEMO_OVERRIDE"
+          ]
+        }
+      },
+      "prevHash": "da6df2fe01e27bdbc4265d2797791f5056a6ea2a515ec012059786a39b428107",
+      "hash": "b614751d41ab4ed7cb3e6d57a936de140205104c76b6a3ec865912390dc9db2a"
+    },
+    {
+      "seq": 7,
+      "id": "audit:7",
+      "ts": 1792833640759,
+      "actor": "code",
+      "seat": "collections",
+      "action": "credit_check",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042",
+        "audit:6"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "evidence": [],
+        "label": "SANDBOX: test identity #7",
+        "ofacStatus": "clear"
+      },
+      "prevHash": "b614751d41ab4ed7cb3e6d57a936de140205104c76b6a3ec865912390dc9db2a",
+      "hash": "f703c8156c0323e896cdd67fd463ebf409b8a74d4b1bc0e6e5e32883cb3755a0"
+    },
+    {
+      "seq": 8,
+      "id": "audit:8",
+      "ts": 1792833640760,
+      "actor": "code",
+      "seat": "collections",
+      "action": "health_check",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042",
+        "audit:6"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "signals": [],
+        "status": "complete"
+      },
+      "prevHash": "f703c8156c0323e896cdd67fd463ebf409b8a74d4b1bc0e6e5e32883cb3755a0",
+      "hash": "0e0bb2b27e510add882f539330966771d1272bda100685323b9a0844c3a1457b"
+    },
+    {
+      "seq": 9,
+      "id": "audit:9",
+      "ts": 1792833640766,
+      "actor": "code",
+      "seat": "collections",
+      "action": "pre_call_permit",
+      "ruleIds": [
+        "IN_BADGE",
+        "DEMO_OVERRIDE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042",
+        "audit:6",
+        "audit:7",
+        "audit:8"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE",
+            "DEMO_OVERRIDE"
+          ]
+        }
+      },
+      "prevHash": "0e0bb2b27e510add882f539330966771d1272bda100685323b9a0844c3a1457b",
+      "hash": "f3819293600ccc5ebe598daae437a35c93d9b5f95fbaf01f2819a4dc85c52af8"
+    },
+    {
+      "seq": 10,
+      "id": "audit:10",
+      "ts": 1792833640774,
+      "actor": "code",
+      "seat": "collections",
+      "action": "envelope",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042",
+        "audit:6",
+        "audit:7",
+        "audit:8",
+        "audit:9"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "envelope": {
+          "feesWaivable": false,
+          "maxDiscountPct": 0,
+          "maxInstallments": 2,
+          "maxPlanDays": 30,
+          "minFirstPct": 50,
+          "payInFull": true
+        }
+      },
+      "prevHash": "f3819293600ccc5ebe598daae437a35c93d9b5f95fbaf01f2819a4dc85c52af8",
+      "hash": "715d0195df82aa8287837b09fc927c0e7d0785e77b9663e67aa7d588ef3d5ae5"
+    },
+    {
+      "seq": 11,
+      "id": "audit:11",
+      "ts": 1792833646039,
+      "actor": "local_model",
+      "seat": "collections",
+      "action": "call_plan",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042",
+        "audit:6",
+        "audit:7",
+        "audit:8",
+        "audit:9",
+        "audit:10"
+      ],
+      "route": "local",
+      "latencyMs": 5257.085417,
+      "costUsd": 0,
+      "inputs": {
+        "model": "gpt-oss:120b"
+      },
+      "prevHash": "715d0195df82aa8287837b09fc927c0e7d0785e77b9663e67aa7d588ef3d5ae5",
+      "hash": "4a1cb41c3df10e9599b711c724beeeca7ca2487fa3ad8d4ae6c823aef9a46485"
+    },
+    {
+      "seq": 12,
+      "id": "audit:12",
+      "ts": 1792833646046,
+      "actor": "code",
+      "seat": "collections",
+      "action": "plan_validated",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "client-02",
+        "1042",
+        "audit:6",
+        "audit:7",
+        "audit:8",
+        "audit:9",
+        "audit:10",
+        "audit:11"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "plan": {
+          "offerOrder": [
+            "pay_in_full",
+            "installments"
+          ],
+          "plan": {
+            "discountPct": 0,
+            "firstPaymentPct": 50,
+            "installments": 2,
+            "totalDays": 30,
+            "waiveFees": false
+          },
+          "tone": "neutral"
+        },
+        "valid": true
+      },
+      "prevHash": "4a1cb41c3df10e9599b711c724beeeca7ca2487fa3ad8d4ae6c823aef9a46485",
+      "hash": "5ec3b94300491389162377be61f614e4300747f3352990ffc7c3d39dc16993e4"
+    },
+    {
+      "seq": 13,
+      "id": "audit:13",
+      "ts": 1792833646059,
+      "actor": "code",
+      "seat": "collections",
+      "action": "canCall",
+      "ruleIds": [
+        "IN_BADGE",
+        "DEMO_OVERRIDE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "context": {
+          "client": {
+            "consent": {
+              "number": "+12025550102",
+              "source": "synthetic-contract:client-02",
+              "text": "Synthetic fixture: I consent to AI-assisted business billing calls to this number, including recording. This is not real consent.",
+              "timestamp": "2026-07-01T17:00:00Z"
+            },
+            "crsIdentityMapping": {
+              "sandboxIdentityId": null,
+              "status": "unmapped"
+            },
+            "dialable": false,
+            "dnc": false,
+            "id": "client-02",
+            "localHour": 11,
+            "localWeekday": 6,
+            "name": "Summit Design Partners",
+            "phoneNumber": "+12025550102",
+            "publicCompanyUrl": null,
+            "timezone": "America/Los_Angeles",
+            "type": "business"
+          },
+          "demoOverride": {
+            "logged": true,
+            "visible": true
+          },
+          "signals": {}
+        }
+      },
+      "prevHash": "5ec3b94300491389162377be61f614e4300747f3352990ffc7c3d39dc16993e4",
+      "hash": "7852b91761d15f4f42bd1718ace1c7fb497610a8e1c22859faee419f705991fa"
+    },
+    {
+      "seq": 14,
+      "id": "audit:14",
+      "ts": 1792833646068,
+      "actor": "code",
+      "seat": "collections",
+      "action": "compute_envelope",
+      "ruleIds": [
+        "IN_BADGE",
+        "DEMO_OVERRIDE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "envelope": {
+          "feesWaivable": false,
+          "maxDiscountPct": 0,
+          "maxInstallments": 2,
+          "maxPlanDays": 30,
+          "minFirstPct": 50,
+          "payInFull": true
+        }
+      },
+      "prevHash": "7852b91761d15f4f42bd1718ace1c7fb497610a8e1c22859faee419f705991fa",
+      "hash": "591c1134d819efeced5aece3c39d067286ae39f40b42f8215e639be08e7c4b1f"
+    },
+    {
+      "seq": 15,
+      "id": "audit:15",
+      "ts": 1792833646076,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.transitionInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "591c1134d819efeced5aece3c39d067286ae39f40b42f8215e639be08e7c4b1f",
+      "hash": "1a1696bf92414631318456f055ae6d31e8e84ae9929d7f5e4f1f7d53521f97df"
+    },
+    {
+      "seq": 16,
+      "id": "audit:16",
+      "ts": 1792833646085,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.setAgentState",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "1a1696bf92414631318456f055ae6d31e8e84ae9929d7f5e4f1f7d53521f97df",
+      "hash": "e19b9d17746ac1fb87c97bd91cb8708960279a8676c08f29aac5d2432889be37"
+    },
+    {
+      "seq": 17,
+      "id": "3e13aa5b-0f95-4d80-8f0f-d50c379d6b29",
+      "ts": 1792833646136,
+      "actor": "code",
+      "seat": "collections",
+      "action": "verify_identity_result",
+      "ruleIds": [
+        "IDENTITY_RESULT"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "demo-core-1042",
+        "1042",
+        "client-02"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "invoiceId": "1042",
+        "kind": "RECORDED",
+        "webhookRequestId": "core-turn-2"
+      },
+      "prevHash": "e19b9d17746ac1fb87c97bd91cb8708960279a8676c08f29aac5d2432889be37",
+      "hash": "2589b8dacc2cf0d6bb089973e90d06a62a41537119a0e4ce40a54651bc3eca26"
+    },
+    {
+      "seq": 18,
+      "id": "abcb2fac-118d-4efc-8c12-114a5fdfd25e",
+      "ts": 1792833646179,
+      "actor": "code",
+      "seat": "collections",
+      "action": "propose_plan",
+      "ruleIds": [
+        "FEES_NON_WAIVABLE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "demo-core-1042",
+        "1042",
+        "client-02"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "DENY",
+      "inputs": {
+        "decision": {
+          "kind": "DENY",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-015",
+            "text": "Late fees may not be waived unless the saved Collections policy explicitly permits it."
+          },
+          "reason": "I cannot waive the late fee. Your policy says: “Late fees may not be waived unless the saved Collections policy explicitly permits it.”",
+          "ruleIds": [
+            "FEES_NON_WAIVABLE"
+          ]
+        },
+        "invoiceId": "1042",
+        "kind": "DENY",
+        "plan": {
+          "discountPct": 0,
+          "durationDays": 30,
+          "firstPaymentPct": 50,
+          "installments": 4,
+          "waiveFee": true
+        },
+        "webhookRequestId": "core-turn-4"
+      },
+      "prevHash": "2589b8dacc2cf0d6bb089973e90d06a62a41537119a0e4ce40a54651bc3eca26",
+      "hash": "e19b90b93cb3bcdeee3b582caaa97fd4c3e69966446d0c5fa949635f0c3be075"
+    },
+    {
+      "seq": 19,
+      "id": "audit:19",
+      "ts": 1792833646207,
+      "actor": "code",
+      "seat": "collections",
+      "action": "create_escalation",
+      "ruleIds": [
+        "MAX_INSTALLMENTS"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1b47d4a4-3373-4341-9096-16c7d1facb26",
+        "6ffea3e0-31be-4090-8924-dc442d78e28f",
+        "1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {},
+      "prevHash": "e19b90b93cb3bcdeee3b582caaa97fd4c3e69966446d0c5fa949635f0c3be075",
+      "hash": "41855ef90235b0b71064179a29c620bfbf9f981810c03be5c91fc829b8cedd16"
+    },
+    {
+      "seq": 20,
+      "id": "6ffea3e0-31be-4090-8924-dc442d78e28f",
+      "ts": 1792833646219,
+      "actor": "code",
+      "seat": "collections",
+      "action": "propose_plan",
+      "ruleIds": [
+        "MAX_INSTALLMENTS"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "demo-core-1042",
+        "1042",
+        "client-02"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-012",
+            "text": "A payment plan may not exceed the saved Collections maximum installment count, initially two; ask Dana for an exception."
+          },
+          "reason": "I need Dana's approval for that many installments. Your policy says: “A payment plan may not exceed the saved Collections maximum installment count, initially two; ask Dana for an exception.”",
+          "ruleIds": [
+            "MAX_INSTALLMENTS"
+          ],
+          "toHuman": "Dana"
+        },
+        "invoiceId": "1042",
+        "kind": "ESCALATE",
+        "plan": {
+          "discountPct": 0,
+          "durationDays": 30,
+          "firstPaymentPct": 50,
+          "installments": 4,
+          "waiveFee": false
+        },
+        "webhookRequestId": "core-turn-5"
+      },
+      "prevHash": "41855ef90235b0b71064179a29c620bfbf9f981810c03be5c91fc829b8cedd16",
+      "hash": "b646f887474eac40706faf641cb31d4d961542bf5319c3cd63289fc553931fd0"
+    },
+    {
+      "seq": 21,
+      "id": "audit:21",
+      "ts": 1792833646280,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.transitionInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "b646f887474eac40706faf641cb31d4d961542bf5319c3cd63289fc553931fd0",
+      "hash": "a332073c89725bb96a0a5ad7883ce7468564c2d1ae38cce0354dc862c1db5004"
+    },
+    {
+      "seq": 22,
+      "id": "audit:22",
+      "ts": 1792833646314,
+      "actor": "human",
+      "seat": "controller",
+      "action": "decide_escalation",
+      "ruleIds": [
+        "MAX_INSTALLMENTS"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1b47d4a4-3373-4341-9096-16c7d1facb26",
+        "6ffea3e0-31be-4090-8924-dc442d78e28f",
+        "1042"
+      ],
+      "route": "passkey",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "decision": {
+          "kind": "Deny"
+        },
+        "method": "passkey"
+      },
+      "prevHash": "a332073c89725bb96a0a5ad7883ce7468564c2d1ae38cce0354dc862c1db5004",
+      "hash": "f0383167f61d26b21c6bd86aa7ebc5cb31af53ad72981972561b55daaa7947fb"
+    },
+    {
+      "seq": 23,
+      "id": "audit:23",
+      "ts": 1792833646369,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.setAgentTarget",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "f0383167f61d26b21c6bd86aa7ebc5cb31af53ad72981972561b55daaa7947fb",
+      "hash": "8f8bb13b632f16932f428677c171b5ecb8e5c86f463bf36c66ddf164e53048a6"
+    },
+    {
+      "seq": 24,
+      "id": "327dfd44-b654-41dc-afdf-ab9ce673e1c0",
+      "ts": 1792833646401,
+      "actor": "code",
+      "seat": "collections",
+      "action": "propose_plan",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "demo-core-1042",
+        "1042",
+        "client-02"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "invoiceId": "1042",
+        "kind": "ALLOW",
+        "plan": {
+          "discountPct": 0,
+          "durationDays": 30,
+          "firstPaymentPct": 50,
+          "installments": 2,
+          "waiveFee": false
+        },
+        "webhookRequestId": "core-turn-8"
+      },
+      "prevHash": "8f8bb13b632f16932f428677c171b5ecb8e5c86f463bf36c66ddf164e53048a6",
+      "hash": "49cced0c06a105bdcd4a48e4998e601b7b5142e851267a998da70b46c1c9f90e"
+    },
+    {
+      "seq": 25,
+      "id": "audit:25",
+      "ts": 1792833646408,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.transitionInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "49cced0c06a105bdcd4a48e4998e601b7b5142e851267a998da70b46c1c9f90e",
+      "hash": "67ef698a2d17f14f3a41fada29d242fa7483f70fa99fde95d8bda1a3d69b3c5d"
+    },
+    {
+      "seq": 26,
+      "id": "31ed1bc9-aebd-47d4-8319-c9545f7cff1f",
+      "ts": 1792833646445,
+      "actor": "code",
+      "seat": "collections",
+      "action": "send_payment_link",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "demo-core-1042",
+        "1042",
+        "client-02"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "invoiceId": "1042",
+        "kind": "ALLOW",
+        "plan": {
+          "auditId": "327dfd44-b654-41dc-afdf-ab9ce673e1c0",
+          "discountPct": 0,
+          "durationDays": 30,
+          "firstPaymentCents": 247500,
+          "firstPaymentPct": 50,
+          "id": "bc0feab1-3d75-4151-883a-9a8a21c70d7c",
+          "installments": 2,
+          "totalCents": 495000,
+          "waiveFee": false
+        },
+        "webhookRequestId": "core-turn-9"
+      },
+      "prevHash": "67ef698a2d17f14f3a41fada29d242fa7483f70fa99fde95d8bda1a3d69b3c5d",
+      "hash": "1941810f61c284ff46131d4a8b91e1dbe80a02d460afc7a278c531049903423e"
+    },
+    {
+      "seq": 27,
+      "id": "audit:27",
+      "ts": 1792833647048,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.reservePayment",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "1941810f61c284ff46131d4a8b91e1dbe80a02d460afc7a278c531049903423e",
+      "hash": "1bd1478465af5715e65cf60f2f6ab8c269c6ea3cc3a3364f425c9ecd9a68b6a7"
+    },
+    {
+      "seq": 28,
+      "id": "audit:28",
+      "ts": 1792833647055,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.transitionInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "1bd1478465af5715e65cf60f2f6ab8c269c6ea3cc3a3364f425c9ecd9a68b6a7",
+      "hash": "3cb8e7cb0180eab001b4b0ee968b7d44d92e730163a464487c540d98dc0c1af7"
+    },
+    {
+      "seq": 29,
+      "id": "audit:29",
+      "ts": 1792833647063,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.recordPayment",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "3cb8e7cb0180eab001b4b0ee968b7d44d92e730163a464487c540d98dc0c1af7",
+      "hash": "d496683b662a63083543012ceefc5b6dd3b5fd86e62495277cfd079003019c61"
+    },
+    {
+      "seq": 30,
+      "id": "audit:30",
+      "ts": 1792833647070,
+      "actor": "code",
+      "seat": "collections",
+      "action": "reconcile",
+      "ruleIds": [
+        "EXACT_PAYMENT_MATCH"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "1042",
+        "5297ba7f-b2e6-4a08-854b-052855309c58",
+        "327dfd44-b654-41dc-afdf-ab9ce673e1c0"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "amountCents": 247500,
+        "depositId": "a5e129ef-dd1a-4edf-9aa5-0c9accb9a829",
+        "invoiceState": "partially_paid"
+      },
+      "prevHash": "d496683b662a63083543012ceefc5b6dd3b5fd86e62495277cfd079003019c61",
+      "hash": "5d2ffa46cb8596476ab1463aa1fa29731be2c03d0ef37fae9b99185230f69dca"
+    },
+    {
+      "seq": 31,
+      "id": "audit:31",
+      "ts": 1792833647184,
+      "actor": "code",
+      "seat": "collections",
+      "action": "state.completeTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "collect-1042"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "collect-1042",
+        "leaseToken": 1,
+        "taskId": "collect-1042"
+      },
+      "prevHash": "5d2ffa46cb8596476ab1463aa1fa29731be2c03d0ef37fae9b99185230f69dca",
+      "hash": "d8566fb461c289c71f4c48d4f38780a63038ad64ffa012cc43aad3bde207bd4f"
+    },
+    {
+      "seq": 32,
+      "id": "audit:32",
+      "ts": 1792833687874,
+      "actor": "local_model",
+      "seat": "collections",
+      "action": "ask_why_rehearsal",
+      "ruleIds": [],
+      "policyVersion": 1,
+      "refs": [
+        "audit_18"
+      ],
+      "route": "local",
+      "latencyMs": 4260.01975,
+      "costUsd": 0,
+      "inputs": {
+        "answer": {
+          "answer": "The fee waiver for invoice 1042 was denied because the policy rule FEES_NON_WAIVABLE applied, which does not allow waiving fees [entry:audit_18].",
+          "citations": [
+            "audit_18"
+          ],
+          "source": "model"
+        },
+        "model": "gpt-oss:120b",
+        "operatorOverride": "GX10-only rehearsal; cloud disabled"
+      },
+      "prevHash": "d8566fb461c289c71f4c48d4f38780a63038ad64ffa012cc43aad3bde207bd4f",
+      "hash": "7304eab429d69ea33ae8845da0e4e89d6e096d8f4aaacd058483e75f47d7b5c6"
+    }
+  ],
+  "routingOverride": true
+}

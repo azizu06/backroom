@@ -1,0 +1,442 @@
+{
+  "kind": "live",
+  "services": {
+    "state": "local_spacetime",
+    "model": "GX10_only",
+    "bank": "Nessie_sandbox",
+    "voice": "scripted_no_dial",
+    "controller": "software_test_authenticator",
+    "crs": "fake",
+    "apify": "fake"
+  },
+  "entries": [
+    {
+      "seq": 1,
+      "id": "audit:1",
+      "ts": 1792833663317,
+      "actor": "code",
+      "seat": "controller",
+      "action": "set_llm_enabled",
+      "ruleIds": [
+        "LLM_SWITCH"
+      ],
+      "policyVersion": 0,
+      "refs": [
+        "runtime_control:global"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "llmEnabled": false
+      },
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "22dceb7ec5778f203d0f873824c86636a28b01a0576c207697f2c61039b6968e"
+    },
+    {
+      "seq": 2,
+      "id": "audit:2",
+      "ts": 1792833663340,
+      "actor": "code",
+      "seat": "payables",
+      "action": "route_inbox_item",
+      "ruleIds": [
+        "INBOX_ROUTING"
+      ],
+      "policyVersion": 0,
+      "refs": [
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "kind": "bank_change",
+        "routedSeat": "payables",
+        "scenario_source": "seed"
+      },
+      "prevHash": "22dceb7ec5778f203d0f873824c86636a28b01a0576c207697f2c61039b6968e",
+      "hash": "2a994c092a47e2325659bce4ebc38623732a1111aeba0c2c4421f519cad9b629"
+    },
+    {
+      "seq": 3,
+      "id": "audit:3",
+      "ts": 1792833663347,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.registerAgent",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "payables-demo"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "payables-demo"
+      },
+      "prevHash": "2a994c092a47e2325659bce4ebc38623732a1111aeba0c2c4421f519cad9b629",
+      "hash": "7cd22b60c841a1d21ad84863f14503e1b0375454c5bb95b85fcb30858a2c8964"
+    },
+    {
+      "seq": 4,
+      "id": "audit:4",
+      "ts": 1792833663353,
+      "actor": "code",
+      "seat": "controller",
+      "action": "state.insertInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "4471"
+      },
+      "prevHash": "7cd22b60c841a1d21ad84863f14503e1b0375454c5bb95b85fcb30858a2c8964",
+      "hash": "2dc0d7b1dc953ef753ae1302b29fb3df851ed6bdd387ad7decc737472e776696"
+    },
+    {
+      "seq": 5,
+      "id": "audit:5",
+      "ts": 1792833663363,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.enqueueTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 0,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "2dc0d7b1dc953ef753ae1302b29fb3df851ed6bdd387ad7decc737472e776696",
+      "hash": "fa8387993d595b72301d7f310941a79b4d63a69348a95ac33e73840be6e19535"
+    },
+    {
+      "seq": 6,
+      "id": "audit:6",
+      "ts": 1792833663371,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.claimTask",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "payables-demo"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "id": "payables-demo"
+      },
+      "prevHash": "fa8387993d595b72301d7f310941a79b4d63a69348a95ac33e73840be6e19535",
+      "hash": "1ee7f29a27fbda8138bda4c6053104780f6aac9662cdabde8d423247de0456e9"
+    },
+    {
+      "seq": 7,
+      "id": "audit:7",
+      "ts": 1792833663412,
+      "actor": "code",
+      "seat": "payables",
+      "action": "pay_invoice",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "4471",
+        "acme-supp1y.com",
+        "acme-supply.com"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "action": {
+          "type": "pay_invoice"
+        },
+        "cursor": 0,
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-020",
+            "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+          },
+          "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN"
+          ],
+          "toHuman": "Dana"
+        },
+        "effectInput": {
+          "invoice": {
+            "account": "operating",
+            "amountCents": 89000,
+            "id": "4471",
+            "lineItems": [
+              {
+                "description": "September packing bench supplies",
+                "quantity": 1,
+                "unitPriceCents": 89000
+              }
+            ],
+            "poMatched": true,
+            "vendorId": "acme"
+          }
+        },
+        "leaseToken": 1,
+        "taskId": "trap-4471",
+        "workerId": "payables-demo"
+      },
+      "prevHash": "1ee7f29a27fbda8138bda4c6053104780f6aac9662cdabde8d423247de0456e9",
+      "hash": "c75ab11b126ed50a1c3d6c12a129f72c34cbe7bfd410e71ef6edf8b3d58f2a9b"
+    },
+    {
+      "seq": 8,
+      "id": "audit:8",
+      "ts": 1792833663419,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.createEscalation",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 1,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "c75ab11b126ed50a1c3d6c12a129f72c34cbe7bfd410e71ef6edf8b3d58f2a9b",
+      "hash": "965cc3d9032d9e87ac92feb140aa2e6e1fa58e729667f89c705a15f1489437c5"
+    },
+    {
+      "seq": 9,
+      "id": "audit:9",
+      "ts": 1792833663426,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.setAgentTarget",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 1,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "965cc3d9032d9e87ac92feb140aa2e6e1fa58e729667f89c705a15f1489437c5",
+      "hash": "f11501e5b200b7af3d54a1845031d02fe4fc00901a547c596f28d436e3b92f37"
+    },
+    {
+      "seq": 10,
+      "id": "audit:10",
+      "ts": 1792833663439,
+      "actor": "code",
+      "seat": "payables",
+      "action": "state.transitionInvoice",
+      "ruleIds": [],
+      "policyVersion": 0,
+      "refs": [
+        "trap-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "inputs": {
+        "cursor": 0,
+        "id": "trap-4471",
+        "leaseToken": 1,
+        "taskId": "trap-4471"
+      },
+      "prevHash": "f11501e5b200b7af3d54a1845031d02fe4fc00901a547c596f28d436e3b92f37",
+      "hash": "9ddc53cd0b94365f7b6c2c8906ca9a48f91f4bcee829faa2442444a91765a54b"
+    },
+    {
+      "seq": 11,
+      "id": "audit:11",
+      "ts": 1792833663464,
+      "actor": "code",
+      "seat": "payables",
+      "action": "bank_change_defense_check",
+      "ruleIds": [
+        "BANK_CHANGE_HOLD"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-019",
+            "text": "A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey."
+          },
+          "reason": "Dana must verify and approve this bank change before payment. Your policy says: “A pending or proposed bank change puts payment on hold for Dana to verify through a known contact and approve with a passkey.”",
+          "ruleIds": [
+            "BANK_CHANGE_HOLD"
+          ],
+          "toHuman": "Dana"
+        },
+        "hypothetical": "sender corrected; bank change still pending"
+      },
+      "prevHash": "9ddc53cd0b94365f7b6c2c8906ca9a48f91f4bcee829faa2442444a91765a54b",
+      "hash": "6bd68ad91c1fc92d12e543d589ef15206026363e546284df620548f552a32198"
+    },
+    {
+      "seq": 12,
+      "id": "audit:12",
+      "ts": 1792833663488,
+      "actor": "code",
+      "seat": "payables",
+      "action": "create_escalation",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "live-inbox:judge-4419",
+        "judge-4419"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {},
+      "prevHash": "6bd68ad91c1fc92d12e543d589ef15206026363e546284df620548f552a32198",
+      "hash": "19eafaf7d7e7978559c1295eb587bbbcb29df6d76a6cef2c996f5576ab3f4dcd"
+    },
+    {
+      "seq": 13,
+      "id": "audit:13",
+      "ts": 1792833663498,
+      "actor": "code",
+      "seat": "payables",
+      "action": "inbox_unrecognized",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4419"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-026",
+            "text": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission."
+          },
+          "reason": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+          "ruleIds": [
+            "INVALID_INPUT"
+          ],
+          "toHuman": "Dana"
+        },
+        "modelStatus": "LLM_OFF",
+        "scenario_source": "judge"
+      },
+      "prevHash": "19eafaf7d7e7978559c1295eb587bbbcb29df6d76a6cef2c996f5576ab3f4dcd",
+      "hash": "72795b08c22abb0446e6c1acc3414dd3deccf2a2b1aa3494ec366ad7ddc79d00"
+    },
+    {
+      "seq": 14,
+      "id": "audit:14",
+      "ts": 1792833663510,
+      "actor": "code",
+      "seat": "payables",
+      "action": "create_escalation",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "live-inbox:judge-4471",
+        "judge-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {},
+      "prevHash": "72795b08c22abb0446e6c1acc3414dd3deccf2a2b1aa3494ec366ad7ddc79d00",
+      "hash": "e3d58d02266d19e503a0d8f40be16bb03fac7c9d456fe68fe919607073d33259"
+    },
+    {
+      "seq": 15,
+      "id": "audit:15",
+      "ts": 1792833663522,
+      "actor": "code",
+      "seat": "payables",
+      "action": "inbox_unrecognized",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "policyVersion": 1,
+      "refs": [
+        "judge-4471"
+      ],
+      "route": "code",
+      "latencyMs": 0,
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "inputs": {
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-026",
+            "text": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission."
+          },
+          "reason": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+          "ruleIds": [
+            "INVALID_INPUT"
+          ],
+          "toHuman": "Dana"
+        },
+        "modelStatus": "LLM_OFF",
+        "scenario_source": "judge"
+      },
+      "prevHash": "e3d58d02266d19e503a0d8f40be16bb03fac7c9d456fe68fe919607073d33259",
+      "hash": "51d160f3852725f611ed272dca5c4552c473c762558b411c516f354e19d81a6a"
+    }
+  ],
+  "routingOverride": true
+}

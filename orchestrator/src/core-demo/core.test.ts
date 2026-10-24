@@ -74,3 +74,17 @@ it('replays frozen AP traps, controller-approved Cedar change, and unmatched alr
   expect(run.alreadyPaid).toBe('exception');
   expect(run.entries.find(row => row.action === 'bank_change_approved')?.actor).toBe('human');
 });
+
+it('uses an injected live planner while retaining actual policy and bank authorization', async () => {
+  let calls = 0;
+  const run = await runCoreDemo({ planner: { draft: async () => {
+    calls++;
+    return { route: 'local', model: 'network-mocked-model', latencyMs: 12, costUsd: 0,
+      output: { tone: 'neutral', offerOrder: ['pay_in_full', 'installments'],
+        plan: { installments: 2, firstPaymentPct: 50, totalDays: 30, waiveFees: false, discountPct: 0 } } };
+  } } });
+  expect(calls).toBe(1);
+  expect(run.entries.find(entry => entry.action === 'call_plan')).toMatchObject({ actor: 'local_model', route: 'local', inputs: { model: 'network-mocked-model' } });
+  expect(run.collection.invoiceState).toBe('partially_paid');
+  expect(run.chainValid).toBe(true);
+});

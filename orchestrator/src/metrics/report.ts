@@ -5,6 +5,7 @@ export interface AuditRun {
   name: string;
   /** Unknown provenance is never counted as a live measurement. */
   kind: 'live' | 'simulated' | 'unknown';
+  routingOverride?: boolean;
   entries: AuditEntry[];
 }
 export const missing = (reason: string) => `not measured — ${reason}`;
@@ -23,8 +24,9 @@ export function auditMetrics(runs: AuditRun[]) {
   const models = live.filter(entry => modelRoutes.includes(entry.route)
     && ['local_model', 'claude'].includes(entry.actor) && typeof entry.inputs?.model === 'string' && entry.inputs?.model !== 'none');
   const localCount = models.filter(entry => local.has(entry.route)).length;
+  const routingOverride = checked.some(run => run.status.valid && run.kind === 'live' && run.routingOverride);
   const localShare = models.length
-    ? `${(localCount / models.length * 100).toFixed(2)}% (${localCount}/${models.length}; target ≥60%: ${localCount / models.length >= 0.6 ? 'met' : 'below target'})`
+    ? `${(localCount / models.length * 100).toFixed(2)}% (${localCount}/${models.length}; ${routingOverride ? 'operator override; production C2 unverified' : `target ≥60%: ${localCount / models.length >= 0.6 ? 'met' : 'below target'}`})`
     : missing('no successful model receipts in verified live chains; scripted/stub calls excluded');
   return { checked, live, models, localShare, fallbacks: models.filter(entry => entry.route === 'cloud_fallback').length,
     costPerDecision: models.length ? models.reduce((sum, entry) => sum + entry.costUsd, 0) / models.length : undefined };
