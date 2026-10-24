@@ -76,7 +76,7 @@ describe("tour progression", () => {
 
   it("captions the current stop", () => {
     const stops: AnchorId[] = tourStops(TOUR_ORDER);
-    expect(tourCaption(1, stops)).toBe("Tour · 2 of 6 · Collections · press any key to stop");
+    expect(tourCaption(1, stops)).toBe("Tour · 2 of 6 · Collections · press any key or click to stop");
     expect(tourCaption(9, stops)).toBe("Tour");
   });
 

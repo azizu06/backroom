@@ -36,5 +36,5 @@ export function tourIndexAt(elapsedMs: number, stopCount: number): number | null
 
 export function tourCaption(index: number, stops: readonly AnchorId[]): string {
   const room = stops[index];
-  return room ? `Tour · ${index + 1} of ${stops.length} · ${OFFICE_ANCHORS[room].name} · press any key to stop` : "Tour";
+  return room ? `Tour · ${index + 1} of ${stops.length} · ${OFFICE_ANCHORS[room].name} · press any key or click to stop` : "Tour";
 }
