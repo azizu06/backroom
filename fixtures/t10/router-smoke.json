@@ -1,0 +1,7 @@
+{
+  "status": "incomplete",
+  "measuredAt": "2026-10-24T07:33:53.073264+00:00",
+  "entries": [],
+  "error": "Model request failed: HTTP 402",
+  "note": "First local request timed out with the 8s production bound; escalation reached OpenRouter but was rejected. No successful live Claude fallback or scenario local share verified. Same-call fallback is covered by network-free tests."
+}
