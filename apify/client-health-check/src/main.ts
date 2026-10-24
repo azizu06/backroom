@@ -2,6 +2,9 @@ import { Actor, log } from 'apify';
 import { healthResult, probeWebsite } from './signals.js';
 
 await Actor.init();
+Actor.on('aborting', async () => {
+  await Actor.exit();
+});
 const input = await Actor.getInput() as {
   companyName?: string; website?: string; phone?: string; listedPhone?: string;
   maps?: { permanentlyClosed?: boolean; temporarilyClosed?: boolean; sourceUrl?: string; observedAt?: string };
