@@ -21,6 +21,7 @@
 git clone https://github.com/azizu06/backroom && cd backroom
 pnpm install
 cp .env.example .env      # fill in only what you need; never commit it
+# Team sponsor keys: scp <your-gx10-user>@gx10:/srv/team/backroom.env .env.local
 pnpm -r build && pnpm -r test
 pnpm dev:web              # http://localhost:3000
 ```
