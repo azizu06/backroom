@@ -73,3 +73,19 @@ test('office props render in the 3D scene', async ({ page }) => {
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
+
+test('office desk monitors survive the Collections escalation preview', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  await expect(canvas).toBeVisible();
+  const toggle = page.getByRole('button', { name: 'Preview escalation' });
+  if (await toggle.count()) {
+    await toggle.click();
+    await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
+  }
+  await page.waitForTimeout(500);
+  await expect(canvas).toBeVisible();
+  expect(errors).toEqual([]);
+});
