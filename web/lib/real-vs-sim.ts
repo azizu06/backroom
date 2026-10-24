@@ -26,6 +26,19 @@ export const unprobedServices = disclosureItems
   .map(item => item.id as ServiceId);
 export const NOT_PROBED_LABEL = 'Not probed in this process';
 
+/** At or below this width the overlay starts collapsed so it does not cover the office. */
+export const NARROW_PANEL_QUERY = '(max-width: 760px)';
+
+/** The details page is always expanded; elsewhere the user's toggle wins over the viewport default. */
+export function panelExpanded({ detailed, narrow, userExpanded }: { detailed: boolean; narrow: boolean; userExpanded: boolean | null }) {
+  return detailed || (userExpanded ?? !narrow);
+}
+
+/** The Hide/Show toggle stores the opposite of what is currently shown. */
+export function toggledPanel(expanded: boolean) {
+  return !expanded;
+}
+
 export type DemoStatus = {
   measuredAt: string;
   /** Always sent by /api/demo-status; optional so older payloads still parse. */
