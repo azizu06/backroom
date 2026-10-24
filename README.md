@@ -1,4 +1,8 @@
-# Backroom
+<p align="center">
+  <img src="web/public/backrooms-banner.png" alt="Backrooms banner" width="752">
+</p>
+
+<h1 align="center">Backrooms</h1>
 
 **A 3D back office for a small business with no finance team. AI agents work real finance seats, and every limit is enforced on the server and visible in the world.** The collections clerk phones a late client, negotiates only inside its badge, and walks to the owner's desk during the call when the client asks for more. The payables clerk refuses a fake bank change. Any agent can explain any decision from the audit wall. (Cal Hacks 13.0. Full spec: [`docs/spec.md`](docs/spec.md).)
 

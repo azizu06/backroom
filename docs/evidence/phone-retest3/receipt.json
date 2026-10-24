@@ -1,0 +1,1336 @@
+{
+  "schema_version": 1,
+  "scope": "One real consenting synthetic B2B call; memory state, mock bank; no financial execution",
+  "tested_commit": "7f8ff937bdc2c951f93fa579308c01e562404aac",
+  "call": {
+    "id": "ac_aAozkPAUE8RwpuegP2ymjf",
+    "start_time": "2026-10-24T19:03:00.932282Z",
+    "end_time": "2026-10-24T19:07:36.614343Z",
+    "status": "completed",
+    "end_reason": "client_hangup"
+  },
+  "gateway_session_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+  "model": "claude-haiku-5.5",
+  "runtime": "Cartesia Managed Agent (not the separate Claude Agent SDK dispatcher)",
+  "redactions": [
+    "Phone numbers and credentials excluded; next delivery nonces redacted; provider dynamic-variable update metadata omitted"
+  ],
+  "prerequisites": {
+    "phone_free_websocket_call": "ac_Q5GNmeguX4dAhnKAN7RF4Z",
+    "echo_ok": true,
+    "controller_registered_before_dial": true,
+    "iphone_face_id_enrollment": "Reported by phone owner; registered=true independently read from server",
+    "preflight": {
+      "orchestrator": "GREEN",
+      "web": "GREEN",
+      "cartesia": "GREEN",
+      "gx10_ollama": "GREEN",
+      "spacetime": "RED: unused memory fallback",
+      "nessie": "RED: unconfigured mock-bank rehearsal"
+    }
+  },
+  "acceptance": {
+    "policy_audit_before_spoken_escalation": "PASS",
+    "four_payments_escalate": "PASS",
+    "passkey_approval_and_relay": "NOT_ACHIEVED: request expired pending_owner; no human decision audit"
+  },
+  "approval_view": {
+    "escalation": {
+      "id": "3c5a4bde-adc3-4e08-8e76-c52b4a830795",
+      "taskId": "call:ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+      "callId": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+      "invoiceId": "1042",
+      "fromAgent": "voice:collections",
+      "toHuman": "Dana",
+      "ruleIds": [
+        "MAX_INSTALLMENTS"
+      ],
+      "evidenceRefs": [
+        "7957532f-c8b6-497a-a0a3-8adaff08ef44",
+        "1042"
+      ],
+      "policyVersion": 1,
+      "quote": {
+        "sentenceId": "NF-012",
+        "text": "A payment plan may not exceed the saved Collections maximum installment count, initially two; ask Dana for an exception."
+      },
+      "amountCents": 495000,
+      "principalCents": 480000,
+      "lateFeeCents": 15000,
+      "currency": "USD",
+      "requestedTerms": {
+        "installments": 4,
+        "firstPaymentPct": 50,
+        "durationDays": 30,
+        "waiveFee": false,
+        "discountPct": 0
+      },
+      "createdAt": 1792868637168,
+      "expiresAt": 1792868697168,
+      "status": "pending_owner"
+    },
+    "registered": true
+  },
+  "approval_delivery": {
+    "observed": "Relative approval_path returned by gateway; full URL manually relayed through operator status file",
+    "automatic_push_sms_email": "No delivery receipt or transport in this path",
+    "phone_navigation_or_assertion_trace": "Not captured"
+  },
+  "audit": {
+    "complete_snapshot_chain_check": {
+      "length": 113,
+      "headHash": "0f9e6ce000a84693ce31dfbb124a94bb4d2173fd8b0c6e707f827efe656af968",
+      "valid": true,
+      "firstBrokenSeq": null
+    },
+    "rows_in_this_file": "Only the five call-related rows; full snapshot was verified in the running server before shutdown",
+    "entries": [
+      {
+        "action": "verify_identity_result",
+        "actor": "code",
+        "costUsd": 0,
+        "id": "b98a3e50-e014-49b6-98ae-78235588176d",
+        "inputs": {
+          "invoiceId": "1042",
+          "kind": "RECORDED",
+          "webhookRequestId": "2de3664b-5590-4d02-b50f-3fbe50049cfb"
+        },
+        "latencyMs": 0,
+        "policyVersion": 1,
+        "prevHash": "e65f06fc8b888b4fac52b2e06f7723a6ff95d000312fee089084efca4e964dfe",
+        "refs": [
+          "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "1042",
+          "northfield-jordan"
+        ],
+        "route": "code",
+        "ruleIds": [
+          "IDENTITY_RESULT"
+        ],
+        "seat": "collections",
+        "seq": 109,
+        "ts": 1792868593813,
+        "hash": "628e391f7815ff6aa35fba7a33c769303ae09bce207a41879092522697b00e11"
+      },
+      {
+        "action": "verify_identity_result",
+        "actor": "code",
+        "costUsd": 0,
+        "id": "25962583-debe-4339-a57d-54dae7c1e22e",
+        "inputs": {
+          "invoiceId": "1042",
+          "kind": "RECORDED",
+          "webhookRequestId": "4c1a5aa1-8f88-47ff-8c80-c5c1aeb71ef0"
+        },
+        "latencyMs": 0,
+        "policyVersion": 1,
+        "prevHash": "628e391f7815ff6aa35fba7a33c769303ae09bce207a41879092522697b00e11",
+        "refs": [
+          "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "1042",
+          "northfield-jordan"
+        ],
+        "route": "code",
+        "ruleIds": [
+          "IDENTITY_RESULT"
+        ],
+        "seat": "collections",
+        "seq": 110,
+        "ts": 1792868608453,
+        "hash": "54d53d717672379aee34ca5868821552d29b41f18f56f26da3a5a9e85954b672"
+      },
+      {
+        "action": "create_escalation",
+        "actor": "code",
+        "costUsd": 0,
+        "decision": "ESCALATE",
+        "id": "audit:111",
+        "inputs": {},
+        "latencyMs": 0,
+        "policyVersion": 1,
+        "prevHash": "54d53d717672379aee34ca5868821552d29b41f18f56f26da3a5a9e85954b672",
+        "refs": [
+          "3c5a4bde-adc3-4e08-8e76-c52b4a830795",
+          "7957532f-c8b6-497a-a0a3-8adaff08ef44",
+          "1042"
+        ],
+        "route": "code",
+        "ruleIds": [
+          "MAX_INSTALLMENTS"
+        ],
+        "seat": "collections",
+        "seq": 111,
+        "ts": 1792868637168,
+        "hash": "ae71890d2055798157c773d018b478fde88c7b6cd972c1b5daa6c1d546c5be7f"
+      },
+      {
+        "action": "propose_plan",
+        "actor": "code",
+        "costUsd": 0,
+        "decision": "ESCALATE",
+        "id": "7957532f-c8b6-497a-a0a3-8adaff08ef44",
+        "inputs": {
+          "decision": {
+            "kind": "ESCALATE",
+            "policyVersion": 1,
+            "quote": {
+              "sentenceId": "NF-012",
+              "text": "A payment plan may not exceed the saved Collections maximum installment count, initially two; ask Dana for an exception."
+            },
+            "reason": "I need Dana's approval for that many installments. Your policy says: “A payment plan may not exceed the saved Collections maximum installment count, initially two; ask Dana for an exception.”",
+            "ruleIds": [
+              "MAX_INSTALLMENTS"
+            ],
+            "toHuman": "Dana"
+          },
+          "invoiceId": "1042",
+          "kind": "ESCALATE",
+          "plan": {
+            "discountPct": 0,
+            "durationDays": 30,
+            "firstPaymentPct": 50,
+            "installments": 4,
+            "waiveFee": false
+          },
+          "webhookRequestId": "0121ff96-c53e-4ee5-99d1-654902fc6358"
+        },
+        "latencyMs": 0,
+        "policyVersion": 1,
+        "prevHash": "ae71890d2055798157c773d018b478fde88c7b6cd972c1b5daa6c1d546c5be7f",
+        "refs": [
+          "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "1042",
+          "northfield-jordan"
+        ],
+        "route": "code",
+        "ruleIds": [
+          "MAX_INSTALLMENTS"
+        ],
+        "seat": "collections",
+        "seq": 112,
+        "ts": 1792868637169,
+        "hash": "78623f04fbe4a625360eab2bf5d3f28c778083bebe36fcc5be14c9b4b3665655"
+      },
+      {
+        "action": "pending_owner",
+        "actor": "system",
+        "costUsd": 0,
+        "id": "audit:113",
+        "inputs": {},
+        "latencyMs": 0,
+        "policyVersion": 1,
+        "prevHash": "78623f04fbe4a625360eab2bf5d3f28c778083bebe36fcc5be14c9b4b3665655",
+        "refs": [
+          "3c5a4bde-adc3-4e08-8e76-c52b4a830795",
+          "7957532f-c8b6-497a-a0a3-8adaff08ef44",
+          "1042"
+        ],
+        "route": "code",
+        "ruleIds": [
+          "MAX_INSTALLMENTS"
+        ],
+        "seat": "collections",
+        "seq": 113,
+        "ts": 1792868697212,
+        "hash": "0f9e6ce000a84693ce31dfbb124a94bb4d2173fd8b0c6e707f827efe656af968"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "provider_turn_id": 3,
+      "call_relative_seconds": 12.105198063,
+      "tool": "verify_identity_result",
+      "arguments": {
+        "result": "confirmed"
+      },
+      "gateway_receipt": {
+        "at": "2026-10-24T19:03:13.801Z",
+        "path": "/api/voice/tools/verify_identity_result",
+        "status": 200,
+        "server_ms": 14.425916000269353,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "2de3664b-5590-4d02-b50f-3fbe50049cfb"
+        },
+        "result": {
+          "kind": "RECORDED",
+          "can_confirm": false,
+          "speak": "Identity result recorded.",
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    },
+    {
+      "provider_turn_id": 4,
+      "call_relative_seconds": 13.58843812,
+      "tool": "get_invoice_context",
+      "arguments": {},
+      "gateway_receipt": {
+        "at": "2026-10-24T19:03:15.317Z",
+        "path": "/api/voice/tools/get_invoice_context",
+        "status": 200,
+        "server_ms": 3.657666999846697,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "393d3f55-00b6-4b76-abca-067ded3ff539"
+        },
+        "result": {
+          "kind": "DENY",
+          "can_confirm": false,
+          "speak": "Please confirm I am speaking with the intended contact first.",
+          "rule_ids": [
+            "IDENTITY_REQUIRED"
+          ],
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    },
+    {
+      "provider_turn_id": 7,
+      "call_relative_seconds": 26.721988955,
+      "tool": "verify_identity_result",
+      "arguments": {
+        "result": "confirmed"
+      },
+      "gateway_receipt": {
+        "at": "2026-10-24T19:03:28.445Z",
+        "path": "/api/voice/tools/verify_identity_result",
+        "status": 200,
+        "server_ms": 11.10416700039059,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "4c1a5aa1-8f88-47ff-8c80-c5c1aeb71ef0"
+        },
+        "result": {
+          "kind": "RECORDED",
+          "can_confirm": false,
+          "speak": "Identity result recorded.",
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    },
+    {
+      "provider_turn_id": 8,
+      "call_relative_seconds": 26.903275138,
+      "tool": "get_invoice_context",
+      "arguments": {},
+      "gateway_receipt": {
+        "at": "2026-10-24T19:03:28.567Z",
+        "path": "/api/voice/tools/get_invoice_context",
+        "status": 200,
+        "server_ms": 5.54916699975729,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "35cffae6-6792-471c-b8e1-1de90e4eaafa"
+        },
+        "result": {
+          "kind": "CONTEXT",
+          "can_confirm": false,
+          "speak": "Identity confirmed; invoice details are available.",
+          "invoice_id": "1042",
+          "amount_cents": 495000,
+          "currency": "USD",
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    },
+    {
+      "provider_turn_id": 14,
+      "call_relative_seconds": 55.453288627,
+      "tool": "propose_plan",
+      "arguments": {
+        "discount_pct": 0,
+        "duration_days": 30,
+        "first_payment_pct": 50,
+        "installments": 4,
+        "waive_fee": false
+      },
+      "gateway_receipt": {
+        "at": "2026-10-24T19:03:57.165Z",
+        "path": "/api/voice/tools/propose_plan",
+        "status": 200,
+        "server_ms": 5.442416000179946,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "0121ff96-c53e-4ee5-99d1-654902fc6358"
+        },
+        "result": {
+          "kind": "ESCALATE",
+          "can_confirm": false,
+          "speak": "I need to check those terms with Dana. Please hold while I ask.",
+          "escalation_id": "3c5a4bde-adc3-4e08-8e76-c52b4a830795",
+          "rule_ids": [
+            "MAX_INSTALLMENTS"
+          ],
+          "audit_id": "7957532f-c8b6-497a-a0a3-8adaff08ef44",
+          "approval_path": "/approve/3c5a4bde-adc3-4e08-8e76-c52b4a830795",
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    },
+    {
+      "provider_turn_id": 16,
+      "call_relative_seconds": 57.105899697,
+      "tool": "check_approval",
+      "arguments": {
+        "escalation_id": "3c5a4bde-adc3-4e08-8e76-c52b4a830795"
+      },
+      "gateway_receipt": {
+        "at": "2026-10-24T19:03:58.399Z",
+        "path": "/api/voice/tools/check_approval",
+        "status": 200,
+        "server_ms": 3.5536249997094274,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "3ccb7c49-41ed-437c-9470-abf6bc930f4f"
+        },
+        "result": {
+          "kind": "PENDING",
+          "can_confirm": false,
+          "approval_status": "pending",
+          "speak": "I am still waiting for Dana. Dana will confirm by email today if needed.",
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    },
+    {
+      "provider_turn_id": 41,
+      "call_relative_seconds": 215.306126602,
+      "tool": "check_approval",
+      "arguments": {
+        "escalation_id": "3c5a4bde-adc3-4e08-8e76-c52b4a830795"
+      },
+      "gateway_receipt": {
+        "at": "2026-10-24T19:06:37.016Z",
+        "path": "/api/voice/tools/check_approval",
+        "status": 200,
+        "server_ms": 8.288625000044703,
+        "body": {
+          "call_id": "ea5f9fdd-ee4e-4e37-a072-6adb7606844e",
+          "webhook_request_id": "1fabeffb-17a1-4e75-a819-be48b8ac168b"
+        },
+        "result": {
+          "kind": "RECORDED",
+          "can_confirm": false,
+          "approval_status": "pending_owner",
+          "speak": "Dana will confirm by email today.",
+          "next_delivery_nonce": "[REDACTED_NONCE]"
+        }
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "id": 1,
+      "role": "assistant",
+      "text": "Hi, this is an AI assistant calling on behalf of Northfield Studio about invoice 1042. This call is recorded. Am I speaking with Jordan?",
+      "start_timestamp": 0.214601372,
+      "end_timestamp": 8.536350753,
+      "was_interrupted": false
+    },
+    {
+      "id": 2,
+      "role": "user",
+      "text": "Yeah, this is Jordan.",
+      "start_timestamp": 10.15890275,
+      "end_timestamp": 11.441313135,
+      "was_interrupted": false
+    },
+    {
+      "id": 3,
+      "role": "assistant",
+      "start_timestamp": 12.105198063,
+      "end_timestamp": 12.105198063,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "verify_identity_result",
+          "arguments": {
+            "result": "confirmed"
+          },
+          "result": "{\"kind\":\"RECORDED\",\"can_confirm\":false,\"speak\":\"Identity result recorded.\",\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_014sYDMS77GFFWdZKRNBBXGH"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "role": "assistant",
+      "start_timestamp": 13.58843812,
+      "end_timestamp": 13.58843812,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "get_invoice_context",
+          "arguments": {},
+          "result": "{\"kind\":\"DENY\",\"can_confirm\":false,\"speak\":\"Please confirm I am speaking with the intended contact first.\",\"rule_ids\":[\"IDENTITY_REQUIRED\"],\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_01DBd5191y3uSHGNTZaUKya7"
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "start_timestamp": 14.269413681,
+      "end_timestamp": 14.269413681,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 3193.296415,
+        "timestamp": 14.269413681
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 14.466047333,
+      "end_timestamp": 14.466047333,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 3388.885928,
+        "timestamp": 14.466047333
+      }
+    },
+    {
+      "id": 5,
+      "role": "assistant",
+      "text": "Thanks, Jordan. The system still needs one more confirmation before I can share the invoice details. Are you the account holder for Northfield Studio?",
+      "start_timestamp": 14.381748373,
+      "end_timestamp": 21.983864004,
+      "was_interrupted": false,
+      "tts_ttfb": 0.06281113624572754
+    },
+    {
+      "id": 6,
+      "role": "user",
+      "text": "Yes.",
+      "start_timestamp": 25.235296193,
+      "end_timestamp": 25.712056118,
+      "was_interrupted": false
+    },
+    {
+      "id": 7,
+      "role": "assistant",
+      "start_timestamp": 26.721988955,
+      "end_timestamp": 26.721988955,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "verify_identity_result",
+          "arguments": {
+            "result": "confirmed"
+          },
+          "result": "{\"kind\":\"RECORDED\",\"can_confirm\":false,\"speak\":\"Identity result recorded.\",\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_015zFK3Pb9hM3Gm6nSC3fKVw"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "role": "assistant",
+      "start_timestamp": 26.903275138,
+      "end_timestamp": 26.903275138,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "get_invoice_context",
+          "arguments": {},
+          "result": "{\"kind\":\"CONTEXT\",\"can_confirm\":false,\"speak\":\"Identity confirmed; invoice details are available.\",\"invoice_id\":\"1042\",\"amount_cents\":495000,\"currency\":\"USD\",\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_01WmyLXD7wCnXZVaXTcUNV3V"
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "start_timestamp": 27.597432365,
+      "end_timestamp": 27.597432365,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 1944.651389,
+        "timestamp": 27.597432365
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 27.77171993,
+      "end_timestamp": 27.77171993,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 2118.07035,
+        "timestamp": 27.77171993
+      }
+    },
+    {
+      "id": 9,
+      "role": "assistant",
+      "text": "Thanks, that's confirmed. Invoice 1042 has a balance of 4,950 dollars. How would you like to take care of it?",
+      "start_timestamp": 27.827256432,
+      "end_timestamp": 35.4299668,
+      "was_interrupted": false,
+      "tts_ttfb": 0.17884397506713867
+    },
+    {
+      "id": 10,
+      "role": "user",
+      "text": "Uh, can I do 4 payments, half today and the rest over 30 days?",
+      "start_timestamp": 38.706602269,
+      "end_timestamp": 43.83081102,
+      "was_interrupted": false
+    },
+    {
+      "id": 11,
+      "role": "user",
+      "text": "keeping the fee and no discount.",
+      "start_timestamp": 43.990983373,
+      "end_timestamp": 46.079520717,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 46.734699039,
+      "end_timestamp": 46.734699039,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 702.39141,
+        "timestamp": 46.734699039
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 46.926464506,
+      "end_timestamp": 46.926464506,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 893.087169,
+        "timestamp": 46.926464506
+      }
+    },
+    {
+      "id": 12,
+      "role": "assistant",
+      "text": "Just to be sure I have it right, is that four payments, with half today?",
+      "start_timestamp": 47.063787206,
+      "end_timestamp": 51.27558508,
+      "was_interrupted": false,
+      "tts_ttfb": 0.24638795852661133
+    },
+    {
+      "id": 13,
+      "role": "user",
+      "text": "Yes, correct.",
+      "start_timestamp": 53.141003586,
+      "end_timestamp": 54.264926623,
+      "was_interrupted": false
+    },
+    {
+      "id": 14,
+      "role": "assistant",
+      "start_timestamp": 55.453288627,
+      "end_timestamp": 55.453288627,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "propose_plan",
+          "arguments": {
+            "discount_pct": 0,
+            "duration_days": 30,
+            "first_payment_pct": 50,
+            "installments": 4,
+            "waive_fee": false
+          },
+          "result": "{\"kind\":\"ESCALATE\",\"can_confirm\":false,\"speak\":\"I need to check those terms with Dana. Please hold while I ask.\",\"escalation_id\":\"3c5a4bde-adc3-4e08-8e76-c52b4a830795\",\"rule_ids\":[\"MAX_INSTALLMENTS\"],\"audit_id\":\"7957532f-c8b6-497a-a0a3-8adaff08ef44\",\"approval_path\":\"/approve/3c5a4bde-adc3-4e08-8e76-c52b4a830795\",\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_016CGK3Yyh9Wo43Nb5EBRH3z"
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "start_timestamp": 56.133939218,
+      "end_timestamp": 56.133939218,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 1934.054304,
+        "timestamp": 56.133939218
+      }
+    },
+    {
+      "id": 16,
+      "role": "assistant",
+      "start_timestamp": 57.105899697,
+      "end_timestamp": 57.105899697,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "check_approval",
+          "arguments": {
+            "escalation_id": "3c5a4bde-adc3-4e08-8e76-c52b4a830795"
+          },
+          "result": "{\"kind\":\"PENDING\",\"can_confirm\":false,\"approval_status\":\"pending\",\"speak\":\"I am still waiting for Dana. Dana will confirm by email today if needed.\",\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_01EUtDwuTkBVs6xe6Kk1HVWH"
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "start_timestamp": 58.127023736,
+      "end_timestamp": 58.127023736,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 3926.601453,
+        "timestamp": 58.127023736
+      }
+    },
+    {
+      "id": 15,
+      "role": "assistant",
+      "text": "Your request for four payments needs approval from the controller, so I'm checking with them now. Please hold while I check the status.",
+      "start_timestamp": 56.443228122,
+      "end_timestamp": 63.169395469,
+      "was_interrupted": false,
+      "tts_ttfb": 0.26139259338378906
+    },
+    {
+      "id": 17,
+      "role": "assistant",
+      "text": "The controller hasn't responded yet. They'll follow up by email today. I can't confirm the payment plan until that approval comes through. Would you like me to check again now, or wait?",
+      "start_timestamp": 63.169776725,
+      "end_timestamp": 72.688092655,
+      "was_interrupted": false,
+      "tts_ttfb": 0.22773385047912598
+    },
+    {
+      "role": "system",
+      "start_timestamp": 78.515648977,
+      "end_timestamp": 78.515648977,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 727.927748,
+        "timestamp": 78.515648977
+      }
+    },
+    {
+      "id": 18,
+      "role": "user",
+      "text": "Um, uh, I mean, uh, the approval link is uh, are you sending it to my phone? or should I have to wait or do you have to check",
+      "start_timestamp": 76.890115243,
+      "end_timestamp": 85.529895159,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 86.075996478,
+      "end_timestamp": 86.075996478,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 579.309465,
+        "timestamp": 86.075996478
+      }
+    },
+    {
+      "id": 19,
+      "role": "user",
+      "text": "again?",
+      "start_timestamp": 86.349322817,
+      "end_timestamp": 86.659152919,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 87.10202037,
+      "end_timestamp": 87.10202037,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 521.036896,
+        "timestamp": 87.10202037
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 87.398897354,
+      "end_timestamp": 87.398897354,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 814.95257,
+        "timestamp": 87.398897354
+      }
+    },
+    {
+      "id": 20,
+      "role": "assistant",
+      "text": "I'm not sending anything to your phone, and I can't approve it myself. The controller will reply by email today. I can check the status again now if you'd like, or you can wait for their email. Which would you prefer?",
+      "start_timestamp": 87.389917377,
+      "end_timestamp": 98.271302023,
+      "was_interrupted": false,
+      "tts_ttfb": 0.23691701889038086
+    },
+    {
+      "id": 21,
+      "role": "user",
+      "text": "Give me one second.",
+      "start_timestamp": 102.847180294,
+      "end_timestamp": 104.135975336,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 104.859062892,
+      "end_timestamp": 104.859062892,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 942.925574,
+        "timestamp": 104.859062892
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 104.910060797,
+      "end_timestamp": 104.910060797,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 992.513675,
+        "timestamp": 104.910060797
+      }
+    },
+    {
+      "id": 22,
+      "role": "assistant",
+      "text": "Take your time.",
+      "start_timestamp": 104.988048788,
+      "end_timestamp": 105.876109256,
+      "was_interrupted": false,
+      "tts_ttfb": 0.08542180061340332
+    },
+    {
+      "role": "system",
+      "start_timestamp": 114.527545533,
+      "end_timestamp": 114.527545533,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 577.226189,
+        "timestamp": 114.527545533
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 114.555830582,
+      "end_timestamp": 114.555830582,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 604.809795,
+        "timestamp": 114.555830582
+      }
+    },
+    {
+      "id": 23,
+      "role": "assistant",
+      "text": "Are you still there, Jordan?",
+      "start_timestamp": 114.64175594,
+      "end_timestamp": 115.851057677,
+      "was_interrupted": false,
+      "tts_ttfb": 0.0714869499206543
+    },
+    {
+      "id": 24,
+      "role": "user",
+      "text": "Yes.",
+      "start_timestamp": 117.941504957,
+      "end_timestamp": 118.582584476,
+      "was_interrupted": false
+    },
+    {
+      "id": 25,
+      "role": "user",
+      "text": "Give me a minute.",
+      "start_timestamp": 118.892910178,
+      "end_timestamp": 119.851807568,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 120.348893466,
+      "end_timestamp": 120.348893466,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 696.268424,
+        "timestamp": 120.348893466
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 120.427518248,
+      "end_timestamp": 120.427518248,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 773.806667,
+        "timestamp": 120.427518248
+      }
+    },
+    {
+      "id": 26,
+      "role": "assistant",
+      "text": "No problem, take your time. I'll be here.",
+      "start_timestamp": 120.4806692,
+      "end_timestamp": 123.047554026,
+      "was_interrupted": false,
+      "tts_ttfb": 0.08210897445678711
+    },
+    {
+      "role": "system",
+      "start_timestamp": 132.591021117,
+      "end_timestamp": 132.591021117,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 1469.79452,
+        "timestamp": 132.591021117
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 132.630593868,
+      "end_timestamp": 132.630593868,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 1508.009318,
+        "timestamp": 132.630593868
+      }
+    },
+    {
+      "id": 27,
+      "role": "assistant",
+      "text": "Are you still there, Jordan?",
+      "start_timestamp": 132.721740919,
+      "end_timestamp": 133.93382488,
+      "was_interrupted": false,
+      "tts_ttfb": 0.08914971351623535
+    },
+    {
+      "id": 28,
+      "role": "user",
+      "text": "Yes.",
+      "start_timestamp": 136.696377877,
+      "end_timestamp": 137.989608676,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 138.273078909,
+      "end_timestamp": 138.273078909,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 502.271231,
+        "timestamp": 138.273078909
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 138.354311875,
+      "end_timestamp": 138.354311875,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 582.589321,
+        "timestamp": 138.354311875
+      }
+    },
+    {
+      "id": 29,
+      "role": "assistant",
+      "text": "Great. Do you want me to check the approval status again now?",
+      "start_timestamp": 138.365596169,
+      "end_timestamp": 141.419305317,
+      "was_interrupted": false,
+      "tts_ttfb": 0.053884029388427734
+    },
+    {
+      "id": 30,
+      "role": "user",
+      "text": "Uh, yeah, give me a minute. I'm sending it again and uh trying to uh uh verify it.",
+      "start_timestamp": 145.04044807,
+      "end_timestamp": 152.407355356,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 152.573522755,
+      "end_timestamp": 152.573522755,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 551.277851,
+        "timestamp": 152.573522755
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 152.669997837,
+      "end_timestamp": 152.669997837,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 646.9876,
+        "timestamp": 152.669997837
+      }
+    },
+    {
+      "id": 31,
+      "role": "assistant",
+      "text": "Okay, take your time. I'll check the status when you're ready.",
+      "start_timestamp": 152.735681163,
+      "end_timestamp": 155.788043181,
+      "was_interrupted": false,
+      "tts_ttfb": 0.12187337875366211
+    },
+    {
+      "role": "system",
+      "start_timestamp": 164.398376388,
+      "end_timestamp": 164.398376388,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 536.347584,
+        "timestamp": 164.398376388
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 164.422076349,
+      "end_timestamp": 164.422076349,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 559.068739,
+        "timestamp": 164.422076349
+      }
+    },
+    {
+      "id": 32,
+      "role": "assistant",
+      "text": "Are you still there, Jordan?",
+      "start_timestamp": 164.509408999,
+      "end_timestamp": 165.720774373,
+      "was_interrupted": false,
+      "tts_ttfb": 0.06963706016540527
+    },
+    {
+      "id": 33,
+      "role": "user",
+      "text": "Yes, one moment.",
+      "start_timestamp": 170.37780588,
+      "end_timestamp": 171.335237576,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 171.908789775,
+      "end_timestamp": 171.908789775,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 613.352706,
+        "timestamp": 171.908789775
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 171.975881119,
+      "end_timestamp": 171.975881119,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 679.538995,
+        "timestamp": 171.975881119
+      }
+    },
+    {
+      "id": 34,
+      "role": "assistant",
+      "text": "No problem. Let me know when you're ready.",
+      "start_timestamp": 172.037509285,
+      "end_timestamp": 173.960749888,
+      "was_interrupted": false,
+      "tts_ttfb": 0.07877373695373535
+    },
+    {
+      "role": "system",
+      "start_timestamp": 182.773919877,
+      "end_timestamp": 182.773919877,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 738.804287,
+        "timestamp": 182.773919877
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 182.808510632,
+      "end_timestamp": 182.808510632,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 772.624689,
+        "timestamp": 182.808510632
+      }
+    },
+    {
+      "id": 35,
+      "role": "assistant",
+      "text": "Are you still there, Jordan?",
+      "start_timestamp": 182.813824715,
+      "end_timestamp": 184.01714674,
+      "was_interrupted": false,
+      "tts_ttfb": 0.0699458122253418
+    },
+    {
+      "id": 36,
+      "role": "user",
+      "text": "Yes.",
+      "start_timestamp": 188.335184818,
+      "end_timestamp": 188.975309323,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 189.489524918,
+      "end_timestamp": 189.489524918,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 576.239175,
+        "timestamp": 189.489524918
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 189.633425409,
+      "end_timestamp": 189.633425409,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 719.545865,
+        "timestamp": 189.633425409
+      }
+    },
+    {
+      "id": 37,
+      "role": "assistant",
+      "text": "Thanks for staying on. Would you like me to check the approval status now?",
+      "start_timestamp": 189.693719369,
+      "end_timestamp": 193.139615156,
+      "was_interrupted": false,
+      "tts_ttfb": 0.1570436954498291
+    },
+    {
+      "role": "system",
+      "start_timestamp": 202.014301944,
+      "end_timestamp": 202.014301944,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 800.675307,
+        "timestamp": 202.014301944
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 202.034596791,
+      "end_timestamp": 202.034596791,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 820.062897,
+        "timestamp": 202.034596791
+      }
+    },
+    {
+      "id": 38,
+      "role": "assistant",
+      "text": "Are you still there, Jordan?",
+      "start_timestamp": 202.124347062,
+      "end_timestamp": 203.253825274,
+      "was_interrupted": false,
+      "tts_ttfb": 0.06641697883605957
+    },
+    {
+      "id": 39,
+      "role": "user",
+      "text": "Can you uh send the 4 payment plan approval again?",
+      "start_timestamp": 210.944245698,
+      "end_timestamp": 214.474128985,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 214.86291154,
+      "end_timestamp": 214.86291154,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 593.671115,
+        "timestamp": 214.86291154
+      }
+    },
+    {
+      "id": 41,
+      "role": "assistant",
+      "start_timestamp": 215.306126602,
+      "end_timestamp": 215.306126602,
+      "was_interrupted": false,
+      "tool_calls": [
+        {
+          "name": "check_approval",
+          "arguments": {
+            "escalation_id": "3c5a4bde-adc3-4e08-8e76-c52b4a830795"
+          },
+          "result": "{\"kind\":\"RECORDED\",\"can_confirm\":false,\"approval_status\":\"pending_owner\",\"speak\":\"Dana will confirm by email today.\",\"next_delivery_nonce\":\"[REDACTED_NONCE]\"}",
+          "id": "toolu_01V1kCRYfMgEXZCFvYC87jcj"
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "start_timestamp": 216.360097072,
+      "end_timestamp": 216.360097072,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 2082.628158,
+        "timestamp": 216.360097072
+      }
+    },
+    {
+      "id": 40,
+      "role": "assistant",
+      "text": "I can't send the approval myself. I'll check the status now.",
+      "start_timestamp": 215.109377742,
+      "end_timestamp": 218.552404482,
+      "was_interrupted": false,
+      "tts_ttfb": 0.19547247886657715
+    },
+    {
+      "id": 42,
+      "role": "assistant",
+      "text": "The four-payment plan is still waiting on Dana, and she'll confirm by email today. I can't resend it or approve it from here. Before we wrap up, is there anything else I can help you with?",
+      "start_timestamp": 218.552768228,
+      "end_timestamp": 228.471036263,
+      "was_interrupted": false,
+      "tts_ttfb": 0.43623876571655273
+    },
+    {
+      "role": "system",
+      "start_timestamp": 234.171526658,
+      "end_timestamp": 234.171526658,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 506.822248,
+        "timestamp": 234.171526658
+      }
+    },
+    {
+      "id": 43,
+      "role": "user",
+      "text": "Can you send that approval again?",
+      "start_timestamp": 232.601877498,
+      "end_timestamp": 234.197251076,
+      "was_interrupted": false
+    },
+    {
+      "role": "system",
+      "start_timestamp": 234.407546432,
+      "end_timestamp": 234.407546432,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 739.21237,
+        "timestamp": 234.407546432
+      }
+    },
+    {
+      "id": 44,
+      "role": "assistant",
+      "text": "I'm sorry, I can't resend that approval. Dana will reply by email today. Is there anything else I can help with, or should we end the call here?",
+      "start_timestamp": 234.451547109,
+      "end_timestamp": 242.702082243,
+      "was_interrupted": false,
+      "tts_ttfb": 0.13886356353759766
+    },
+    {
+      "role": "system",
+      "start_timestamp": 251.593971647,
+      "end_timestamp": 251.593971647,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "llm_first_text_ms",
+        "value": 818.234749,
+        "timestamp": 251.593971647
+      }
+    },
+    {
+      "role": "system",
+      "start_timestamp": 251.60771705,
+      "end_timestamp": 251.60771705,
+      "was_interrupted": false,
+      "log_metric": {
+        "name": "agent_turn_ms",
+        "value": 831.070246,
+        "timestamp": 251.60771705
+      }
+    },
+    {
+      "id": 45,
+      "role": "assistant",
+      "text": "Are you still there, Jordan?",
+      "start_timestamp": 251.702974634,
+      "end_timestamp": 252.833832194,
+      "was_interrupted": false,
+      "tts_ttfb": 0.06678032875061035
+    }
+  ],
+  "lifecycle_summary": {
+    "http_status_counts": {
+      "200": 48
+    },
+    "types": {
+      "call_started": 1,
+      "call_turn": 45,
+      "call_completed": 1,
+      "post_call_analysis": 1
+    }
+  },
+  "cost": {
+    "duration_seconds": 275.682061,
+    "estimated_agent_plus_pstn_usd": 0.340008,
+    "prerequisite_websocket_estimated_usd": 0.055,
+    "source": "https://www.cartesia.ai/pricing",
+    "checked_at": "2026-10-24",
+    "billing_total": "Unavailable in GET call; excludes unreported LLM charges and billing rounding; full sub-$1 total not independently verified",
+    "direct_anthropic_sdk_inference_usd": 0
+  },
+  "limitations": [
+    "No raw in-memory GatewayCall export was captured before the required host shutdown; tool inputs/results and actual approval view are preserved",
+    "No iPhone approval POST trace; no claim about a specific WebAuthn error or a submitted assertion",
+    "No second propose_plan during resend requests; offline fresh-id replay succeeded",
+    "No exact observed phone ring timestamp",
+    "Owned server and tunnel stopped after evidence capture; no redial"
+  ]
+}

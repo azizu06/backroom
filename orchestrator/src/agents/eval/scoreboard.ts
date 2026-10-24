@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { northfield, northfieldInvoice } from '../../payables';
@@ -165,10 +165,15 @@ for (const name of Object.keys(JUDGE_CASES) as JudgeCase[]) {
   if (!run.match) gaps.push({ id: `C5:judge:${name}`, detail: `Judge call missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 }
 const metrics = score(observations);
+const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
+const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
 const rates = {
   extractionMockFieldFidelity: fraction(fieldCorrect, fieldTotal),
-  sourceDocumentExtractionAccuracy: { numerator: null, denominator: null, percent: null, reason: 'No model reads PDFs; mock candidates are fixture-fed.' },
+  // Recorded live GX10 run (pdf-extraction.ts); the deterministic scoreboard only reads its committed result.
+  sourceDocumentExtractionAccuracy: pdfRun ? { ...fraction(pdfRun.fieldsCorrect, pdfRun.fieldsTotal), exactItems: pdfRun.exactItems, items: pdfRun.items,
+    model: pdfRun.model, recordedAt: pdfRun.recordedAt, p50LatencyMs: pdfRun.p50LatencyMs }
+    : { numerator: null, denominator: null, percent: null, reason: 'No recorded GX10 PDF run.' },
   ...metrics,
   exactAPRules: fraction(gradedAP.filter(row => row.exactRuleMatch === true).length, gradedAP.filter(row => row.exactRuleMatch !== null).length),
   collectionsPermits: fraction(permits.filter(row => row.match === true).length, permits.filter(row => row.match !== null).length),
@@ -187,7 +192,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'judge.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'judge.ts', 'pdf-extraction.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -207,6 +212,7 @@ const report = {
     arConversations: conversations[0]?.scope ?? 'not run',
     judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
+    pdfExtraction: pdfRun ? `${pdfRun.scope} Recorded ${pdfRun.recordedAt} at ${String(pdfRun.baseCommit).slice(0, 7)}; p50 ${pdfRun.p50LatencyMs} ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.` : 'not recorded',
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
@@ -233,7 +239,8 @@ const lines = [
   'Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).', '',
   '| Measurement | Result |', '| --- | --- |',
   `| Extraction field fidelity, fixture-fed mock (8 fields × 83 invoices) | ${display(rates.extractionMockFieldFidelity)} |`,
-  '| Source/PDF extraction accuracy | Not measured |',
+  rates.sourceDocumentExtractionAccuracy.numerator === null ? '| Source/PDF extraction accuracy | Not measured |'
+    : `| Source/PDF extraction accuracy, GX10 ${pdfRun.model} on PDF text (recorded live ${String(pdfRun.recordedAt).slice(0, 10)}; ${pdfRun.exactItems}/${pdfRun.items} invoices exact) | ${display(rates.sourceDocumentExtractionAccuracy as any)} |`,
   `| Initial AP pay/hold decisions vs key | ${display(rates.decisions)} |`,
   `| Vendor fraud catch (lookalike sender only) | ${display(rates.fraudCatch)} |`,
   `| Duplicate catch | ${display(rates.duplicateCatch)} |`,

@@ -12,7 +12,7 @@ function parse(file: string) {
 const office = parse('Office.tsx');
 /** Modules in the initial office bundle; only the lazy scene (and its ./play rig) may load WebGL. */
 const initialBundle = [office, parse('PlayHud.tsx'), parse('RoomEntryLabel.tsx'), parse('FloorPlan.tsx'), parse('RoomInspector.tsx'), parse('ReceiptList.tsx'), parse('ViewBoundary.tsx'), parse('PerfOverlay.tsx'), parse('ProximityChat.tsx'), parse('useProximityChat.ts'), parse('usePresence.ts'), parse('PresenceChip.tsx'),
-  parse('panels/index.ts'), parse('panels/types.ts'), parse('panels/DeskPanel.tsx'), parse('panels/TreasuryPanel.tsx'), parse('panels/PaylinkPanel.tsx'), parse('panels/ServerPanel.tsx'), parse('panels/CoworkerPanel.tsx')];
+  parse('panels/index.ts'), parse('panels/types.ts'), parse('panels/DeskPanel.tsx'), parse('panels/TreasuryPanel.tsx'), parse('panels/PaylinkPanel.tsx'), parse('panels/ServerPanel.tsx'), parse('panels/CoworkerPanel.tsx'), parse('panels/InboxPanel.tsx')];
 
 describe('lazy office scene', () => {
   it.each(initialBundle.map(file => [file.fileName, file] as const))('keeps scene and WebGL runtime imports out of %s', (_, file) => {
