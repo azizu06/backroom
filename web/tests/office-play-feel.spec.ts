@@ -99,7 +99,7 @@ test('walking eases the FOV out and back, and the player keeps moving', async ({
   await page.waitForTimeout(200);
   const later = await reading(page);
   expect(later.z).toBe(stopped.z);
-  expect(stopped.z - walking.z).toBeLessThan(0.5);
+  expect(Math.abs(stopped.z - walking.z)).toBeLessThan(0.5);
   expect(errors).toEqual([]);
 });
 
