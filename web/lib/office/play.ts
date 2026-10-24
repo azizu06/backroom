@@ -2,6 +2,7 @@
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
+import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -154,6 +155,8 @@ export class PlayInput {
   lookPitch = 0;
   /** Walking speed multiplier from the viewer's Play settings. */
   speed = 1;
+  /** Game-feel switches from the viewer's Play settings; the rig also applies reduced motion. */
+  feel: FeelFlags = DEFAULT_FEEL;
   press(control: PlayControl) { this.held.add(control); }
   release(control: PlayControl) { this.held.delete(control); }
   setJoystick(x: number, y: number) {
@@ -232,7 +235,7 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
 }
 
 export function headBob(distance: number, moving: boolean, reduced: boolean): number {
-  return reduced || !moving ? 0 : Math.sin(distance * 7) * 0.035;
+  return reduced || !moving ? 0 : bobHeight(distance, 1);
 }
 
 export type PlayPanel = PlayPanelOf<PlayTarget["kind"]>;

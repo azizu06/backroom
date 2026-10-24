@@ -7,8 +7,10 @@ import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } 
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { interpolateIntroPose, playIntroProgress, type IntroPose } from '../../lib/office/play-intro';
 import type { MotionRegistry } from '../../lib/office/motion';
+import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, type FeelState } from '../../lib/office/playFeel';
+import { playOfficeCue } from '../../lib/office/sound-events';
 import {
-  EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, guidePose, headBob, interactCandidates, lerpPose, moveIntent, movePlayer, officeColliders,
+  EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, guidePose, interactCandidates, lerpPose, moveIntent, movePlayer, officeColliders,
   pickTarget, targetKey, turnIntent, type PlayBridge, type PlayGuide, type PlayPose, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
@@ -40,8 +42,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null,
   }));
   const yaw = useRef<number>(SPAWN.yaw);
   const pitch = useRef(0);
-  const walked = useRef(0);
+  const feel = useRef<FeelState>(INITIAL_FEEL);
+  const velocity = useRef<[number, number]>([0, 0]);
+  const fov = useRef(BASE_FOV);
   const wasActive = useRef(false);
+  const feelSettling = useRef(false);
   const written = useRef(false);
   const target = useRef('');
   const reduced = useRef(window.matchMedia(REDUCED_MOTION_QUERY).matches);
@@ -93,14 +98,18 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null,
       }
       intro.done = true;
     }
-    const active = input.active();
+    const flags = effectiveFeel(input.feel, reduced.current);
+    const coasting = velocity.current[0] !== 0 || velocity.current[1] !== 0 || feelSettling.current;
+    const active = input.active() || coasting;
     // The first frame after idle has a stale clock delta; treat it as one display frame.
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;
     wasActive.current = active;
-    if (active) glide.current = null;
+    // Any move or look input cancels a guided walk (coasting to a stop does not).
+    if (input.active()) glide.current = null;
     const guided = glide.current;
     let next: [number, number];
     let turned: boolean;
+    let wanted: [number, number] = [0, 0];
     if (guided) {
       // Scripted path through the open aisle: no collision sweep, and it ends in a free spot (guidePose).
       const now = performance.now();
@@ -120,15 +129,28 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null,
       turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
       yaw.current = look.yaw;
       pitch.current = look.pitch;
-      const step = moveIntent(input, yaw.current, dt);
-      next = movePlayer(position.current, step, latest.current.colliders, PLAYER_RADIUS);
+      // moveIntent at dt = 1 is the wanted velocity in m/s; the velocity eases toward it (or snaps, without smoothing).
+      const wish = moveIntent(input, yaw.current, 1);
+      wanted = integrateVelocity(velocity.current, wish, dt, flags.smoothing);
+      next = movePlayer(position.current, [wanted[0] * dt, wanted[1] * dt], latest.current.colliders, PLAYER_RADIUS);
     }
     const travelled = Math.hypot(next[0] - position.current[0], next[1] - position.current[1]);
     const moved = travelled > 0;
-    walked.current += travelled;
+    // A wall absorbs the speed it stopped: keep only what actually moved, so sliding along it stays smooth.
+    const wantedStep = Math.hypot(wanted[0], wanted[1]) * dt;
+    velocity.current = travelled < wantedStep - 1e-6 ? [(next[0] - position.current[0]) / dt, (next[1] - position.current[1]) / dt] : wanted;
     position.current = next;
+    const frame = advanceFeel(feel.current, { speed: travelled / dt, travelled, dt, flags });
+    feel.current = frame.state;
+    feelSettling.current = frame.settling;
+    if (frame.steps > 0) playOfficeCue('step');
     if (camera.current) {
-      camera.current.position.set(next[0], EYE_HEIGHT + headBob(walked.current, moved, reduced.current), next[1]);
+      if (Math.abs(camera.current.fov - frame.fov) > 1e-3) {
+        camera.current.fov = frame.fov;
+        camera.current.updateProjectionMatrix();
+      }
+      fov.current = frame.fov;
+      camera.current.position.set(next[0], EYE_HEIGHT + frame.bobY, next[1]);
       camera.current.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
       camera.current.updateMatrixWorld();
     }
@@ -143,9 +165,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, guide = null,
       hud.current.dataset.playerZ = next[1].toFixed(3);
       hud.current.dataset.playerYaw = yaw.current.toFixed(3);
     }
+    const fovText = fov.current.toFixed(2);
+    if (hud.current && hud.current.dataset.playerFov !== fovText) hud.current.dataset.playerFov = fovText;
     if (active) state.invalidate();
   }, -1);
 
   useEffect(() => { invalidate(); }, [invalidate]);
-  return <PerspectiveCamera ref={camera} makeDefault fov={70} near={0.05} />;
+  return <PerspectiveCamera ref={camera} makeDefault fov={BASE_FOV} near={0.05} />;
 }

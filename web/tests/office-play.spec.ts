@@ -289,7 +289,7 @@ test('play settings change speed and invert Y, persist per viewer and return foc
   await dialog.getByRole("checkbox", { name: /Invert Y/ }).check();
   await expect(dialog).toContainText('Movement speed 2×');
   const stored = await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'));
-  expect(JSON.parse(stored ?? '{}')).toEqual({ sensitivity: 1, invertY: true, speed: 2 });
+  expect(JSON.parse(stored ?? '{}')).toMatchObject({ sensitivity: 1, invertY: true, speed: 2 });
 
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();

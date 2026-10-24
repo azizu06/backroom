@@ -20,3 +20,7 @@ Rules:
 - Target modules stay pure: they read the snapshot and never write state, evaluate policy or call a model. Live data (for example GX10) belongs in the panel view.
 - Only `scene.tsx` and its imports may load three.js or `@react-three/*`. `Office.tsx`, `PlayHud.tsx`, the split-out Office components and everything in `panels/` are in the initial bundle (`web/lib/office/lazy-scene.test.ts`).
 - If the piece is solid in Play, pass its footprint to `officeColliders(rooms, extra)` (see `SERVER_ROOM_BOX`) instead of editing the built-in list.
+
+## Play feel
+
+Pure maths for first-person feel lives in `web/lib/office/playFeel.ts` (acceleration and friction, bob phase, FOV kick, footstep timing, crosshair state) and is unit-tested in `playFeel.test.ts`. The rig (`play.tsx`) only applies it. The viewer's switches (`smoothMove`, `headBob`, `fovKick`) are in `playSettings.ts`; `effectiveFeel` forces all three off under `prefers-reduced-motion`. Footsteps are `step` sound cues (`sound-events.ts`), so the Sound toggle mutes them; `step` has its own short cooldown in `sound.ts`. The rig exposes `data-player-fov` on the play surface for browser specs.
