@@ -1,43 +1,31 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Instance, Instances, OrbitControls } from '@react-three/drei';
-import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
-import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../../lib/office/a11y';
+import { ContactShadows, Instances, OrbitControls } from '@react-three/drei';
+import { Group, MathUtils, Vector3 } from 'three';
+import { cameraAlpha, legSwing } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
-import { SERVER_ROOM, type PlayBridge } from '../../lib/office/play';
+import type { PlayBridge } from '../../lib/office/play';
 import { PlayRig } from './play';
-import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
+import { OFFICE_ANCHORS, isAnchorId, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING } from '../../lib/office/lighting';
-import { ServerRoom } from './rooms/ServerRoom';
-import { OfficeProps } from './props/OfficeProps';
-
-function subscribeReducedMotion(onChange: () => void) {
-  const query = window.matchMedia(REDUCED_MOTION_QUERY);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-function useReducedMotion() {
-  return useSyncExternalStore(subscribeReducedMotion,
-    () => window.matchMedia(REDUCED_MOTION_QUERY).matches, () => false);
-}
+import { SCENE_MOUNTS } from './mounts';
+import { Block, useReducedMotion } from './mounts/shared';
+import { PresenceGhosts } from './PresenceGhosts';
+import type { PresencePeer } from '../../lib/office/presence';
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
 /** Looks up the HTML tag element Office renders for an agent id. */
 export type AgentTagLookup = (agentId: string) => HTMLDivElement | undefined;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
-const deskIds = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
-const { key: keyLight, fill: fillLight, hemisphere, contactShadows, base, screen, vault } = OFFICE_LIGHTING;
+const { key: keyLight, fill: fillLight, hemisphere, contactShadows, base } = OFFICE_LIGHTING;
 // Office (in the initial bundle) requests on-demand frames through this bridge.
 registerSceneFrameRequester(invalidate);
 
-function Block({ at, size, color, rotation = 0 }: { at: [number, number, number]; size: [number, number, number]; color: string; rotation?: number }) {
-  return <Instance position={at} rotation={[0, rotation, 0]} scale={size} color={color} />;
-}
 function ScreenLabel({ at, element }: { at: [number, number, number]; element: LabelRef }) {
   const point = useRef(new Vector3());
   useFrame(({ camera, size }) => {
@@ -60,60 +48,6 @@ function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkM
     tag.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -100%)`;
   });
   return null;
-}
-function Desk({ room }: { room: typeof deskIds[number] }) {
-  const [x, z] = OFFICE_ANCHORS[room].center;
-  const accent = OFFICE_ANCHORS[room].color;
-  const facing = room === 'dana' ? Math.PI : 0;
-  return <group position={[x, 0, z]} rotation={[0, facing, 0]}>
-    <Block at={[0, 0.83, 0]} size={[2.25, 0.16, 1.05]} color='#bcaa8c' />
-    {[-0.9, 0.9].map(x => <Block key={x} at={[x, 0.4, 0]} size={[0.13, 0.8, 0.8]} color='#485049' />)}
-    <Block at={[-0.35, 1.18, -0.23]} size={[0.78, 0.5, 0.08]} color='#343d36' />
-    {/* A plain mesh, not an instance, so the screen gets its own glossy material. */}
-    <mesh position={[-0.35, 1.18, -0.18]} castShadow receiveShadow>
-      <boxGeometry args={[0.67, 0.37, 0.015]} />
-      <meshPhysicalMaterial color={accent} emissive={accent} emissiveIntensity={screen.emissiveIntensity} roughness={screen.roughness}
-        metalness={screen.metalness} clearcoat={screen.clearcoat} clearcoatRoughness={screen.clearcoatRoughness} />
-    </mesh>
-    <Block at={[-0.35, 0.96, -0.23]} size={[0.1, 0.22, 0.1]} color='#485049' />
-    <Block at={[0.65, 0.95, 0.1]} size={[0.4, 0.06, 0.5]} color='#e7ddc5' rotation={-0.12} />
-    <Block at={[0.05, 0.45, -0.9]} size={[0.65, 0.14, 0.6]} color={accent} />
-    <Block at={[0.05, 0.77, -1.14]} size={[0.65, 0.65, 0.12]} color={accent} />
-  </group>;
-}
-function Plant({ x, z }: { x: number; z: number }) {
-  return <group position={[x, 0, z]}>
-    <mesh position={[0, 0.22, 0]} castShadow><cylinderGeometry args={[0.27, 0.18, 0.44, 6]} /><meshStandardMaterial color='#b98667' /></mesh>
-    <mesh position={[0, 0.8, 0]} castShadow><dodecahedronGeometry args={[0.5, 0]} /><meshStandardMaterial color='#81936b' /></mesh>
-  </group>;
-}
-function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) {
-  const reduced = useReducedMotion();
-  const denial = matchingDenial(snapshot, room);
-  const door = useRef<Mesh>(null);
-  const invalidate = useThree(state => state.invalidate);
-  const [x] = OFFICE_ANCHORS[room].center;
-  useEffect(() => { if (denial) invalidate(); }, [denial, invalidate]);
-  useFrame(({ invalidate }) => {
-    if (!door.current) return;
-    // Ages clamp at 0: clock skew can put a row's `at` ahead of this clock (same rule as doorFlash).
-    const age = denial ? Math.max(0, Date.now() - denial.at) : Infinity;
-    const highlight = doorHighlight(age, reduced);
-    door.current.visible = highlight.visible;
-    if (highlight.visible) invalidate();
-    (door.current.material as MeshBasicMaterial).opacity = highlight.opacity;
-  });
-  if (room === 'lobby' || room === 'dana') return null;
-  const z = room === 'treasury' ? 1.15 : -0.65;
-  return <group>
-    <Block at={[x - 0.72, 0.52, z]} size={[0.14, 1.04, 0.18]} color='#7d8874' />
-    <Block at={[x + 0.72, 0.52, z]} size={[0.14, 1.04, 0.18]} color='#7d8874' />
-    {room === 'treasury' && <>
-      <Block at={[x, 0.51, z]} size={[1.3, 1.02, 0.12]} color='#3c4d47' />
-      <Block at={[x, 0.62, z - 0.09]} size={[0.3, 0.28, 0.08]} color='#c3b68e' />
-    </>}
-    <mesh ref={door} visible={false} position={[x, 0.65, z]}><boxGeometry args={[1.5, 1.3, 0.2]} /><meshBasicMaterial color='#ed6252' transparent opacity={0.85} /></mesh>
-  </group>;
 }
 /** Draws the shared motion; Office's MotionRegistry owns re-seating, retargeting and the wake-up frame. */
 function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean }) {
@@ -218,9 +152,9 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play }: {
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [] }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
-  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge;
+  agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[];
 }) {
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
@@ -253,33 +187,18 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
         <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : '#626e5b'} />
-        <Door room={room} snapshot={snapshot} />
         <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
       </group>;
     })}
-    {deskIds.filter(room => visibleRooms(snapshot).includes(room)).map(room => <Desk key={room} room={room} />)}
-    {visibleRooms(snapshot).includes('lobby') && <group position={[-5.9, 0, 3.9]}>
-      <Block at={[0, 1.25, 0]} size={[2, 1.45, 0.15]} color='#303d34' />
-      {snapshot.audit.slice(-3).map((row, i) => <Block key={row.id} at={[0, 1.65 - i * 0.35, -0.09]} size={[1.55, 0.09, 0.04]} color={row.decision === 'DENY' ? '#ed6252' : '#a9bc8f'} />)}
-      <Block at={[1.5, 0.72, -0.8]} size={[0.8, 0.12, 1]} color='#bcaa8c' />
-      {Array.from({ length: Math.min(snapshot.inboxCount, 3) }, (_, i) => <Block key={i} at={[1.5, 0.84 + i * 0.09, -0.8]} size={[0.5, 0.06, 0.65]} color='#e7ddc5' rotation={i * 0.06} />)}
-    </group>}
-    {visibleRooms(snapshot).includes('treasury') && <group>
-    <Block at={[5, 0.7, 4]} size={[1.8, 1.4, 1.25]} color='#3d4e47' />
-    <mesh position={[5, 0.7, 3.35]} castShadow receiveShadow>
-      <boxGeometry args={[1.4, 1.05, 0.08]} />
-      <meshStandardMaterial color={vault.color} roughness={vault.roughness} metalness={vault.metalness} />
-    </mesh>
-    <Block at={[5, 0.7, 3.28]} size={[0.12, 0.48, 0.1]} color='#c3b68e' />
-    </group>}
-    <Plant x={-7.1} z={-4.6} /><Plant x={7.1} z={-4.6} /><Plant x={1.7} z={4.5} />
+    {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}
+    {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     {snapshot.agents.map(agent => <Fragment key={agent.id}>
       <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />
       {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
     </Fragment>)}
     </Instances>
-    <ServerRoom position={[SERVER_ROOM.position[0], 0, SERVER_ROOM.position[1]]} />
-    <OfficeProps snapshot={snapshot} />
+    {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
+    <PresenceGhosts peers={presence} />
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
