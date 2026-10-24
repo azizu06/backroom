@@ -4,6 +4,7 @@
  * Colours come from the cozy pastel roles in ./palette; only intensities and geometry live here.
  */
 import { ROLES } from "./palette";
+import { OFFICE_ANCHORS, type AnchorId } from "./state";
 
 export type Vec3 = [number, number, number];
 
@@ -67,3 +68,54 @@ export const OFFICE_LIGHTING: OfficeLighting = {
 };
 
 export const OFFICE_DIRECTIONAL_LIGHTS: readonly DirectionalLightConfig[] = [OFFICE_LIGHTING.key, OFFICE_LIGHTING.fill];
+
+/** Includes the hemisphere, both directionals and the shared lamp pools. Never one light per desk. */
+export const MAX_OFFICE_LIGHTS = 6;
+export const OFFICE_EXPOSURE = 1;
+export const LOW_POWER_QUERY = '(prefers-reduced-data: reduce)';
+
+export interface OfficeLamp {
+  room: AnchorId;
+  base: Vec3;
+  height: number;
+  floor: boolean;
+}
+
+/** Small desk lamps sit within the existing desk footprints; floor lamps stay out of the aisle. */
+export const OFFICE_LAMPS: readonly OfficeLamp[] = [
+  ...(['collections', 'payables', 'vendor_onboarding', 'dana'] as const).map(room => {
+    const [x, z] = OFFICE_ANCHORS[room].center;
+    const flip = room === 'dana' ? -1 : 1;
+    return { room, base: [x + flip * 0.9, 0.91, z - flip * 0.3] as Vec3, height: 0.55, floor: false };
+  }),
+  { room: 'lobby', base: [-7.2, 0.05, 4.3], height: 1.9, floor: true },
+  { room: 'treasury', base: [7, 0.05, 4.5], height: 1.9, floor: true },
+];
+
+const LAMP_POOLS = OFFICE_LAMPS.filter(lamp => lamp.floor).map(lamp => ({
+  room: lamp.room,
+  position: [lamp.base[0], lamp.base[1] + lamp.height - 0.1, lamp.base[2]] as Vec3,
+  color: ROLES.lampLight,
+  intensity: 1.2,
+  distance: 5,
+  decay: 2,
+  castShadow: false as const,
+}));
+
+/** Static in every motion mode: no light animation or frame requests, including reduced motion. */
+export function officeLightRig(lowPower = false) {
+  return {
+    key: { ...OFFICE_LIGHTING.key, castShadow: !lowPower },
+    fill: OFFICE_LIGHTING.fill,
+    hemisphere: OFFICE_LIGHTING.hemisphere,
+    pointLights: lowPower ? [] : LAMP_POOLS,
+    contactShadows: lowPower ? null : OFFICE_LIGHTING.contactShadows,
+    shadows: lowPower ? false as const : 'soft' as const,
+    exposure: OFFICE_EXPOSURE,
+  };
+}
+
+/** No existing quality switch; honour browser data saving and offer an explicit lighting override. */
+export function officeLowPower(search: string, reducedData = false, saveData = false): boolean {
+  return new URLSearchParams(search).get('lowPower') === '1' || reducedData || saveData;
+}
