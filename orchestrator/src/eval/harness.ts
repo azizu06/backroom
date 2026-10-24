@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { evaluate, type ActionRequest, type Badge, type Context } from '@backroom/policy';
 import { FakeEffects, MemoryStateStore, SeatWorker, type AuditInput } from '../index';
+import { MemoryFinanceRepository } from '../payables/repository';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
 
@@ -79,14 +80,20 @@ async function payInvoice(scenario: Scenario, step: PolicyStep, seed: any): Prom
     signals: step.signals,
   };
   const store = new MemoryStateStore();
-  const effects = new FakeEffects();
+  const master = new MemoryFinanceRepository({ vendors: vendor ? [{
+    id: vendor.id, domain: vendor.knownDomain, accountId: vendor.approvedBankRef,
+    approved: vendor.approved === true, revision: 1,
+  }] : [] });
+  const effects = new FakeEffects(master);
+  const canonicalInvoice = { id: invoice.id, vendorId: invoice.vendorId, amountCents: invoice.amountCents,
+    lineItems: invoice.lineItems, poMatched: invoice.poMatched, account: invoice.account };
   const worker = new SeatWorker({ id: `eval-${scenario.id}-${step.invoiceId}`, seat: step.badge ?? 'payables', store, effects, now: () => fixedNow });
   await worker.start();
   await store.enqueueTask({
     id: `${scenario.id}:${step.invoiceId}:${step.expected?.ruleIds?.[0] ?? 'pay'}`,
     seatId: step.badge ?? 'payables', refs: [`scenario:${scenario.id}`, `ap_invoice:${step.invoiceId}`],
     idempotencyKey: `eval:${scenario.id}:${step.invoiceId}:${step.expected?.ruleIds?.[0] ?? 'pay'}`,
-    steps: [{ kind: 'nessie', action: { type: 'pay_invoice', invoice }, context, input: { invoiceId: step.invoiceId, simulated: true } }],
+    steps: [{ kind: 'nessie', action: { type: 'pay_invoice', invoice }, context, input: { invoice: canonicalInvoice } }],
   });
   await worker.tick();
   const audits = await store.listAudit();
