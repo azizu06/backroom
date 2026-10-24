@@ -1,4 +1,4 @@
-import { timingSafeEqual, randomUUID } from 'node:crypto';
+import { timingSafeEqual, randomUUID, randomBytes } from 'node:crypto';
 import {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse,
@@ -13,14 +13,17 @@ export interface ApprovalConfig {
 }
 interface Challenge {
   challenge: string; expiresAt: number;
-  intent: { kind: 'register' } | { kind: 'decide'; id: string; decision: ControllerDecision };
+  intent: { kind: 'register' } | { kind: 'session' } | { kind: 'decide'; id: string; decision: ControllerDecision };
 }
+const SESSION_MS = 12 * 60 * 60_000;
 /** Single-process controller service. Public credentials only; no biometric/private key leaves the authenticator.
  * Replace together with StateStore for durable deployments. Never instantiate once per request.
  */
 export class ControllerApprovals {
   private credential?: WebAuthnCredential;
   private challenges = new Map<string, Challenge>();
+  /** Sign-in token -> expiry. A session only lists pending requests; it never decides one. */
+  private sessions = new Map<string, number>();
   private human: string;
   constructor(private store: StateStore, private config: ApprovalConfig, private now = Date.now) {
     const origin = new URL(config.origin);
@@ -95,5 +98,37 @@ export class ControllerApprovals {
       decision: item.intent.decision, credentialId: credential.id }), this.now());
     credential.counter = Math.max(credential.counter, result.authenticationInfo.newCounter);
     return escalation;
+  }
+  async sessionOptions() {
+    if (!this.credential) throw new Error('CONTROLLER_NOT_REGISTERED');
+    const options = await generateAuthenticationOptions({ rpID: this.config.rpID, userVerification: 'required',
+      allowCredentials: [{ id: this.credential.id, transports: this.credential.transports }] });
+    return { options, challengeId: this.save(options.challenge, { kind: 'session' }) };
+  }
+  /** Passkey sign-in for the live controller inbox. Each decision still needs its own bound assertion. */
+  async signIn(challengeId: string, response: AuthenticationResponseJSON) {
+    const item = this.take(challengeId, 'session');
+    const credential = this.credential;
+    if (!credential || response?.id !== credential.id) throw new Error('PASSKEY_INVALID');
+    const result = await verifyAuthenticationResponse({ response, credential,
+      expectedChallenge: item.challenge, expectedOrigin: this.config.origin,
+      expectedRPID: this.config.rpID, requireUserVerification: true });
+    if (!result.verified) throw new Error('PASSKEY_INVALID');
+    credential.counter = Math.max(credential.counter, result.authenticationInfo.newCounter);
+    for (const [token, expiresAt] of this.sessions) if (expiresAt <= this.now()) this.sessions.delete(token);
+    if (this.sessions.size >= 20) this.sessions.delete(this.sessions.keys().next().value!);
+    const token = randomBytes(32).toString('base64url');
+    this.sessions.set(token, this.now() + SESSION_MS);
+    return { token, maxAgeSeconds: SESSION_MS / 1000 };
+  }
+  hasSession(token: unknown) {
+    return typeof token === 'string' && (this.sessions.get(token) ?? 0) > this.now();
+  }
+  /** Pending requests for this controller among `ids`, newest first. Expiry runs first, as in `get`. */
+  async pending(ids: readonly string[]) {
+    await this.store.expireEscalations(this.now());
+    const rows = await Promise.all(ids.map(id => this.store.getEscalation(id)));
+    return rows.filter((row): row is NonNullable<typeof row> => !!row && row.toHuman === this.human && row.status === 'pending')
+      .sort((a, b) => b.createdAt - a.createdAt);
   }
 }

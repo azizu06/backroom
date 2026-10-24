@@ -7,6 +7,7 @@ const messages: Record<string, string> = {
   ESCALATION_CLOSED: 'This request has closed. Refresh to see its current status.',
   CHALLENGE_INVALID: 'The passkey prompt expired or was already used. Try your decision again.',
   ORIGIN_REJECTED: 'Open the approval link on the configured Backroom address.',
+  SESSION_REQUIRED: 'Sign in with Dana’s passkey to see live requests.',
 };
 
 /** Carries the server error code so pages can tell a dead link from a passing outage. */
