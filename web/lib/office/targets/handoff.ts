@@ -1,3 +1,4 @@
+import { handoffTalk } from "../agent-talk";
 import { compareHandoffs, handoffAgentName, handoffStatus, needsHandoffHuman, statusLabel } from "../handoffs";
 import { AGENT_RADIUS } from "./agent";
 import { defineTarget } from "./types";
@@ -14,7 +15,7 @@ export const handoffTarget = defineTarget<{ kind: "handoff"; actor: string }>({
     const carrying = handoffFor?.(target.actor);
     const current = rows.find(row => row.handoffId === carrying?.handoffId) ?? [...rows].sort((a, b) => compareHandoffs(b, a))[0]!;
     return {
-      kind: "handoff", title: `${handoffAgentName(target.actor)} · handoff`, state: statusLabel(current.status),
+      kind: "handoff", title: `${handoffAgentName(target.actor)} · handoff`, state: statusLabel(current.status), talk: handoffTalk(snapshot, target.actor, current) ?? undefined,
       handoff: { correction: current.correction, from: handoffAgentName(current.fromRole), to: handoffAgentName(current.toRole), caseDisplayId: current.caseDisplayId,
         reason: current.reason, summary: current.summary, status: handoffStatus(current), errorCode: current.status === "rejected" ? current.errorCode : undefined },
       entries: rows.filter(row => row.caseDisplayId === current.caseDisplayId).sort((a, b) => compareHandoffs(b, a)).slice(0, 8).map((row, i) => ({

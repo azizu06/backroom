@@ -190,7 +190,7 @@ export function targetKey(target: PlayTarget | null): string {
 
 /**
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
- * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
+ * handoff agents, each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and coworkers.
  */
 export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], coworkers: readonly CoworkerSpot[] = [], handoffAgents: readonly { id: string; position: Vec2 }[] = []): PlayCandidate[] {
   const context = { agents, visible: new Set(rooms), handoffAgents, coworkers };

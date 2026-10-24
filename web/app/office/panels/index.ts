@@ -3,9 +3,9 @@
  * web/lib/office/targets). A new target with custom UI adds one file here and one line below.
  */
 import type { PlayTarget } from '../../../lib/office/play';
+import { agentTalkPanel } from './AgentTalkPanel';
 import { coworkerPanel } from './CoworkerPanel';
 import { deskPanel } from './DeskPanel';
-import { handoffPanel } from './HandoffPanel';
 import { inboxPanel } from './InboxPanel';
 import { paylinkPanel } from './PaylinkPanel';
 import { phonePanel } from './PhonePanel';
@@ -15,8 +15,9 @@ import type { PlayPanelView } from './types';
 
 export type { PlayPanelView } from './types';
 export const PLAY_PANEL_VIEWS: Partial<Record<PlayTarget['kind'], PlayPanelView>> = {
+  agent: agentTalkPanel,
+  handoff: agentTalkPanel,
   desk: deskPanel,
-  handoff: handoffPanel,
   treasury: treasuryPanel,
   paylink: paylinkPanel,
   server: serverPanel,
