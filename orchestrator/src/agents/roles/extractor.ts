@@ -15,7 +15,7 @@ export interface ExtractorDependencies {
   fetch?: typeof fetch;
   /** Cloud fallback when GX10 is unreachable; defaults to the production router. */
   router?: ExtractionRouter;
-  /** Records route, model, latency and cost for every extraction (local and cloud_fallback). */
+  /** Records route, model, latency and cost for every extraction (local and cloud_fallback). Defaults to the shared StateStore. */
   audit?: Pick<StateStore, 'appendAudit'>;
 }
 const ref = z.string().min(1).max(256);
@@ -97,7 +97,8 @@ export function createExtractorSpecialist(deps: ExtractorDependencies): Speciali
         return { decision: 'DENY', errors: ['LOCAL_EXTRACTION_FAILED'], attemptsRemaining: MAX_ATTEMPTS - s.localAttempts };
       }
       await ctx.assertCurrent();
-      await deps.audit?.appendAudit({ ts: Date.now(), actor: result.route === 'local' ? 'local_model' : 'claude', seat: 'controller',
+      const sink = deps.audit ?? (await import('../../runtime')).getStateStore();
+      await sink.appendAudit({ ts: Date.now(), actor: result.route === 'local' ? 'local_model' : 'claude', seat: 'controller',
         action: 'extraction_routed', ruleIds: result.route === 'cloud_fallback' ? ['ROUTE_FALLBACK'] : [], policyVersion: 0,
         refs: [ctx.activation.caseId, args.documentRef], route: result.route, latencyMs: result.latencyMs, costUsd: result.costUsd,
         inputs: { model: result.model, taskType: 'field_extraction', activationId: ctx.activation.activationId } });
