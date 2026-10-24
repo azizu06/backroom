@@ -196,3 +196,44 @@ describe('collections post-call step', () => {
     await expect(runCollectionsPostCall(scripted(async () => done), stale, postHarness(call()).deps)).rejects.toThrow('STALE_LEASE');
   });
 });
+
+describe('judge-supplied calls (#30)', () => {
+  const handoff = (): ActivationResult => ({ kind: 'handoff', usage,
+    request: { to: 'reconciler', reason: 'Caller says paid', summary: 'Already-paid claim; verify bank evidence.', artifactRefs: ['case-1:call:sess-1'] } });
+  it('an unknown call status is never routed onward: it escalates to a human', async () => {
+    const odd = call({ status: 'transferred_to_ai' as never, links: [{ id: 'l1' }], plans: [{ id: 'p1' }], scenarioSource: 'judge' });
+    expect(classifyCall(odd)).toBe('unrecognized');
+    expect(routeOutcome('unrecognized')).toEqual({ kind: 'terminal', result: 'held' });
+    const h = postHarness(odd);
+    const rt = scripted(async () => { throw new Error('model must not run'); });
+    expect(await runCollectionsPostCall(rt, ctx(), h.deps)).toMatchObject({ kind: 'held' });
+    expect(rt.specs).toEqual([]);
+    expect((await h.store.listAudit()).find(a => a.action === 'collections_postcall_terminal')).toMatchObject({
+      decision: 'ESCALATE', ruleIds: ['CALL_UNRECOGNIZED'], inputs: { outcome: 'unrecognized', result: 'held', scenario_source: 'judge' } });
+  });
+  it.each([
+    ['dispute', { status: 'disputed' }, 'CALL_DISPUTE'],
+    ['wrong number / human', { status: 'human_requested' }, 'CALL_HUMAN_REQUESTED'],
+    ['no agreement', {}, 'CALL_NO_AGREEMENT'],
+  ] as const)('a judge %s holds as ESCALATE, never a pass', async (_name, over, rule) => {
+    const h = postHarness(call({ ...over, scenarioSource: 'judge' } as Partial<CallRecordView>));
+    expect(await runCollectionsPostCall(scripted(async () => done), ctx(), h.deps)).toMatchObject({ kind: 'held' });
+    expect((await h.store.listAudit()).find(a => a.action === 'collections_postcall_terminal')).toMatchObject({
+      decision: 'ESCALATE', ruleIds: [rule], inputs: { scenario_source: 'judge' } });
+  });
+  it('a judge opt-out stops as done without escalating, and is tagged', async () => {
+    const h = postHarness(call({ status: 'opted_out', scenarioSource: 'judge' }));
+    expect(await runCollectionsPostCall(scripted(async () => done), ctx(), h.deps)).toMatchObject({ kind: 'done' });
+    const row = (await h.store.listAudit()).find(a => a.action === 'collections_postcall_terminal');
+    expect(row?.decision).toBeUndefined();
+    expect(row?.inputs).toMatchObject({ outcome: 'opt_out', scenario_source: 'judge' });
+  });
+  it('a judge already-paid claim is handed to the reconciler and tagged; seeded calls stay seed', async () => {
+    const judge = postHarness(call({ status: 'already_paid', scenarioSource: 'judge' }));
+    expect(await runCollectionsPostCall(scripted(async () => handoff()), ctx(), judge.deps)).toMatchObject({ kind: 'handoff' });
+    expect((await judge.store.listAudit()).find(a => a.action === 'collections_postcall_handoff')?.inputs).toMatchObject({ scenario_source: 'judge' });
+    const seeded = postHarness(call({ status: 'already_paid' }));
+    await runCollectionsPostCall(scripted(async () => handoff()), ctx(), seeded.deps);
+    expect((await seeded.store.listAudit()).find(a => a.action === 'collections_postcall_handoff')?.inputs).toMatchObject({ scenario_source: 'seed' });
+  });
+});

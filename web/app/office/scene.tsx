@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Instances, OrbitControls } from '@react-three/drei';
+import { Instances, OrbitControls } from '@react-three/drei';
 import { Group, MathUtils, Vector3 } from 'three';
 import { cameraAlpha } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
@@ -11,7 +11,9 @@ import { PlayRig } from './play';
 import { OFFICE_ANCHORS, isAnchorId, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
 import { tourProgress } from '../../lib/office/tour';
-import { OFFICE_LIGHTING } from '../../lib/office/lighting';
+import { OFFICE_LIGHTING, officeLightRig } from '../../lib/office/lighting';
+import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights';
+import { ROLES } from '../../lib/office/palette';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
 import { PresenceGhosts } from './PresenceGhosts';
@@ -25,7 +27,7 @@ export type RoomLabels = Record<AnchorId, LabelRef>;
 /** Looks up the HTML tag element Office renders for an agent id. */
 export type AgentTagLookup = (agentId: string) => HTMLDivElement | undefined;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
-const { key: keyLight, fill: fillLight, hemisphere, contactShadows, base } = OFFICE_LIGHTING;
+const { base } = OFFICE_LIGHTING;
 // Office (in the initial bundle) requests on-demand frames through this bridge.
 registerSceneFrameRequester(invalidate);
 
@@ -152,37 +154,26 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
   agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[]; chatBubbles?: ChatBubble[];
 }) {
-  return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
-    gl={{ antialias: true, powerPreference: 'high-performance' }} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
-    <color attach='background' args={['#202620']} />
-    <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
-    <directionalLight position={keyLight.position} color={keyLight.color} intensity={keyLight.intensity} castShadow={keyLight.castShadow}
-      shadow-mapSize={[keyLight.shadow.mapSize, keyLight.shadow.mapSize]} shadow-bias={keyLight.shadow.bias}
-      shadow-camera-near={keyLight.shadow.near} shadow-camera-far={keyLight.shadow.far}
-      shadow-camera-left={keyLight.shadow.left} shadow-camera-right={keyLight.shadow.right} shadow-camera-top={keyLight.shadow.top} shadow-camera-bottom={keyLight.shadow.bottom} />
-    <directionalLight position={fillLight.position} color={fillLight.color} intensity={fillLight.intensity} castShadow={fillLight.castShadow} />
-    {/* frames={Infinity} (default) re-bakes on every frame, but with frameloop='demand' that is only frames
-        something else requested (walking agents, door flashes, camera moves), so avatars stay grounded while
-        they walk and the scene never loops on its own. Each such frame also pays a second shadow-map pass.
-        Scale and color are module constants so drei's render targets are not reallocated on re-render.
-        Bases exactly at y=0 (desk legs, walls) sit below the plane and get no blob; raised undersides
-        (desktops, torsos, feet) do. */}
-    <ContactShadows position={contactShadows.position} near={contactShadows.near} scale={contactShadows.scale} resolution={contactShadows.resolution}
-      blur={contactShadows.blur} opacity={contactShadows.opacity} far={contactShadows.far} color={contactShadows.color} />
+  const lowPower = useOfficeLowPower();
+  return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows={officeLightRig(lowPower).shadows} dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
+    gl={OFFICE_RENDERER} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
+    <color attach='background' args={[ROLES.background]} />
+    <OfficeLights snapshot={snapshot} lowPower={lowPower} />
     <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
-    <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color='#535c4e' />
-    <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color='#828976' />
-    <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color='#747e6a' />
-    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color='#687361' />
+    {/* Room shell: peach floor, cream walls, lavender partitions, cream room pads and a blush aisle runner. */}
+    <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color={ROLES.floor} />
+    <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color={ROLES.wall} />
+    <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color={ROLES.wall} />
+    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color={ROLES.aisle} />
     {[-2.5, 2.5].map(x => <group key={x}>
-      <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color='#828976' />
-      <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color='#828976' />
+      <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
+      <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color={ROLES.partition} />
     </group>)}
     {visibleRooms(snapshot).map(room => {
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
-        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : '#626e5b'} />
+        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : ROLES.roomPad} />
         <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
       </group>;
     })}

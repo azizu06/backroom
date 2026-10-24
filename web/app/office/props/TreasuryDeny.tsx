@@ -9,8 +9,9 @@ import { Bear, createBearRig, poseBear } from '../avatars/Bear';
 import { canvasTextLines } from '../../../lib/office/props/readability';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { useReducedMotion } from './useReducedMotion';
+import { ROLES } from '../../../lib/office/palette';
 
-const DENY_RED = '#ed6252', RING_MAX = 2.4;
+const DENY_RED = ROLES.deny, RING_MAX = 2.4;
 // Frame just outside scene.tsx's door flash box (1.5 x 1.3 x 0.2 at (5, 0.65, 1.15), front face z 1.25).
 const RING_Z = 1.275, RING_T = 0.08, RING_D = 0.04, OPEN_W = 1.6, OPEN_H = 1.4;
 const RING: readonly { at: [number, number, number]; size: [number, number, number] }[] = [
@@ -28,19 +29,26 @@ function drawSign(ctx: CanvasRenderingContext2D, text: string) {
   const rule = rest.join(' · ').replace(/[_-]+/g, ' ');
   ctx.fillStyle = DENY_RED;
   ctx.fillRect(0, 0, TEX_W, TEX_H);
-  ctx.strokeStyle = '#272f25';
+  ctx.strokeStyle = ROLES.frame;
   ctx.lineWidth = 6;
   ctx.strokeRect(10, 10, TEX_W - 20, TEX_H - 20);
-  // Dark ink on the red board has much higher contrast than white on this red.
-  ctx.fillStyle = '#171d16';
+  // Neither navy nor cream reads on the coral board, so each line sits on a navy plaque with cream ink (above 4.5:1).
+  const plaque = (label: string, y: number, half: number) => {
+    const w = Math.min(TEX_W - 40, ctx.measureText(label).width + 40);
+    ctx.fillStyle = ROLES.frame;
+    ctx.fillRect((TEX_W - w) / 2, y - half, w, half * 2);
+  };
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `800 112px ${PROP_FONT}`;
   const measure = (label: string) => ctx.measureText(label).width;
-  ctx.fillText(canvasTextLines(head, measure, TEX_W - 32, 1)[0] ?? '', TEX_W / 2, 88);
+  const title = canvasTextLines(head, measure, TEX_W - 32, 1)[0] ?? '';
+  plaque(title, 88, 48);
+  ctx.fillStyle = ROLES.wall;
+  ctx.fillText(title, TEX_W / 2, 88);
   ctx.font = `800 120px ${PROP_FONT}`;
   const lines = canvasTextLines(rule === head ? '' : rule, measure, TEX_W - 64, 2);
-  lines.forEach((label, i) => ctx.fillText(label, TEX_W / 2, 224 + i * 120));
+  lines.forEach((label, i) => { plaque(label, 224 + i * 120, 48); ctx.fillStyle = ROLES.wall; ctx.fillText(label, TEX_W / 2, 224 + i * 120); });
 }
 
 /** One played moment for one DENY receipt; unmounts (via onEnd) when it is over. */
@@ -53,7 +61,7 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
   const ended = useRef(false);
   const [ring] = useState(() => new MeshStandardMaterial({ color: DENY_RED, emissive: DENY_RED, emissiveIntensity: 0, roughness: 0.6 }));
   const [sign] = useState(() => new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
-  const [post] = useState(() => new MeshBasicMaterial({ color: '#3c342e', transparent: true, opacity: 0, depthWrite: false }));
+  const [post] = useState(() => new MeshBasicMaterial({ color: ROLES.frame, transparent: true, opacity: 0, depthWrite: false }));
   const [ghost] = useState(() => new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawSign(ctx, receipt.signText), [receipt.signText]);
   useEffect(() => { sign.map = texture; sign.needsUpdate = true; }, [sign, texture]);
