@@ -13,8 +13,8 @@ const steps = [
     instruction: 'Select “Preview Treasury denial”.', outcome: 'See the door refusal and its simulated audit receipt.' },
   { title: 'Ask why on the audit wall', href: '/audit', time: '40 sec',
     instruction: 'Open the wall with an operator code, then ask about a decision.', outcome: 'Read an explanation tied to recorded evidence.' },
-  { title: 'Approval by passkey', href: '/office', time: '30 sec',
-    instruction: 'Choose “Preview escalation” below the office: the case stops at Dana’s desk until a human approves with a passkey on its approval link.', outcome: 'Review an exception with a human before it can proceed.' },
+  { title: 'Escalation to a human', href: '/office', time: '30 sec',
+    instruction: 'Choose “Preview escalation” below the office: the agent walks the case to Dana’s desk and stops there. The preview creates no approval; in a live run only a human with a passkey can approve.', outcome: 'See that an exception waits for a person, never a model or a voice.' },
   { title: 'Real vs simulated status', href: '/real-vs-sim', time: '15 sec',
     instruction: 'Read the integration and sandbox disclosures.', outcome: 'Know which parts are real, simulated, or unverified.' },
 ] as const;
