@@ -90,6 +90,16 @@ describe('/_admin/dial pre-call gate', () => {
     expect((await h.dial()).status).toBe(200);
     expect(h.provider).toHaveBeenCalledTimes(2);
   });
+  it('rings once when two dials race after the previous call stopped', async () => {
+    const h = harness({ status: 'ready' });
+    expect((await h.dial()).status).toBe(200);
+    for (const id of h.stopped.keys()) h.stopped.set(id, true);
+    // Both arrive while the journal read for the stopped call is pending.
+    const results = await Promise.all([h.dial(), h.dial()]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(results.map(r => r.body)).toContain('DIAL_IN_PROGRESS');
+    expect(h.provider).toHaveBeenCalledTimes(2);
+  });
   it('never redials an unconfirmed provider request but releases a definite rejection', async () => {
     const timeout = harness({ status: 'ready' }, { provider: async () => { throw new DOMException('timed out', 'TimeoutError'); } });
     expect(await timeout.dial()).toEqual({ status: 504, body: 'DIAL_UNCONFIRMED' });

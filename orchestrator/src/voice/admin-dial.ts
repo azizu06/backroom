@@ -34,10 +34,11 @@ export function createAdminDial(options: AdminDialOptions) {
     return { status, body };
   };
   return async (): Promise<AdminDialResponse> => {
+    // Take the lock before any await, so two requests cannot both pass the line check.
     if (dialing) return { status: 409, body: 'DIAL_IN_PROGRESS' };
-    if (line && now() < line.until && !(await options.sessionStopped(line.sessionId))) return { status: 409, body: 'CALL_ACTIVE' };
     dialing = true;
     try {
+      if (line && now() < line.until && !(await options.sessionStopped(line.sessionId))) return { status: 409, body: 'CALL_ACTIVE' };
       if (await options.bridge.clientStopped()) return { status: 409, body: 'CLIENT_STOPPED' };
       let gate: Awaited<ReturnType<DemoVoiceBridge['preCall']>>;
       try { gate = await options.bridge.preCall(); } catch { return blocked(503, 'PRECALL_UNAVAILABLE', 'pre-call status unreachable'); }

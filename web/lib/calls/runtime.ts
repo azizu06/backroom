@@ -13,7 +13,10 @@ export async function activeCall(now = Date.now()): Promise<CallProjectionRow | 
   const store = getStateStore();
   const escalations = Object.fromEntries(await Promise.all(call.escalations.map(async escalation =>
     [escalation.id, await store.getEscalation(escalation.id).catch(() => undefined)] as const)));
-  const row = projectVoiceCall(call, lifecycle, { now, escalations });
+  // A stopped call's last gateway audit is its stop; the shared chain holds that audit's time.
+  const stop = call.status !== 'active' ? call.audits.at(-1) : undefined;
+  const stoppedAt = stop && (await store.getAudit(stop.id).catch(() => undefined))?.ts;
+  const row = projectVoiceCall(call, lifecycle, { now, escalations, ...(stoppedAt !== undefined && { stoppedAt }) });
   const endedAt = row.endedAt ?? (lifecycle.registeredAt ?? now) + MAX_CALL_MS;
   return row.status === 'ended' && now - endedAt > ENDED_VISIBLE_MS ? null : row;
 }

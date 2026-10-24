@@ -67,6 +67,7 @@ describe('desk phone call projection', () => {
     expect(projectVoiceCall(voiceCall(), { registeredAt: 1, startedAt: 2, endedAt: 3, endReason: 'completed' }, { now: 4 }))
       .toMatchObject({ status: 'ended', endedAt: 3, endReason: 'Call ended' });
     expect(projectVoiceCall(voiceCall(), { registeredAt: 1, endedAt: 3, endReason: 'failed' }, { now: 4 })).toMatchObject({ status: 'ended', endReason: 'Call failed' });
-    expect(projectVoiceCall(voiceCall({ status: 'opted_out' }), { registeredAt: 1, startedAt: 2 }, { now: 4 })).toMatchObject({ status: 'ended', endReason: 'Opt-out recorded' });
+    expect(projectVoiceCall(voiceCall({ status: 'opted_out' }), { registeredAt: 1, startedAt: 2 }, { now: 4, stoppedAt: 3 }))
+      .toMatchObject({ status: 'ended', endReason: 'Opt-out recorded', endedAt: 3 });
   });
 });

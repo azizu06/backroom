@@ -91,6 +91,13 @@ describe('office call request', () => {
     release(); expect((await next).status).toBe(200);
     expect(h.audits.filter(a => a.outcome === 'refused').map(a => a.code)).toEqual(['CALL_REQUEST_IN_FLIGHT', 'CALL_ACTIVE', 'CALL_ACTIVE', 'COOLDOWN']);
   });
+  it('forwards one of two concurrent clicks while the call state read is pending', async () => {
+    const h = harness();
+    const cookie = await h.unlock();
+    const results = await Promise.all([click(h, cookie), click(h, cookie)]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(h.relay).toHaveBeenCalledTimes(1);
+  });
   it('relays pre-call and policy refusals, and never retries an unconfirmed dial', async () => {
     const blocked = harness(async () => new Response('PRECALL_BLOCKED:Credit/OFAC check unavailable', { status: 409 }));
     const response = await click(blocked, await blocked.unlock());

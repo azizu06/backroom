@@ -93,13 +93,14 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
     }
     const relay = options.relay();
     if (!relay) return refuse(503, 'VOICE_NOT_RUNNING', 'The voice relay is not running on this host. No call placed.');
+    // Take the lock before any await, so two clicks cannot both pass the call-state check.
     if (inFlight) return refuse(409, 'CALL_REQUEST_IN_FLIGHT', 'A call is already being placed.');
-    const current = await options.currentCall();
-    if (current && current.status !== 'ended') return refuse(409, 'CALL_ACTIVE', 'A call is already on the line.');
-    const wait = Math.max(lastAttemptAt, current?.endedAt ?? -Infinity) + cooldownMs - now();
-    if (wait > 0) return refuse(429, 'COOLDOWN', `Line cooling down. Try again in ${Math.ceil(wait / 1000)} s.`);
     inFlight = true;
     try {
+      const current = await options.currentCall();
+      if (current && current.status !== 'ended') return refuse(409, 'CALL_ACTIVE', 'A call is already on the line.');
+      const wait = Math.max(lastAttemptAt, current?.endedAt ?? -Infinity) + cooldownMs - now();
+      if (wait > 0) return refuse(429, 'COOLDOWN', `Line cooling down. Try again in ${Math.ceil(wait / 1000)} s.`);
       try { await options.audit({ outcome: 'requested', code: 'DIAL_REQUESTED' }); }
       catch { return json({ ok: false, error: 'AUDIT_UNAVAILABLE', message: 'The audit record is unavailable. No call placed.' }, 503); }
       lastAttemptAt = now();

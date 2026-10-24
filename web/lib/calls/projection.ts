@@ -39,7 +39,9 @@ const shownApproval = (view: EscalationView): EscalationView['status'] =>
  * Never includes the phone number, contact name, payment link path or code, or the session id.
  */
 export function projectVoiceCall(call: GatewayCall, lifecycle: VoiceCallLifecycle = {},
-  options: { now: number; escalations?: Record<string, EscalationView | undefined> }): CallProjectionRow {
+  options: { now: number; escalations?: Record<string, EscalationView | undefined>;
+    /** When the gateway stop was recorded, so a stopped call ends even if the provider's end event is lost. */
+    stoppedAt?: number }): CallProjectionRow {
   const money = (cents: number) => call.identityConfirmed
     ? `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$•••';
   const at = lifecycle.startedAt ?? lifecycle.registeredAt ?? 0;
@@ -82,7 +84,7 @@ export function projectVoiceCall(call: GatewayCall, lifecycle: VoiceCallLifecycl
   if (lifecycle.endedAt !== undefined) {
     status = 'ended'; endedAt = lifecycle.endedAt; endReason = call.status !== 'active' ? STOPPED[call.status] : lifecycle.endReason === 'failed' ? 'Call failed' : 'Call ended';
   } else if (call.status !== 'active') {
-    status = 'ended'; endReason = STOPPED[call.status];
+    status = 'ended'; endedAt = options.stoppedAt; endReason = STOPPED[call.status];
   } else if (lifecycle.startedAt === undefined && !call.audits.length) {
     status = 'ringing';
     if (lifecycle.registeredAt !== undefined && options.now - lifecycle.registeredAt > RING_TIMEOUT_MS) {
