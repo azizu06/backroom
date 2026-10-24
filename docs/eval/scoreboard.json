@@ -4,11 +4,11 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "349e46f577ec4f9daea102a2311a30c17eeb8814",
+    "baseCommit": "7af08249dbae88dbbf3f4e26a811f162c59abc98",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "525de5180e937c4c55bbeebe572d1c33001ea003a6c6fc719a86fb9cf2d06b0e",
+      "orchestrator/src/agents/eval/conversation.ts": "accf5a5567a238bcfb337a3ec2564cd4e914178e7943efed5d1184f77312cbae",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -22,7 +22,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "68c631cf2b74e271c21fa6bdcac426f79952fee197f51e3449ab261ed89d19ec"
+      "orchestrator/src/agents/eval/scoreboard.ts": "6482d84ff6a276908a6b53188678f5218c21b45e557e2bcafa77372844fdbe4e"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -160,8 +160,8 @@
       "percent": 100
     },
     "arConversations": {
-      "numerator": 9,
-      "denominator": 9,
+      "numerator": 10,
+      "denominator": 10,
       "percent": 100
     },
     "judgeCalls": {
@@ -14158,6 +14158,45 @@
         "collections.next-call.start_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    },
+    {
+      "id": "phone_mismatch",
+      "scenarioId": "C17",
+      "invoiceId": "1042",
+      "match": true,
+      "checks": {
+        "dialedOnce": true,
+        "callStatus": true,
+        "caseStatus": true,
+        "roles": true,
+        "cleared": true,
+        "noLeakBeforeIdentity": true,
+        "auditChain": true,
+        "warningRecorded": true,
+        "noAmountBeforeIdentity": true,
+        "contextAfterIdentity": true
+      },
+      "callStatus": "active",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "roles": [
+        "collections"
+      ],
+      "cleared": false,
+      "reconRules": [],
+      "gatewayTools": [
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:DENY",
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:CONTEXT"
+      ],
+      "tools": [
+        "collections.planner.get_invoice_context",
+        "collections.planner.can_call",
+        "collections.planner.run_precall",
+        "collections.planner.start_call"
+      ],
+      "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     }
   ],
   "judgeCalls": [
@@ -15335,7 +15374,7 @@
     },
     {
       "id": "AR_RUNTIME",
-      "detail": "9 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
+      "detail": "10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     }
   ]
 }
