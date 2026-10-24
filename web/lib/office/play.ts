@@ -201,7 +201,8 @@ export function interactCandidates(agents: readonly { id: string; position: Vec2
 }
 
 /**
- * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone; agents win ties.
+ * Nearest candidate within range (radius extends the range) whose bearing is inside the view cone.
+ * A desk's general inspect prompt yields to an eligible agent; other targets still compete by distance.
  * Up close the cone widens to the candidate's angular size (asin(radius / distance)), so a target stays
  * picked while the crosshair is anywhere on it. Open doors require facing the swung leaf. Open leaves
  * yield to other targets; closed leaves compete by distance so targets behind them cannot take priority.
@@ -209,6 +210,7 @@ export function interactCandidates(agents: readonly { id: string; position: Vec2
 export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCandidate[], range = INTERACT_RANGE, cone = PICK_CONE): PlayTarget | null {
   const [fx, fz] = forwardOf(yaw);
   let best: { target: PlayTarget; distance: number } | null = null;
+  let nonDesk: { target: PlayTarget; distance: number } | null = null;
   let door: { target: PlayTarget; distance: number } | null = null;
   for (const candidate of candidates) {
     const dx = candidate.position[0] - eye[0], dz = candidate.position[1] - eye[1];
@@ -227,7 +229,11 @@ export function pickTarget(eye: Vec2, yaw: number, candidates: readonly PlayCand
     if (!best || distance < best.distance - 1e-9 || (Math.abs(distance - best.distance) <= 1e-9 && agent && best.target.kind !== "agent")) {
       best = { target: candidate.target, distance };
     }
+    if (candidate.target.kind !== "desk" && (!nonDesk || distance < nonDesk.distance - 1e-9 || (Math.abs(distance - nonDesk.distance) <= 1e-9 && agent && nonDesk.target.kind !== "agent"))) {
+      nonDesk = { target: candidate.target, distance };
+    }
   }
+  if (best?.target.kind === "desk" && nonDesk?.target.kind === "agent") return nonDesk.target;
   return best?.target ?? door?.target ?? null;
 }
 
