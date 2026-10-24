@@ -10,25 +10,33 @@
     "test:approvals:browser": "playwright test --config playwright.approvals.config.ts",
     "test:office:browser": "playwright test --config playwright.office.config.ts",
     "test:audit:browser": "playwright test --config playwright.audit.config.ts",
-    "test:inbox:browser": "playwright test --config playwright.inbox.config.ts"
+    "test:inbox:browser": "playwright test --config playwright.inbox.config.ts",
+    "test:payments:browser": "playwright test --config playwright.payments.config.ts",
+    "test:policy:browser": "playwright test --config playwright.policy.config.ts",
+    "test:replay:browser": "playwright test --config playwright.replay.config.ts",
+    "test:browser": "pnpm run test:approvals:browser && pnpm run test:audit:browser && pnpm run test:inbox:browser && pnpm run test:office:browser && pnpm run test:payments:browser && pnpm run test:policy:browser && pnpm run test:replay:browser"
   },
   "dependencies": {
+    "@backroom/nessie": "workspace:*",
     "@backroom/orchestrator": "workspace:*",
     "@react-three/drei": "10.7.9",
     "@react-three/fiber": "9.8.2",
     "@simplewebauthn/browser": "^14.0.0",
     "next": "16.4.3",
+    "qrcode": "1.5.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "three": "0.186.1",
     "spacetimedb": "2.13.0",
-    "@backroom/nessie": "workspace:*"
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "@types/node": "20.19.39",
+    "@types/qrcode": "1.5.6",
     "@types/react": "19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/three": "0.186.0",
+    "jsqr": "1.4.0",
     "typescript": "5.9.3",
     "vitest": "3.2.7"
   }

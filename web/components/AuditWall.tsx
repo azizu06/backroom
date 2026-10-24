@@ -2,15 +2,25 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { AuditEntry, ChainStatus, WhyAnswer } from '@backroom/orchestrator';
+import { jsonObject, NETWORK_MESSAGE, outageMessage, serverError } from '../lib/http/response';
 import './AuditWall.css';
 
 export type AuditSnapshot = { entries: AuditEntry[]; chain: ChainStatus; measuredAt: string };
 const message = (error: unknown) => error instanceof Error ? error.message : 'Request failed. Try again.';
-async function api(path: string, body?: unknown, signal?: AbortSignal) {
-  const response = await fetch(`/api/audit/${path}`, { cache: 'no-store', signal,
-    ...(body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) });
-  const data = await response.json();
-  if (!response.ok) throw Object.assign(new Error(data.error ?? 'Request failed. Try again.'), { status: response.status });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callers read route-specific shapes, as before
+async function api(path: string, body?: unknown, signal?: AbortSignal): Promise<any> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/audit/${path}`, { cache: 'no-store', signal,
+      ...(body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) });
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    throw new Error(NETWORK_MESSAGE);
+  }
+  const data = await jsonObject(response);
+  const status = response.status;
+  if (!data) throw Object.assign(new Error(outageMessage(status)), { status });
+  if (!response.ok) throw Object.assign(new Error(serverError(data) ?? 'Request failed. Try again.'), { status });
   return data;
 }
 function recordedDecision(entry: AuditEntry) {
