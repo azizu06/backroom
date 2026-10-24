@@ -164,10 +164,10 @@ export function targetKey(target: PlayTarget | null): string {
 
 /**
  * Every registered target's candidates, in registry order (./targets): agents at their drawn (motion) positions,
- * each visible desk at its room centre, the Treasury door, the lobby payment kiosk and the GX10 server.
+ * each visible desk at its room centre, the Treasury door, the lobby payment kiosk, the GX10 server and props.
  */
-export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[]): PlayCandidate[] {
-  const context = { agents, visible: new Set(rooms) };
+export function interactCandidates(agents: readonly { id: string; position: Vec2 }[], rooms: readonly AnchorId[], snapshot?: OfficeSnapshot): PlayCandidate[] {
+  const context = { agents, visible: new Set(rooms), snapshot };
   return PLAY_TARGET_LIST.flatMap(target => [...target.candidates(context)]);
 }
 

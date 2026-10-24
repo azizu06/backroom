@@ -3,6 +3,7 @@
  * interacted with, its HUD prompt, and its panel data (read from the snapshot only).
  */
 import type { AnchorId, OfficeSnapshot } from "../state";
+import type { PropPanelRow } from "../props/interact";
 
 export type Vec2 = readonly [x: number, z: number];
 export interface PlayPanelEntry { readonly id: string; readonly decision: string; readonly summary: string; readonly ruleIds: readonly string[] }
@@ -15,6 +16,7 @@ export interface PlayPanelOf<K extends string = string> {
   readonly seated?: readonly { readonly id: string; readonly name: string; readonly state: string }[];
   readonly locked?: string;
   readonly denial?: PlayPanelEntry;
+  readonly rows?: readonly PropPanelRow[];
   readonly entries: readonly PlayPanelEntry[];
 }
 export interface PlayCandidateOf<T> { readonly target: T; readonly position: Vec2; readonly radius: number }
@@ -22,6 +24,8 @@ export interface PlayCandidateOf<T> { readonly target: T; readonly position: Vec
 export interface TargetContext {
   readonly agents: readonly { id: string; position: Vec2 }[];
   readonly visible: ReadonlySet<AnchorId>;
+  /** Current view data when called by the rig; layout-only callers may supply just visible rooms. */
+  readonly snapshot?: OfficeSnapshot;
 }
 export interface PlayTargetModule<T extends { kind: string }> {
   /** Equal to the target's `kind`. */

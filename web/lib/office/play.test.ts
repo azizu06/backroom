@@ -189,7 +189,7 @@ describe("targets", () => {
     const input = new PlayInput();
     input.press("forward");
     let found = null;
-    for (let i = 0; i < 120 && !found; i++) {
+    for (let i = 0; i < 120 && found?.kind !== "agent"; i++) {
       position = movePlayer(position, moveIntent(input, SPAWN.yaw, 1 / 60), colliders);
       found = pickTarget(position, SPAWN.yaw, candidates, INTERACT_RANGE);
     }
@@ -206,7 +206,7 @@ describe("targets", () => {
   });
 
   it("does not offer a desk from across the aisle", () => {
-    const candidates = interactCandidates([], ALL);
+    const candidates = interactCandidates([], ALL).filter(candidate => candidate.target.kind === "desk");
     for (const room of ["collections", "payables", "vendor_onboarding"] as const) {
       const [x, z] = OFFICE_ANCHORS[room].center;
       const edge = z + DESK_SIZE.depth / 2;
@@ -222,7 +222,7 @@ describe("targets", () => {
   it("offers the Treasury door only when the room is visible", () => {
     const visible = interactCandidates([], ALL);
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
-    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "server"]);
+    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "server", "prop:clock", "prop:monitor:collections"]);
     expect(pickTarget([5, 0.6], Math.PI, visible)).toEqual({ kind: "treasury" });
   });
 

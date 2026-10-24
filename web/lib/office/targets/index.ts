@@ -7,6 +7,7 @@ import { deskTarget } from "./desk";
 import { paylinkTarget } from "./paylink";
 import { serverTarget } from "./server";
 import { treasuryTarget } from "./treasury";
+import { propTarget } from "./props";
 import type { PlayTargetModule } from "./types";
 
 export const PLAY_TARGETS = [
@@ -15,6 +16,7 @@ export const PLAY_TARGETS = [
   treasuryTarget,
   paylinkTarget,
   serverTarget,
+  propTarget,
 ] as const;
 
 type TargetOf<M> = M extends PlayTargetModule<infer T> ? T : never;

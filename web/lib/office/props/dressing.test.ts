@@ -5,8 +5,9 @@ import {
   dressingBoxes, dressingColliders, dressingFor, paintKey, polylineLength, routeArrow, routeDashes, routePaint,
   type DressingBox, type FloorPoint, type PaintSegment,
 } from './dressing';
-import { FLOOR as PLAY_FLOOR, PLAYER_RADIUS, SPAWN, insideAny, movePlayer, officeColliders, type Box as PlayBox } from '../play';
+import { FLOOR as PLAY_FLOOR, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, insideAny, interactCandidates, movePlayer, officeColliders, pickTarget, targetKey, type Box as PlayBox } from '../play';
 import { OFFICE_PROP_INTERACTIONS } from './index';
+import { createMockOfficeState } from '../preview';
 
 const snapshot = (patch: Partial<OfficeSnapshot> = {}): OfficeSnapshot => ({ ...INITIAL_OFFICE, connection: 'preview', ...patch });
 const withRooms = (...ids: AnchorId[]) => snapshot({ rooms: ids.map(id => ({ id, rowId: `row:${id}` })) });
@@ -302,7 +303,7 @@ describe('dressingColliders', () => {
   });
 
   it('lets the player walk the whole aisle with the office colliders', () => {
-    const solid = officeColliders(allRooms, colliders);
+    const solid = officeColliders(allRooms, [SERVER_ROOM_BOX, ...colliders]);
     for (const [from, to] of [[-7.5, 7.5], [7.5, -7.5]] as const) {
       let position: [number, number] = [from, 0.6];
       const step = Math.sign(to - from) * 0.05;
@@ -313,5 +314,54 @@ describe('dressingColliders', () => {
       }
       expect(position[1]).toBe(0.6);
     }
+  });
+
+  it('blocks a shelf and a dressing plant with the same footprints Play uses', () => {
+    const solid = officeColliders(allRooms, [SERVER_ROOM_BOX, ...colliders]);
+    const shelf = colliders[3]!; // Lobby shelf, rotated along the left wall.
+    const atShelf = movePlayer([-6.5, 1.8], [-2, 0], solid);
+    expect(atShelf[0]).toBeCloseTo(shelf.maxX + PLAYER_RADIUS, 3);
+    expect(insideAny(atShelf, solid, PLAYER_RADIUS)).toBe(false);
+    const plant = colliders.at(-1)!; // Vendor doorway plant.
+    const atPlant = movePlayer([3.1, 0.4], [0, -2], solid);
+    expect(atPlant[1]).toBeCloseTo(plant.maxZ + PLAYER_RADIUS, 3);
+    expect(insideAny(atPlant, solid, PLAYER_RADIUS)).toBe(false);
+  });
+
+  it('keeps spawn, every open doorway and every interact target reachable with all solids', () => {
+    const solid = officeColliders(allRooms, [SERVER_ROOM_BOX, ...colliders]);
+    expect(insideAny(SPAWN.position, solid, PLAYER_RADIUS)).toBe(false);
+    const snapshot = createMockOfficeState().source.getSnapshot();
+    const candidates = interactCandidates(snapshot.agents.map(agent => ({ id: agent.id, position: agent.pos })), allRooms, snapshot);
+    const remaining = new Set(candidates.map(candidate => targetKey(candidate.target)));
+    const doors = new Map(topRooms.map(room => [room, [OFFICE_ANCHORS[room].center[0], -0.65] as const]));
+    // Flood-fill actual walking steps from spawn. Picking uses the full registry, so a new
+    // prop cannot silently make a desk, kiosk, Treasury door or server panel unselectable.
+    const step = 0.15;
+    const queue: FloorPoint[] = [SPAWN.position];
+    const visited = new Set(['0,0']);
+    const cells: [number, number][] = [[0, 0]];
+    for (let i = 0; i < queue.length; i++) {
+      const position = queue[i]!, cell = cells[i]!;
+      for (const candidate of candidates) {
+        const key = targetKey(candidate.target);
+        if (!remaining.has(key)) continue;
+        const yaw = Math.atan2(-(candidate.position[0] - position[0]), -(candidate.position[1] - position[1]));
+        if (targetKey(pickTarget(position, yaw, candidates)) === key) remaining.delete(key);
+      }
+      for (const [room, point] of doors) if (length([position, point]) <= step) doors.delete(room);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nextCell: [number, number] = [cell[0] + dx, cell[1] + dz];
+        const key = nextCell.join(',');
+        if (visited.has(key)) continue;
+        visited.add(key);
+        const next: FloorPoint = [SPAWN.position[0] + nextCell[0] * step, SPAWN.position[1] + nextCell[1] * step];
+        const moved = movePlayer(position, [dx * step, dz * step], solid);
+        if (length([moved, next]) > 1e-6 || insideAny(next, solid, PLAYER_RADIUS)) continue;
+        queue.push(next); cells.push(nextCell);
+      }
+    }
+    expect([...doors.keys()]).toEqual([]);
+    expect([...remaining]).toEqual([]);
   });
 });

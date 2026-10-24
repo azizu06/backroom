@@ -12,6 +12,7 @@ import {
   pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
+import { dressingColliders } from '../../lib/office/props/dressing';
 
 const PLAY_EYE: IntroPose = {
   position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]],
@@ -43,7 +44,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
   const reduced = useRef(window.matchMedia(REDUCED_MOTION_QUERY).matches);
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
-  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
+  const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX, ...dressingColliders(rooms)]), [roomsKey]);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
 
@@ -103,7 +104,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
-    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current)));
+    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), current));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
     if (hud.current && (moved || turned || !written.current)) {

@@ -37,25 +37,36 @@ type Release =
   | { kind: 'turned'; yaw: number }
   | { kind: 'facing'; x: number; z: number; sign: number }
   | { kind: 'arrived'; x: number; z: number; tolerance: number };
-/**
- * Holds `key` until the release condition holds, checked in the page on every animation frame so
- * slow headless frames do not overshoot while a Node-side poll round-trips.
- */
+/** Release in the page as soon as the rig reports the condition, before another slow frame can turn. */
 async function holdInPage(page: Page, key: string, release: Release, timeout = 15_000) {
-  await page.keyboard.down(key);
-  try {
-    await page.waitForFunction(r => {
-      const element = document.querySelector<HTMLElement>('[data-player-yaw]');
-      if (!element) return false;
-      const x = Number(element.dataset.playerX), z = Number(element.dataset.playerZ), yaw = Number(element.dataset.playerYaw);
-      if (r.kind === 'turned') return yaw !== r.yaw;
-      const raw = Math.atan2(-(r.x - x), -(r.z - z)) - yaw;
+  await surface(page).evaluate((element, { key, release }) => {
+    const hud = element as HTMLElement;
+    hud.dataset.testHeld = key;
+    const observer = new MutationObserver(() => {
+      const x = Number(hud.dataset.playerX), z = Number(hud.dataset.playerZ), yaw = Number(hud.dataset.playerYaw);
+      const raw = release.kind === 'turned' ? 0 : Math.atan2(-(release.x - x), -(release.z - z)) - yaw;
       const diff = Math.atan2(Math.sin(raw), Math.cos(raw));
-      if (r.kind === 'facing') return Math.abs(diff) <= 0.3 || Math.sign(diff) !== r.sign;
-      return Math.hypot(r.x - x, r.z - z) <= r.tolerance || Math.abs(diff) > 0.2;
-    }, release, { polling: 'raf', timeout });
+      const done = release.kind === 'turned' ? yaw !== release.yaw
+        : release.kind === 'facing' ? Math.abs(diff) <= 0.3 || Math.sign(diff) !== release.sign
+        : Math.hypot(release.x - x, release.z - z) <= release.tolerance || Math.abs(diff) > 0.2;
+      if (!done) return;
+      hud.dataset.testHeld = 'released';
+      // React's surface handler releases the input immediately; keyboard.up below also clears
+      // Playwright's physical key state. A Node round trip here can otherwise add several frames.
+      hud.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+    });
+    const cleanup = () => { observer.disconnect(); hud.removeEventListener('keyup', cleanup); };
+    hud.addEventListener('keyup', cleanup);
+    observer.observe(hud, { attributes: true, attributeFilter: ['data-player-x', 'data-player-z', 'data-player-yaw'] });
+  }, { key, release });
+  try {
+    await page.keyboard.down(key);
+    await page.waitForFunction(() => document.querySelector<HTMLElement>('[data-player-yaw]')?.dataset.testHeld === 'released', undefined, { polling: 'raf', timeout });
   } finally {
     await page.keyboard.up(key);
+    // Let the requested idle frame consume keyup before the next fine adjustment. Its first
+    // turning frame then uses the rig's 1/60 s idle step rather than a stale slow-frame delta.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   }
 }
 const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -76,7 +87,7 @@ async function face(page: Page, x: number, z: number, tolerance = 0.08) {
     else await holdInPage(page, key, { kind: 'turned', yaw: (await player(page)).yaw });
   }
   const { diff } = await bearingTo(page, x, z);
-  expect(Math.abs(diff)).toBeLessThanOrEqual(tolerance * 2);
+  expect(Math.abs(diff)).toBeLessThanOrEqual(tolerance);
 }
 async function walkTo(page: Page, x: number, z: number, tolerance = 0.15) {
   for (let leg = 0; leg < 12; leg++) {
@@ -209,6 +220,48 @@ test('play mode walks to the GX10 server room and reads live telemetry read-only
   await expect(surface(page)).toBeFocused();
   expect(methods.length).toBeGreaterThan(0);
   expect(methods.every(method => method === 'GET')).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('play mode walks into the lobby shelf and is blocked', async ({ page }) => {
+  test.setTimeout(60_000);
+  const errors = await startPlay(page);
+  await walkTo(page, -6.5, 0.6);
+  await walkTo(page, -6.5, 1.8);
+  await face(page, -7.74, 1.8);
+  const start = await player(page);
+  await holdUntil(page, 'w', async () => (await player(page)).x < -7.27);
+  // Keep pushing past the shelf's face: without its collider the player reaches the floor edge.
+  await page.keyboard.down('w');
+  try { await page.waitForTimeout(1_000); }
+  finally { await page.keyboard.up('w'); }
+  const stopped = await player(page);
+  expect(stopped.x).toBeLessThan(start.x - 0.5);
+  expect(stopped.x).toBeCloseTo(-7.29, 1); // Shelf maxX -7.57 + player radius 0.28.
+  expect(stopped.x).toBeGreaterThan(-7.3);
+  expect(stopped.z).toBeGreaterThan(1.2);
+  expect(stopped.z).toBeLessThan(2.4);
+  expect(errors).toEqual([]);
+});
+
+test('play mode presses E at the whiteboard and reads its snapshot panel', async ({ page }) => {
+  test.setTimeout(60_000);
+  const errors = await startPlay(page);
+  await walkTo(page, -4.6, 0.45);
+  await walkTo(page, 1.6, 0.45);
+  // Pass the right end of the Payables desk and chair to reach the back-wall board.
+  await walkTo(page, 1.6, -4.2);
+  await face(page, 1.1, -4.95);
+  await expect(page.getByText('E · Read the whiteboard')).toBeVisible();
+  await page.keyboard.press('e');
+  const dialog = page.getByRole('dialog', { name: 'Payables board' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Read-only');
+  await expect(dialog.locator('dt')).toContainText(['Allow', 'Deny', 'Hold', 'Recorded', 'Total', 'Inbox', 'Agents', 'Connection']);
+  await expect(dialog.getByRole('button', { name: 'Close Payables board' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
   expect(errors).toEqual([]);
 });
 

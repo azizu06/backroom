@@ -7,6 +7,7 @@ import { deskPanel } from './DeskPanel';
 import { paylinkPanel } from './PaylinkPanel';
 import { serverPanel } from './ServerPanel';
 import { treasuryPanel } from './TreasuryPanel';
+import { propPanel } from './PropPanel';
 import type { PlayPanelView } from './types';
 
 export type { PlayPanelView } from './types';
@@ -15,4 +16,5 @@ export const PLAY_PANEL_VIEWS: Partial<Record<PlayTarget['kind'], PlayPanelView>
   treasury: treasuryPanel,
   paylink: paylinkPanel,
   server: serverPanel,
+  prop: propPanel,
 };
