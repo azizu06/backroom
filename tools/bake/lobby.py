@@ -16,6 +16,19 @@ import bmesh
 import bpy
 from mathutils import Matrix
 
+# ---- cozy pastel palette ----------------------------------------------------------------------------------------
+# These mirror web/lib/office/palette.ts (Blender's Python cannot import the TS module, so keep the two in sync).
+# Rules: no pure black or white; shadows and ambient tint slate; warm butter key, cool aqua fill at low strength.
+AQUA = "#9EF2FB"      # logo anchor: accents, cool fill
+CREAM = "#FFF7EC"     # walls, ceiling
+PEACH = "#F6D3B8"     # warm wood / floor, table
+BUTTER = "#FFF0B3"    # warm light panels, key light
+BLUSH = "#FFC9D9"     # rug, cushions, plant pot
+LAVENDER = "#D9CCFF"  # sofa, accent wainscot
+MINT = "#CDF2DC"      # plant
+NAVY = "#4A5A7A"      # trim, door frames, outlines
+SLATE = "#7C88A6"     # shadow / ambient tint
+
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # ---- arguments (after the "--") -------------------------------------------------------------------------------
@@ -74,18 +87,27 @@ def hexlin(h):
     return tuple(v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c)
 
 
+def mix(a, b, t):
+    """Linear blend of two palette colours (already linear), t=0 -> a."""
+    return tuple(x + (y - x) * t for x, y in zip(a, b))
+
+
 MATS = {
-    "floor": make_material("floor", hexlin("#9a7b57"), 0.55,
-                           brick=(hexlin("#a58560"), hexlin("#8d6f4e"), hexlin("#5b4630"))),
-    "wall_far": make_material("wall_far", hexlin("#c9d3bd")),
-    "wall_near": make_material("wall_near", hexlin("#c9d3bd")),
-    "ceiling": make_material("ceiling", hexlin("#ece6d6")),
-    "trim": make_material("trim", hexlin("#efe9da"), 0.5),
-    "wainscot": make_material("wainscot", hexlin("#6f8a73"), 0.7),
-    "rug": make_material("rug", hexlin("#b8553f"), 1.0),
-    "sofa": make_material("sofa", hexlin("#4f6a7a"), 0.95),
-    "wood": make_material("wood", hexlin("#7a5638"), 0.5),
-    "panel": make_material("panel", hexlin("#fff4dd"), 0.4),
+    # Peach planks; alternate rows and the seams lean towards slate so the floor reads against cream walls.
+    "floor": make_material("floor", hexlin(PEACH), 0.55,
+                           brick=(hexlin(PEACH), mix(hexlin(PEACH), hexlin(SLATE), 0.12),
+                                  mix(hexlin(PEACH), hexlin(SLATE), 0.45))),
+    "wall_far": make_material("wall_far", hexlin(CREAM)),
+    "wall_near": make_material("wall_near", hexlin(CREAM)),
+    "ceiling": make_material("ceiling", hexlin(CREAM)),
+    "trim": make_material("trim", hexlin(NAVY), 0.5),
+    "wainscot": make_material("wainscot", hexlin(LAVENDER), 0.7),
+    "rug": make_material("rug", hexlin(BLUSH), 1.0),
+    "sofa": make_material("sofa", hexlin(LAVENDER), 0.95),
+    "wood": make_material("wood", mix(hexlin(PEACH), hexlin(SLATE), 0.25), 0.5),
+    "pot": make_material("pot", hexlin(BLUSH), 0.8),
+    "plant": make_material("plant", hexlin(MINT), 0.9),
+    "panel": make_material("panel", hexlin(BUTTER), 0.4),
 }
 
 # ---- geometry -------------------------------------------------------------------------------------------------
@@ -157,6 +179,10 @@ def build():
     box("wood", -6.55, 0.35, 2.45, 0.7, 0.05, 0.5, bevel=0.015)
     for (dx, dz) in ((-0.28, -0.18), (0.28, -0.18), (-0.28, 0.18), (0.28, 0.18)):
         box("wood", -6.55 + dx, 0.17, 2.45 + dz, 0.05, 0.34, 0.05, bevel=0.01)
+    # Small potted plant on the coffee table: blush pot, mint leaves.
+    box("pot", -6.68, 0.43, 2.45, 0.12, 0.11, 0.12, bevel=0.012)
+    box("plant", -6.68, 0.54, 2.45, 0.16, 0.12, 0.16, bevel=0.04)
+    box("plant", -6.66, 0.63, 2.44, 0.1, 0.1, 0.1, bevel=0.03, rot_y=0.6)
     # Ceiling light panels (emissive in the bake) and the ceiling lamps' housings.
     for px in (-6.4, -4.1):
         box("panel", px, WALL_H - 0.02, 3.4, 0.9, 0.04, 1.5, bevel=0.01)
@@ -195,8 +221,8 @@ for slot in shell.material_slots:
 world = bpy.data.worlds.new("w")
 world.use_nodes = True
 bg = world.node_tree.nodes["Background"]
-bg.inputs["Color"].default_value = (0.78, 0.86, 0.82, 1.0)   # cool daylight leaking in from outside
-bg.inputs["Strength"].default_value = 0.35
+bg.inputs["Color"].default_value = (*mix(hexlin(SLATE), hexlin(CREAM), 0.35), 1.0)  # slate-tinted ambient
+bg.inputs["Strength"].default_value = 0.28
 scene.world = world
 
 
@@ -210,13 +236,15 @@ def area(name, loc, size, energy, color, rot=(0, 0, 0), shape="RECTANGLE", size_
     scene.collection.objects.link(obj)
 
 
-# Warm key: the two ceiling panels, pointing down. Area lights face -Z by default (down in Blender).
+# Energies are low on purpose: the web layer draws the lightmap unlit and untonemapped, and the pastel albedos
+# sit near white, so brighter lights clip cream walls to white.
+# Warm butter key: the two ceiling panels, pointing down. Area lights face -Z by default (down in Blender).
 for px in (-6.4, -4.1):
-    area(f"key_{px}", (px, WALL_H - 0.06, 3.4), 0.9, 260, (1.0, 0.82, 0.60), size_y=1.5)
-# Cool fill: a big soft light low in the south-east corner, aimed across the room, off to the side of the camera.
-area("fill", (-3.0, 1.9, 5.0), 2.0, 180, (0.70, 0.80, 1.0), rot=(math.radians(-60), 0, math.radians(135)), size_y=2.0)
+    area(f"key_{px}", (px, WALL_H - 0.06, 3.4), 0.9, 45, hexlin(BUTTER), size_y=1.5)
+# Cool aqua fill at low strength: a big soft light low in the south-east corner, aimed across the room.
+area("fill", (-3.0, 1.9, 5.0), 2.0, 26, hexlin(AQUA), rot=(math.radians(-60), 0, math.radians(135)), size_y=2.0)
 # A narrow warm accent over the door so the corridor edge has a gradient.
-area("door_glow", (-5.0, 2.2, Z0 + 0.4), 1.2, 60, (1.0, 0.75, 0.5), rot=(math.radians(180), 0, 0), size_y=0.3)
+area("door_glow", (-5.0, 2.2, Z0 + 0.4), 1.2, 12, hexlin(BUTTER), rot=(math.radians(180), 0, 0), size_y=0.3)
 
 # ---- Cycles: CPU, no denoising (Blender 4.0.2 here has no OIDN) -------------------------------------------------
 scene.render.engine = "CYCLES"
