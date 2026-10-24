@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { AgentHandoffPublic } from '@backroom/orchestrator/spacetime-client/types';
-import { HANDOFF_AGENTS, HANDOFF_ROLES, FLOOR_AGENTS, compareHandoffs, handoffFlag, handoffFromRow, handoffGroups, handoffLine, handoffRoute, handoffSpot, needsHandoffHuman } from './handoffs';
+import { HANDOFF_AGENTS, HANDOFF_ROLES, FLOOR_AGENTS, compareHandoffs, handoffFlag, handoffFromRow, handoffGroups, handoffLine, handoffRoute, handoffSpot, needsHandoffHuman, upsertHandoffs } from './handoffs';
 import { insideAny, officeColliders } from './play';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
 import { projectOfficeRows } from './spacetime';
@@ -33,9 +33,27 @@ describe('handoff public contract', () => {
   it('caps strings, ignores malformed optional fields and tolerates missing timestamps', () => {
     expect(row({ handoffId: 'x'.repeat(200), summary: 's'.repeat(200), reason: 'r'.repeat(2000), line: 'l'.repeat(400),
       decisionRef: 'd'.repeat(400), errorCode: 'e'.repeat(400), createdAt: undefined, acceptedAt: Infinity, completedAt: {}, correction: 'true' }))
-      .toMatchObject({ handoffId: 'x'.repeat(128), summary: 's'.repeat(160), reason: 'r'.repeat(1000), line: 'l'.repeat(400),
+      .toMatchObject({ handoffId: 'x'.repeat(200), summary: 's'.repeat(160), reason: 'r'.repeat(1000), line: 'l'.repeat(400),
         decisionRef: 'd'.repeat(256), errorCode: 'e'.repeat(128), createdAt: 0, correction: false });
     expect(row({ acceptedAt: NaN }).acceptedAt).toBeUndefined();
+  });
+  it('keeps distinct handoff primary keys for a 200-character case id in u64 order', () => {
+    const activationId = `${'c'.repeat(200)}:a1`;
+    const first = row({ handoffId: `${activationId}:h1`, sequence: 9_007_199_254_740_992n });
+    const second = row({ handoffId: `${activationId}:h2`, sequence: 9_007_199_254_740_993n });
+    const updated = { ...first, status: 'accepted' as const };
+    expect(upsertHandoffs([second, first], [updated])).toEqual([updated, second]);
+    expect(first.handoffId).toBe(`${activationId}:h1`);
+    expect(second.handoffId).toBe(`${activationId}:h2`);
+  });
+  it('preserves a trailing masked token after 77 emoji within the summary limit', () => {
+    const summary = `${'😀'.repeat(77)} ••6819`;
+    expect(row({ summary }).summary).toBe(summary);
+    expect(row({ summary: '😀'.repeat(161) }).summary).toBe('😀'.repeat(160));
+  });
+  it.each(['••6819', 'GB29 NWBK ••6819', '[email]'])('keeps a masked token whole at the summary boundary: %s', token => {
+    const prefix = 's'.repeat(158) + ' ';
+    expect(row({ summary: prefix + token + ' trailing text' }).summary).toBe(prefix + token);
   });
   it('orders u64 sequences without rounding and groups by case display id', () => {
     const a = row({ handoffId: 'z', sequence: 9_007_199_254_740_992n }), b = row({ handoffId: 'a', sequence: 9_007_199_254_740_993n });
