@@ -13,18 +13,18 @@ import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, interactCandidates, moveIntent, movePlayer, officeColliders,
   pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
+import { playSpawn } from '../../lib/office/play-spawn';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 
-const PLAY_EYE: IntroPose = {
-  position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]],
-  quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)],
-};
+function playEye([x, z]: readonly [number, number]): IntroPose {
+  return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)] };
+}
 
 /**
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);
@@ -35,7 +35,6 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
     from: { position: previous.position.toArray(), quaternion: previous.quaternion.toArray() } satisfies IntroPose,
     startedAt: null as number | null, done: false,
   }));
-  const position = useRef<[number, number]>([SPAWN.position[0], SPAWN.position[1]]);
   const yaw = useRef<number>(SPAWN.yaw);
   const pitch = useRef(0);
   const feel = useRef<FeelState>(INITIAL_FEEL);
@@ -49,6 +48,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
   const rooms = visibleRooms(snapshot);
   const roomsKey = rooms.join(',');
   const colliders = useMemo(() => officeColliders(rooms, [SERVER_ROOM_BOX]), [roomsKey]);
+  const [spawn] = useState(() => playSpawn(location.search, colliders));
+  const [eye] = useState(() => playEye(spawn));
+  const position = useRef<[number, number]>(spawn);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
 
@@ -75,7 +77,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
       const now = performance.now();
       intro.startedAt ??= now;
       const progress = playIntroProgress(now - intro.startedAt, reduced.current);
-      const pose = interpolateIntroPose(intro.from, PLAY_EYE, progress);
+      const pose = interpolateIntroPose(intro.from, eye, progress);
       camera.current.position.fromArray(pose.position);
       camera.current.quaternion.fromArray(pose.quaternion);
       camera.current.updateMatrixWorld();
@@ -123,7 +125,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud }: PlayBridge 
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
-    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current)));
+    const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
     if (hud.current && (moved || turned || !written.current)) {
