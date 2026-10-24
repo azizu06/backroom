@@ -42,6 +42,9 @@ describe('desk phone call projection', () => {
     expect(texts(projectVoiceCall(call, {}, { now: 0, escalations: { [escalation]: { status: 'approved', method: 'passkey' } } }))[3]).toBe('Dana approved with a passkey');
     // Only the passkey backend can mark a decision; an unverified status is still pending.
     expect(texts(projectVoiceCall(call, {}, { now: 0, escalations: { [escalation]: { status: 'approved' } } }))[3]).toBe("Waiting for Dana's passkey decision");
+    // A window closed by time or call end shows as closed, never as still waiting.
+    expect(texts(projectVoiceCall(call, {}, { now: 0, escalations: { [escalation]: { status: 'expired' } } }))[3]).toBe('No decision from Dana in time · request closed');
+    expect(texts(projectVoiceCall(call, {}, { now: 0, escalations: { [escalation]: { status: 'pending_owner' } } }))[3]).toBe('No decision · Dana will confirm by email');
   });
   it('masks every amount until identity is confirmed and never exposes contact, number, session or link details', async () => {
     const confirmed = await played('confirmed');

@@ -26,8 +26,12 @@ const APPROVALS: Record<EscalationView['status'], (human: string) => string> = {
   approved: human => `${human} approved with a passkey`,
   denied: human => `${human} denied with a passkey`,
   counter: human => `${human} countered with a passkey`,
-  pending_owner: human => `No decision in 60 s · ${human} will confirm by email`,
+  pending_owner: human => `No decision · ${human} will confirm by email`,
+  expired: human => `No decision from ${human} in time · request closed`,
 };
+/** Closed by the clock or call end; a decision counts only when the passkey backend recorded it. */
+const shownApproval = (view: EscalationView): EscalationView['status'] =>
+  view.status === 'pending_owner' || view.status === 'expired' || (view.status !== 'pending' && view.method === 'passkey') ? view.status : 'pending';
 
 /**
  * Read-only desk-phone view of one live voice call. The transcript is code decisions from the
@@ -66,7 +70,7 @@ export function projectVoiceCall(call: GatewayCall, lifecycle: VoiceCallLifecycl
       say(audit.id, `${verdict} → ${human}${terms ? ` · ${terms}` : ''}`);
       if (escalation) {
         const view = options.escalations?.[escalation.id] ?? escalation;
-        const status = view.status === 'pending_owner' || (view.status !== 'pending' && view.method === 'passkey') ? view.status : 'pending';
+        const status = shownApproval(view);
         say(`${escalation.id}:${status}`, APPROVALS[status](escalation.toHuman));
       }
     } else {
