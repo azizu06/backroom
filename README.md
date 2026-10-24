@@ -136,8 +136,8 @@ Cartesia request was made to prepare these sections.
 | Cartesia | Provider voice/tool implementation and scoped historical call receipts | Scripted turns and recorder tests are not a new successful phone call |
 | GX10 and cloud models | Real inference paths with retained per-run evidence | Scripted eval has no live-model accuracy claim; fallback must retain its route label |
 | Apify | Public-web Actor and timestamped receipts where retained | Fixture/cached signals remain labeled with their source/time; no new scrape is implied |
-| CRS | Sandbox-only projected evidence with test-identity labels | Public records/fraud risk are not business-credit or OFAC products; fixture CRS is FAKE |
-| Nessie and pay page | Sandbox API integration and a simulated card | Posted deposits and displayed account balance are separate; neither fabricated balance growth nor settlement is claimed |
+| CRS | Sandbox-only projected evidence with test-identity labels | Public records/fraud risk are not business-credit or OFAC products; fixture CRS is FAKE. Cached sandbox evidence is wall-only and cannot turn a pre-call hold into a pass |
+| Nessie and pay page | Sandbox API integration and a simulated card | Posted deposits and displayed account balance are separate; neither fabricated balance growth nor settlement is claimed. A balance shown while Nessie is down keeps the cached-at label and is not a live read |
 
 See the [sponsor evidence checklist](docs/sponsor-deliverables.md) before copying
 claims into a pitch. The [synthetic eval recheck](docs/evidence/eval/current-main-windows-2026-10-24.md)
@@ -150,6 +150,10 @@ ignored environment files. The client projects typed summaries plus response
 hashes, source and observation time; do not publish raw reports, credentials,
 private identity records or phone numbers in screenshots, logs or board posts.
 Preserve `crs_sandbox` versus `crs_fixture` and the FAKE/test-identity label.
+When the sandbox is unreachable, the demo host may repeat the last evidence with
+`cached: true` and a cached-at time. That copy is audit-wall evidence only. The
+pre-call decision stays on the uncached client, so a cached clear cannot turn a
+hold into a pass.
 The [retained sandbox receipt](docs/evidence/crs/live-run.json) explicitly says
 business credit and OFAC were not run because those products are absent from the
 Cal Hacks sandbox. It does not establish live OFAC coverage. Integration behavior
