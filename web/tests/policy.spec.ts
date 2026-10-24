@@ -53,7 +53,7 @@ test('owner edits badge limits and subsequent gateway decisions use v2 with immu
   })).toBe(true);
   await page.screenshot({ path: '../docs/evidence/policy-editor/mobile.png', fullPage: true });
 
-  const session = await request.post('/api/audit/session', { headers: { origin }, data: { code: 'local-policy-audit-only' } });
+  const session = await request.post('/api/session', { headers: { origin }, data: { code: 'local-policy-audit-only' } });
   expect(session.ok()).toBe(true);
   const audit = await (await request.get('/api/audit/entries')).json();
   expect(audit.chain.valid).toBe(true);
