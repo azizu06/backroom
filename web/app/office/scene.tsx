@@ -6,6 +6,7 @@ import { Instance, Instances, OrbitControls } from '@react-three/drei';
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
+import { doorFlash } from '../../lib/office/view';
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
@@ -54,11 +55,10 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
   useEffect(() => { if (denial) invalidate(); }, [denial, invalidate]);
   useFrame(({ invalidate }) => {
     if (!door.current) return;
-    const age = denial ? Date.now() - denial.at : Infinity;
-    const flash = age >= 0 && age < 4500 && Math.floor(age / 300) % 2 === 0;
-    door.current.visible = age >= 0 && age < 4500;
-    if (door.current.visible) invalidate();
-    (door.current.material as MeshBasicMaterial).opacity = flash ? 0.95 : 0.65;
+    const flash = doorFlash(Date.now(), denial?.at);
+    door.current.visible = flash.visible;
+    if (flash.visible) invalidate();
+    (door.current.material as MeshBasicMaterial).opacity = flash.bright ? 0.95 : 0.65;
   });
   if (room === 'lobby' || room === 'dana') return null;
   const z = room === 'treasury' ? 1.15 : -0.65;
@@ -72,12 +72,10 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
     <mesh ref={door} visible={false} position={[x, 0.65, z]}><boxGeometry args={[1.5, 1.3, 0.2]} /><meshBasicMaterial color='#ed6252' transparent opacity={0.85} /></mesh>
   </group>;
 }
-/** Draws the shared motion; Office's MotionRegistry owns re-seating and retargeting. */
+/** Draws the shared motion; Office's MotionRegistry owns re-seating, retargeting and the wake-up frame. */
 function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean }) {
   const body = useRef<Group>(null);
   const legs = useRef<Group>(null);
-  const invalidate = useThree(state => state.invalidate);
-  useEffect(() => { invalidate(); }, [agent.targetAnchor, agent.pos[0], agent.pos[1], motion, recorded, invalidate]);
   useFrame((state, delta) => {
     const walk = motion;
     if (paused) return;

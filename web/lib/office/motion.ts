@@ -68,6 +68,7 @@ export class WalkMotion {
  */
 export class MotionRegistry {
   private readonly entries = new Map<string, { motion: WalkMotion; target?: string; pos?: FloorPosition }>();
+  private recorded = false;
 
   /** Returns the agent's motion, creating it at the row's position on first sight. */
   get(agent: Pick<OfficeAgent, "id" | "pos">): WalkMotion {
@@ -82,15 +83,22 @@ export class MotionRegistry {
   /**
    * Applies a snapshot: a changed row `pos` re-seats the motion and walks on to the target,
    * a changed anchor retargets, and agents that left are disposed. Recorded (replay) rows
-   * pin the motion to `pos` so it never walks on its own.
+   * pin the motion to `pos` so it never walks on its own; leaving replay walks every agent
+   * on to its target. Returns true when anything a view draws changed (an on-demand renderer
+   * should request a frame).
    */
-  sync(agents: readonly Pick<OfficeAgent, "id" | "pos" | "targetAnchor">[], { recorded = false } = {}) {
+  sync(agents: readonly Pick<OfficeAgent, "id" | "pos" | "targetAnchor">[], { recorded = false } = {}): boolean {
+    const resumed = this.recorded && !recorded;
+    let changed = this.recorded !== recorded;
+    this.recorded = recorded;
     const present = new Set<string>();
     for (const agent of agents) {
       present.add(agent.id);
       const motion = this.get(agent);
       const entry = this.entries.get(agent.id)!;
-      const moved = !!entry.pos && (entry.pos[0] !== agent.pos[0] || entry.pos[1] !== agent.pos[1]);
+      const seen = !!entry.pos;
+      const moved = seen && (entry.pos![0] !== agent.pos[0] || entry.pos![1] !== agent.pos[1]);
+      if (!seen || moved) changed = true;
       entry.pos = [agent.pos[0], agent.pos[1]];
       if (recorded) {
         motion.seat(agent.pos);
@@ -98,12 +106,14 @@ export class MotionRegistry {
         continue;
       }
       if (moved) motion.seat(agent.pos);
-      if (moved || entry.target !== agent.targetAnchor) {
+      if (moved || resumed || entry.target !== agent.targetAnchor) {
         entry.target = agent.targetAnchor;
         motion.moveTo(agent.targetAnchor);
+        changed = true;
       }
     }
-    for (const id of this.entries.keys()) if (!present.has(id)) this.entries.delete(id);
+    for (const id of this.entries.keys()) if (!present.has(id)) { this.entries.delete(id); changed = true; }
+    return changed;
   }
 
   has(id: string) {

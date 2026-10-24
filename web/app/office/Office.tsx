@@ -1,15 +1,16 @@
 'use client';
 
-import { Component, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { invalidate } from '@react-three/fiber';
 import { LlmToggle } from '../../components/LlmToggle';
 import { MotionRegistry, type WalkMotion } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
+import { INITIAL_VIEWPORT, boundaryStateForProps, reportViewFailure, viewportLayers, viewportReducer, type BoundaryState, type ViewMode } from '../../lib/office/view';
 import { OfficeLobby } from './OfficeLobby';
 import { OfficeScene, type RoomLabels } from './scene';
 import '../office.css';
 
-type ViewMode = 'walk' | 'tween' | 'plan';
 function planLeft(position: readonly number[]) { return `${50 + position[0]! / 16 * 100}%`; }
 function planTop(position: readonly number[]) { return `${50 + position[1]! / 11 * 100}%`; }
 /** Draws the shared motion; Office's MotionRegistry owns re-seating and retargeting. */
@@ -50,14 +51,11 @@ function FloorPlan({ snapshot, motions, select }: { snapshot: OfficeSnapshot; mo
   </div>;
 }
 /** Contains a render failure to its own region; a changed `resetKey` retries the children. */
-class ViewBoundary extends Component<{ children: ReactNode; fallback: ReactNode; onFailure?: () => void; resetKey?: unknown },
-  { failed: boolean; resetKey?: unknown }> {
-  state: { failed: boolean; resetKey?: unknown } = { failed: false, resetKey: this.props.resetKey };
+class ViewBoundary extends Component<{ name: string; children: ReactNode; fallback: ReactNode; onFailure?: () => void; resetKey?: unknown }, BoundaryState> {
+  state: BoundaryState = { failed: false, resetKey: this.props.resetKey };
   static getDerivedStateFromError() { return { failed: true }; }
-  static getDerivedStateFromProps(props: { resetKey?: unknown }, state: { failed: boolean; resetKey?: unknown }) {
-    return props.resetKey === state.resetKey ? null : { failed: false, resetKey: props.resetKey };
-  }
-  componentDidCatch() { this.props.onFailure?.(); }
+  static getDerivedStateFromProps(props: { resetKey?: unknown }, state: BoundaryState) { return boundaryStateForProps(props.resetKey, state); }
+  componentDidCatch(error: unknown) { reportViewFailure(this.props.name, error, this.props.onFailure); }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 function valueText(value: unknown): string {
@@ -90,24 +88,21 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   auditWall?: ReactNode; inboxTray?: ReactNode;
 }) {
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
-  const [mode, setMode] = useState<ViewMode>('tween');
+  const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
+  const { mode, lostContext, sceneAttempt } = viewport;
+  const layers = viewportLayers(viewport);
   const [focus, setFocus] = useState<AnchorId | null>(null);
   const [inspecting, setInspecting] = useState<AnchorId | null>(null);
-  const [lostContext, setLostContext] = useState(false);
-  const [sceneAttempt, setSceneAttempt] = useState(0);
   const [motions] = useState(() => new MotionRegistry());
   const recorded = snapshot.connection === 'replay';
-  useEffect(() => { motions.sync(snapshot.agents, { recorded }); }, [motions, snapshot.agents, recorded]);
+  // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
+  useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) invalidate(); }, [motions, snapshot.agents, recorded]);
   const labels: RoomLabels = { lobby: useRef(null), collections: useRef(null), payables: useRef(null), vendor_onboarding: useRef(null), dana: useRef(null), treasury: useRef(null) };
-  const onFailure = useCallback(() => setLostContext(true), []);
-  const onRestored = useCallback(() => setLostContext(false), []);
-  function pickMode(next: ViewMode) {
-    setMode(next);
-    setLostContext(false);
-    setSceneAttempt(attempt => attempt + 1);
-  }
+  const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
+  const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
+  function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
   useEffect(() => {
-    if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) setMode('walk');
+    if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
   }, []);
   function inspect(room: AnchorId) { setInspecting(room); setFocus(room); }
   const plan = mode === 'plan' || lostContext;
@@ -129,13 +124,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
     </nav>
     <div className='office-viewport' data-testid='office-viewport'>
-      <ViewBoundary resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
-        {mode === 'plan' ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
-          {/* Kept mounted while the context is lost so `webglcontextrestored` can bring the 3D view back. */}
-          <div style={{ position: 'absolute', inset: 0, visibility: lostContext ? 'hidden' : undefined }} aria-hidden={lostContext || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={mode === 'tween'} paused={lostContext} focus={focus} labels={labels} onFailure={onFailure} onRestored={onRestored} />
+      <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
+        {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
+          {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
+              Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
+          <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={mode === 'tween'} paused={!layers.scene.visible} focus={focus} labels={labels} onFailure={onFailure} onRestored={onRestored} />
           </div>
-          {lostContext ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
+          {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
             const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
               <button className='desk-label' onClick={() => inspect(room)} aria-label={badge ? `${OFFICE_ANCHORS[room].name} badge limits` : `${OFFICE_ANCHORS[room].name} details`}>
@@ -150,18 +146,22 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
     <footer className='office-footer'>
-      <ViewBoundary resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
+      <ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
       <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}
       </div>)}</div>
+      </ViewBoundary>
       <section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
+        <ViewBoundary name='Audit wall' resetKey={snapshot} fallback={<p role='status'>Audit wall unavailable · open the full audit page for receipts.</p>}>
         {auditWall ?? <><h2>Lobby audit wall <span>{snapshot.connection === 'preview' ? 'Preview receipts' : snapshot.connection === 'replay' ? 'REPLAY receipts' : 'Subscribed receipts'}</span></h2>
           {!snapshot.audit.length ? <p>No decisions received.</p> : <ol>{snapshot.audit.slice(-20).reverse().map(entry => <li key={entry.id} data-audit-id={entry.id}>
             <strong className={entry.decision === 'DENY' ? 'denial-text' : ''}>{entry.decision}</strong> {entry.summary}<br /><code>{entry.id} · {entry.ruleIds.join(', ')}</code>
           </li>)}</ol>}</>}
+        </ViewBoundary>
       </section>
-      {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>{inboxTray}</section>}
-      </ViewBoundary>
+      {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
+        <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
+      </section>}
       {controls}
     </footer>
   </section>;
