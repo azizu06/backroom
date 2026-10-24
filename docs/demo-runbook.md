@@ -7,6 +7,46 @@ The office subscribes to the selected StateStore in SpacetimeDB mode; memory
 mode retains its labeled preview. The local voice relay and external sponsor
 checks are still separate integration paths. Keep the rehearsal banner visible.
 
+## Table-side recovery card
+
+Start on the Mac first; bring the owned state server up before the web/orchestrator
+host, then the optional voice relay. `demo:up` performs that order for you.
+Run from the repo root, with private `.env.local` already configured:
+
+```sh
+DEMO_TUNNEL=0 pnpm demo:up  # local SpacetimeDB + mock bank, LLM OFF
+pnpm demo:preflight        # six bounded read-only checks; exit 1 if any RED
+pnpm demo:reset            # fresh DB, seed_company, scripted public gateway/reducer setup
+```
+
+For a phone passkey use `pnpm demo:up` with the default HTTPS tunnel instead.
+Reset immediately before the pitch, reopen the printed approval/pay URLs, and
+reload the office. The 60-second approval starts during reset. A fresh publish
+can take longer than a few seconds: keep the labeled offline replay ready.
+Stop only this worktree's host with `pnpm demo:down` before changing modes.
+
+| Failure / RED row | Recovery at the table |
+| --- | --- |
+| Orchestrator | Inspect private `.demo/supervisor.log` and `.demo/web.log`; stop/start this owned host. Re-enroll the passkey if the origin changed. Never kill shared processes. |
+| SpacetimeDB | Confirm the publisher config and CLI 2.13.0. Maincloud unavailable: stop and restart with `DEMO_SPACETIME=local`, retaining a local CLI. Last fallback: `STATE_STORE=memory DEMO_TUNNEL=0 pnpm demo:up`, visibly labeled preview. |
+| Web | Use the printed port; close an unrelated listener only with its owner's permission, or select `DEMO_PORT=3300`. If only 3D fails, use 2D plan or `/audit`. |
+| Cartesia | Continue the deterministic text take or labeled recorded voice; no automatic redial. A GREEN catalog read proves API access, not call readiness. |
+| Nessie | Stop/start with `DEMO_LIVE=0` for the mock bank. Reset does not undo sandbox transactions; never replay an ambiguous payment. |
+| GX10 Ollama | Keep the Mac host and set `DEMO_LLM=off` for the deterministic take. Cloud inference requires a separately verified opt-in route; preflight makes no inference. |
+
+Preflight runs GETs in parallel (4-second provider timeouts), reads the owned
+host's authenticated status (5-second timeout, including a StateStore policy
+read), checks the web ping, Cartesia voice catalog, Nessie account and configured
+Ollama model listing. It prints all six rows even when the host is down, with
+no URLs, tokens or provider response bodies. Provider keys come from this
+command's private environment; run it on the actual host with the same config.
+Mock/memory/offline rehearsal intentionally leaves unused dependencies RED.
+GREEN reachability does not claim a completed call, inference or deposit.
+
+For GX10 deployment and a warm Mac fallback use [GX10 host operations](#gx10-production-host-and-warm-mac-fallback-refs-29-32).
+Keep Anthropic credentials Mac-only; do not copy a Mac `.env.local` containing
+them to GX10. Do not reset a shared host while another presenter is using it.
+
 ## Bring up / reset / shut down
 
 Requires Node 22+, `pnpm install`, `cloudflared` on PATH, and SpacetimeDB CLI
@@ -18,6 +58,7 @@ AGENTS.md only if needed. No command here dials a phone.
 
 ```sh
 pnpm demo:up           # local DB + publish/import, production web, seats, quick tunnel
+pnpm demo:preflight    # six read-only reachability checks, nonzero on RED
 pnpm demo:health       # local status + configured/missing; no external probes
 pnpm demo:health --live # read-only, bounded GX10 /models, Nessie account, tunnel probes
 pnpm demo:reset        # fresh local DB + scripted starting state; reprint fresh approve/pay links
@@ -101,11 +142,45 @@ latency and an internet dependency. Describe the deployment as “web and
 orchestration on GX10; state hosted on SpacetimeDB Maincloud” when that is the
 actual topology. Do not claim all stack components run on GX10 in this mode.
 
-A seed is idempotent import and cannot reset completed work. Hosted rehearsals
-must publish fresh owned databases for clean takes; never delete or overwrite
-shared state to reset the demo. To return to local, stop this owned demo and
-restart with the local default after removing hosted state configuration;
-verify the connection indicator again. Keep the local CLI 2.13.0 installed.
+The owned demo host now supports fresh Maincloud databases too. Authenticate a
+SpacetimeDB CLI 2.13.0 config privately first (the same publisher config used by
+`demo:parity`). Then select the hosted lane at **startup**:
+
+```sh
+DEMO_SPACETIME=maincloud DEMO_MAINCLOUD=1 \
+  SPACETIME_CONFIG=/absolute/private/cli.toml pnpm demo:up
+pnpm demo:reset
+pnpm demo:preflight
+```
+
+`BACKROOM_DEMO=1` is set by the owned supervisor. Hosted mode additionally
+requires `DEMO_MAINCLOUD=1`, a private authenticated `SPACETIME_CONFIG`, and the
+fixed Maincloud endpoint. An existing `SPACETIMEDB_DATABASE` value must be named
+`backroom-demo-*` or startup refuses it; remove the legacy shared database
+selection from the private environment before starting this fresh-database lane.
+It never resets `backrooms-calhacks13` or any other existing shared DB. The
+separate `DEMO_STATE_REMOTE=1` host mode still attaches to existing shared state
+and refuses reset; do not combine it with `DEMO_SPACETIME=maincloud`.
+
+Each reset publishes a new `backroom-demo-<time>-<random>` module, then the
+existing private reset API stops the old seat workers, imports the seed company
+via `seed_company`, installs the new StateStore and recreates the scripted
+approval/pay scenario through public gateway/reducer APIs. No reducer changes,
+SQL deletes, clear-database flags, or fixture edits are involved. Old local and
+hosted databases remain for inspection; this is a clean **active run**, not data
+erasure. The runtime integration seam remains `/__demo/reset` with
+`{uri,database,token}`; autonomous runtime hosts must call their existing
+`AgentCaseStore.stopCase(caseId, 'cancelled', 'DEMO_RESET')` and drain active
+queries before switching the installed store. See [agents.md](agents.md).
+This command does not stop independent agent runtime processes or clear separate voice/usage journals. Preserve the
+real `FileUsageLedger` at `.env.agents/usage-ledger.json`: resetting the demo must
+never reset credential-owner spend accounting or its budget limits.
+
+Keep the same backend for the lifetime of a host; changing shell variables on
+`demo:reset` does not retarget an already running host. To return to local,
+`pnpm demo:down`, then `DEMO_SPACETIME=local DEMO_MAINCLOUD=0 pnpm demo:up`.
+Reload the office and verify **State connected**. Maincloud publishing is opt-in
+network activity; preflight itself is read-only and makes no model calls.
 
 ## Phone / operator setup
 
@@ -322,3 +397,156 @@ The [one-item live smoke receipt](evidence/burst/smoke.json) measured 3.24 secon
 and one simulated payment on `gpt-oss:20b`. It is a connectivity/path smoke, not
 a 925-item throughput result. The runner's `tokensPerSecond` includes input plus
 output; `outputTokensPerSecond` isolates generated output.
+
+## GX10 production host and warm Mac fallback (Refs #29 #32)
+
+`pnpm demo:up:gx10` bootstraps private Linux ARM64 tools, clones/fetches clean
+`main` into `~/work/backroom-judge-host/app`, installs the lockfile, runs
+`pnpm -r build`, then starts the existing detached demo supervisor. SSH logout
+leaves it running. No sudo, system services, shared jobs or Ollama changes.
+`GX10_HOST` selects the SSH alias; `GX10_DEPLOY_DIR=work/<name>` selects a different
+owned directory. `GX10_REF` is for explicitly testing a candidate branch; the
+judging default is `main`. A running host is reused without updating its checkout;
+stop it before deploying a new release. Dirty tracked files fail closed.
+
+```sh
+pnpm demo:up:gx10
+pnpm demo:health:gx10 --live
+pnpm demo:down:gx10
+```
+
+The wrapper reads Mac Keychain item `backroom-anthropic-key` and transfers it over
+SSH stdin to private `~/work/backroom-judge-host/anthropic.env` (0600). The key is
+never printed, passed in command arguments, added to the shared team env, or
+copied into the app's `.env.local`. Sponsor settings come from the GX10 team env.
+Keep `host.env` and `state.env` under that same private host directory, mode 0600;
+they are dotenv data, never sourced shell scripts. Inspect private host logs on
+the GX10 (`build.log`, `install.log`, `app/.demo/*.log`); do not paste raw logs.
+
+`host.env` defaults to the real sandbox adapter path and receiver (no dial), and may override these settings:
+
+```dotenv
+DEMO_LIVE=1
+DEMO_VOICE=1
+```
+
+Voice setup creates/updates this checkout's private Cartesia agent/tools, then
+starts the receiver. It never invokes `dial`. Receiver and control listeners
+remain loopback-only. Its file-backed gateway is still separate from the web
+StateStore; hosting does not prove phone → passkey → payment integration.
+
+Actual callbacks `/api/voice/tools/*` and `/api/voice/cartesia` also proxy to the
+authenticated receiver; `/_cartesia/*` remains available for relay health.
+
+Web binds **100.117.44.20:3340** and **127.0.0.1:3340** with the same
+handler/authentication. The loopback socket is required by the private voice
+bridge; both listeners close together. Local fallback DB binds **100.117.44.20:3341**,
+voice **127.0.0.1:3342**. Startup prints `ss -ltn`; the runner checks each selected
+port before launch. The quick tunnel forwards HTTPS pages and `/_cartesia/*` to
+web. From the Mac, use the printed Tailscale `/office` URL when the DB is local:
+a public HTTPS office cannot subscribe to an insecure private `ws://` DB. Phone
+approval/pay pages use the HTTPS tunnel and server APIs. Maincloud uses WSS and
+makes the public office subscription accessible too.
+
+If the Maincloud worker has published a **fresh database for this host**, place
+its private settings in `~/work/backroom-judge-host/state.env`:
+
+```dotenv
+DEMO_STATE_REMOTE=1
+STATE_STORE=spacetime
+SPACETIMEDB_URI=wss://maincloud.spacetimedb.com
+SPACETIMEDB_DATABASE=<fresh host database>
+SPACETIMEDB_TOKEN=<private publisher token>
+```
+
+The host never publishes/deletes/resets external databases. `demo:reset` returns
+409 in this mode. Seed is idempotent, so restarting against an already advanced
+scripted database is not a clean rehearsal; obtain a fresh one from the state
+operator. Without `state.env`, the host owns its own GX10 SpacetimeDB server and
+fresh `backroom-demo-*` database. Never point two hosts at the same demo database.
+
+The honest pitch is “the application server stack and routine inference run on
+GX10; durable state is Maincloud when configured; Cartesia, Anthropic, Nessie and
+Apify remain external services.” Do not say every provider runs on GX10.
+
+### Switch in under one minute
+
+Prepare the Mac **before** judging: install dependencies and SpacetimeDB 2.13.0,
+copy sponsor env privately as in AGENTS.md, build once with `pnpm -r build`, then
+keep a separate warm standby running:
+
+```sh
+DEMO_LIVE=1 DEMO_VOICE=1 DEMO_VOICE_SETUP=0 DEMO_PREBUILT=1 \
+DEMO_PORT=3350 DEMO_STATE_PORT=3351 VOICE_PORT=3352 pnpm demo:up
+```
+
+Copy the already-provisioned voice resource IDs/secrets as described below before
+starting this receiver. These flags use a separate local database, live sandbox
+adapters, LLM ON and an existing-agent receiver; callbacks stay on GX10 until the
+explicit setup command below. Save both hosts' public URLs and enroll Dana's
+passkey on each origin in advance. Startup can make one capped Apify attempt.
+For a labeled offline standby instead, select `DEMO_LIVE=0 DEMO_VOICE=0`; this
+uses mock bank + LLM OFF. Never let two receiver writers use the same `.env.voice`
+directory.
+
+1. If GX10 degrades, open the already-warm Mac `/office` and the saved Mac public
+   approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
+   credential copy or passkey registration belongs in this minute.
+2. For fresh seeded links, run `pnpm demo:reset` on the **local** standby, then
+   reopen its printed links (the approval expires after 60 seconds).
+3. When GX10 health recovers, switch back to its saved URLs after a read-only
+   health check. Do not stop/restart either origin during a live take.
+
+This is a URL/origin switch, not transparent failover. Process-local finance and
+voice state do not migrate. Complete an in-flight approval/payment on its original
+host; never replay a possibly completed bank operation on the fallback.
+
+For an equivalent warm live Mac receiver without allocating a second Cartesia
+agent, copy **only** the GX10's private `.env.voice/resources.json` and
+`.demo/voice-private.env` into those same paths in the separate Mac checkout
+(mode 0600). Do not copy journals, gateway state or bank idempotency claims.
+Start with `DEMO_LIVE=1 DEMO_VOICE=1 DEMO_VOICE_SETUP=0` plus the Mac ports above.
+This does not update the active GX10 agent's webhook destinations. A fresh
+second-agent attempt returned HTTP 402 during testing; do not keep retrying it
+or purchase credits as part of switching hosts.
+
+To direct **new sessions** to the prepared Mac receiver, update the existing
+agent's tools/webhook explicitly from the Mac repo root:
+
+```sh
+STATE_STORE=memory node --env-file=.env.local --env-file=.demo/private.env \
+  --env-file=.demo/voice-private.env --env-file=.demo/voice.env \
+  --import ./orchestrator/node_modules/tsx/dist/loader.mjs \
+  orchestrator/src/voice/live.ts setup
+```
+
+Measured existing-resource callback update: 6.3 seconds to Mac, 11.6 seconds to
+restore GX10 (see the receipt). That updates existing IDs, never dials and must
+finish before the receiver is
+called active. Copy the current `.demo/voice.env` into the Node command only as
+shown; it contains the warm Mac's public origin. Return traffic to GX10 by
+running the same setup under the GX10 private env/current voice.env. Do not
+switch a live call between separate journals. Hardware failure still needs
+Cartesia/internet access to update callbacks; if those are down, say so and
+continue with the web/text fallback.
+
+Measured host latency and scope live in [the GX10 hosting receipt](evidence/gx10-host/README.md).
+The reproducible opt-in `tools/demo/measure-hosts.ts` writes synthetic duplicate
+inbox/audit rows only; it requires `MAC_PUBLIC_URL` / `GX10_PUBLIC_URL` for the
+same-origin decision endpoints. Page loads use direct host URLs. It performs
+no model inference, bank request, approval or dial.
+
+After a host/listener change, exercise the authenticated bridge as well as health.
+Run from the Mac repo root; the probe streams to the existing clean checkout
+without replacing runtime sources:
+
+```sh
+ssh gx10 'cd ~/work/backroom-judge-host/app; PATH="$HOME/work/backroom-judge-host/.runtime/bin:$PATH" BACKROOM_ROOT="$PWD" node --import ./orchestrator/node_modules/tsx/dist/loader.mjs --input-type=module - --confirm-owned-demo' < tools/demo/voice-bridge-live.ts
+```
+
+This calls the private loopback client-stop read and an authenticated
+`get_invoice_context` for seeded synthetic invoice 1042 (200 `CONTEXT`), plus the signed
+public voice-tool callback for an unknown session (404 `SESSION_NOT_FOUND`). It
+records one synthetic gateway delivery receipt but never registers a call, dials,
+approves, pays, mutates a live call, or contacts a provider. A relay `/health` or
+unsigned 401 alone does not prove bridge → web connectivity.
