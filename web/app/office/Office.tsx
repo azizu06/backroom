@@ -37,7 +37,7 @@ const OfficeScene = dynamic(() => import('./scene').then(module => module.Office
 /** All finance state comes through OfficeState. Commands belong to an authenticated controller. */
 export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: {
   source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
-  auditWall?: ReactNode; inboxTray?: ReactNode;
+  auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode;
 }) {
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
   const [viewport, dispatch] = useReducer(viewportReducer, INITIAL_VIEWPORT);
@@ -173,7 +173,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
       </ViewBoundary>
       <section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
         <ViewBoundary name='Audit wall' resetKey={snapshot} fallback={<p role='status'>Audit wall unavailable · open the full audit page for receipts.</p>}>
-        {auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
+        {typeof auditWall === 'function' ? auditWall(snapshot, setFocus) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
         </ViewBoundary>
       </section>
       {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Preview audit receipts'>
@@ -193,7 +193,7 @@ export function MockOffice() {
   const [mock] = useState(createMockOfficeState);
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
-  return <Office source={mock.source} auditWall={<OfficeLobby />} controls={<div className='mock-controls'>
+  return <Office source={mock.source} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Preview only</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>
