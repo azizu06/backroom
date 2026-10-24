@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createNorthfieldRepository, getStateStore, PayablesSeat, processInbox, VendorSeat,
   type InboxOptions, type InvoiceFields, type StateStore, type VendorFields } from '@backroom/orchestrator';
 
+import { narrateInbox, type InboxNarration } from '../demo/agents';
+
 import { matchPreset, presetFields } from './presets';
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -9,7 +11,7 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 const LIMIT = 4 * 1024 * 1024;
 
 /** Public synthetic judge intake: no payment adapter, approval writes, or live vendor checks. */
-export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute'] } = {}) {
+export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown> } = {}) {
   return async (request: Request) => {
     if (request.headers.get('origin') !== new URL(request.url).origin) return json({ error: 'Origin rejected.' }, 403);
     if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) return json({ error: 'Use the inbox form.' }, 415);
@@ -78,6 +80,11 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
         refs: [id, ...result.evidenceRefs, ...(result.escalationId ? [result.escalationId] : [])], route: 'code', latencyMs: 0, costUsd: 0,
         inputs: { scenario_source: 'judge', extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized', decision: result.decision, fields, attachment,
           text, senderDomain: sender, kind, attachmentParsed: !!file && !!fields } });
+      // Narration is outside the decision boundary: it cannot change, delay or fail this response.
+      try {
+        void (options.agents ?? narrateInbox)({ item: { ...source, kind: kind as 'email' | 'invoice', text },
+          fields, repository, result, auditId: entry.id }).catch(() => {});
+      } catch { /* A synchronous adapter failure also leaves the recorded decision intact. */ }
       const documentRoute = 'documentRoute' in result ? result.documentRoute : null;
       const documentModelAttempted = 'documentModelAttempted' in result && result.documentModelAttempted;
       return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
