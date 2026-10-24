@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { PolicyLimits } from '@backroom/orchestrator';
 import type { Policy } from '../../../policy/src/index';
 import { BadgeEditor } from '../../components/BadgeEditor';
+import { jsonObject, NETWORK_MESSAGE, outageMessage, serverError } from '../../lib/http/response';
 import styles from './policy.module.css';
 
 const messages: Record<string, string> = {
@@ -19,13 +20,21 @@ export default function PolicyPage() {
   async function request(body?: { expectedVersion: number; limits: PolicyLimits }) {
     setBusy(true); setError(''); setNotice('');
     try {
-      const res = await fetch('/api/policy', { method: body ? 'POST' : 'GET', cache: 'no-store',
-        headers: { 'x-policy-demo-pin': pin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-        ...(body ? { body: JSON.stringify(body) } : {}) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(messages[data.error] ?? 'The policy could not be loaded or saved. Try again.');
-      setPolicy(data.policy); setRevision(value => value + 1);
-      if (body) setNotice(`Saved v${data.policy.policyVersion}. New decisions use these limits. Your change is recorded in the audit wall.`);
+      let res: Response;
+      try {
+        res = await fetch('/api/policy', { method: body ? 'POST' : 'GET', cache: 'no-store',
+          headers: { 'x-policy-demo-pin': pin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+          ...(body ? { body: JSON.stringify(body) } : {}) });
+      } catch { throw new Error(NETWORK_MESSAGE); }
+      const data = await jsonObject(res);
+      if (!data) throw new Error(outageMessage(res.status));
+      const code = serverError(data);
+      if (!res.ok) throw new Error(code !== undefined && Object.prototype.hasOwnProperty.call(messages, code)
+        ? messages[code] : 'The policy could not be loaded or saved. Try again.');
+      const saved = data.policy as Policy | undefined;
+      if (!saved || typeof saved.policyVersion !== 'number') throw new Error('The policy could not be loaded or saved. Try again.');
+      setPolicy(saved); setRevision(value => value + 1);
+      if (body) setNotice(`Saved v${saved.policyVersion}. New decisions use these limits. Your change is recorded in the audit wall.`);
     } catch (e) { setError(e instanceof Error ? e.message : 'The policy request failed. Try again.'); }
     finally { setBusy(false); }
   }

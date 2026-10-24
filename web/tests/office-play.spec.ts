@@ -32,6 +32,31 @@ async function holdUntil(page: Page, key: string, done: () => Promise<boolean>, 
     await page.keyboard.up(key);
   }
 }
+type Release =
+  | { kind: 'turned'; yaw: number }
+  | { kind: 'facing'; x: number; z: number; sign: number }
+  | { kind: 'arrived'; x: number; z: number; tolerance: number };
+/**
+ * Holds `key` until the release condition holds, checked in the page on every animation frame so
+ * slow headless frames do not overshoot while a Node-side poll round-trips.
+ */
+async function holdInPage(page: Page, key: string, release: Release, timeout = 15_000) {
+  await page.keyboard.down(key);
+  try {
+    await page.waitForFunction(r => {
+      const element = document.querySelector<HTMLElement>('[data-player-yaw]');
+      if (!element) return false;
+      const x = Number(element.dataset.playerX), z = Number(element.dataset.playerZ), yaw = Number(element.dataset.playerYaw);
+      if (r.kind === 'turned') return yaw !== r.yaw;
+      const raw = Math.atan2(-(r.x - x), -(r.z - z)) - yaw;
+      const diff = Math.atan2(Math.sin(raw), Math.cos(raw));
+      if (r.kind === 'facing') return Math.abs(diff) <= 0.3 || Math.sign(diff) !== r.sign;
+      return Math.hypot(r.x - x, r.z - z) <= r.tolerance || Math.abs(diff) > 0.2;
+    }, release, { polling: 'raf', timeout });
+  } finally {
+    await page.keyboard.up(key);
+  }
+}
 const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
 /** Yaw 0 looks toward -z; forward = (-sin yaw, -cos yaw). */
 async function bearingTo(page: Page, x: number, z: number) {
@@ -44,17 +69,10 @@ async function face(page: Page, x: number, z: number, tolerance = 0.08) {
     if (Math.abs(diff) <= tolerance) return;
     // ArrowLeft turns left (yaw increases), ArrowRight turns right.
     const key = diff > 0 ? 'ArrowLeft' : 'ArrowRight';
-    if (Math.abs(diff) > 0.35) {
-      // Coarse: hold, releasing early because slow headless frames can overshoot.
-      await holdUntil(page, key, async () => {
-        const now = (await bearingTo(page, x, z)).diff;
-        return Math.abs(now) <= 0.3 || Math.sign(now) !== Math.sign(diff);
-      });
-    } else {
-      // Fine: hold only until the rig has rendered one turning frame.
-      const { yaw } = await player(page);
-      await holdUntil(page, key, async () => (await player(page)).yaw !== yaw);
-    }
+    // Coarse: hold until roughly facing. Fine: hold for one turning frame (the rig turns a fixed
+    // 1/60 s step on the first frame after idle).
+    if (Math.abs(diff) > 0.35) await holdInPage(page, key, { kind: 'facing', x, z, sign: Math.sign(diff) });
+    else await holdInPage(page, key, { kind: 'turned', yaw: (await player(page)).yaw });
   }
   const { diff } = await bearingTo(page, x, z);
   expect(Math.abs(diff)).toBeLessThanOrEqual(tolerance * 2);
@@ -63,10 +81,7 @@ async function walkTo(page: Page, x: number, z: number, tolerance = 0.15) {
   for (let leg = 0; leg < 12; leg++) {
     if ((await bearingTo(page, x, z)).distance <= tolerance) return;
     await face(page, x, z);
-    await holdUntil(page, 'w', async () => {
-      const { diff, distance } = await bearingTo(page, x, z);
-      return distance <= tolerance || Math.abs(diff) > 0.2;
-    });
+    await holdInPage(page, 'w', { kind: 'arrived', x, z, tolerance });
   }
   expect((await bearingTo(page, x, z)).distance).toBeLessThanOrEqual(tolerance * 2);
 }
@@ -144,4 +159,29 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   await expect(dialog).toContainText('DENY');
   await expect(dialog.locator('code')).toHaveText(/^preview-denial-\d+$/);
   expect(errors).toEqual([]);
+});
+
+test.describe('play mode on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('caption shows the touch hint and the joystick is visible', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/office');
+    await requireWebGL(page);
+    const select = page.getByLabel('Office view');
+    await expect(select).toBeEnabled();
+    // Narrow screens may prefer another initial view; retry until hydrated so the pick sticks.
+    await expect(async () => {
+      await select.selectOption({ label: 'Play (first person)' });
+      await expect(surface(page)).toBeVisible({ timeout: 1_000 });
+    }).toPass();
+    await expect(select).toHaveValue('play');
+    const caption = page.getByTestId('office-viewport').locator('.office-caption');
+    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Exit Play to leave');
+    await expect(caption).not.toContainText('WASD');
+    await expect(page.locator('.play-joystick')).toBeVisible();
+    await expect(page.locator('.play-touch-hint')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 });
