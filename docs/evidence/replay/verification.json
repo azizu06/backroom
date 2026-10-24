@@ -1,0 +1,25 @@
+{
+  "fixture": "fixtures/replays/core-offline.jsonl",
+  "frameCount": 140,
+  "durationMs": 25375,
+  "phases": [
+    "collections-1042",
+    "inbox-llm-on",
+    "inbox-llm-off",
+    "northfield-ap"
+  ],
+  "workspaceTestsPassed": 448,
+  "workspaceBuild": "passed",
+  "workspaceTypecheck": "passed",
+  "replayBrowserTestsPassed": 2,
+  "existingAuditBrowserTestsPassed": 1,
+  "replayApiRequests": 0,
+  "replayBrowserErrors": 0,
+  "screenshots": [
+    "office-mid-replay.png",
+    "floor-plan-paused.png",
+    "audit-mid-replay.png",
+    "phone-replay.png"
+  ],
+  "note": "Headless production app; synthetic scripted capture. No live voice, sponsor-service, money movement, or physical-laptop performance claim."
+}
