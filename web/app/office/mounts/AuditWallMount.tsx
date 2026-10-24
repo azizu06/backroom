@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
 import { PROP_FONT, useCanvasTexture } from '../props/useCanvasTexture';
-import { AUDIT_WALL, auditWallText, auditWallView, auditWallVisible, type AuditWallView } from '../../../lib/office/props/auditWall';
+import { AUDIT_WALL, auditWallNoticeLines, auditWallText, auditWallView, auditWallVisible, type AuditWallView } from '../../../lib/office/props/auditWall';
 import type { SceneMountProps } from './types';
 
 const DECISION_COLORS = { ALLOW: '#a9bc8f', DENY: '#ed6252', ESCALATE: '#e0b365', RECORDED: '#8c9c87' } as const;
@@ -29,8 +29,8 @@ function drawWall(ctx: CanvasRenderingContext2D, view: AuditWallView) {
   if (!view.rows.length) {
     ctx.fillStyle = '#9fae9a';
     ctx.font = `500 24px ${PROP_FONT}`;
-    // Preview and replay feeds are not the audit log: say so on two lines instead of painting their rows.
-    const [first, second] = view.notice ? ['Preview feed: no audit entries.', 'Live receipts appear here; see /audit.'] : ['No receipts yet', ''];
+    // Preview and replay feeds are not the audit log: paint the shared notice on two lines instead of their rows.
+    const [first, second] = view.notice ? auditWallNoticeLines(view.notice) : ['No receipts yet', ''];
     ctx.fillText(first, 22, ROW_TOP + 36);
     if (second) ctx.fillText(second, 22, ROW_TOP + 72);
     return;
@@ -61,7 +61,7 @@ function Wall({ snapshot }: SceneMountProps) {
     canvas.dataset.auditWall = text;
     canvas.setAttribute('aria-description', `Lobby audit wall, newest first:\n${text || view.notice || 'no receipts yet'}`);
     return () => { delete canvas.dataset.auditWall; canvas.removeAttribute('aria-description'); };
-  }, [canvas, text]);
+  }, [canvas, text, view.notice]);
   const { width, height, faceWidth, faceHeight, bottom } = AUDIT_WALL;
   return <group name='mount:audit-wall' position={[AUDIT_WALL.x, 0, AUDIT_WALL.z]} rotation={[0, Math.PI / 2, 0]}>
     <mesh position={[0, bottom + height / 2, 0]} castShadow receiveShadow>
