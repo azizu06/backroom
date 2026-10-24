@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Decision } from '@backroom/policy';
+import { POLICY_SENTENCES, RULE_SENTENCES, type Decision } from '@backroom/policy';
 import { MemoryStateStore, type NewTask } from './store';
 import { SeatWorker } from './worker';
 import { FakeEffects } from './effects';
 
-const allow: Decision = { kind: 'ALLOW', ruleIds: ['PAY_PERMIT'], policyVersion: 3 };
+const allow: Decision = { kind: 'ALLOW', ruleIds: ['IN_BADGE'], policyVersion: 3 };
+const quote = (rule: 'NOT_IN_BADGE' | 'OVER_LIMIT') => ({ sentenceId: RULE_SENTENCES[rule], text: POLICY_SENTENCES[RULE_SENTENCES[rule]] });
 const payment: NewTask = { id: 't1', seatId: 'payables', refs: ['invoice:1'], idempotencyKey: 'invoice:1:payment:1',
   steps: [{ kind: 'nessie', action: { type: 'pay_invoice' }, context: { policyVersion: 3 },
     input: { invoiceId: '1', amountCents: 5000, accountId: 'approved-bank' } }] };
@@ -16,13 +17,13 @@ describe('seat worker policy gate', () => {
     let auditedBeforeEffect = false;
     effects.beforeEffect = async () => { auditedBeforeEffect = (await store.listAudit())[0]?.decision === 'ALLOW'; };
     const decision: Decision = kind === 'ALLOW' ? allow : kind === 'DENY'
-      ? { ...allow, kind, reason: 'NOT_IN_BADGE' }
-      : { ...allow, kind, reason: 'OVER_LIMIT', toHuman: 'dana' };
+      ? { ...allow, kind, reason: 'NOT_IN_BADGE', quote: quote('NOT_IN_BADGE') }
+      : { ...allow, kind, reason: 'OVER_LIMIT', toHuman: 'dana', quote: quote('OVER_LIMIT') };
     const worker = new SeatWorker({ id: 'payables-1', seat: 'payables', store, effects, now: () => 0,
       evaluate: () => decision });
     await worker.start(); await store.enqueueTask(payment); await worker.tick();
     expect((await store.listAudit())[0]).toMatchObject({ actor: 'code', seat: 'payables',
-      action: 'pay_invoice', decision: kind, policyVersion: 3, ruleIds: ['PAY_PERMIT'],
+      action: 'pay_invoice', decision: kind, policyVersion: 3, ruleIds: ['IN_BADGE'],
       refs: ['invoice:1'], route: 'code' });
     expect(effects.calls).toHaveLength(kind === 'ALLOW' ? 1 : 0);
     if (kind === 'ALLOW') {
@@ -147,7 +148,8 @@ describe('effect execution boundary', () => {
     const effects = new FakeEffects();
     let permitted = true;
     const worker = new SeatWorker({ id: 'vendor', seat: 'vendor_onboarding', store, effects, now: () => 0,
-      evaluate: () => permitted ? allow : { kind: 'DENY', ruleIds: ['NOT_IN_BADGE'], policyVersion: 4, reason: 'NOT_IN_BADGE' } });
+      evaluate: () => permitted ? allow : { kind: 'DENY', ruleIds: ['NOT_IN_BADGE'], policyVersion: 4,
+        reason: 'NOT_IN_BADGE', quote: quote('NOT_IN_BADGE') } });
     await worker.start();
     await store.enqueueTask({ id: 'vendor-check', seatId: 'vendor_onboarding', refs: ['vendor:1'], steps: [
       { kind: 'crs', action: { type: 'run_crs' }, input: { vendorId: 'vendor:1' }, context: { policyVersion: 3 } },

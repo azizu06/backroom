@@ -3,9 +3,9 @@
 `pnpm --filter orchestrator dev` runs Collections, Payables and Vendor onboarding
 against a tiny in-memory scenario, prints agents/tasks and the hash-chained audit,
 and exits. All effects are fake. The production policy adapter uses
-`@backroom/policy`; while that package is the deny-all stub, the demo honestly
-shows three denials. Tests inject policy outcomes to exercise allowed effects
-and escalations without network or model calls.
+`@backroom/policy` with typed, trusted Northfield context and cents-based AP
+invoice inputs. Tests cover real policy decisions as well as injected outcomes
+for concurrency cases, without network or model calls.
 
 `pnpm --filter orchestrator test` runs Vitest. `pnpm --filter orchestrator build`
 checks TypeScript. The package entry exports the core without starting a process.
@@ -43,10 +43,14 @@ reference implementation, not durable storage across a complete service restart.
 ## Policy and effects
 
 [`src/policy-gate.ts`](src/policy-gate.ts) is the only compatibility adapter for
-policy #11. It binds effect kind to action (`call_client`, `run_crs`, `run_apify`,
+the policy package. It binds effect kind to action (`call_client`, `run_crs`, `run_apify`,
 `pay_invoice`) and evaluates the actual effect input. Producers supply trusted
 policy context; raw emails, model text and voice must never construct it.
-Each decision (ALLOW, DENY, ESCALATE) is appended **before** calling an effect.
+Each complete decision (ALLOW, DENY, ESCALATE), including exact policy quotes,
+is persisted with the proposed action and actual effect input **before** calling an effect.
+Payments carry the policy's `APInvoice` under `input.invoice`; its amount is in
+integer cents. `Context.policyVersion` guards against a stale saved policy, and
+the audit records the actual evaluated version returned by the engine.
 An audit-write or policy failure prevents the call. DENY closes the task;
 ESCALATE creates evidence and a walk target without executing the effect.
 

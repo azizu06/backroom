@@ -67,7 +67,8 @@ export class SeatWorker {
       const decision = (this.options.evaluate ?? evaluateStep)(seat, step);
       await store.appendAudit({ ts: this.now(), actor: 'code', seat, action: step.action.type,
         ruleIds: decision.ruleIds, policyVersion: decision.policyVersion, refs: task.refs,
-        route: 'code', decision: decision.kind, latencyMs: 0, costUsd: 0 });
+        route: 'code', decision: decision.kind,
+        inputs: { action: step.action, effectInput: step.input, decision }, latencyMs: 0, costUsd: 0 });
       if (decision.kind === 'DENY') {
         await store.completeTask(lease, 'denied', this.now()); this.lease = undefined; return;
       }
