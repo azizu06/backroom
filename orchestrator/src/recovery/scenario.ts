@@ -1,3 +1,4 @@
+import { MemoryFinanceRepository } from '../payables/repository';
 import { fork, type ChildProcess } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -47,7 +48,7 @@ export async function runRecovery(options: RecoveryOptions = {}): Promise<Recove
   const store = new MemoryStateStore();
   // This demo runs only deterministic payments; keep models OFF for its entire lifetime.
   await store.setLlmEnabled(false);
-  const effects = new FakeEffects();
+  const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:recovery', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
   const batch = Array.from({ length: batchSize }, (_, index) => paymentTask(index + 1));
   for (const task of batch) await store.enqueueTask(task);
   const before: AuditEntry[][] = [];

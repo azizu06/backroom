@@ -1,3 +1,4 @@
+import { MemoryFinanceRepository } from './payables/repository';
 import { describe, expect, it } from 'vitest';
 import { POLICY_SENTENCES, RULE_SENTENCES, type Decision } from '@backroom/policy';
 import { MemoryStateStore, type NewTask } from './store';
@@ -8,12 +9,12 @@ const allow: Decision = { kind: 'ALLOW', ruleIds: ['IN_BADGE'], policyVersion: 3
 const quote = (rule: 'NOT_IN_BADGE' | 'OVER_LIMIT') => ({ sentenceId: RULE_SENTENCES[rule], text: POLICY_SENTENCES[RULE_SENTENCES[rule]] });
 const payment: NewTask = { id: 't1', seatId: 'payables', refs: ['invoice:1'], idempotencyKey: 'invoice:1:payment:1',
   steps: [{ kind: 'nessie', action: { type: 'pay_invoice' }, context: { policyVersion: 3 },
-    input: { invoiceId: '1', amountCents: 5000, accountId: 'approved-bank' } }] };
+    input: { invoiceId: '1', vendorId: 'vendor:1', amountCents: 5000, sourceAccount: 'operating', destinationAccountId: 'approved-bank' } }] };
 
 describe('seat worker policy gate', () => {
   it.each(['ALLOW', 'DENY', 'ESCALATE'] as const)('audits %s before any external effect', async kind => {
     const store = new MemoryStateStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     let auditedBeforeEffect = false;
     effects.beforeEffect = async () => { auditedBeforeEffect = (await store.listAudit())[0]?.decision === 'ALLOW'; };
     const decision: Decision = kind === 'ALLOW' ? allow : kind === 'DENY'
@@ -42,7 +43,7 @@ describe('payment crash recovery', () => {
   it('reuses the provider key after a crash between payment and receipt persistence', async () => {
     let now = 0;
     const store = new MemoryStateStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     const old = new SeatWorker({ id: 'old', seat: 'payables', store, effects, now: () => now, evaluate: () => allow });
     await old.start(); await store.enqueueTask(payment);
     effects.beforeEffect = async () => { now = 16000; await store.reapExpired(now); };
@@ -78,7 +79,7 @@ describe('worker runtime heartbeat', () => {
     const { vi } = await import('vitest');
     vi.useFakeTimers(); vi.setSystemTime(0);
     const store = new MemoryStateStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     let finishCall!: () => void;
     const call = new Promise<void>(resolve => { finishCall = resolve; });
     effects.beforeEffect = () => call;
@@ -114,7 +115,7 @@ describe('async store adapter races', () => {
       }
     }
     const store = new DelayedStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     let finishEffect!: () => void;
     let effectStarted!: () => void;
     const started = new Promise<void>(resolve => { effectStarted = resolve; });
@@ -136,7 +137,7 @@ describe('effect execution boundary', () => {
       override async appendAudit(): Promise<never> { throw new Error('STORE_UNAVAILABLE'); }
     }
     const store = new UnavailableAuditStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     const worker = new SeatWorker({ id: 'a', seat: 'payables', store, effects, now: () => 0, evaluate: () => allow });
     await worker.start(); await store.enqueueTask(payment);
     await expect(worker.tick()).rejects.toThrow('STORE_UNAVAILABLE');
@@ -145,7 +146,7 @@ describe('effect execution boundary', () => {
 
   it('persists the multi-step cursor and checks policy again before Apify', async () => {
     const store = new MemoryStateStore();
-    const effects = new FakeEffects();
+    const effects = new FakeEffects(new MemoryFinanceRepository({ vendors: [{ id: 'vendor:1', domain: 'example.com', accountId: 'approved-bank', approved: true, revision: 1 }] }));
     let permitted = true;
     const worker = new SeatWorker({ id: 'vendor', seat: 'vendor_onboarding', store, effects, now: () => 0,
       evaluate: () => permitted ? allow : { kind: 'DENY', ruleIds: ['NOT_IN_BADGE'], policyVersion: 4,
