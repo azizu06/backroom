@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { route } from '@backroom/orchestrator';
+import { route, signalsFromCrs, signalsFromHealth } from '@backroom/orchestrator';
 import { createDemoServices } from './services';
 
 mkdirSync('.demo', { recursive: true });
@@ -128,4 +128,42 @@ it('audits cached CRS evidence and still blocks the pre-call when CRS is down', 
     expect(row.cached).toBe(true);
     expect(row.label).toMatch(/\(cached at \d\d:\d\d UTC\)$/);
   }
+});
+
+it('records FAKE CRS and fixture health signals, replays as a no-op, and still readies pre-call when the store fails', async () => {
+  const http = vi.fn();
+  const plan = { tone: 'neutral' as const, offerOrder: ['pay_in_full' as const], plan: { installments: 1, firstPaymentPct: 100, totalDays: 0, waiveFees: false, discountPct: 0 } };
+  const modelRoute = (async () => ({ output: plan, route: 'cloud' as const, model: 'test', latencyMs: 1, costUsd: 0 })) as typeof route;
+  const env: NodeJS.ProcessEnv = { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private', NESSIE_ACCOUNT_ID: 'sandbox-account', PRECALL_APIFY: 'fake' };
+  const services = await createDemoServices({ env, fetch: http, modelRoute });
+  const { MemoryStateStore } = await import('@backroom/orchestrator');
+  const state = new MemoryStateStore();
+  await services.prepare(state);
+  expect(services.status().services.preCall.status).toBe('ready');
+  expect(services.status().services.crs.mode).toBe('FAKE');
+  expect(services.status().services.apify).toMatchObject({ mode: 'FAKE', status: 'complete' });
+  const audit = await state.listAudit();
+  expect(audit.find(row => row.action === 'health_check')?.inputs).toMatchObject({ label: 'FAKE' });
+  const inputs = audit.find(row => row.action === 'demo_pre_call_evidence')?.inputs as { crs?: Parameters<typeof signalsFromCrs>[1][]; health?: Parameters<typeof signalsFromHealth>[1] } | undefined;
+  const expected = [
+    ...(inputs?.crs ?? []).flatMap(row => signalsFromCrs('1042', row)),
+    ...(inputs?.health ? signalsFromHealth('1042', inputs.health, 'FAKE') : []),
+  ];
+  expect(expected.length).toBeGreaterThan(0);
+  expect(expected.every(row => row.subjectRef === '1042' && row.source === 'crs_fixture' && row.label === 'FAKE: CRS fixture, test identity #1')).toBe(true);
+  expect(expected.some(row => /live run/i.test(row.label))).toBe(false);
+  expect(await state.listSignals()).toEqual(expected);
+  await services.prepare(state);
+  expect(await state.listSignals()).toEqual(expected);
+  expect(http).not.toHaveBeenCalled();
+
+  const broken = await createDemoServices({ env, fetch: http, modelRoute });
+  const failing = new MemoryStateStore();
+  failing.recordSignal = async () => { throw new Error('signal store down'); };
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  await broken.prepare(failing);
+  expect(broken.status().services.preCall.status).toBe('ready');
+  expect(await failing.listSignals()).toEqual([]);
+  expect(logged).toHaveBeenCalledWith('demo signal recording failed', { failed: expected.length });
+  logged.mockRestore();
 });
