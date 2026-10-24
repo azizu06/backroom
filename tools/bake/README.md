@@ -16,4 +16,4 @@ scp gx10:bake/run1/out/lobby.glb web/public/office-art/lobby.glb
 
 Inspect the GLB (size, parses, only the expected nodes) before committing. Scripts are our own code only: no downloads, no subprocess, socket, urllib, requests or exec.
 
-Node names the web layer relies on: `shell`, `wall_far`, `wall_near`, `ceiling`. `wall_near` and `ceiling` are hidden in the orthographic overview and shown in first-person Play.
+Node names the web layer relies on: `shell`, `wall_far`, `wall_near`, `ceiling`. `wall_near` and `ceiling` are hidden in the orthographic overview and shown in first-person Play. The ceiling panels, downlights and pendants are joined into `ceiling` so they hide with it. `lobby.colliders.json` is written by the script (no bake needed to know it) and mirrored in `web/public/office-art/`.
