@@ -156,3 +156,16 @@ it('recognizes the applied bank account on a resent inbox message without reopen
   expect(checks.business).toHaveBeenCalledTimes(priorChecks);
   expect((await state.listAudit()).at(-1)?.action).toBe('bank_change_already_applied');
 });
+
+it.each(['sender', 'field-domain', 'pending', 'sanctioned'] as const)('does not recognize an applied account as approved when %s evidence differs', async mismatch => {
+  const { seat, repository, decide } = await setup();
+  const proposal = await seat.propose(change, source);
+  await decide(proposal.escalationId!); await seat.apply(source.id);
+  const current = (await repository.getVendor(vendor.id))!;
+  if (mismatch === 'pending') await repository.saveVendor({ ...current, pendingBankChange: true });
+  if (mismatch === 'sanctioned') await repository.saveVendor({ ...current, ofacHit: true });
+  const fields = mismatch === 'field-domain' ? { ...change, domain: 'cedarfre1ght.example' } : change;
+  const envelope = { ...source, id: 'resent-invoice-4480', ...(mismatch === 'sender' && { senderDomain: 'cedarfre1ght.example' }) };
+  expect((await seat.propose(fields, envelope)).decision.kind).not.toBe('ALLOW');
+  expect((await repository.getVendor(vendor.id))?.revision).toBe(2);
+});
