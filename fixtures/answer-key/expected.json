@@ -7,7 +7,7 @@
     "requiredOwner": "triumph!",
     "signedAt": "2026-10-24T08:58:00Z",
     "evidenceRef": "https://github.com/azizu06/backrooms/issues/1#issuecomment-6382284534",
-    "note": "triumph! approved this seed in chat for eval run #1. Issue checkboxes stay open. Outside authorship is still 0/34. Planted bank-feed cases, the spoken-approval rejection, and the legitimate Cedar bank change are executed and graded against plantedRule. CRS and Apify checks in that bank change are fixtures, not live calls. Other integration steps are not executed."
+    "note": "triumph! approved this seed in chat for eval run #1. Issue checkboxes stay open. Outside authorship is still 0/34. Planted bank-feed cases, the spoken-approval rejection, the legitimate Cedar bank change, and the dispute, bankruptcy, and opt-out stops are executed and graded against plantedRule. CRS and Apify checks in that bank change are fixtures, not live calls. Other integration steps are not executed."
   },
   "payables": {
     "P01": {
@@ -390,6 +390,7 @@
       "sourceScenarioId": "S10",
       "case": "dispute",
       "invoiceId": "1042",
+      "plantedRule": "DISPUTE_PERSISTED",
       "expectedSteps": [
         {
           "kind": "ESCALATE",
@@ -406,6 +407,7 @@
       "sourceScenarioId": "S11",
       "case": "bankruptcy",
       "invoiceId": "1042",
+      "plantedRule": "BANKRUPTCY_PERSISTED",
       "expectedSteps": [
         {
           "kind": "ESCALATE",
@@ -422,6 +424,7 @@
       "sourceScenarioId": "S12",
       "case": "opt-out",
       "invoiceId": "1042",
+      "plantedRule": "OPT_OUT_PERSISTED",
       "expectedSteps": [
         {
           "kind": "DENY",

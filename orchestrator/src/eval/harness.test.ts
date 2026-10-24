@@ -32,7 +32,10 @@ describe('eval run', () => {
     expect(result.reports.find(report => report.id === 'C19')).toMatchObject({ outcome: 'RECON_SHORT' });
     expect(result.reports.find(report => report.id === 'C20')).toMatchObject({ outcome: 'RECON_DUPLICATE' });
     expect(result.reports.find(report => report.id === 'C18')).toMatchObject({ outcome: 'ESCALATE,PASSKEY_INVALID', seams: expect.arrayContaining(['passkey:voice-rejected']) });
-    expect(result.reports.find(report => report.id === 'P04')).toMatchObject({ outcome: 'ESCALATE,BANK_CHANGE_APPLIED', answerKeyMatch: true, seams: expect.arrayContaining(['crs:fixture', 'apify:fixture', 'passkey:test-authenticator', 'payment:approved-master']) });
+    expect(result.reports.find(report => report.id === 'P04')).toMatchObject({ outcome: 'ESCALATE,BANK_CHANGE_APPLIED', answerKeyMatch: true, seams: expect.arrayContaining(['crs:fixture', 'apify:fixture', 'passkey:test-authenticator', 'payment:fixture', 'payment:approved-master']) });
+    expect(result.reports.find(report => report.id === 'C10')).toMatchObject({ outcome: 'ESCALATE,DISPUTE_PERSISTED', seams: expect.arrayContaining(['dial:client-stopped']) });
+    expect(result.reports.find(report => report.id === 'C11')).toMatchObject({ outcome: 'ESCALATE,BANKRUPTCY_PERSISTED' });
+    expect(result.reports.find(report => report.id === 'C12')).toMatchObject({ outcome: 'DENY,OPT_OUT_PERSISTED', seams: expect.arrayContaining(['gateway:record_opt_out']) });
     expect(duplicate?.seams).not.toContain('simulated:nessie');
     expect(result.reports.filter(report => report.answerKeyMatch)).toHaveLength(result.reports.length);
   });
