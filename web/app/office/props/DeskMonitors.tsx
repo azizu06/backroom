@@ -7,16 +7,18 @@ import { OFFICE_ANCHORS, type OfficeSnapshot } from '../../../lib/office/state';
 import { MONITOR_DESKS, MONITOR_FACE, MONITOR_TEXTURE, monitorInteraction, monitorOverview, monitorScreen, monitorScreenKey, type MonitorDesk, type MonitorScreen, type MonitorStatusKey } from '../../../lib/office/props/monitors';
 import { canvasTextLines } from '../../../lib/office/props/readability';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
+import { PALETTE, ROLES } from '../../../lib/office/palette';
 
-const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: '#b9d59b', deny: '#ff998c', escalate: '#f3dfb9', recorded: '#d0d6c6' };
-const LINE_COLORS = { agent: '#f2f5ed', away: '#d0d6c6', folder: '#f3dfb9', idle: '#d0d6c6', awaiting: '#f2f5ed', escalation: '#d0d6c6' } as const;
+// Text is always navy on the aqua screen (contrast above 4.5:1); the decision colour is a swatch beside it, never the ink.
+const STATUS_COLORS: Record<MonitorStatusKey, string> = { allow: PALETTE.mint, deny: ROLES.deny, escalate: PALETTE.butter, recorded: PALETTE.lavender };
+const SWATCH_W = 14;
 const { width: TEX_W, height: TEX_H, overviewFont } = MONITOR_TEXTURE;
 const { width: FACE_W, height: FACE_H } = MONITOR_FACE;
 const SCREEN_GEOMETRY = new PlaneGeometry(FACE_W, FACE_H);
 const MONITORS = Object.fromEntries(MONITOR_DESKS.map(room => [room, monitorInteraction(room)])) as Record<MonitorDesk, ReturnType<typeof monitorInteraction>>;
 
 function drawScreen(ctx: CanvasRenderingContext2D, screen: MonitorScreen, accent: string, detailed: boolean) {
-  ctx.fillStyle = '#1d2420';
+  ctx.fillStyle = ROLES.screenGlow;
   ctx.fillRect(0, 0, TEX_W, TEX_H);
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, TEX_W, 8);
@@ -26,23 +28,27 @@ function drawScreen(ctx: CanvasRenderingContext2D, screen: MonitorScreen, accent
   if (!detailed) {
     ctx.font = `700 ${overviewFont}px ${PROP_FONT}`;
     monitorOverview(screen).forEach((text, i) => {
-      ctx.fillStyle = i === 1 && screen.status ? STATUS_COLORS[screen.status.key] : '#f2f5ed';
-      ctx.fillText(canvasTextLines(text, measure, TEX_W - 56, 1)[0] ?? '', 20, 86 + i * 144);
+      const status = i === 1 && screen.status;
+      if (status) { ctx.fillStyle = STATUS_COLORS[status.key]; ctx.fillRect(0, 86 + i * 144 - 44, SWATCH_W, 88); }
+      ctx.fillStyle = ROLES.text;
+      ctx.fillText(canvasTextLines(text, measure, TEX_W - 56, 1)[0] ?? '', 20 + (status ? SWATCH_W : 0), 86 + i * 144);
     });
     return;
   }
-  ctx.fillStyle = accent;
+  ctx.fillStyle = ROLES.text;
   ctx.font = `700 44px ${PROP_FONT}`;
   ctx.fillText(canvasTextLines(screen.heading, measure, TEX_W - 56, 1)[0] ?? '', 20, 42);
   ctx.font = `600 36px ${PROP_FONT}`;
   screen.lines.forEach((entry, i) => {
-    ctx.fillStyle = LINE_COLORS[entry.kind];
+    ctx.fillStyle = ROLES.text;
     ctx.fillText(canvasTextLines(entry.text, measure, TEX_W - 56, 1)[0] ?? '', 20, 96 + i * 44);
   });
   if (!screen.status) return;
   ctx.font = `700 40px ${PROP_FONT}`;
   ctx.fillStyle = STATUS_COLORS[screen.status.key];
-  ctx.fillText(screen.status.decision, 20, TEX_H - 28);
+  ctx.fillRect(0, TEX_H - 28 - 24, SWATCH_W, 48);
+  ctx.fillStyle = ROLES.text;
+  ctx.fillText(screen.status.decision, 20 + SWATCH_W, TEX_H - 28);
 }
 
 function Screen({ snapshot, room }: { snapshot: OfficeSnapshot; room: MonitorDesk }) {

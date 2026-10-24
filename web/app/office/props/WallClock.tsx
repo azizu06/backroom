@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { CLOCK_INTERACTION, clockFace, msUntilNextMinute } from '../../../lib/office/props/clock';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
+import { ROLES } from '../../../lib/office/palette';
 
 const RADIUS = 0.65, FACE = RADIUS - 0.04, TEX = 512;
 const FACE_UNITS = 256;
@@ -13,11 +14,11 @@ const MINUTE_LENGTH = FACE * 0.74, HOUR_LENGTH = MINUTE_LENGTH * 0.68;
 function drawFace(ctx: CanvasRenderingContext2D) {
   ctx.scale(TEX / FACE_UNITS, TEX / FACE_UNITS);
   const c = FACE_UNITS / 2;
-  ctx.fillStyle = '#f1ede2';
+  ctx.fillStyle = ROLES.wall;
   ctx.beginPath();
   ctx.arc(c, c, c, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#303d34';
+  ctx.strokeStyle = ROLES.text;
   ctx.lineCap = 'round';
   for (let i = 0; i < 12; i++) {
     if (i % 3 === 0) continue;
@@ -28,7 +29,7 @@ function drawFace(ctx: CanvasRenderingContext2D) {
     ctx.lineTo(c + Math.sin(angle) * (c - 10), c - Math.cos(angle) * (c - 10));
     ctx.stroke();
   }
-  ctx.fillStyle = '#303d34';
+  ctx.fillStyle = ROLES.text;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `700 70px ${PROP_FONT}`;
@@ -38,7 +39,7 @@ function drawFace(ctx: CanvasRenderingContext2D) {
 function Hand({ angle, length, width, z }: { angle: number; length: number; width: number; z: number }) {
   return <group rotation={[0, 0, -angle]} position={[0, 0, z]}>
     <mesh position={[0, length / 2 - HAND_BACK, 0]} receiveShadow>
-      <boxGeometry args={[width, length, 0.012]} /><meshStandardMaterial color='#303d34' />
+      <boxGeometry args={[width, length, 0.012]} /><meshStandardMaterial color={ROLES.text} />
     </mesh>
   </group>;
 }
@@ -55,16 +56,16 @@ function Clock() {
   const texture = useCanvasTexture(TEX, TEX, drawFace, [face.text]);
   return <group name='prop:clock' position={[-7.9, 1.75, 0.6]}>
     <mesh position={[0.26, 0, 0]} receiveShadow>
-      <boxGeometry args={[0.52, 0.08, 0.08]} /><meshStandardMaterial color='#5a6156' />
+      <boxGeometry args={[0.52, 0.08, 0.08]} /><meshStandardMaterial color={ROLES.shadow} />
     </mesh>
     {/* Fixed wall bracket with a tilted face; its normal follows the overview's (13, 15, 17) direction. */}
     <group position={[0.52, 0, 0]} rotation={[-Math.atan2(15, Math.hypot(13, 17)), Math.atan2(13, 17), 0, 'YXZ']}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[RADIUS, RADIUS, 0.08, 32]} /><meshStandardMaterial color='#3c4d47' roughness={0.7} />
+        <cylinderGeometry args={[RADIUS, RADIUS, 0.08, 32]} /><meshStandardMaterial color={ROLES.partition} roughness={0.7} />
       </mesh>
       <mesh position={[0, 0, 0.041]} receiveShadow>
         <circleGeometry args={[FACE, 32]} />
-        <meshStandardMaterial map={texture} emissiveMap={texture} emissive='#ffffff' emissiveIntensity={0.3} roughness={1} />
+        <meshStandardMaterial map={texture} emissiveMap={texture} emissive={ROLES.wall} emissiveIntensity={0.3} roughness={1} />
       </mesh>
       <Hand angle={face.hourAngle} length={HOUR_LENGTH} width={0.035} z={0.05} />
       <Hand angle={face.minuteAngle} length={MINUTE_LENGTH} width={0.022} z={0.058} />
