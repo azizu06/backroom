@@ -31,7 +31,7 @@
       "fixtures/answer-key/frozen-manifest.json": "6ff7132e7792784b833774f1bf02fa79b5b15d59a02d3c18062ca377f65da1e5",
       "fixtures/scenarios/payables.json": "5dfb840adc3286e91df15148b9c698e7e7908294f0ba16bcacd93f36fa9a37d8",
       "fixtures/scenarios/collections.json": "e8411c084e3da3f8a6812ceaeb96d1e565bf3ddb5149933c0923ed567642735a",
-      "docs/eval/pdf-extraction.json": "03867e1033150506131d4390a993615e5ce99cf0ee3946d756f29f3c2511a456"
+      "docs/eval/pdf-extraction.json": "762e09694c6605dcb77c36fb5c84364ffc6248e04c05d8a17e54e709d7ff4e90"
     },
     "keyVersion": "northfield-v1",
     "signoff": {
