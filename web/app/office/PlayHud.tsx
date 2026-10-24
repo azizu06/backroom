@@ -9,6 +9,7 @@ import {
   DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
 import { RoomEntryLabel } from './RoomEntryLabel';
@@ -236,6 +237,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     if (knob.current) knob.current.style.transform = '';
     requestSceneFrame();
   }
+
+  useGamepad({ input, enabled: true, move: !panel, onInteract: panel ? undefined : interact, onExit: panel ? closePanel : onExit });
 
   const prompt = target && !panel ? targetLabel(snapshot, target) : '';
   return <div className='play-hud'>
