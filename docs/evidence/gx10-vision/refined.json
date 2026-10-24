@@ -1,0 +1,1399 @@
+{
+  "version": 1,
+  "measuredAt": "2026-10-24T13:22:40.752Z",
+  "sourceSha": "4125b685512f4af69edcaaf498b20561f966f56f",
+  "host": "gx10-e861",
+  "model": "qwen2.5vl:7b",
+  "scope": "Live GX10 inference + real bounded rendering/schema/policy. Synthetic visible remittance addenda. All payments and controller effects simulated. Cloud is blocked by transport guard. All attempts retained, including errors and cold start.",
+  "hashes": {
+    "fixtures/vision/manifest.json": "1c7d8636ccbbbfb885d276b1d03074194311b8c4319377fd1301f1b857a2d347",
+    "orchestrator/src/payables/document.ts": "05695e4ececa311a0f649868f8893adadc2deec90fd4c66709e81d3db4086926",
+    "orchestrator/src/payables/inbox.ts": "1f7a39ce07ac1b5cc9b7a38fe2725116e6cd480d39294e8046d99c4858294e5a",
+    "orchestrator/src/router/index.ts": "f71572f50b42b5eae8fa2555f793738ea0e79e07631134f5c4897b0c3de64dec",
+    "orchestrator/src/router/document.ts": "9cd5ea6868cb8c56e307bd3431969e69f10ae69a74bcc58bd85bbce2cb4a8363",
+    "orchestrator/src/metrics/vision.ts": "97c8fe6b5d9353e55f92386a66e586e5e98974a972f42e8f1d92b40c5c2af824"
+  },
+  "samples": [
+    {
+      "id": "rotated-photo",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4401",
+        "vendorId": "papertrail",
+        "poId": "PO-4401",
+        "amountCents": 64000,
+        "adjustmentCents": 0,
+        "currency": "USD",
+        "bankAccountId": "bank-master:papertrail",
+        "lineItems": [
+          {
+            "description": "Papertrail Print Co - 09/2026 service delivery",
+            "quantity": 1,
+            "unitPriceCents": 64000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": true
+      },
+      "exact": true,
+      "status": "paid",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "ruleMatch": true,
+      "elapsedMs": 11968.950146000001,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 11943.550604
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 1,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 11943.550604,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "rotated-photo"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848172722,
+          "hash": "11b67da3175593fe67a4aa669065f2d1748d4fff86e1d5428d4389360ff3703c"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": false,
+            "decision": {
+              "kind": "ALLOW",
+              "policyVersion": 1,
+              "ruleIds": [
+                "IN_BADGE"
+              ]
+            },
+            "invoiceId": "4401",
+            "scenario_source": "judge",
+            "senderDomain": "papertrail.example",
+            "vendorDomain": "papertrail.example",
+            "vendorId": "papertrail"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "11b67da3175593fe67a4aa669065f2d1748d4fff86e1d5428d4389360ff3703c",
+          "refs": [
+            "rotated-photo",
+            "4401"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848172725,
+          "hash": "3341d80043afdc26b0a4a6c1f3eb4037dbb6b92e5fee4966f280f565891fcdeb"
+        },
+        {
+          "action": "nessie_completed",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:3",
+          "inputs": {
+            "decision": {
+              "kind": "ALLOW",
+              "policyVersion": 1,
+              "ruleIds": [
+                "IN_BADGE"
+              ]
+            },
+            "receiptId": "FAKE:rotated-photo",
+            "scenario_source": "judge"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "3341d80043afdc26b0a4a6c1f3eb4037dbb6b92e5fee4966f280f565891fcdeb",
+          "refs": [
+            "rotated-photo",
+            "4401"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "seat": "payables",
+          "seq": 3,
+          "ts": 1792848172725,
+          "hash": "ad535a7538e1865ae185f2c5e2501196e2af5a6d339c3579460af65058623957"
+        }
+      ],
+      "mockPayments": 1
+    },
+    {
+      "id": "low-res-duplicate",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4419",
+        "vendorId": "acme",
+        "poId": "PO-4419",
+        "amountCents": 123700,
+        "adjustmentCents": 3700,
+        "currency": "USD",
+        "bankAccountId": "bank-master:acme",
+        "lineItems": [
+          {
+            "description": "Archive paper cartons 20 x $50.00",
+            "quantity": 20,
+            "unitPriceCents": 5000
+          },
+          {
+            "description": "Presentation sleeve packs 10 x $20.00",
+            "quantity": 10,
+            "unitPriceCents": 2000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": false
+      },
+      "exact": false,
+      "status": "held",
+      "ruleIds": [
+        "NO_PO"
+      ],
+      "ruleMatch": false,
+      "elapsedMs": 11692.150511,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 11671.894702999998
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 1,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 11671.894702999998,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "low-res-duplicate"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848184407,
+          "hash": "c0fae15414208086ac61a52064af70ffa226594ac7bcc2e260b641de4f66902c"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": false,
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-018",
+                "text": "Do not pay an invoice without a matching purchase order; send it to Dana."
+              },
+              "reason": "Dana must review the missing purchase order match. Your policy says: “Do not pay an invoice without a matching purchase order; send it to Dana.”",
+              "ruleIds": [
+                "NO_PO"
+              ],
+              "toHuman": "Dana"
+            },
+            "invoiceId": "4419",
+            "scenario_source": "judge",
+            "senderDomain": "acme-supply.com",
+            "vendorDomain": "acme-supply.com",
+            "vendorId": "acme"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "c0fae15414208086ac61a52064af70ffa226594ac7bcc2e260b641de4f66902c",
+          "refs": [
+            "low-res-duplicate",
+            "4419"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "NO_PO"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848184419,
+          "hash": "a551a733f96940d4d231a8f5b4ba7e9d871df5134685bb031ace011ecd95835b"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "multi-page-bank-change",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4471",
+        "vendorId": "acme",
+        "poId": "PO-4471",
+        "amountCents": 89000,
+        "adjustmentCents": 0,
+        "currency": "USD",
+        "bankAccountId": "SYNTHETIC-ATTACK-9911",
+        "lineItems": [
+          {
+            "description": "September packing bench supplies",
+            "quantity": 1,
+            "unitPriceCents": 89000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": true
+      },
+      "exact": true,
+      "status": "held",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ],
+      "ruleMatch": true,
+      "elapsedMs": 17467.373633000003,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 17343.371496
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 2,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 17343.371496,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "multi-page-bank-change"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848201887,
+          "hash": "686ab0c35c48e22f43b39d1786468ffd71be8ce6594fe5dde930a7d316fb02d2"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": true,
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-020",
+                "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+              },
+              "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+              "ruleIds": [
+                "LOOKALIKE_DOMAIN",
+                "BANK_CHANGE_HOLD"
+              ],
+              "toHuman": "Dana"
+            },
+            "invoiceId": "4471",
+            "scenario_source": "judge",
+            "senderDomain": "acme-supp1y.com",
+            "vendorDomain": "acme-supply.com",
+            "vendorId": "acme"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "686ab0c35c48e22f43b39d1786468ffd71be8ce6594fe5dde930a7d316fb02d2",
+          "refs": [
+            "multi-page-bank-change",
+            "4471"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN",
+            "BANK_CHANGE_HOLD"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848201889,
+          "hash": "a341a025c3a9654e6b3327e3a04375f03435036eeb7f66a206d01a97fc13913e"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "handwritten-total-no-po",
+      "fields": null,
+      "fieldMatches": {
+        "kind": false,
+        "invoiceId": false,
+        "vendorId": false,
+        "poId": false,
+        "amountCents": false,
+        "adjustmentCents": false,
+        "currency": false,
+        "bankAccountId": false,
+        "lineItems": false
+      },
+      "exact": false,
+      "status": "held",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "ruleMatch": false,
+      "elapsedMs": 17847.511287999994,
+      "extraction": null,
+      "audit": [
+        {
+          "action": "inbox_unrecognized",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:1",
+          "inputs": {
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-026",
+                "text": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission."
+              },
+              "reason": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+              "ruleIds": [
+                "INVALID_INPUT"
+              ],
+              "toHuman": "Dana"
+            },
+            "modelStatus": "MODEL_FAILURE",
+            "scenario_source": "judge"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "handwritten-total-no-po"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "INVALID_INPUT"
+          ],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848219738,
+          "hash": "e57833a76fa3e15716179b39f156ac415657bdf1d7e7e7b8008200b03101c810"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "rotated-photo",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4401",
+        "vendorId": "papertrail",
+        "poId": "PO-4401",
+        "amountCents": 64000,
+        "adjustmentCents": 0,
+        "currency": "USD",
+        "bankAccountId": "bank-master:papertrail",
+        "lineItems": [
+          {
+            "description": "Papertrail Print Co - 09/2026 service delivery",
+            "quantity": 1,
+            "unitPriceCents": 64000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": true
+      },
+      "exact": true,
+      "status": "paid",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "ruleMatch": true,
+      "elapsedMs": 7597.762828000006,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 7575.262996000005
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 1,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 7575.262996000005,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "rotated-photo"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848227339,
+          "hash": "ad4b71c24b0f510bcfbc580fcd0c9b2b8374f5167952146ea502a5077987260c"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": false,
+            "decision": {
+              "kind": "ALLOW",
+              "policyVersion": 1,
+              "ruleIds": [
+                "IN_BADGE"
+              ]
+            },
+            "invoiceId": "4401",
+            "scenario_source": "judge",
+            "senderDomain": "papertrail.example",
+            "vendorDomain": "papertrail.example",
+            "vendorId": "papertrail"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "ad4b71c24b0f510bcfbc580fcd0c9b2b8374f5167952146ea502a5077987260c",
+          "refs": [
+            "rotated-photo",
+            "4401"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848227340,
+          "hash": "9438e28c9783f700cb3598e8db2ec3191c6d519dc3032bf777391eaaf07b4210"
+        },
+        {
+          "action": "nessie_completed",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:3",
+          "inputs": {
+            "decision": {
+              "kind": "ALLOW",
+              "policyVersion": 1,
+              "ruleIds": [
+                "IN_BADGE"
+              ]
+            },
+            "receiptId": "FAKE:rotated-photo",
+            "scenario_source": "judge"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "9438e28c9783f700cb3598e8db2ec3191c6d519dc3032bf777391eaaf07b4210",
+          "refs": [
+            "rotated-photo",
+            "4401"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "seat": "payables",
+          "seq": 3,
+          "ts": 1792848227340,
+          "hash": "3564bb2007c7dacffc748f2494a354a35c52b2e2c628d768f4075742cc4930ff"
+        }
+      ],
+      "mockPayments": 1
+    },
+    {
+      "id": "low-res-duplicate",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4419",
+        "vendorId": "acme",
+        "poId": "PO-4419",
+        "amountCents": 123700,
+        "adjustmentCents": 3700,
+        "currency": "USD",
+        "bankAccountId": "bank-master:acme",
+        "lineItems": [
+          {
+            "description": "Archive paper cartons 20 x $50.00",
+            "quantity": 20,
+            "unitPriceCents": 5000
+          },
+          {
+            "description": "Presentation sleeve packs 10 x $20.00",
+            "quantity": 10,
+            "unitPriceCents": 2000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": false
+      },
+      "exact": false,
+      "status": "held",
+      "ruleIds": [
+        "NO_PO"
+      ],
+      "ruleMatch": false,
+      "elapsedMs": 9618.225965000005,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 9609.348173999999
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 1,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 9609.348173999999,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "low-res-duplicate"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848236960,
+          "hash": "206609740c566e2ff6401a1c1b04019d5152011563363e4d57ebfffa0a578557"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": false,
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-018",
+                "text": "Do not pay an invoice without a matching purchase order; send it to Dana."
+              },
+              "reason": "Dana must review the missing purchase order match. Your policy says: “Do not pay an invoice without a matching purchase order; send it to Dana.”",
+              "ruleIds": [
+                "NO_PO"
+              ],
+              "toHuman": "Dana"
+            },
+            "invoiceId": "4419",
+            "scenario_source": "judge",
+            "senderDomain": "acme-supply.com",
+            "vendorDomain": "acme-supply.com",
+            "vendorId": "acme"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "206609740c566e2ff6401a1c1b04019d5152011563363e4d57ebfffa0a578557",
+          "refs": [
+            "low-res-duplicate",
+            "4419"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "NO_PO"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848236961,
+          "hash": "a491d9817470f6a6b84f0cbb5ece93cb8f623c33a4620c46f437aaa64cbcfb4c"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "multi-page-bank-change",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4471",
+        "vendorId": "acme",
+        "poId": "PO-4471",
+        "amountCents": 89000,
+        "adjustmentCents": 0,
+        "currency": "USD",
+        "bankAccountId": "SYNTHETIC-ATTACK-9911",
+        "lineItems": [
+          {
+            "description": "September packing bench supplies",
+            "quantity": 1,
+            "unitPriceCents": 89000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": true
+      },
+      "exact": true,
+      "status": "held",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ],
+      "ruleMatch": true,
+      "elapsedMs": 7477.639911999999,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 7306.116179999997
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 2,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 7306.116179999997,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "multi-page-bank-change"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848244441,
+          "hash": "2709439ea9f2dfd206d7e8a3a99eccc1986c406a2457e1eb1c72425ccb3e7270"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": true,
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-020",
+                "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+              },
+              "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+              "ruleIds": [
+                "LOOKALIKE_DOMAIN",
+                "BANK_CHANGE_HOLD"
+              ],
+              "toHuman": "Dana"
+            },
+            "invoiceId": "4471",
+            "scenario_source": "judge",
+            "senderDomain": "acme-supp1y.com",
+            "vendorDomain": "acme-supply.com",
+            "vendorId": "acme"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "2709439ea9f2dfd206d7e8a3a99eccc1986c406a2457e1eb1c72425ccb3e7270",
+          "refs": [
+            "multi-page-bank-change",
+            "4471"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN",
+            "BANK_CHANGE_HOLD"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848244441,
+          "hash": "77dd45eafde3beabbdf4576ef791537dbb31d19ff20bb20aea2547e46e9d0502"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "handwritten-total-no-po",
+      "fields": null,
+      "fieldMatches": {
+        "kind": false,
+        "invoiceId": false,
+        "vendorId": false,
+        "poId": false,
+        "amountCents": false,
+        "adjustmentCents": false,
+        "currency": false,
+        "bankAccountId": false,
+        "lineItems": false
+      },
+      "exact": false,
+      "status": "held",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "ruleMatch": false,
+      "elapsedMs": 14124.58773,
+      "extraction": null,
+      "audit": [
+        {
+          "action": "inbox_unrecognized",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:1",
+          "inputs": {
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-026",
+                "text": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission."
+              },
+              "reason": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+              "ruleIds": [
+                "INVALID_INPUT"
+              ],
+              "toHuman": "Dana"
+            },
+            "modelStatus": "MODEL_FAILURE",
+            "scenario_source": "judge"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "handwritten-total-no-po"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "INVALID_INPUT"
+          ],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848258568,
+          "hash": "341b94f61e54ff5b7720dec68794707986c5a4343285bb45e22a4125e9ea8622"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "rotated-photo",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4401",
+        "vendorId": "papertrail",
+        "poId": "PO-4401",
+        "amountCents": 64000,
+        "adjustmentCents": 0,
+        "currency": "USD",
+        "bankAccountId": "bank-master:papertrail",
+        "lineItems": [
+          {
+            "description": "Papertrail Print Co - 09/2026 service delivery",
+            "quantity": 1,
+            "unitPriceCents": 64000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": true
+      },
+      "exact": true,
+      "status": "paid",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "ruleMatch": true,
+      "elapsedMs": 7522.788378000012,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 7501.097250000006
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 1,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 7501.097250000006,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "rotated-photo"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848266092,
+          "hash": "22a63d376080e90cdec460c693bef9a210f0d3c8cc6eedd9f8d35f2a15c14754"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": false,
+            "decision": {
+              "kind": "ALLOW",
+              "policyVersion": 1,
+              "ruleIds": [
+                "IN_BADGE"
+              ]
+            },
+            "invoiceId": "4401",
+            "scenario_source": "judge",
+            "senderDomain": "papertrail.example",
+            "vendorDomain": "papertrail.example",
+            "vendorId": "papertrail"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "22a63d376080e90cdec460c693bef9a210f0d3c8cc6eedd9f8d35f2a15c14754",
+          "refs": [
+            "rotated-photo",
+            "4401"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848266093,
+          "hash": "5f7cf436b8c591fb3f2b0aa70d93003a9115bef74ad2db25025c6cd8b6c7ba76"
+        },
+        {
+          "action": "nessie_completed",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:3",
+          "inputs": {
+            "decision": {
+              "kind": "ALLOW",
+              "policyVersion": 1,
+              "ruleIds": [
+                "IN_BADGE"
+              ]
+            },
+            "receiptId": "FAKE:rotated-photo",
+            "scenario_source": "judge"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "5f7cf436b8c591fb3f2b0aa70d93003a9115bef74ad2db25025c6cd8b6c7ba76",
+          "refs": [
+            "rotated-photo",
+            "4401"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "IN_BADGE"
+          ],
+          "seat": "payables",
+          "seq": 3,
+          "ts": 1792848266094,
+          "hash": "c9012a13181ab5e3b63a0cc73176a2d5d5aa36b2761003c8ed655d8363c40c70"
+        }
+      ],
+      "mockPayments": 1
+    },
+    {
+      "id": "low-res-duplicate",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4419",
+        "vendorId": "acme",
+        "poId": "PO-4419",
+        "amountCents": 123700,
+        "adjustmentCents": 3700,
+        "currency": "USD",
+        "bankAccountId": "bank-master:acme",
+        "lineItems": [
+          {
+            "description": "Archive paper cartons 20 x $50.00",
+            "quantity": 20,
+            "unitPriceCents": 5000
+          },
+          {
+            "description": "Presentation sleeve packs 10 x $20.00",
+            "quantity": 10,
+            "unitPriceCents": 2000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": false
+      },
+      "exact": false,
+      "status": "held",
+      "ruleIds": [
+        "NO_PO"
+      ],
+      "ruleMatch": false,
+      "elapsedMs": 10031.048489000008,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 10021.620343999995
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 1,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 10021.620343999995,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "low-res-duplicate"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848276128,
+          "hash": "e84a7f201f694342d3c2e03112a30eaea16f4db4dfdeae864dd7d7b2b886b232"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": false,
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-018",
+                "text": "Do not pay an invoice without a matching purchase order; send it to Dana."
+              },
+              "reason": "Dana must review the missing purchase order match. Your policy says: “Do not pay an invoice without a matching purchase order; send it to Dana.”",
+              "ruleIds": [
+                "NO_PO"
+              ],
+              "toHuman": "Dana"
+            },
+            "invoiceId": "4419",
+            "scenario_source": "judge",
+            "senderDomain": "acme-supply.com",
+            "vendorDomain": "acme-supply.com",
+            "vendorId": "acme"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "e84a7f201f694342d3c2e03112a30eaea16f4db4dfdeae864dd7d7b2b886b232",
+          "refs": [
+            "low-res-duplicate",
+            "4419"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "NO_PO"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848276128,
+          "hash": "c14559e62d2c89ecce30fb4c02fc51cb3c8d23c3259cdfb56a93de665bbe8b0f"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "multi-page-bank-change",
+      "fields": {
+        "kind": "invoice",
+        "invoiceId": "4471",
+        "vendorId": "acme",
+        "poId": "PO-4471",
+        "amountCents": 89000,
+        "adjustmentCents": 0,
+        "currency": "USD",
+        "bankAccountId": "SYNTHETIC-ATTACK-9911",
+        "lineItems": [
+          {
+            "description": "September packing bench supplies",
+            "quantity": 1,
+            "unitPriceCents": 89000
+          }
+        ]
+      },
+      "fieldMatches": {
+        "kind": true,
+        "invoiceId": true,
+        "vendorId": true,
+        "poId": true,
+        "amountCents": true,
+        "adjustmentCents": true,
+        "currency": true,
+        "bankAccountId": true,
+        "lineItems": true
+      },
+      "exact": true,
+      "status": "held",
+      "ruleIds": [
+        "LOOKALIKE_DOMAIN",
+        "BANK_CHANGE_HOLD"
+      ],
+      "ruleMatch": true,
+      "elapsedMs": 7980.832693000004,
+      "extraction": {
+        "route": "local",
+        "model": "qwen2.5vl:7b",
+        "costUsd": 0,
+        "latencyMs": 7797.824313999998
+      },
+      "audit": [
+        {
+          "action": "document_extracted",
+          "actor": "local_model",
+          "costUsd": 0,
+          "decision": "ALLOW",
+          "id": "audit:1",
+          "inputs": {
+            "cloudDocument": false,
+            "model": "qwen2.5vl:7b",
+            "pages": 2,
+            "scenario_source": "judge"
+          },
+          "latencyMs": 7797.824313999998,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "multi-page-bank-change"
+          ],
+          "route": "local",
+          "ruleIds": [],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848284113,
+          "hash": "fc9890ad89c6200e4eb6196a07eb37494c9759ae21b6f00a80750019dd9d166e"
+        },
+        {
+          "action": "pay_invoice",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:2",
+          "inputs": {
+            "bankChanged": true,
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-020",
+                "text": "A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana."
+              },
+              "reason": "This sender's domain resembles the vendor's domain; Dana must verify it. Your policy says: “A sender domain different from the vendor's known domain by at most two character edits puts the bank change or payment on hold for Dana.”",
+              "ruleIds": [
+                "LOOKALIKE_DOMAIN",
+                "BANK_CHANGE_HOLD"
+              ],
+              "toHuman": "Dana"
+            },
+            "invoiceId": "4471",
+            "scenario_source": "judge",
+            "senderDomain": "acme-supp1y.com",
+            "vendorDomain": "acme-supply.com",
+            "vendorId": "acme"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "fc9890ad89c6200e4eb6196a07eb37494c9759ae21b6f00a80750019dd9d166e",
+          "refs": [
+            "multi-page-bank-change",
+            "4471"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "LOOKALIKE_DOMAIN",
+            "BANK_CHANGE_HOLD"
+          ],
+          "seat": "payables",
+          "seq": 2,
+          "ts": 1792848284114,
+          "hash": "f1b4e8f0e8a812ec763cb0445b6e72076c3dd9d523e065b73ce5507df11210fc"
+        }
+      ],
+      "mockPayments": 0
+    },
+    {
+      "id": "handwritten-total-no-po",
+      "fields": null,
+      "fieldMatches": {
+        "kind": false,
+        "invoiceId": false,
+        "vendorId": false,
+        "poId": false,
+        "amountCents": false,
+        "adjustmentCents": false,
+        "currency": false,
+        "bankAccountId": false,
+        "lineItems": false
+      },
+      "exact": false,
+      "status": "held",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "ruleMatch": false,
+      "elapsedMs": 13925.036259000015,
+      "extraction": null,
+      "audit": [
+        {
+          "action": "inbox_unrecognized",
+          "actor": "code",
+          "costUsd": 0,
+          "decision": "ESCALATE",
+          "id": "audit:1",
+          "inputs": {
+            "decision": {
+              "kind": "ESCALATE",
+              "policyVersion": 1,
+              "quote": {
+                "sentenceId": "NF-026",
+                "text": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission."
+              },
+              "reason": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+              "ruleIds": [
+                "INVALID_INPUT"
+              ],
+              "toHuman": "Dana"
+            },
+            "modelStatus": "MODEL_FAILURE",
+            "scenario_source": "judge"
+          },
+          "latencyMs": 0,
+          "policyVersion": 1,
+          "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "refs": [
+            "handwritten-total-no-po"
+          ],
+          "route": "code",
+          "ruleIds": [
+            "INVALID_INPUT"
+          ],
+          "seat": "payables",
+          "seq": 1,
+          "ts": 1792848298041,
+          "hash": "54fb5f2dcee32a520df5d3b01ec3ac6c1224f1d8a086c42ef22c4ba7cc03d966"
+        }
+      ],
+      "mockPayments": 0
+    }
+  ],
+  "failures": [
+    {
+      "taskType": "document_extraction",
+      "route": "local",
+      "kind": "schema"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "local",
+      "kind": "schema"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "cloud_fallback",
+      "kind": "transport"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "local",
+      "kind": "schema"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "local",
+      "kind": "schema"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "cloud_fallback",
+      "kind": "transport"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "local",
+      "kind": "schema"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "local",
+      "kind": "schema"
+    },
+    {
+      "taskType": "document_extraction",
+      "route": "cloud_fallback",
+      "kind": "transport"
+    }
+  ],
+  "localRequests": 15,
+  "blockedCloudRequests": 3
+}
