@@ -1,3 +1,5 @@
+import type { ServiceProbe } from './demo-probes';
+
 export type ServiceId = 'phone' | 'claude' | 'gx10' | 'apify' | 'policy' | 'spacetime';
 export type DisclosureItem = {
   id: ServiceId | 'crs' | 'nessie' | 'company' | 'card';
@@ -7,20 +9,20 @@ export type DisclosureItem = {
 };
 
 export const disclosureItems = [
-  { id: 'phone', kind: 'real', label: 'Phone call', description: 'A real voice connection through Cartesia. Connection status is not yet reported here.' },
-  { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments; provider availability is not yet reported here.' },
-  { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Status comes from the model router in this server process.' },
-  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Run status is not yet reported here.' },
-  { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Enforcement is independent of this view.' },
-  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Connection status is not yet reported here.' },
+  { id: 'phone', kind: 'real', label: 'Phone call', description: 'A real voice connection through Cartesia. Verified from the latest voice webhook receipt written by the call receiver.' },
+  { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments. Verified from a committed route receipt plus a credential present in this process; no paid call is made per page load.' },
+  { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
+  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt.' },
+  { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
+  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live SpacetimeDB database probe, or shown as a fixture when the in-memory store is used.' },
   { id: 'crs', kind: 'sandbox', label: 'CRS test identities', description: 'Sandbox identities only; no real customer credit reports.' },
   { id: 'nessie', kind: 'sandbox', label: 'Nessie bank', description: 'Sandbox bank accounts and transactions; no real money moves.' },
   { id: 'company', kind: 'sandbox', label: 'Company, vendors & emails', description: 'Northfield Studio and its business records are fictional demo fixtures.' },
   { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'Simulated card payment; the demo creates a sandbox Nessie deposit.' },
 ] as const satisfies readonly DisclosureItem[];
 
-/** Services /api/demo-status observes in this server process. Everything else is never probed here. */
-export const probedServices = ['gx10'] as const satisfies readonly ServiceId[];
+/** Services /api/demo-status reports evidence for. Any id it lists in `notProbed` is shown as NOT_PROBED_LABEL. */
+export const probedServices = ['phone', 'claude', 'gx10', 'apify', 'policy', 'spacetime'] as const satisfies readonly ServiceId[];
 export const unprobedServices = disclosureItems
   .filter(item => item.kind === 'real' && !(probedServices as readonly string[]).includes(item.id))
   .map(item => item.id as ServiceId);
@@ -49,25 +51,52 @@ export type DemoStatus = {
     localAvailable: boolean;
     checkedAt: string | null;
   } | null;
+  probesCheckedAt?: string | null;
+  services?: Partial<Record<ServiceId, ServiceProbe>>;
 };
-export type DisclosureStatus = { label: string; tone: 'neutral' | 'good' | 'warning' };
+export type DisclosureStatus = { label: string; tone: 'neutral' | 'good' | 'warning'; detail?: string };
+
+/** Live observations older than this are no longer claimed as Verified. */
+export const LIVE_PROBE_MAX_AGE_MS = 120_000;
+const STATUS_MAX_AGE_MS = 30_000;
+// Fixed UTC formatting so server and client renders agree.
+const receiptTime = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const liveTime = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+
+function probeStatus(probe: ServiceProbe, now: number): DisclosureStatus {
+  const unverified: DisclosureStatus = { label: 'Unverified', tone: 'neutral' };
+  switch (probe.state) {
+    case 'verified': {
+      const at = Date.parse(probe.at ?? '');
+      if (!Number.isFinite(at)) return unverified;
+      if (probe.source === 'live' && Math.abs(now - at) > LIVE_PROBE_MAX_AGE_MS) return unverified;
+      const time = `${(probe.source === 'live' ? liveTime : receiptTime).format(at)} UTC`;
+      return { label: 'Verified', tone: 'good', detail: `${probe.evidence} · ${time}` };
+    }
+    case 'simulated': return { label: 'Simulated', tone: 'neutral', detail: probe.evidence };
+    case 'unreachable': return { label: 'Unreachable', tone: 'warning', detail: probe.evidence };
+    case 'disabled': return { label: 'Disabled', tone: 'warning', detail: probe.evidence };
+    case 'unverified': return { label: 'Unverified', tone: 'neutral', detail: probe.evidence };
+    default: return unverified;
+  }
+}
 
 export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | null, now = Date.now()): DisclosureStatus {
   if (item.kind === 'sandbox') return { label: 'Simulated', tone: 'neutral' };
-  const probed = (probedServices as readonly string[]).includes(item.id);
-  const notProbed: DisclosureStatus = { label: NOT_PROBED_LABEL, tone: 'neutral' };
+  const unverified: DisclosureStatus = { label: 'Unverified', tone: 'neutral' };
   // Do not retain an ON/online claim after a disconnected or stalled status poll.
-  if (!status || !Number.isFinite(Date.parse(status.measuredAt)) || now - Date.parse(status.measuredAt) > 30_000) {
-    return probed ? { label: 'Unverified', tone: 'neutral' } : notProbed;
-  }
+  if (!status || !Number.isFinite(Date.parse(status.measuredAt)) || now - Date.parse(status.measuredAt) > STATUS_MAX_AGE_MS) return unverified;
   if (['phone', 'claude', 'gx10'].includes(item.id) && !status.llmEnabled) return { label: 'LLM OFF', tone: 'warning' };
-  if (!probed) return notProbed;
-  if (item.id === 'gx10' && status.gx10) {
+  const id = item.id as ServiceId;
+  if (status.notProbed?.includes(id)) return { label: NOT_PROBED_LABEL, tone: 'neutral' };
+  const probe = status.services?.[id];
+  if (probe) return probeStatus(probe, now);
+  if (id === 'gx10' && status.gx10) {
     if (!status.gx10.localEnabled) return { label: 'Disabled', tone: 'warning' };
     const checkedAt = Date.parse(status.gx10.checkedAt ?? '');
-    if (Number.isFinite(checkedAt) && now - checkedAt <= 30_000) {
+    if (Number.isFinite(checkedAt) && now - checkedAt <= STATUS_MAX_AGE_MS) {
       return status.gx10.localAvailable ? { label: 'Online', tone: 'good' } : { label: 'Offline', tone: 'warning' };
     }
   }
-  return { label: 'Unverified', tone: 'neutral' };
+  return unverified;
 }
