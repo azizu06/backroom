@@ -8,6 +8,8 @@ function deepFreeze<T>(value: T): T {
   }
   return value;
 }
+/** Northfield bank-change risk threshold (NF-028); models cannot override it. */
+export const CRS_FRAUD_RISK_THRESHOLD = 70;
 export const DEFAULT_POLICY: Policy = deepFreeze(northfield);
 
 /** Pure save: use the previous persisted version, never a caller-supplied draft version. */

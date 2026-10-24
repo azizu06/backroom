@@ -58,3 +58,5 @@ remain historical defaults when Dana saves a new version.
 [NF-026] Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.
 
 [NF-027] The first payment link must equal the code-computed first installment of the invoice principal and non-waived late fees after any permitted principal discount.
+
+[NF-028] A CRS fraud risk score of 70 or higher puts bank changes and payments on hold for Dana; a lower score never approves a bank change.
