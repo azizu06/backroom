@@ -49,9 +49,75 @@ describe('call state', () => {
       .mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(Response.json({ call: null }));
     const states: string[] = [];
     const stop = pollCallFeed(state => states.push(state.status), 1000);
-    await vi.advanceTimersByTimeAsync(2500);
+    await vi.advanceTimersByTimeAsync(3500);
     stop();
     expect(states).toEqual(['live', 'idle']);
+  });
+  it('backs off after a 503 and drops a ringing call to idle after repeated failures', async () => {
+    vi.useFakeTimers();
+    const unavailable = () => new Response(JSON.stringify({ error: 'CALL_FEED_UNAVAILABLE' }), { status: 503 });
+    const fetch = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(Response.json({ call: { callId: 'call-1', status: 'ringing', direction: 'outbound', transcript: [] } }))
+      .mockImplementation(async () => unavailable());
+    const states: string[] = [];
+    const stop = pollCallFeed(state => states.push(state.status), 1000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(states).toEqual(['ringing']);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(states).toEqual(['ringing']);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(states).toEqual(['ringing', 'idle']);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    const settled = fetch.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(7999);
+    expect(fetch.mock.calls.length).toBe(settled);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch.mock.calls.length).toBe(settled + 1);
+    stop();
+  });
+  it('pauses while the tab is hidden and polls again when it becomes visible', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ call: null }));
+    let visibilityState = 'visible';
+    const listeners = new Set<() => void>();
+    vi.stubGlobal('document', {
+      get visibilityState() { return visibilityState; },
+      addEventListener(_type: string, listener: () => void) { listeners.add(listener); },
+      removeEventListener(_type: string, listener: () => void) { listeners.delete(listener); },
+    });
+    const stop = pollCallFeed(() => {}, 1000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    visibilityState = 'hidden';
+    listeners.forEach(listener => listener());
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    visibilityState = 'visible';
+    listeners.forEach(listener => listener());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    stop();
+    expect(listeners.size).toBe(0);
+    vi.unstubAllGlobals();
+  });
+  it('stops polling when the last subscriber unsubscribes', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ call: null }));
+    vi.stubGlobal('window', { location: { search: '' } });
+    const unsubscribe = callStore.subscribe(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch.mock.calls.length).toBeGreaterThan(0);
+    const settled = fetch.mock.calls.length;
+    unsubscribe();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetch.mock.calls.length).toBe(settled);
+    expect(callStore.getSnapshot()).toEqual(IDLE_CALL);
+    vi.unstubAllGlobals();
   });
   it('runs mock calls in ringing, live, ended, idle order', () => {
     vi.useFakeTimers();

@@ -31,7 +31,8 @@ or any audit is `live` (10 min cap); `call_completed`/`call_failed` or a stopped
 gateway status (opt-out, dispute, human, already paid) is `ended`, hidden 2 min
 after the end. The transcript is code decisions from gateway audits, never speech:
 identity result, `propose_plan → DENY FEES_NON_WAIVABLE`, `ESCALATE … → Dana`,
-Dana's passkey result from the StateStore, link queued. Amounts read `$•••` until
+Dana's passkey result from the StateStore, link queued. Amounts read `$•••`, and
+plan terms such as installments, a waived fee, or a discount percent stay hidden, until
 identity is confirmed. Rows never include the phone number, contact name, payment
 link path or code, or the raw session id. State is process-local, like the gateway.
 

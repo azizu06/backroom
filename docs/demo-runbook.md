@@ -7,6 +7,56 @@ The office subscribes to the selected StateStore in SpacetimeDB mode; memory
 mode retains its labeled preview. The optional voice relay forwards tools to the
 web host's gateway; external sponsor checks remain separate. Keep the rehearsal banner visible.
 
+## In-app operator console and external-action inventory
+
+After starting the owned host once, open **Operator** in the office toolbar (or
+Play HUD), at `http://127.0.0.1:<DEMO_PORT>/operator`. Press **Unlock local
+operator session**. The host checks the socket, exact numeric loopback Host and
+Origin before minting an eight-hour HttpOnly, SameSite=Strict cookie using its
+server-held `DEMO_CONTROL_SECRET`. No control key is sent to the browser.
+The public tunnel cannot unlock this console. For a remote host, an operator
+may use a private SSH forward with the **same local and remote demo port**;
+do not expose the private supervisor port. This is host operation authority,
+not controller approval authority. `/controller` and approval pages still use
+their own passkey checks. A normal `next dev` server cannot unlock the console.
+
+All console actions require the configured host origin and operator session,
+accept no arbitrary commands or arguments, serialize against each other (OFF
+remains available to abort model work), and
+record started/completed/failed receipts in the canonical audit chain. Reset
+uses the **same private supervisor endpoint as `demo:reset`**, including fresh
+publish and seed; its completion receipt goes into the replacement state.
+Reset does not reverse sandbox money or clear persisted voice stops. Reload
+the office and refresh demo links after resetting; old links are stale.
+
+Inventory checked against this runbook, `tools/demo/cli.ts`, package scripts and
+spec §6. CLI commands remain available. Coverage and deliberate exclusions:
+
+| External action before this change | In-app coverage / reason to retain outside setup |
+| --- | --- |
+| `demo:up`, `demo:down`, build/install, tunnels, voice relay/attack-server startup | Retained as host bootstrap/recovery: a stopped app cannot start itself; process lifecycle belongs to the owned supervisor. Attack startup is another worker's task. |
+| `demo:up:gx10`, `demo:down:gx10`, SSH deploy, warm Mac provisioning, callback rebinding / host failover | Retained as deployment operations, never browser-driven shared infrastructure changes. Keep a prepared fallback URL. |
+| `demo:reset`, local `state:seed`, fresh approval/pay URLs | **Reset company** and **Refresh demo links**. Reset owns publish + seed + gateway setup. No separate seed button against a live database. Maincloud reset stays rejected by the existing supervisor. |
+| `demo:health [--live]`, `demo:health:gx10 --live`, `demo:preflight` | **Check dependencies** / **Run preflight**, using the same functions and running host's adapters. Probe results are reachability, not call/inference/payment proof. |
+| `demo:core` offline scenarios | **Run core scenarios**, the same CLI in an isolated memory process; output shown in console, not projected as live office state. |
+| `eval:run` scripted run | **Run scripted eval**, same CLI, no GX10 persona or graded/signoff override. Software authenticators and fake transports are labeled. |
+| `metrics`, agent `scoreboard.ts` generation shown to judges | **Run offline metrics** / **Run agent scoreboard**, same CLIs; private per-run output directory, no overwrite of checked-in reports. Historical evidence keeps its dates and gaps. |
+| `demo:burst --plan`, GX10 month burst | **Preview month burst** (25 companies, no models); **Run small GX10 burst** (one company/item/worker). Full 25-company live runs remain CLI-only to bound shared GPU work. |
+| GX10 model warm-up and global LLM toggle | **Warm GX10 model**, **Enable models**, **Turn models OFF**. Warm/burst require server `BACKROOM_OPERATOR_LOCAL_MODELS=1` and LLM ON; OFF aborts them. One-token warm-up never falls back to cloud. Host/model installation stays setup. |
+| Pre-call company/credit refresh, consent and phone dial | Link to **Office · Request call**; owned by the call-button worker. Host pre-call evidence remains one-shot to avoid rebilling Apify; console health does not refresh it or manufacture consent/dial authority. |
+| Judge inbox / invoice submission and frozen trap runs | Link to existing **Judge inbox** form; raw submissions still traverse `/api/inbox`, policy and audit. No second intake pipeline. |
+| Controller enrollment, phone inbox and approve/deny | Link to **Controller inbox**; owned by the controller worker. Each approval stays bound to a passkey and its original expiry. |
+| Payment-link creation and pay/reconcile | **Refresh demo links** exposes seeded gateway links; **Authorized call payment** reuses the existing active-link/QR component. Actual link generation stays in the policy gateway; payment stays on its existing page. |
+| Attack-demo triggers | Link to existing **Attack demo** page, whose server is started by the other worker. The console does not bypass its live/mock controls. |
+| Policy edits, audit unlock, cited ask-why, replay and real-vs-sim disclosure | Links to existing app views. Their own authorization and provenance labels remain in force. |
+| `demo:live --confirm-sandbox`, live vision/inbox benchmarks, measurements, `state:live`, `demo:parity`, automated rehearsals / recordings | Retained as engineering evidence tools: can provision databases, write receipts or contact services; not needed to operate the judge-facing app. No browser sandbox-deposit or software-passkey shortcut. |
+
+Offline scenario/eval/report processes receive no sponsor/cloud/voice credentials
+and cannot replace the running host's globals. Results are synthetic evidence,
+not a live call, real human approval or settlement receipt. The console neither
+dials nor approves nor creates a bank instruction. No provider/model warm-up or
+outbound call is needed to validate the console.
+
 ## Table-side recovery card
 
 Start on the Mac first; bring the owned state server up before the web/orchestrator
@@ -257,7 +307,8 @@ smoke command is documented in `docs/t1-cartesia.md`.
 
 Assign people before the take: **presenter**, **Dana**, **demo operator**,
 **network/backup operator**. Any teammate may fill each role; do not assume whose
-phone holds the passkey. Run `demo:reset` immediately before the opening.
+phone holds the passkey. Use **Operator → Reset company** immediately before the
+opening (or the retained `demo:reset` CLI), refresh demo links and reload the office.
 
 | Time | Speaker / operator | Action and claim |
 | --- | --- | --- |
@@ -266,7 +317,7 @@ phone holds the passkey. Run `demo:reset` immediately before the opening.
 | 0:45–1:15 | Demo operator; presenter | Open the printed pay URL, press Pay with simulated card, then show `partially_paid` and the exact-match reconciliation audit. “The real policy, SDK and reducer path ran over an in-memory mock HTTP transport.” No card data and no real money. |
 | 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Open the printed `/attack` URL for the hostile-document proof (mock by default; assessment only, no payment). Use the frozen #4419 or #4471 preset for the inbox trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
 | 1:45–2:15 | Presenter; audit operator | On `/audit`, select a cited event and ask why. LLM defaults OFF, so this is a cited deterministic answer. Show saved policy text and code/human attribution. Do not claim cloud narration was exercised. |
-| 2:15–2:45 | Network operator; presenter | Show `pnpm demo:health` and `/real-vs-sim`. Separate configured key, reachable API, routed model call, and actual call/deposit receipts. Red means unavailable or unverified; say it plainly. |
+| 2:15–2:45 | Network operator; presenter | Show Operator → Check dependencies and `/real-vs-sim`. Separate configured key, reachable API, routed model call, and actual call/deposit receipts. Red means unavailable or unverified; say it plainly. |
 | 2:45–3:00 | Presenter | “The renderer is a view. Code owns the money and the record; a passkey owns approvals.” State that the phone → Dana → pay loop is wired and the live phone receipt is still pending A0; invite policy Q&A. Report only actual eval receipt numbers. |
 
 The target §6.2 sequence is live consent/company intake → judge call → Dana

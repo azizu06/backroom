@@ -35,7 +35,7 @@ const shownApproval = (view: EscalationView): EscalationView['status'] =>
 
 /**
  * Read-only desk-phone view of one live voice call. The transcript is code decisions from the
- * gateway audit, never speech. Amounts stay masked until the caller's identity is confirmed.
+ * gateway audit, never speech. Amounts and plan terms stay masked until the caller's identity is confirmed.
  * Never includes the phone number, contact name, payment link path or code, or the session id.
  */
 export function projectVoiceCall(call: GatewayCall, lifecycle: VoiceCallLifecycle = {},
@@ -51,7 +51,7 @@ export function projectVoiceCall(call: GatewayCall, lifecycle: VoiceCallLifecycl
   let escalations = 0, links = 0;
   call.audits.forEach((audit, index) => {
     const verdict = `${audit.action} → ${audit.kind}${audit.ruleIds.length ? ` ${audit.ruleIds.join(', ')}` : ''}`;
-    const terms = audit.plan ? `${audit.plan.installments} payment${audit.plan.installments === 1 ? '' : 's'}`
+    const terms = call.identityConfirmed && audit.plan ? `${audit.plan.installments} payment${audit.plan.installments === 1 ? '' : 's'}`
       + `${audit.plan.waiveFee ? ', fee waived' : ''}${audit.plan.discountPct ? `, ${audit.plan.discountPct}% off` : ''}` : '';
     if (audit.action === 'verify_identity_result') {
       say(audit.id, index !== lastIdentity ? 'Identity check recorded'

@@ -8,6 +8,7 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: {
     code: 'ABCDEF1234', url: 'https://demo.example/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr: PIXEL,
+    bankLine: 'Mock bank (offline) · simulated card',
   } } }));
   await page.goto('/office');
   const kiosk = page.locator("[data-office-mount='payment-link']");
@@ -17,6 +18,7 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
   await expect(kiosk.getByRole('link', { name: 'https://demo.example/p/ABCDEF1234' })).toHaveAttribute('href', 'https://demo.example/p/ABCDEF1234');
   await expect(kiosk.getByRole('img', { name: 'Scan to open your authorized payment page' })).toBeVisible();
   await expect(kiosk).toContainText('$2,475.00');
+  await expect(kiosk.getByText('Mock bank (offline) · simulated card', { exact: true })).toBeVisible();
   // Phone width: the kiosk and its QR fit the viewport instead of forcing horizontal scroll.
   await page.setViewportSize({ width: 360, height: 800 });
   const card = await kiosk.boundingBox();
