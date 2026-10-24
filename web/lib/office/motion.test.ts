@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { WalkMotion } from "./motion";
+import { MotionRegistry, WalkMotion } from "./motion";
+import type { AnchorId } from "./state";
 import { createMockOfficeState } from "./preview";
 
 describe("office row → view contract", () => {
@@ -51,5 +52,91 @@ describe("office row → view contract", () => {
     expect(Math.hypot(walk.position[0] - before[0]!, walk.position[1] - before[1]!)).toBeLessThanOrEqual(0.24 + 1e-6);
     for (let frame = 0; frame < 360; frame += 1) walk.advance(1 / 60);
     expect(walk.position).toEqual([-5, -1.8]);
+  });
+});
+
+describe("unknown anchors from live rows", () => {
+  it("treats moveTo with an unknown anchor as a no-op that leaves the agent standing", () => {
+    const walk = new WalkMotion([-5, -1.8]);
+    expect(() => walk.moveTo("Dana_desk")).not.toThrow();
+    expect(walk.moving).toBe(false);
+    walk.advance(1);
+    expect(walk.position).toEqual([-5, -1.8]);
+    for (const anchor of ["", "constructor", "__proto__", "toString"]) expect(() => walk.moveTo(anchor)).not.toThrow();
+    expect(walk.position).toEqual([-5, -1.8]);
+    expect(walk.moving).toBe(false);
+  });
+
+  it("does not throw when the registry syncs a row with an unknown anchor", () => {
+    const registry = new MotionRegistry();
+    const agent = { id: "live-1", pos: [0, -1.8] as const, targetAnchor: "Dana_desk" as AnchorId };
+    expect(() => registry.sync([agent])).not.toThrow();
+    expect(registry.get(agent).position).toEqual([0, -1.8]);
+    expect(registry.moving).toBe(false);
+  });
+});
+
+describe("shared motion registry", () => {
+  const alex = { id: "collections-clerk", pos: [-5, -1.8] as const, targetAnchor: "collections" as AnchorId };
+
+  it("returns one WalkMotion per agent so position persists across a view switch", () => {
+    const registry = new MotionRegistry();
+    registry.sync([alex]);
+    const planView = registry.get(alex);
+    registry.sync([{ ...alex, targetAnchor: "dana" }]);
+    expect(planView.moving).toBe(true);
+    for (let frame = 0; frame < 90; frame += 1) planView.advance(1 / 60);
+    const midWalk = [...planView.position];
+    expect(midWalk).not.toEqual([-5, -1.8]);
+
+    // The 3D scene mounts and asks for the same agent: it must continue, not restart.
+    const sceneView = registry.get({ ...alex, pos: [-5, -1.8] });
+    expect(sceneView).toBe(planView);
+    expect(sceneView.position).toEqual(midWalk);
+    registry.sync([{ ...alex, targetAnchor: "dana" }]);
+    expect(sceneView.position).toEqual(midWalk);
+    expect(sceneView.moving).toBe(true);
+    for (let frame = 0; frame < 360; frame += 1) sceneView.advance(1 / 60);
+    expect(sceneView.position).toEqual([0, 2.2]);
+    expect(registry.moving).toBe(false);
+  });
+
+  it("creates motions as agents appear and disposes them when they leave", () => {
+    const registry = new MotionRegistry();
+    const sam = { id: "payables-clerk", pos: [0, -1.8] as const, targetAnchor: "payables" as AnchorId };
+    registry.sync([alex, sam]);
+    expect(registry.size).toBe(2);
+    const first = registry.get(alex);
+    registry.sync([sam]);
+    expect(registry.has(alex.id)).toBe(false);
+    expect(registry.size).toBe(1);
+    registry.sync([alex, sam]);
+    expect(registry.get(alex)).not.toBe(first);
+  });
+
+  it("re-seats the shared motion when a row's pos changes, then walks on to the target", () => {
+    const registry = new MotionRegistry();
+    registry.sync([{ ...alex, targetAnchor: "dana" }]);
+    const walk = registry.get(alex);
+    for (let frame = 0; frame < 30; frame += 1) walk.advance(1 / 60);
+    registry.sync([{ ...alex, pos: [-3, 0.6], targetAnchor: "dana" }]);
+    expect(registry.get(alex)).toBe(walk);
+    expect(walk.position).toEqual([-3, 0.6]);
+    expect(walk.moving).toBe(true);
+    for (let frame = 0; frame < 360; frame += 1) walk.advance(1 / 60);
+    expect(walk.position).toEqual([0, 2.2]);
+  });
+
+  it("pins recorded (replay) rows to agent.pos without walking", () => {
+    const registry = new MotionRegistry();
+    registry.sync([{ ...alex, targetAnchor: "dana" }], { recorded: true });
+    const walk = registry.get(alex);
+    expect(walk.position).toEqual([-5, -1.8]);
+    expect(walk.moving).toBe(false);
+    registry.sync([{ ...alex, pos: [-2, 0.6], targetAnchor: "dana" }], { recorded: true });
+    expect(registry.get(alex)).toBe(walk);
+    expect(walk.position).toEqual([-2, 0.6]);
+    expect(walk.moving).toBe(false);
+    expect(registry.moving).toBe(false);
   });
 });
