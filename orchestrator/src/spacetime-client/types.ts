@@ -25,6 +25,44 @@ export const Agent = __t.object("Agent", {
 });
 export type Agent = __Infer<typeof Agent>;
 
+export const AgentCase = __t.object("AgentCase", {
+  id: __t.string(),
+  status: __t.string(),
+  json: __t.string(),
+});
+export type AgentCase = __Infer<typeof AgentCase>;
+
+export const AgentHandoff = __t.object("AgentHandoff", {
+  id: __t.string(),
+  caseId: __t.string(),
+  sequence: __t.u64(),
+  json: __t.string(),
+});
+export type AgentHandoff = __Infer<typeof AgentHandoff>;
+
+export const AgentHandoffPublic = __t.object("AgentHandoffPublic", {
+  handoffId: __t.string(),
+  sequence: __t.u64(),
+  caseDisplayId: __t.string(),
+  fromAgentId: __t.string(),
+  toAgentId: __t.string(),
+  fromRole: __t.string(),
+  toRole: __t.string(),
+  fromVoiceRole: __t.string(),
+  toVoiceRole: __t.string(),
+  status: __t.string(),
+  correction: __t.bool(),
+  reason: __t.string(),
+  summary: __t.string(),
+  line: __t.string(),
+  createdAt: __t.f64(),
+  acceptedAt: __t.option(__t.f64()),
+  completedAt: __t.option(__t.f64()),
+  decisionRef: __t.option(__t.string()),
+  errorCode: __t.option(__t.string()),
+});
+export type AgentHandoffPublic = __Infer<typeof AgentHandoffPublic>;
+
 export const ApInvoice = __t.object("ApInvoice", {
   id: __t.string(),
   state: __t.string(),

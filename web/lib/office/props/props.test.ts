@@ -104,14 +104,14 @@ describe('office prop interactions', () => {
     expect(WHITEBOARD_INTERACTION.panel(held, now).rows).toContainEqual({ label: 'Hold', value: 'four installments' });
   });
 
-  it('hide the whiteboard without payables and the clock without lobby or collections', () => {
+  it('hide the whiteboard without payables, the clock without lobby or collections and the Treasury door without treasury', () => {
     // Desk monitors are covered in monitors.test.ts.
     const ids = (value: OfficeSnapshot) => propInteractions(value).map(prop => prop.id).filter(id => !id.startsWith('monitor:'));
-    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'clock']);
+    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'clock', 'treasury-door']);
     expect(ids(withRooms())).toEqual([]);
     expect(ids(withRooms('payables'))).toEqual(['whiteboard']);
     expect(ids(withRooms('lobby'))).toEqual(['clock']);
-    expect(ids(withRooms('collections', 'treasury'))).toEqual(['clock']);
-    expect(ids(withRooms('dana', 'treasury', 'vendor_onboarding'))).toEqual([]);
+    expect(ids(withRooms('collections', 'treasury'))).toEqual(['clock', 'treasury-door']);
+    expect(ids(withRooms('dana', 'treasury', 'vendor_onboarding'))).toEqual(['treasury-door']);
   });
 });

@@ -3,6 +3,7 @@ import { schema, table, t, SenderError } from 'spacetimedb/server';
 import { ReducerEngine, AuditLog, evaluateStep, type ApprovalGrant } from '@backroom/orchestrator/reducer';
 import { evaluate, DEFAULT_POLICY, type Badge, type Context, type Policy } from '@backroom/policy';
 import type { Agent, AuditEntry, Escalation, Invoice, Lease, Task, Step } from '@backroom/orchestrator/reducer';
+import * as agents from '@backroom/orchestrator/agent-handoff';
 
 // JSON columns preserve the exported StateStore/fixture shapes. Indexed state and
 // visual fields stay typed; private payloads never enter anonymous subscriptions.
@@ -33,6 +34,15 @@ const spacetimedb = schema({
   payment_receipt: table({}, { id: t.string().primaryKey(), fingerprint: t.string(), json: t.string().optional() }),
   operation_result: receipt,
   controller: table({}, { id: t.u8().primaryKey(), identity: t.identity() }),
+  // Agent runtime (additive): private case/handoff packets plus a sanitized office projection.
+  agent_case: table({}, { id: t.string().primaryKey(), status: t.string(), json: t.string() }),
+  agent_handoff: table({}, { id: t.string().primaryKey(), caseId: t.string(), sequence: t.u64(), json: t.string() }),
+  agent_handoff_public: table({ public: true }, {
+    handoffId: t.string().primaryKey(), sequence: t.u64(), caseDisplayId: t.string(), fromAgentId: t.string(), toAgentId: t.string(),
+    fromRole: t.string(), toRole: t.string(), fromVoiceRole: t.string(), toVoiceRole: t.string(), status: t.string(), correction: t.bool(),
+    reason: t.string(), summary: t.string(), line: t.string(), createdAt: t.f64(), acceptedAt: t.f64().optional(), completedAt: t.f64().optional(),
+    decisionRef: t.string().optional(), errorCode: t.string().optional(),
+  }),
 });
 export default spacetimedb;
 type Ctx = Parameters<Parameters<typeof spacetimedb.reducer>[1]>[0];
@@ -462,3 +472,85 @@ export const record_payment_link = spacetimedb.reducer({ id: t.string(), planId:
   if (decision.kind !== 'ALLOW') throw new SenderError(`${decision.kind}:${decision.ruleIds.join(',')}`);
   appendEntity(ctx, ctx.db.payment_link, id, { id, planId, callId: saved.callId, invoiceId: call.invoiceId, amountCents });
 });
+
+// Agent runtime reducers: the same pure engine as MemoryHandoffStore, one transaction each.
+// Payload is the canonical JSON array of the AgentCaseStore call; time comes from ctx.timestamp.
+type AgentMethod = 'openCase' | 'startActivation' | 'assertActive' | 'recordArtifacts' | 'commitHandoff' | 'rejectHandoff'
+  | 'finishActivation' | 'stopCase' | 'resumeCase' | 'getCase' | 'listPublic';
+function loadCase(ctx: Ctx, caseId: string): agents.CaseState {
+  const row = ctx.db.agent_case.id.find(String(caseId));
+  if (!row) throw new SenderError('AGENT_CASE_NOT_FOUND');
+  return JSON.parse(row.json);
+}
+function persistCase(ctx: Ctx, before: agents.CaseState | undefined, state: agents.CaseState) {
+  const prior = ctx.db.agent_case.id.find(state.caseId);
+  const row = { id: state.caseId, status: state.status, json: json(state) };
+  if (!prior) ctx.db.agent_case.insert(row); else if (prior.json !== row.json) ctx.db.agent_case.id.update(row);
+  const was = new Map((before?.handoffs ?? []).map(h => [h.handoffId, json(h)]));
+  for (const h of state.handoffs) {
+    if (was.get(h.handoffId) === json(h)) continue;
+    const priv = { id: h.handoffId, caseId: state.caseId, sequence: BigInt(h.sequence), json: json(h) };
+    if (ctx.db.agent_handoff.id.find(h.handoffId)) ctx.db.agent_handoff.id.update(priv); else ctx.db.agent_handoff.insert(priv);
+    const p = agents.toPublicHandoff(state, h);
+    const pub = { ...p, sequence: BigInt(p.sequence), acceptedAt: p.acceptedAt, completedAt: p.completedAt, decisionRef: p.decisionRef, errorCode: p.errorCode };
+    if (ctx.db.agent_handoff_public.handoffId.find(h.handoffId)) ctx.db.agent_handoff_public.handoffId.update(pub); else ctx.db.agent_handoff_public.insert(pub);
+  }
+  const audits = agents.handoffAudits(state, before?.handoffs ?? [], now(ctx));
+  if (audits.length) { const engine = load(ctx); engine.appendAudits(audits); persist(ctx, engine); }
+}
+function agentInvoke(method: AgentMethod) {
+  return spacetimedb.reducer(args, (ctx, { requestId, payload }) => {
+    authorize(ctx);
+    try {
+      if (!requestId || requestId.length > 200 || payload.length > 200_000) throw new SenderError('INVALID_REQUEST');
+      if (ctx.db.operation_result.id.find(requestId)) return;
+      const v = JSON.parse(payload) as any[];
+      if (!Array.isArray(v)) throw new SenderError('INVALID_REQUEST');
+      const at = now(ctx);
+      const sequence = Number(ctx.db.agent_handoff.count()) + 1;
+      let value: unknown = null;
+      if (method === 'listPublic') {
+        value = [...ctx.db.agent_handoff_public.iter()].filter(r => Number(r.sequence) > Number(v[0] ?? 0))
+          .sort((a, b) => Number(a.sequence - b.sequence)).map(r => ({ ...r, sequence: Number(r.sequence) }));
+      } else if (method === 'getCase') {
+        value = ctx.db.agent_case.id.find(String(v[0])) ? loadCase(ctx, v[0]) : null;
+      } else if (method === 'openCase') {
+        const prior = ctx.db.agent_case.id.find(String(v[0]?.caseId));
+        const state = agents.openCase(prior ? JSON.parse(prior.json) : undefined, { ...v[0], now: at });
+        persistCase(ctx, prior ? JSON.parse(prior.json) : undefined, state);
+        value = state;
+      } else {
+        const before = loadCase(ctx, v[0]);
+        const state = loadCase(ctx, v[0]);
+        const claim = v[1] as agents.LeaseClaim;
+        switch (method) {
+          case 'startActivation': value = agents.startActivation(state, { leaseOwner: String(v[1]), now: at }); break;
+          case 'assertActive': agents.assertActive(state, claim); break;
+          case 'recordArtifacts': agents.recordArtifacts(state, claim, v[2]); break;
+          case 'commitHandoff': value = agents.commitHandoff(state, { ...claim, request: v[2], now: at, sequence }); break;
+          case 'rejectHandoff': value = agents.rejectHandoff(state, { ...claim, request: v[2], errorCode: String(v[3]), now: at, sequence }); break;
+          case 'finishActivation': agents.finishActivation(state, { ...claim, outcome: v[2], reason: v[3] ?? undefined, now: at }); break;
+          case 'stopCase': agents.stopCase(state, { status: v[1], reason: String(v[2]), now: at }); break;
+          case 'resumeCase': agents.resumeCase(state); break;
+        }
+        persistCase(ctx, before, state);
+      }
+      ctx.db.operation_result.insert({ id: requestId, result: json({ value: value ?? null }) });
+    } catch (error) {
+      if (error instanceof SenderError) throw error;
+      const message = error instanceof Error && /^[A-Z_]+(?::[A-Z_0-9,]+)?$/.test(error.message) ? error.message : 'INVALID_AGENT_REQUEST';
+      throw new SenderError(message);
+    }
+  });
+}
+export const agent_open_case = agentInvoke('openCase');
+export const agent_start_activation = agentInvoke('startActivation');
+export const agent_assert_active = agentInvoke('assertActive');
+export const agent_record_artifacts = agentInvoke('recordArtifacts');
+export const agent_commit_handoff = agentInvoke('commitHandoff');
+export const agent_reject_handoff = agentInvoke('rejectHandoff');
+export const agent_finish_activation = agentInvoke('finishActivation');
+export const agent_stop_case = agentInvoke('stopCase');
+export const agent_resume_case = agentInvoke('resumeCase');
+export const agent_get_case = agentInvoke('getCase');
+export const agent_list_public = agentInvoke('listPublic');
