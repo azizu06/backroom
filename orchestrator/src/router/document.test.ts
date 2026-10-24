@@ -14,7 +14,9 @@ it('extracts image content with the dedicated local vision model', async () => {
 it('requires two invalid local envelopes before sending images to Anthropic', async () => {
   const http = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ approved: true })).mockResolvedValueOnce(reply({}))
     .mockResolvedValueOnce(Response.json({ model: 'claude-sonnet-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ output: northfieldInvoice('4401'), confidence: 0.99 }) }], usage: { input_tokens: 100, output_tokens: 100 } }));
-  const result = await createRouter({ fetch: http, anthropicApiKey: 'synthetic', cloudProvider: 'anthropic' }).route('document_extraction', input, invoiceSchema);
+  const router = createRouter({ fetch: http, anthropicApiKey: 'synthetic', cloudProvider: 'anthropic' });
+  const result = await router.route('document_extraction', input, invoiceSchema);
+  expect(router.telemetry()).toMatchObject({ totalCalls: 3, localCalls: 2, pricedLocalCalls: 0 });
   expect(result.route).toBe('cloud_fallback');
   expect(http.mock.calls.map(call => String(call[0]))).toEqual(['http://100.117.44.20:11434/v1/chat/completions', 'http://100.117.44.20:11434/v1/chat/completions', 'https://api.anthropic.com/v1/messages']);
   const body = JSON.parse(String(http.mock.calls[2]![1]!.body));

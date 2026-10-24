@@ -36,3 +36,18 @@ it('rejects privileged extraction fields and never falls back to accompanying em
   expect(payables.process).not.toHaveBeenCalled();
   expect(JSON.stringify(await state.listAudit())).not.toContain(bytes.toString('base64'));
 });
+
+it('bounds concurrent PDF workers and holds excess uploads without model work', async () => {
+  const bytes = await readFile(new URL('../../../fixtures/vision/multi-page-bank-change.pdf', import.meta.url));
+  const attachment = { bytes, mediaType: 'application/pdf' };
+  const first = renderInvoiceDocument(attachment);
+  const second = renderInvoiceDocument(attachment);
+  const modelRoute = vi.fn() as unknown as typeof route;
+  const result = await processInbox({ id: 'busy', source: 'judge', senderDomain: 'papertrail.example', kind: 'invoice', text: '', attachment }, {
+    state: new MemoryStateStore(), controller: { request: async () => 'busy-hold' },
+    payables: { process: vi.fn() }, vendor: { propose: vi.fn() }, modelRoute,
+  });
+  expect(result).toMatchObject({ status: 'held', documentModelAttempted: false });
+  expect(modelRoute).not.toHaveBeenCalled();
+  await Promise.all([first, second]);
+});

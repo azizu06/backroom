@@ -78,10 +78,11 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
         refs: [id, ...result.evidenceRefs, ...(result.escalationId ? [result.escalationId] : [])], route: 'code', latencyMs: 0, costUsd: 0,
         inputs: { scenario_source: 'judge', extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized', decision: result.decision, fields, attachment,
           text, senderDomain: sender, kind, attachmentParsed: !!file && !!fields } });
-      const extraction = (await state.listAudit()).find(entry => entry.action === 'document_extracted' && entry.refs.includes(id));
-      return json({ attachmentParsed: !!file && !!fields, documentRoute: extraction?.route ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
+      const documentRoute = 'documentRoute' in result ? result.documentRoute : null;
+      const documentModelAttempted = 'documentModelAttempted' in result && result.documentModelAttempted;
+      return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
         extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
-        notice: file ? fields ? `Attachment extracted (${extraction?.route ?? 'model'}). Code policy decided the receipt. No bank debit is configured. File bytes are not retained.${extraction?.route === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : 'Attachment could not be safely extracted; held for human review. File bytes are not retained. Cloud fallback may have received document images after two local schema failures.'
+        notice: file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. No bank debit is configured. File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
           : 'Synthetic Northfield company. No bank debit or live vendor verification is configured. Approvals require the controller’s passkey.',
         auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay` });
     } catch { return json({ error: 'Intake could not record a decision. Try again; no payment was submitted.' }, 503); }

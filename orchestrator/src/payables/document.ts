@@ -4,6 +4,9 @@ import sharp from 'sharp';
 import type { DocumentInput } from '../router/document';
 export interface InvoiceAttachment { mediaType: string; bytes: Uint8Array }
 const MAX_BYTES = 4 * 1024 * 1024;
+// Fail closed instead of queueing unbounded public uploads. Count until worker exit.
+let activePdfWorkers = 0;
+const MAX_PDF_WORKERS = 2;
 /** Local, bounded rasterization. PDFium runs in a disposable worker with a hard
  * deadline; no system PDF tools, external URLs or raw document retention.
  */
@@ -20,8 +23,11 @@ export async function renderInvoiceDocument(file: InvoiceAttachment): Promise<Do
     return [await raster(file.bytes)];
   }
   if (Buffer.from(file.bytes.subarray(0, 5)).toString() !== '%PDF-') throw new Error('INVALID_PDF');
+  if (activePdfWorkers >= MAX_PDF_WORKERS) throw new Error('PDF_RENDER_BUSY');
   const bitmaps = await new Promise<{ width: number; height: number; data: Uint8Array }[]>((resolve, reject) => {
-    const worker = new Worker(`
+    let worker: Worker;
+    activePdfWorkers++;
+    try { worker = new Worker(`
       const { parentPort, workerData } = require('node:worker_threads');
       (async () => {
         // Resolve inside the worker: bundlers rewrite parent require.resolve to a numeric module ID.
@@ -45,6 +51,7 @@ export async function renderInvoiceDocument(file: InvoiceAttachment): Promise<Do
         } finally { doc?.destroy(); library.destroy(); }
       })().catch(() => { parentPort.postMessage({ error: true }); });
     `, { eval: true, workerData: { paths: [process.cwd(), join(process.cwd(), 'orchestrator'), join(process.cwd(), '..', 'orchestrator')], bytes: file.bytes }, stdout: true, stderr: true, resourceLimits: { maxOldGenerationSizeMb: 128 } });
+    } catch (error) { activePdfWorkers--; reject(error); return; }
     // Parser diagnostics must never leak document content into API logs.
     worker.stdout.resume(); worker.stderr.resume();
     const timer = setTimeout(() => { void worker.terminate(); reject(new Error('PDF_RENDER_TIMEOUT')); }, 20000);
@@ -54,7 +61,7 @@ export async function renderInvoiceDocument(file: InvoiceAttachment): Promise<Do
       else resolve(message);
     });
     worker.once('error', () => { clearTimeout(timer); reject(new Error('PDF_RENDER_FAILED')); });
-    worker.once('exit', () => { clearTimeout(timer); reject(new Error('PDF_RENDER_FAILED')); });
+    worker.once('exit', () => { activePdfWorkers--; clearTimeout(timer); reject(new Error('PDF_RENDER_FAILED')); });
   });
   return await Promise.all(bitmaps.map(async image => ({ mediaType: 'image/png' as const,
     data: (await sharp(image.data, { raw: { width: image.width, height: image.height, channels: 4 } }).png().toBuffer()).toString('base64') })));
