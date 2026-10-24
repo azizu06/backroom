@@ -26,6 +26,12 @@ const root = globalThis as typeof globalThis & { backroomCallRequests?: ReturnTy
 export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = (action, request) => (root.backroomCallRequests ??= createCallRequestHTTP({
   secret: () => process.env.CONTROLLER_ENROLLMENT_SECRET,
   origin: () => process.env.WEBAUTHN_ORIGIN,
+  // The tunnel office cannot open ws://127.0.0.1. The host office can, so the dial route
+  // accepts that exact loopback origin and no other. Public origins stay on WEBAUTHN_ORIGIN.
+  loopbackOrigin: () => {
+    const port = process.env.DEMO_PORT || '3000';
+    return /^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535 ? `http://127.0.0.1:${Number(port)}` : undefined;
+  },
   // demo:up starts the relay on loopback and shares its admin secret with this host only.
   relay: () => process.env.DEMO_VOICE_RUNNING === '1' && process.env.VOICE_ADMIN_SECRET
     ? { url: `http://127.0.0.1:${Number(process.env.VOICE_PORT || 8788)}/_admin/dial`, secret: process.env.VOICE_ADMIN_SECRET } : undefined,

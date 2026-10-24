@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { createCallRequestHTTP, type CallRequestAudit } from './request';
 
 const ORIGIN = 'https://demo.example';
-function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' })) {
+const LOOPBACK = 'http://127.0.0.1:3477';
+function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' }), extras?: { loopback?: string; relay?: false }) {
   let clock = 1_000_000;
   let current: { status: 'ringing' | 'live' | 'ended'; endedAt?: number } | null = null;
   const audits: CallRequestAudit[] = [];
   const relay = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => relayResponse());
-  const handle = createCallRequestHTTP({ secret: () => 'operator-code', origin: () => ORIGIN, now: () => clock,
-    relay: () => ({ url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin-secret' }), currentCall: async () => current,
+  const handle = createCallRequestHTTP({ secret: () => 'operator-code', origin: () => ORIGIN, loopbackOrigin: () => extras?.loopback, now: () => clock,
+    relay: extras?.relay === false ? () => undefined : () => ({ url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin-secret' }), currentCall: async () => current,
     audit: async entry => { audits.push(entry); }, fetch: relay as typeof fetch });
   const post = (action: 'session' | 'request', body: unknown, headers: Record<string, string> = {}) => handle(action, new Request(`${ORIGIN}/api/calls/${action}`, {
     method: 'POST', headers: { origin: ORIGIN, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }));
@@ -97,6 +98,59 @@ describe('office call request', () => {
     const results = await Promise.all([click(h, cookie), click(h, cookie)]);
     expect(results.map(r => r.status).sort()).toEqual([200, 409]);
     expect(h.relay).toHaveBeenCalledTimes(1);
+  });
+  it('accepts the host loopback office after unlock and still dials only the server allowlist', async () => {
+    const h = harness(async () => Response.json({ sessionId: 's', callId: 'c' }), { loopback: LOOPBACK });
+    const locked = await h.post('request', { line: 'collections' }, { origin: LOOPBACK });
+    expect(locked.status).toBe(401);
+    expect(await locked.json()).toMatchObject({ error: 'OPERATOR_SESSION_REQUIRED' });
+    const session = await h.post('session', { code: 'operator-code' }, { origin: LOOPBACK });
+    expect(session.status).toBe(200);
+    const setCookie = session.headers.get('set-cookie')!;
+    expect(setCookie).not.toContain('Secure');
+    const cookie = setCookie.split(';')[0]!;
+    expect((await h.post('request', { to: '+15555550199' }, { cookie, origin: LOOPBACK })).status).toBe(400);
+    expect(h.relay).not.toHaveBeenCalled();
+    const response = await h.post('request', { line: 'collections' }, { cookie, origin: LOOPBACK });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, message: 'Ringing the allowlisted demo phone. Answer on speaker.' });
+    expect(h.relay).toHaveBeenCalledTimes(1);
+    const [url, init] = h.relay.mock.calls[0]!;
+    expect(url).toBe('http://127.0.0.1:8788/_admin/dial');
+    expect(init?.body).toBeUndefined();
+    expect((await h.post('request', { line: 'collections' }, { cookie, origin: LOOPBACK })).status).toBe(429);
+    expect(h.relay).toHaveBeenCalledTimes(1);
+    const tunnel = harness(async () => Response.json({}), { loopback: LOOPBACK });
+    expect((await click(tunnel, await tunnel.unlock())).status).toBe(200);
+  });
+  it('forwards one loopback click while another is still placing the call', async () => {
+    let release!: () => void;
+    const h = harness(() => new Promise(resolve => { release = () => resolve(Response.json({})); }), { loopback: LOOPBACK });
+    const cookie = (await h.post('session', { code: 'operator-code' }, { origin: LOOPBACK })).headers.get('set-cookie')!.split(';')[0]!;
+    const first = h.post('request', { line: 'collections' }, { cookie, origin: LOOPBACK });
+    await vi.waitFor(() => expect(h.relay).toHaveBeenCalledTimes(1));
+    expect((await h.post('request', { line: 'collections' }, { cookie, origin: LOOPBACK })).status).toBe(409);
+    release();
+    expect((await first).status).toBe(200);
+    expect(h.relay).toHaveBeenCalledTimes(1);
+  });
+  it('refuses loopback without a relay as voice down, and refuses every other origin', async () => {
+    const down = harness(async () => Response.json({}), { loopback: LOOPBACK, relay: false });
+    const cookie = (await down.post('session', { code: 'operator-code' }, { origin: LOOPBACK })).headers.get('set-cookie')!.split(';')[0]!;
+    const voice = await down.post('request', { line: 'collections' }, { cookie, origin: LOOPBACK });
+    expect(voice.status).toBe(503);
+    expect(await voice.json()).toMatchObject({ error: 'VOICE_NOT_RUNNING' });
+    const h = harness(async () => Response.json({}), { loopback: LOOPBACK });
+    const unlocked = (await h.post('session', { code: 'operator-code' }, { origin: LOOPBACK })).headers.get('set-cookie')!.split(';')[0]!;
+    for (const origin of ['https://evil.example', 'http://localhost:3477', 'http://127.0.0.1:3478', 'http://127.0.0.1:34770',
+      'https://127.0.0.1:3477', 'http://127.0.0.2:3477', 'http://0.0.0.0:3477', `${LOOPBACK}/`]) {
+      expect((await h.post('request', { line: 'collections' }, { cookie: unlocked, origin })).status).toBe(403);
+      expect((await h.post('session', { code: 'operator-code' }, { origin })).status).toBe(403);
+    }
+    expect((await h.post('request', { line: 'collections' }, { cookie: unlocked, origin: LOOPBACK, 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect((await h.post('request', { line: 'collections' }, { cookie: unlocked, origin: ORIGIN, 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect(h.relay).not.toHaveBeenCalled();
+    expect(down.relay).not.toHaveBeenCalled();
   });
   it('relays pre-call and policy refusals, and never retries an unconfirmed dial', async () => {
     const blocked = harness(async () => new Response('PRECALL_BLOCKED:Credit/OFAC check unavailable', { status: 409 }));

@@ -5,14 +5,16 @@ server-side; no number, secret or session id reaches the browser.
 
 | Route | Auth | Does |
 |---|---|---|
-| `POST /api/calls/session` | `{ code }` = operator code (`CONTROLLER_ENROLLMENT_SECRET`, same as the audit wall) | Sets `backroom_calls`, HttpOnly, SameSite=Strict, `Path=/api/calls`, 12 h |
-| `POST /api/calls/request` | that cookie + `Origin` = `WEBAUTHN_ORIGIN` | Dials once through the relay's `/_admin/dial` |
+| `POST /api/calls/session` | `{ code }` = operator code (`CONTROLLER_ENROLLMENT_SECRET`, same as the audit wall), from `WEBAUTHN_ORIGIN` or `http://127.0.0.1:$DEMO_PORT` | Sets `backroom_calls`, HttpOnly, SameSite=Strict, `Path=/api/calls`, 12 h. `Secure` only when that origin is https |
+| `POST /api/calls/request` | that cookie + `Origin` is `WEBAUTHN_ORIGIN` or `http://127.0.0.1:$DEMO_PORT` | Dials once through the relay's `/_admin/dial` |
 | `GET /api/calls/active` | none (carries no secrets) | Read-only projection of the latest voice call, `no-store` |
 
-**Before judging**, open the office at its public URL and click Request call once;
-it answers "Calls are locked" with an Unlock link to `/calls`. Enter the operator
-code (`CONTROLLER_ENROLLMENT_SECRET` in `.demo/private.env`). After that, each click
-rings the allowlisted phone, with no CLI step.
+**Before judging**, open the office at `http://127.0.0.1:$DEMO_PORT/office`. The
+tunnel page cannot open the state socket, so it has no Request call button. The
+first click answers "Calls are locked" with an Unlock link to `/calls` on that same
+loopback origin. Enter the operator code (`CONTROLLER_ENROLLMENT_SECRET` in
+`.demo/private.env`). After that, each click rings the allowlisted phone, with no
+CLI step. A public origin still has to be `WEBAUTHN_ORIGIN` exactly.
 
 `request` accepts only `{}` or `{ "line": "collections" }`. The destination is the
 relay's `T1_DIAL_TO`, never request input. It refuses when voice is not running
