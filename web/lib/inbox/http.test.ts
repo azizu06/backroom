@@ -1,16 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRouter, MemoryStateStore } from '@backroom/orchestrator';
 import { createInboxHTTP } from './http';
 import { inboxPresets } from './presets';
 
-function submission(values: Record<string, string> = {}, file?: File) {
+function submission(values: Record<string, string> = {}, file?: File, url = 'http://localhost/api/inbox', origin: string | null = 'http://localhost') {
   const form = new FormData();
   for (const [key, value] of Object.entries({ kind: 'email', text: 'Please do something unexpected for my business.', senderDomain: 'judge.example', ...values })) form.set(key, value);
   if (file) form.set('attachment', file);
-  return new Request('http://localhost/api/inbox', { method: 'POST', headers: { origin: 'http://localhost' }, body: form });
+  const headers = new Headers();
+  if (origin !== null) headers.set('origin', origin);
+  return new Request(url, { method: 'POST', headers, body: form });
 }
 
 describe('judge inbox HTTP boundary', () => {
+  beforeEach(() => { vi.stubEnv('DEMO_PUBLIC_URL', 'http://localhost'); });
+  afterEach(() => { vi.unstubAllEnvs(); });
+
   it('a narration failure cannot replace the recorded inbox response', async () => {
     const state = new MemoryStateStore();
     const agents = vi.fn().mockRejectedValue(new Error('SDK unavailable'));
@@ -108,6 +113,24 @@ describe('judge inbox HTTP boundary', () => {
     expect(JSON.stringify(entries)).not.toContain(png.toString('base64'));
     expect((await state.getAudit(result.auditId))?.inputs?.attachmentParsed).toBe(true);
     expect(result.receiptId).toBeUndefined();
+  });
+
+  it('accepts the configured public origin when Next request.url is a different loopback or tunnel host', async () => {
+    const state = new MemoryStateStore();
+    const modelRoute = vi.fn().mockResolvedValue({ output: { kind: 'unknown' }, route: 'local', model: 'mock', costUsd: 0, latencyMs: 1 });
+    const loopback = createInboxHTTP({ store: () => state, modelRoute, origin: () => 'http://localhost:34721' });
+    const printed = await loopback(submission({}, undefined, 'http://127.0.0.1:34721/api/inbox', 'http://localhost:34721'));
+    expect(printed.status).toBe(200);
+    const tunnel = createInboxHTTP({ store: () => state, modelRoute, origin: () => 'https://judge.example' });
+    expect((await tunnel(submission({}, undefined, 'http://127.0.0.1:34721/api/inbox', 'https://judge.example'))).status).toBe(200);
+    const accepted = (await state.listAudit()).length;
+    expect(accepted).toBeGreaterThan(0);
+    expect((await loopback(submission({}, undefined, 'http://localhost:34721/api/inbox', 'http://127.0.0.1:34721'))).status).toBe(403);
+    expect((await loopback(submission({}, undefined, 'http://localhost:34721/api/inbox', null))).status).toBe(403);
+    expect((await loopback(submission({}, undefined, 'http://localhost:34721/api/inbox', 'http://localhost:34799'))).status).toBe(403);
+    expect((await loopback(submission({}, undefined, 'http://localhost:34721/api/inbox', 'https://untrusted.example'))).status).toBe(403);
+    expect((await createInboxHTTP({ store: () => state, origin: () => undefined })(submission())).status).toBe(403);
+    expect(await state.listAudit()).toHaveLength(accepted);
   });
 
   it('rejects cross-origin, oversized, unsupported and empty submissions without writing audit records', async () => {

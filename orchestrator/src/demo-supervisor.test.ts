@@ -76,7 +76,9 @@ it.each(['memory', 'spacetime'])('demo:up owns an isolated mock attack child wit
     const response = await fetch(`http://127.0.0.1:${port}/api/attack-demo`);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ defaultMode: 'mock', liveBlocked: true });
-    expect(output).toContain(`Attack demo: http://127.0.0.1:${port}/attack`);
+    expect(output).toContain(`Local office: http://127.0.0.1:${port}/office`);
+    expect(output).toContain(`Inbox tray: http://localhost:${port}/inbox`);
+    expect(output).toContain(`Attack demo: http://localhost:${port}/attack`);
     const health = await cli('health');
     expect(health).toContain('Attack demo: reachable (mock)');
     if (stateStore === 'spacetime') expect(health).toContain('SpacetimeDB: adapter connected');
