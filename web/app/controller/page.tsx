@@ -95,7 +95,8 @@ function Inbox({ alert, onSignedOut }: { alert: ReturnType<typeof createControll
         setPending(escalations); setLive(true);
         if (fresh.length) {
           alert.ring();
-          // Never pull the card out from under Dana mid-review; a newer request waits in the queue.
+          // Never pull a still-pending card out from under Dana; a newer request waits in the queue.
+          // A recorded or expired card has nothing left to decide, so the new request takes its place.
           const reviewing = current.current && escalations.some(row => row.id === current.current);
           if (!reviewing) setCurrentId(fresh[0]!.id);
         }
@@ -117,7 +118,10 @@ function Inbox({ alert, onSignedOut }: { alert: ReturnType<typeof createControll
     document.addEventListener('visibilitychange', wake);
     document.addEventListener('pointerdown', arm);
     const clock = setInterval(() => tick(n => n + 1), 1000);
-    return () => { document.removeEventListener('visibilitychange', wake); document.removeEventListener('pointerdown', arm); clearInterval(clock); };
+    return () => {
+      document.removeEventListener('visibilitychange', wake); document.removeEventListener('pointerdown', arm); clearInterval(clock);
+      alert.releaseAwake();
+    };
   }, [alert]);
   const waiting = pending?.length ?? 0;
   useEffect(() => {

@@ -8,6 +8,7 @@ type WakeLockNavigator = Navigator & { wakeLock?: { request(type: 'screen'): Pro
 export function createControllerAlert() {
   let audio: AudioContext | undefined;
   let lock: WakeLockSentinel | undefined;
+  let generation = 0;
   return {
     /** Call from a tap: iOS only lets a page play sound after a user gesture has resumed its context. */
     unlock() {
@@ -37,8 +38,19 @@ export function createControllerAlert() {
     /** Keeps the screen on while Dana waits; the browser drops it when the tab hides, so re-request on return. */
     async keepAwake() {
       if (lock && !lock.released) return true;
-      try { lock = await (navigator as WakeLockNavigator).wakeLock?.request('screen'); } catch { lock = undefined; }
+      const asked = generation;
+      let next: WakeLockSentinel | undefined;
+      try { next = await (navigator as WakeLockNavigator).wakeLock?.request('screen'); } catch { next = undefined; }
+      // The inbox closed while the request was in flight: do not keep a phone awake for nothing.
+      if (asked !== generation) { void next?.release().catch(() => undefined); return false; }
+      lock = next;
       return !!lock;
+    },
+    /** Lets the screen sleep again once the inbox closes (sign-out or session expiry). */
+    releaseAwake() {
+      generation++;
+      void lock?.release().catch(() => undefined);
+      lock = undefined;
     },
   };
 }
