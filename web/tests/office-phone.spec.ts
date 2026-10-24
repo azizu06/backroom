@@ -76,6 +76,7 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await expect(dialog.getByTestId('phone-transcript').locator('li').first()).toContainText('Collections');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-live.png' });
   await expect(dialog).toContainText('AI-disclosed');
+  await expect(dialog.getByTestId('phone-precall')).toContainText('Mock preview: no pre-call evidence');
   await expect.poll(() => dialog.getByTestId('phone-status').innerText(), { timeout: 15_000, intervals: [100] }).toContain('Ended');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-ended.png' });
   await dialog.getByTestId('phone-request').click();
@@ -96,5 +97,12 @@ test('phone stays idle without the mock query', async ({ page }) => {
   await aimAtPhone(page);
   await expect(page.getByText('E · Use desk phone')).toBeVisible();
   await page.keyboard.press('e');
-  await expect(page.getByRole('dialog', { name: 'Collections desk phone' }).getByTestId('phone-status')).toHaveText('Idle · no call');
+  const dialog = page.getByRole('dialog', { name: 'Collections desk phone' });
+  await expect(dialog.getByTestId('phone-status')).toHaveText('Idle · no call');
+  // Plain next start has no demo host: the card reads unknown/not prepared, never open.
+  const card = dialog.getByRole('region', { name: 'Pre-call check' });
+  await expect(card).toHaveAttribute('data-business', 'unknown');
+  await expect(card).toContainText('No Apify evidence recorded');
+  await expect(card).toContainText('not prepared');
+  if (process.env.BR_SHOTS === '1') await card.screenshot({ path: '/tmp/br-3d/phone-precall.png' });
 });

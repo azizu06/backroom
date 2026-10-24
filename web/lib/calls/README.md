@@ -1,6 +1,6 @@
 # Office calls: Request call button and desk phone feed
 
-The office desk phone (`web/lib/office/calls.ts`) uses three host routes. All are
+The office desk phone (`web/lib/office/calls.ts`) uses four host routes. All are
 server-side; no number, secret or session id reaches the browser.
 
 | Route | Auth | Does |
@@ -8,6 +8,7 @@ server-side; no number, secret or session id reaches the browser.
 | `POST /api/session` | `{ code }` = operator code (`CONTROLLER_ENROLLMENT_SECRET`), from `WEBAUTHN_ORIGIN`, `DEMO_PUBLIC_URL` or `http://127.0.0.1:$DEMO_PORT` | The shared operator sign-in (`web/lib/operator/sign-in.ts`): sets `backroom_session`, HttpOnly, SameSite=Strict, `Path=/`, 8 h, `Secure` on https. Five wrong codes lock that client out for 60 s |
 | `POST /api/calls/request` | that cookie + `Origin` is `WEBAUTHN_ORIGIN` or `http://127.0.0.1:$DEMO_PORT` | Dials once through the relay's `/_admin/dial` |
 | `GET /api/calls/active` | none (carries no secrets) | Read-only projection of the latest voice call, `no-store` |
+| `GET /api/calls/precall` | none (carries no secrets) | Pre-call card above Request call: Apify business status, source label verbatim (live run id / FAKE / cached), source host, checked time, phone match, pre-call ready/blocked + reason, optional warnings. Reads evidence `prepare()` already fetched; starts no Apify or CRS check, `no-store` |
 
 **Before judging**, open the office on the public URL and sign in once at
 `/operator` (or `/calls`) with the operator code (`CONTROLLER_ENROLLMENT_SECRET` in
