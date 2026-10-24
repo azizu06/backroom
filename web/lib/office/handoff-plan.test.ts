@@ -17,6 +17,8 @@ describe('public handoff choreography', () => {
     expect(actorAt(plan, 'intake', trip.arrive + 1).position).toEqual(handoffSpot('payables'));
     expect(sampleHandoffs(plan, (trip.start + trip.arrive) / 2).folders).toHaveLength(1);
     expect(sampleHandoffs(plan, trip.arrive + PASS_MS / 2).folders[0]!.position[1]).toBeGreaterThan(.95);
+    expect(sampleHandoffs(plan, (trip.start + trip.arrive) / 2).folders[0]!.carrier).toBe('intake');
+    expect(sampleHandoffs(plan, trip.arrive + PASS_MS / 2).folders[0]!.carrier).toBeUndefined();
     expect(actorAt(plan, 'intake', trip.end + 1).position).toEqual(HANDOFF_AGENTS.intake.station);
     expect(sampleHandoffs(plan, trip.end + 1).folders).toEqual([]);
   });
