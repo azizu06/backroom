@@ -2,6 +2,7 @@
 
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { TreasuryDeny } from './TreasuryDeny';
+import { DeskMonitors } from './DeskMonitors';
 import { WallClock } from './WallClock';
 import { Whiteboard } from './Whiteboard';
 
@@ -15,5 +16,6 @@ export function OfficeProps({ snapshot }: { snapshot: OfficeSnapshot }) {
     <Whiteboard snapshot={snapshot} />
     <WallClock snapshot={snapshot} />
     <TreasuryDeny snapshot={snapshot} />
+    <DeskMonitors snapshot={snapshot} />
   </>;
 }

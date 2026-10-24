@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 const HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
@@ -158,6 +159,56 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   await expect(dialog).toContainText('NOT_IN_BADGE');
   await expect(dialog).toContainText('DENY');
   await expect(dialog.locator('code')).toHaveText(/^preview-denial-\d+$/);
+  expect(errors).toEqual([]);
+});
+
+test('play mode walks to the GX10 server room and reads live telemetry read-only', async ({ page }) => {
+  // Longest walk in the suite; headless software WebGL renders slowly.
+  test.setTimeout(60_000);
+  const methods: string[] = [];
+  await page.route('**/api/gx10', async route => {
+    methods.push(route.request().method());
+    const now = new Date().toISOString();
+    const status: Gx10Status = {
+      measuredAt: now, reachable: true, models: ['qwen2.5:7b'], gpuUtilization: null,
+      telemetry: {
+        scope: 'process-local, last 200 HTTP attempts', totalCalls: 4, localCalls: 3, localShare: 0.75,
+        pricedLocalCalls: 3, estimatedSavingsUsd: 0.0012, comparisonModel: 'claude-haiku-4-5',
+        recent: { at: now, latencyMs: 900, tokensPerSecond: 42.5 },
+      },
+    };
+    await route.fulfill({ json: status });
+  });
+  const errors = await startPlay(page);
+
+  // Around the partitions and door posts: lobby aisle, along z 0.45, then in front of the server.
+  await walkTo(page, -4.6, 0.45);
+  await walkTo(page, 5, 0.45);
+  await walkTo(page, 7.1, 0.4);
+  await face(page, 7.1, -0.8);
+  const prompt = page.getByText('E · Check GX10 server');
+  await expect(prompt).toBeVisible();
+  const at = await player(page);
+  // The server box (z -1.325..-0.275) is solid: the player stays in front of its face.
+  expect(at.z).toBeGreaterThan(-0.275);
+
+  await page.keyboard.press('e');
+  const dialog = page.getByRole('dialog', { name: 'GX10 server' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Close/ })).toBeFocused();
+  await expect(dialog.getByTestId('play-gx10-speed')).toHaveText('42.5 tok/s');
+  await expect(dialog).toContainText('Online');
+  await expect(dialog).toContainText('qwen2.5:7b');
+  await expect(dialog).toContainText('0.90 s');
+  await expect(dialog).toContainText('75%');
+  await expect(dialog).toContainText('3/4 attempts local');
+  await expect(dialog).toContainText('Read-only');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
+  expect(methods.length).toBeGreaterThan(0);
+  expect(methods.every(method => method === 'GET')).toBe(true);
   expect(errors).toEqual([]);
 });
 
