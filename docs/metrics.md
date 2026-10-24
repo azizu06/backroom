@@ -1,7 +1,7 @@
 # Proof-it-works metrics
 
-Generated: 2026-10-24T09:50:18.638Z
-Source git SHA: `47b911a7fad734e5c39a52be272124f0cc762b5b` (report/tool changes may be uncommitted at generation time).
+Generated: 2026-10-24T13:38:06.936Z
+Source git SHA: `10d1fa4f744fef28daafd0ad374a6fb0ddefa9bc` (report/tool changes may be uncommitted at generation time).
 Exact command (repository root): `pnpm metrics --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/collections.audit.json --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/inbox.audit.json --audit docs/evidence/live-run/2026-10-24T09-20-39.386Z/off.audit.json`
 
 Refs #29 #32; spec §7.2. Saved-run mode verifies retained audit chains without network calls. Live service scope and simulation boundaries are documented in [receipt notes](evidence/live-run/README.md); the live-model sample uses an explicit GX10-only operator override. Historical service receipts are labeled separately.
@@ -17,6 +17,7 @@ Refs #29 #32; spec §7.2. Saved-run mode verifies retained audit chains without 
 | Live completed model local share (C2) | 100.00% (6/6; operator override; production C2 unverified) | Counts local + gx10_fallback / all completed model decisions in verified live chains; corpus generation excluded. |
 | Estimated model cost per completed decision | $0.000000 | Mean recorded costUsd; estimates exclude hardware/electricity, telephony, failed requests and retries. |
 | GX10 → cloud fallback events | 0 | route=cloud_fallback; gx10_fallback is the opposite direction (cloud → GX10). |
+| GX10 invoice vision (live local model; simulated effects) | 9/12 exact; 105/108 fields; p50 7922.41 ms / p95 10188.24 ms | Recorded 2026-10-24T13:35:43.920Z; qwen2.5vl:7b; 9/12 expected code rules; 9/9 traps held; 0/3 clean false holds. Includes render/retries/failures, no warmup removal. [Receipt](evidence/gx10-vision/receipt.json); [limits](evidence/gx10-vision/README.md). Small synthetic sample; no real transfer or population-accuracy claim. |
 | Pre-call pipeline p50 (recorded live-model smoke) | 12695.89 ms (n=1) | Historical 2026-10-24T08:02:23.377Z; model=live, CRS=fake, Apify=fake, dial=none. Not a live end-to-end pipeline benchmark. |
 | Call ring time | not measured — phone-owner ring confirmation not recorded | docs/t1-cartesia.md reports 8.236 s to connection (upper bound on ring), not exact ring latency. |
 | Voice turn latency p50/p90 | not measured — no user-turn-end → audio samples | T1 tool/receiver timing is not voice response latency. |
@@ -190,7 +191,7 @@ No samples means not measured, not zero latency/cost. Nearest-rank percentiles i
 - Raw inbox safety benchmark: `INBOX_BENCHMARK_LIVE=1 pnpm --filter @backroom/orchestrator exec tsx src/metrics/inbox-live.ts ../docs/evidence/inbox-benchmark/receipt.json`; run via `gx10 run` on the GX10. Exact inputs and per-case full audit chains are in [receipt](evidence/inbox-benchmark/receipt.json); scope and limitations in [notes](evidence/inbox-benchmark/README.md). `pnpm metrics` reads this receipt offline in both modes.
 - Sources: [answer key](../fixtures/answer-key/expected.json), [T1 voice](t1-cartesia.md), [pre-call receipt](../orchestrator/src/collections/live-receipt.json), [T10 router smoke](../fixtures/t10/router-smoke.json).
 
-Answer-key SHA-256: `66e7546da7965c027877b246f4268717dbbbd733a1db5ffc391697dfa4efaabd`
+Answer-key SHA-256: `486033e930a903ad6b63bee06a5b9c267bd3300bcf5746a95cc0443c4a61606f`
 Corpus SHA-256: `2edbd381ba2818f94e08b7dcc4fe5cf9d44fee09ee144082194eb4975ee9f041`
 
 <details><summary>Fresh policy-step eval details (not full final-state grading)</summary>
