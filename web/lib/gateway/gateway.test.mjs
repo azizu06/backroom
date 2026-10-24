@@ -546,3 +546,28 @@ describe("Cartesia tool gateway", () => {
     expect(await store.transact("call-1", (c) => c.outbox)).toHaveLength(1);
   });
 });
+
+describe("payment short-code transaction uniqueness", () => {
+  const link = (id, shortCode) => ({ id, shortCode, path: `/pay/${id}`, planId: "plan", auditId: "audit", amountCents: 100 });
+  it("can rename a seeded link without colliding with its previous stored copy", async () => {
+    const store = new MemoryGatewayStore([{ ...seed(), links: [link("generated", "ABC123")] }], new MemoryStateStore());
+    await store.transact("call-1", call => {
+      call.links[0].id = "payment-demo-1042";
+      call.links[0].path = "/pay/payment-demo-1042";
+    });
+    expect((await store.findPaymentCode("ABC123")).links[0]).toMatchObject({ id: "payment-demo-1042", path: "/pay/payment-demo-1042" });
+  });
+  it.each(["same-call", "same-call-same-link-id", "other-call", "other-call-same-link-id"])("rejects and rolls back a real %s collision", async scope => {
+    const original = link("original", "ABC123");
+    const store = new MemoryGatewayStore([
+      { ...seed(), links: [original] },
+      { ...seed(), callId: "call-2" },
+    ], new MemoryStateStore());
+    const callId = scope.startsWith("same-call") ? "call-1" : "call-2";
+    await expect(store.transact(callId, call => {
+      call.links.push(link(scope.endsWith("same-link-id") ? "original" : "duplicate", "ABC123"));
+    })).rejects.toMatchObject({ status: 409, code: "PAYMENT_CODE_COLLISION" });
+    expect((await store.findPaymentCode("ABC123")).links).toEqual([original]);
+    expect(await store.transact("call-2", call => call.links)).toEqual([]);
+  });
+});

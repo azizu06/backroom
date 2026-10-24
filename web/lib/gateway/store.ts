@@ -168,9 +168,14 @@ export class MemoryGatewayStore implements GatewayStore {
           throw new GatewayError(409, "WEBHOOK_ID_REUSED");
         }
       }
+      // Validate the final transaction, not the stale copy it replaces (seed links may be renamed).
+      const codes = new Set<string>();
       for (const link of copy.links) {
-        if (link.shortCode && [...this.calls.values()].some(other => other.links.some(row => row.id !== link.id && row.shortCode === link.shortCode)))
+        if (!link.shortCode) continue;
+        if (codes.has(link.shortCode) || [...this.calls].some(([id, other]) =>
+          id !== callId && other.links.some(row => row.shortCode === link.shortCode)))
           throw new GatewayError(409, 'PAYMENT_CODE_COLLISION');
+        codes.add(link.shortCode);
       }
       // Prepare every potentially throwing clone/check before appending evidence.
       // The call rows retain their existing UUIDs; the shared chain uses those
