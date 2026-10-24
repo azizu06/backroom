@@ -6,7 +6,7 @@ import { ContactShadows, Instance, Instances, OrbitControls } from '@react-three
 import { Group, Mesh, MathUtils, Vector3, type MeshBasicMaterial } from 'three';
 import { REDUCED_MOTION_QUERY, cameraAlpha, doorHighlight, legSwing } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
-import type { PlayBridge } from '../../lib/office/play';
+import { SERVER_ROOM, type PlayBridge } from '../../lib/office/play';
 import { PlayRig } from './play';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
@@ -277,7 +277,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
       {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
     </Fragment>)}
     </Instances>
-    <ServerRoom position={[7.1, 0, -0.8]} />
+    <ServerRoom position={[SERVER_ROOM.position[0], 0, SERVER_ROOM.position[1]]} />
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
