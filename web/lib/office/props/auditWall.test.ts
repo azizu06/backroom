@@ -33,6 +33,17 @@ describe('audit wall rows', () => {
     expect(auditWallView(snap([])).rows).toEqual([]);
     expect(auditWallText(auditWallView(snap([])))).toBe('');
   });
+  it('paints rows only for the live audit log; other snapshots get a notice and no receipt-looking rows', () => {
+    for (const connection of ['preview', 'replay', 'connecting', 'disconnected'] as const) {
+      const view = auditWallView(snap([row('preview-denial-0', { decision: 'DENY' })], { connection }));
+      expect(view.rows).toEqual([]);
+      expect(view.total).toBe(0);
+      expect(view.notice).toBeTruthy();
+      expect(auditWallText(view)).toBe(view.notice);
+      expect(auditWallText(view)).not.toContain('preview-denial-0');
+    }
+    expect(auditWallView(snap([row('a')])).notice).toBeUndefined();
+  });
   it('is shown only while the lobby is visible', () => {
     expect(auditWallVisible(snap([], { rooms: undefined }))).toBe(true); // preview keeps the fixture floor
     expect(auditWallVisible(snap([]))).toBe(false); // live, no rooms subscribed yet

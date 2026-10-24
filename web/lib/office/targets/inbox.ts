@@ -9,9 +9,9 @@ const MAX_ENTRIES = 8;
 export const inboxTarget = defineTarget<{ kind: "inbox" }>({
   id: "inbox",
   candidates: ({ visible }) => visible.has("payables") ? [{ target: { kind: "inbox" } as const, position: INBOX_TRAY, radius: INBOX_TRAY_RADIUS }] : [],
-  label: snapshot => `Open inbox tray · ${snapshot.inboxCount} unread`,
+  label: snapshot => `Open inbox tray · ${snapshot.inboxCount} items`,
   panel: snapshot => ({
-    kind: "inbox", title: "Inbox tray", state: `${snapshot.inboxCount} unread`,
+    kind: "inbox", title: "Inbox tray", state: `${snapshot.inboxCount} items in the inbox`,
     // Preview and replay count items without carrying their receipts; say so instead of showing an empty list as "none".
     ...(snapshot.inboxCount > 0 && !snapshot.inboxReceipts?.length ? { task: `${snapshot.inboxCount} intake items are counted, but this feed carries no receipts for them.` } : {}),
     entries: (snapshot.inboxReceipts ?? []).slice(-MAX_ENTRIES).reverse().map((row): PlayPanelEntry =>

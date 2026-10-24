@@ -22,14 +22,14 @@ function drawWall(ctx: CanvasRenderingContext2D, view: AuditWallView) {
   ctx.textAlign = 'right';
   ctx.fillStyle = '#9fae9a';
   ctx.font = `500 20px ${PROP_FONT}`;
-  ctx.fillText(`${view.total} receipts · ${view.connection}`, TEX_W - 22, 42);
+  ctx.fillText(view.notice ? view.connection : `${view.total} receipts · live`, TEX_W - 22, 42);
   ctx.fillStyle = '#3a4a3f';
   ctx.fillRect(22, 54, TEX_W - 44, 2);
   ctx.textAlign = 'left';
   if (!view.rows.length) {
     ctx.fillStyle = '#9fae9a';
     ctx.font = `500 24px ${PROP_FONT}`;
-    ctx.fillText('No receipts yet', 22, ROW_TOP + 36);
+    ctx.fillText(view.notice ?? 'No receipts yet', 22, ROW_TOP + 36);
     return;
   }
   view.rows.forEach((row, i) => {
@@ -50,7 +50,7 @@ function drawWall(ctx: CanvasRenderingContext2D, view: AuditWallView) {
 function Wall({ snapshot }: SceneMountProps) {
   const view = useMemo(() => auditWallView(snapshot), [snapshot]);
   const text = auditWallText(view);
-  const key = `${view.total}|${view.connection}|${text}`;
+  const key = `${view.total}|${view.connection}|${view.notice ?? ''}|${text}`;
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawWall(ctx, view), [key]);
   const canvas = useThree(state => state.gl.domElement);
   // The wall is pixels, so mirror its text onto the canvas element: aria-description for assistive tech, data attribute for tests.
