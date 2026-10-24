@@ -23,7 +23,7 @@ test('Play hands control over after the intro and immediately with reduced motio
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const available = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     return !!(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));

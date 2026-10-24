@@ -12,7 +12,7 @@ test('office sound is opt-in and remembers its label without starting audio on r
   });
   const contexts = () => page.evaluate(() => Number(Reflect.get(window, '__officeAudioContexts')));
 
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const off = page.getByRole('button', { name: 'Sound off', exact: true });
   await expect(off).toBeEnabled();
   await expect(off).toHaveAttribute('aria-pressed', 'false');

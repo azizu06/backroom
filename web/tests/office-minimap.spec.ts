@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('Play minimap toggles with M without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });
@@ -17,7 +17,7 @@ test('Play minimap toggles with M without page errors', async ({ page }) => {
 });
 
 test('Play minimap can be hidden and restored by touch button and persists after reload', async ({ page }) => {
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });

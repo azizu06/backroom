@@ -16,7 +16,7 @@ import { RoomEntryLabel } from './RoomEntryLabel';
 import './play.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
-export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
+export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Overview to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
   w: 'forward', arrowup: 'forward', keyw: 'forward', s: 'back', arrowdown: 'back', keys: 'back',
@@ -108,8 +108,10 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit }: {
+export function PlayHud({ snapshot, input, target, hud, onExit, lookOnStart = false }: {
   snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void;
+  /** Entered from an explicit Enter click: ask for pointer lock right away (that click is the user gesture). */
+  lookOnStart?: boolean;
 }) {
   const touch = useTouch();
   const [panel, setPanel] = useState<PlayTarget | null>(null);
@@ -121,10 +123,12 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
   const knob = useRef<HTMLSpanElement>(null);
   const targetRef = useRef(target);
   targetRef.current = target;
+  const lookOnMount = useRef(lookOnStart);
 
   useEffect(() => {
     const surface = hud.current;
     surface?.focus();
+    if (surface && lookOnMount.current) requestLook(surface);
     requestSceneFrame();
     return () => {
       input.clear();
@@ -256,7 +260,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit }: {
     <div className='play-crosshair' aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <p className='play-prompt' aria-live='polite'>{prompt && `E · ${prompt}`}</p>
-    <button className='play-exit' onClick={onExit}>Exit Play</button>
+    <button className='play-exit' onClick={onExit}>Overview</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     {touch && <>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
