@@ -25,7 +25,7 @@ if (process.env.TOOL_GATEWAY_SECRET || process.env.CONTROLLER_ENROLLMENT_SECRET 
 async function control(action) {
   const response = await fetch(`http://127.0.0.1:${owner.port}/${action}`, {
     method: action === 'status' ? 'GET' : 'POST', headers: { authorization: `Bearer ${owner.token}` },
-    signal: AbortSignal.timeout(35000),
+    signal: AbortSignal.timeout(135000),
   });
   assert(response.ok, `Demo control ${action} failed`); return response.json();
 }

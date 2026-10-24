@@ -83,8 +83,11 @@ reuse that attempt; restarting the host can initiate a fresh attempt. Public
 company input remains separate from CRS's synthetic identity. CRS uses
 `createCrsClientFromEnv()` when both credentials exist, otherwise the explicitly
 **FAKE** fixture client. Only public-record and fraud-risk products are available;
-the event sandbox offers no business credit or OFAC. No result grants dial or
-payment authority.
+the event sandbox offers no business credit or OFAC. With credentials, startup
+also enables `PRECALL_CRS=live` and `VENDOR_CRS=live`, consuming the exported
+pre-call and bank-change checks. The scripted pre-call gate records blocked
+results (including bankruptcy/unknown OFAC); the separate preverified gateway
+rehearsal remains synthetic. No result grants live dial or payment authority.
 
 `demo:health --live` asks the running web process for its actual adapter probes.
 It never infers live Nessie usage from the CLI's keys. GX10 model listing is

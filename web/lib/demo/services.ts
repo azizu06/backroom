@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { FileClaims, NessieClient, seedNorthfield } from '@backroom/nessie';
 import { createCrsClientFromEnv, createCrsFixtureClient, createPreCallHealthCheck, APIFY_DEMO_COMPANY,
-  northfield, type HealthResult, type StateStore } from '@backroom/orchestrator';
+  northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
 
 const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
@@ -10,7 +10,7 @@ export const getDemoHostServices = () => root.backroomDemoServiceStatus?.() ?? n
 export function installDemoServiceStatus(read: () => DemoStatus['services']) { root.backroomDemoServiceStatus = read; }
 
 /** Adapters belong to the web host, survive company resets, and never serialize credentials. */
-export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch } = {}) {
+export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; modelRoute?: typeof route } = {}) {
   const env = options.env ?? process.env, http = options.fetch ?? fetch;
   const live = env.DEMO_LIVE === '1';
   if (live && !env.NESSIE_API_KEY) throw new Error('DEMO_NESSIE_KEY_REQUIRED');
@@ -29,10 +29,12 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   const accountId = live ? env.NESSIE_ACCOUNT_ID || (await seedNorthfield(bank, claims)).account._id : 'mock-northfield';
   const realCrs = live ? createCrsClientFromEnv(env, http) : undefined;
   const crs = realCrs ?? createCrsFixtureClient();
+  const credit = createPreCallCreditCheck({ ...env, PRECALL_CRS: realCrs ? 'live' : 'fake' }, http);
   const healthCheck = createPreCallHealthCheck({ ...env, PRECALL_APIFY: live ? 'live' : 'fake' }, http);
   let preflight: Promise<void> | undefined;
   let apify: { mode: string; status: string; runId?: string } = { mode: live ? 'live' : 'FAKE', status: 'not_probed' };
   let crsStatus = 'not_probed';
+  let preCall: PreCallResult | undefined;
   let evidence: { health?: HealthResult; crs?: unknown[] } = {};
   // One Actor attempt per owned host, including failed/ambiguous starts. Reset never re-bills.
   function prepare() {
@@ -56,7 +58,7 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
     })();
   }
   const status = () => ({ live, bank: live ? 'nessie_sandbox' as const : 'mock' as const,
-    services: { model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
+    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
       nessie: { mode: live ? 'sandbox' : 'mock' }, apify: { ...apify },
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
   return { bank, accountId, status,
@@ -67,6 +69,23 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
         ruleIds: [], policyVersion: (await state.getPolicy()).policyVersion, refs: ['1042'], route: 'code', latencyMs: 0, costUsd: 0,
         inputs: { noDial: true, syntheticCaller: true, crsLabel: realCrs ? 'SANDBOX: test identity #1' : 'FAKE: test identity #1',
           apify, crsStatus, ...evidence, ofac: 'unknown', businessCredit: 'unavailable' } });
+      const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
+      const client = northfield.clients.find(row => row.id === invoice.clientId)!;
+      if (client.type !== 'business' && client.type !== 'consumer') throw new Error('DEMO_CLIENT_TYPE');
+      // Scripted pre-call only: synthetic consent and an explicitly logged weekend override.
+      // The separate preverified gateway rehearsal is not evidence of a live dial permit.
+      preCall = await runPreCall({ clientId: client.id, invoiceId: invoice.id, testIdentityId: 7,
+        company: APIFY_DEMO_COMPANY, context: { policy: await state.getPolicy(),
+          client: { ...client, type: client.type, localWeekday: 6, localHour: 11 },
+          demoOverride: { visible: true, logged: true }, signals: {} } }, {
+        credit, health: { label: healthCheck.label, async check() {
+          if (!evidence.health) throw new Error('Cached health check unavailable');
+          return evidence.health;
+        } }, planner: createCallPlanner({ cloudRoute: options.modelRoute ?? route }), audit: state,
+        escalate: async (decision, refs) => { await state.createCallEscalation({ id: `demo:precall:${Date.now()}`,
+          taskId: 'demo:precall', fromAgent: 'demo:precall', seat: 'collections', toHuman: decision.toHuman,
+          ruleIds: decision.ruleIds, evidenceRefs: refs, policyVersion: decision.policyVersion, quote: decision.quote }, Date.now()); },
+      });
     },
     async health(): Promise<HealthRow[]> {
       const rows: HealthRow[] = [{ name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present in web host; not a call-readiness test' : 'missing in web host' }];
@@ -82,7 +101,9 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
         const ok = response.ok && body.data?.some(row => row.id === (env.GX10_MODEL || 'gpt-oss:20b')) === true;
         rows.push({ name: 'GX10 router', ok, detail: ok ? 'host configured model listed; inference not tested by health' : 'host model unavailable' });
       } catch { rows.push({ name: 'GX10 router', ok: false, detail: 'host model listing unavailable' }); }
-      rows.push({ name: 'Cloud fallback', ok: false, detail: env.ANTHROPIC_API_KEY ? 'Anthropic configured in host; inference not probed by health' : 'Anthropic key missing in host' },
+      const cloudObserved = preCall?.status === 'ready' && preCall.route === 'cloud';
+      rows.push({ name: 'Anthropic', ok: cloudObserved, detail: cloudObserved ? 'web host pre-call inference succeeded; schema/policy validated' : env.ANTHROPIC_API_KEY ? 'Anthropic configured in host; inference not observed' : 'Anthropic key missing in host' },
+        { name: 'Pre-call plan', ok: preCall?.status === 'ready', detail: `${preCall?.status ?? 'not prepared'}; synthetic preparation only, never a live dial permit` },
         { name: 'Apify', ok: apify.mode === 'live' && apify.status === 'complete', detail: `${apify.mode}: ${apify.status}; at most one $0.10 Actor attempt per host` },
         { name: 'CRS', ok: !!realCrs && crsStatus === 'complete', detail: `${realCrs ? 'sandbox' : 'FAKE fixture client'}: ${crsStatus}; public records/fraud risk only; OFAC/business credit unavailable` });
       return rows;

@@ -23,7 +23,7 @@ const owner = (): Owner => JSON.parse(readFileSync(recordFile, 'utf8'));
 async function control<T = DemoStatus & { publicUrl: string; localUrl: string }>(action: string) {
   const record = owner();
   const response = await fetch(`http://127.0.0.1:${record.port}/${action}`, { method: action === 'status' || action === 'health' ? 'GET' : 'POST',
-    headers: { authorization: `Bearer ${record.token}` }, signal: AbortSignal.timeout(action === 'reset' ? 90000 : action === 'health' ? 30000 : 10000) });
+    headers: { authorization: `Bearer ${record.token}` }, signal: AbortSignal.timeout(action === 'reset' ? 130000 : action === 'health' ? 30000 : 10000) });
   if (!response.ok) throw new Error('DEMO_CONTROL_FAILED');
   return response.json() as Promise<T>;
 }
@@ -53,7 +53,8 @@ async function supervise() {
   const env: NodeJS.ProcessEnv = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'spacetime',
     BACKROOM_DEMO: '1', BACKROOM_APPROVAL_DEMO: '0', BACKROOM_PAYMENT_DEMO: '0', DEMO_CONTROL_SECRET: token };
   if (env.DEMO_LIVE === '1') {
-    env.PRECALL_APIFY = 'live'; env.LLM_CLOUD_PROVIDER = 'anthropic'; env.GX10_ENABLED = 'true';
+    env.PRECALL_APIFY = 'live';
+    env.PRECALL_CRS = env.CRS_USERNAME?.trim() && env.CRS_PASSWORD ? 'live' : 'fake'; env.VENDOR_CRS = env.PRECALL_CRS; env.LLM_CLOUD_PROVIDER = 'anthropic'; env.GX10_ENABLED = 'true';
   }
   const children = new OwnedProcesses(root, env);
   let stopping = false;
@@ -64,7 +65,7 @@ async function supervise() {
   const queryWeb = async (action: string) => {
     const response = await fetch(`${base}/__demo/${action}`, { method: action === 'reset' ? 'POST' : 'GET',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      ...(action === 'reset' ? { body: JSON.stringify(stateConfig || {}) } : {}), signal: AbortSignal.timeout(action === 'reset' ? 85000 : action === 'health' ? 28000 : 5000) });
+      ...(action === 'reset' ? { body: JSON.stringify(stateConfig || {}) } : {}), signal: AbortSignal.timeout(action === 'reset' ? 125000 : action === 'health' ? 28000 : 5000) });
     if (!response.ok) throw new Error('DEMO_WEB_UNAVAILABLE');
     return response.json() as Promise<DemoStatus>;
   };
