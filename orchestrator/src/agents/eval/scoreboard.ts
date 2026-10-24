@@ -8,11 +8,11 @@ import { runEval, scriptedPersona } from '../../eval/harness';
 import { runFailoverPair } from './failover';
 import { CONVERSATIONS, runConversation } from './conversation';
 import { PRECALL_STOPS, runPrecallStop } from './precall';
+import { runApprovalExpiry } from './approval-expiry';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
 import { runBadgeAttack } from './badge-attack';
-import { runApprovalExpiry } from './approval-expiry';
 import { evaluatorSourceHash } from './provenance';
 import { score, type Observation } from './score';
 
@@ -187,8 +187,8 @@ const rates = {
   gx10Failover: fraction(failoverRuns.filter(row => row.match).length, failoverRuns.length),
   arConversations: fraction(conversations.filter(row => row.match).length, conversations.length),
   precallStops: fraction(precallStops.filter(row => row.match).length, precallStops.length),
+  approvalExpiry: fraction(Object.values(approvalExpiry.checks).filter(Boolean).length, Object.keys(approvalExpiry.checks).length),
   bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
-  approvalExpiry: fraction(Object.values(approvalExpiry.checks).filter(Boolean).length, Object.values(approvalExpiry.checks).length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
 };
@@ -231,7 +231,26 @@ const report = {
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
     after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
-  failover: failoverRuns, conversations, precallStops, approvalExpiry, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  failover: failoverRuns, conversations, precallStops,
+  approvalExpiry: {
+    match: approvalExpiry.match, checks: approvalExpiry.checks, scope: approvalExpiry.scope,
+    windowMs: approvalExpiry.live.windowMs, storedCallId: approvalExpiry.live.storedCallId, storedWindow: approvalExpiry.live.storedWindow,
+    voice: approvalExpiry.live.voice,
+    atSixty: approvalExpiry.live.atSixty, expiredAuditsAtSixty: approvalExpiry.live.expiredAuditsAtSixty,
+    atWindowMinus: approvalExpiry.live.atWindowMinus, expiredAuditsBeforeWindow: approvalExpiry.live.expiredAuditsBeforeWindow,
+    atWindow: approvalExpiry.live.atWindow, serviceAtWindow: approvalExpiry.live.serviceAtWindow,
+    expiredAuditsAtWindow: approvalExpiry.live.expiredAuditsAtWindow,
+    latePasskeyError: approvalExpiry.live.latePasskeyError, afterDecide: approvalExpiry.live.afterDecide, decideAudits: approvalExpiry.live.decideAudits,
+    fresh: { kind: approvalExpiry.live.fresh.kind, can_confirm: approvalExpiry.live.fresh.can_confirm, rule_ids: approvalExpiry.live.fresh.rule_ids },
+    createdAfterFresh: approvalExpiry.live.createdAfterFresh,
+    open: { kind: approvalExpiry.live.open.kind, can_confirm: approvalExpiry.live.open.can_confirm, rule_ids: approvalExpiry.live.open.rule_ids },
+    createdAfterOpen: approvalExpiry.live.createdAfterOpen,
+    secondClosed: approvalExpiry.live.secondClosed,
+    retry: { kind: approvalExpiry.live.retry.kind, can_confirm: approvalExpiry.live.retry.can_confirm, rule_ids: approvalExpiry.live.retry.rule_ids },
+    createdAfterRetry: approvalExpiry.live.createdAfterRetry,
+    owner: approvalExpiry.owner,
+  },
+  legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;

@@ -30,7 +30,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | P10 Collections dispatcher tool isolation (not policy rule agreement) | 1/1 (100%) |
 | P04 dispatcher bank-change application (software passkey, fixture providers) | 1/1 (100%) |
 | P04 missing/denied/spoken approval guards | 3/3 (100%) |
-| Live-call approval expiry and one re-escalation per call (injected clock; no-callId row closes at 60s) | 9/9 (100%) |
+| Live-call approval expiry and one re-escalation per call (injected clock; no-callId row closes at 60s) | 13/13 (100%) |
 | P12 GX10 cut: same outcome with audited cloud_fallback (mock transport) | 10/10 (100%) |
 | Existing eval answer-key checks (partial execution permitted) | 34/34 (100%) |
 | Existing eval scenarios with no unexecuted integration step | 22/34 (64.71%) |
@@ -53,7 +53,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **precallStops**: Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.
 - **badgeAttack**: Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.
 - **bankChange**: Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.
-- **approvalExpiry**: ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore. A live call stays pending at 60s and returns approval_status expired with may_reask true at approvalWindowMs(); the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expiry may_reask is false and propose_plan is ESCALATION_RETRY_USED. A still-valid passkey assertion after expiry is rejected. decide_escalation is not a gateway tool and writes no decide_escalation audit. A row with no callId closes at 60s as pending_owner. No dial, model, or network.
+- **approvalExpiry**: Production ControllerApprovals with an injected clock, and createGateway + createApprovalBridge + MemoryGatewayStore on a synthetic call. A live escalation stays pending at 60s and becomes expired with may_reask at approvalWindowMs(); the same terms open one fresh escalation, a second open re-ask is ESCALATION_OPEN, and after that expires another propose_plan is ESCALATION_RETRY_USED. A still-valid passkey decide after expiry is rejected with no decide_escalation audit; voice cannot approve. A worker row with no callId stays pending through 59.999s and closes at 60s as pending_owner when ControllerApprovals reads it. Software passkey and fixture call only; Cartesia, email, phone, and a human tap are not executed.
 - **falseHoldDefinition**: Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.
 - **unscored**: The 83 raw AP runs and 10 AR runs are coverage, not 93 labeled ground-truth decisions. Only explicit answer-key labels count toward accuracy.
 
