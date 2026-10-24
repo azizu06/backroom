@@ -9,6 +9,20 @@ export const hashAudit = (entry: Omit<AuditEntry, 'hash'>): string =>
 
 /** Single-process reducer analogue: no awaits inside read/check/write sections. */
 export class MemoryStateStore implements StateStore {
+  private modelController = new AbortController();
+  private modelsEnabled = true;
+  get llmEnabled() { return this.modelsEnabled; }
+  get llmSignal() { return this.modelController.signal; }
+  async setLlmEnabled(enabled: boolean) {
+    if (typeof enabled !== 'boolean') throw new Error('INVALID_LLM_ENABLED');
+    if (enabled === this.modelsEnabled) return;
+    this.modelsEnabled = enabled;
+    if (enabled) this.modelController = new AbortController();
+    else this.modelController.abort('LLM_OFF');
+    this.append({ ts: Date.now(), actor: 'code', seat: 'controller', action: 'set_llm_enabled',
+      ruleIds: ['LLM_SWITCH'], policyVersion: 0, refs: ['runtime_control:global'], route: 'code',
+      inputs: { llmEnabled: enabled }, latencyMs: 0, costUsd: 0 });
+  }
   private agents = new Map<string, Agent>();
   private tasks = new Map<string, Task>();
   private escalations = new Map<string, Escalation>();
@@ -42,7 +56,7 @@ export class MemoryStateStore implements StateStore {
     const agent = this.agent(agentId);
     if (agent.state === 'offline' || now - agent.heartbeatAt > 15000) return;
     if ([...this.tasks.values()].some(t => t.seatId === agent.seatId && t.status === 'in_progress')) return;
-    const task = [...this.tasks.values()].find(t => t.seatId === agent.seatId && t.status === 'queued');
+    const task = [...this.tasks.values()].find(t => t.seatId === agent.seatId && (t.status === 'queued' || (t.status === 'paused' && this.llmEnabled)));
     if (!task) return;
     task.status = 'in_progress'; task.leaseOwner = agentId;
     task.leaseExpiresAt = now + leaseMs; task.leaseToken++;
@@ -62,7 +76,7 @@ export class MemoryStateStore implements StateStore {
       if (task.status !== 'in_progress') continue;
       const owner = this.agent(task.leaseOwner!);
       if (task.leaseExpiresAt! <= now || owner.state === 'offline') {
-        this.append({ ts: now, actor: 'system', seat: task.seatId, action: 'lease_expired',
+        this.append({ ts: now, actor: this.llmEnabled ? 'system' : 'code', seat: task.seatId, action: 'lease_expired',
           ruleIds: ['LEASE_EXPIRED'], policyVersion: task.steps[task.cursor]?.context.policyVersion ?? 0,
           refs: [...task.refs, task.id], route: 'code', latencyMs: 0, costUsd: 0 });
         task.status = 'queued'; task.leaseOwner = undefined; task.leaseExpiresAt = undefined;
@@ -84,6 +98,12 @@ export class MemoryStateStore implements StateStore {
     const agent = this.agent(lease.leaseOwner);
     if (!agentTransitions[agent.state].includes('walking')) throw new Error('INVALID_AGENT_TRANSITION');
     agent.state = 'walking'; agent.targetAnchor = targetAnchor;
+  }
+  async pauseTask(lease: Lease, now: number) {
+    const task = this.owned(lease, now);
+    task.status = 'paused'; task.leaseOwner = undefined; task.leaseExpiresAt = undefined;
+    const agent = this.agent(lease.leaseOwner);
+    agent.state = 'paused'; agent.currentTaskId = undefined; agent.targetAnchor = undefined;
   }
   async advanceTask(lease: Lease, now: number) { this.owned(lease, now).cursor++; }
   async completeTask(lease: Lease, status: 'done' | 'denied' | 'failed', now: number) {
@@ -157,7 +177,7 @@ export class MemoryStateStore implements StateStore {
 
 const agentTransitions: Record<AgentState, AgentState[]> = {
   idle: ['working'], working: ['working', 'walking', 'on_call'], walking: ['walking', 'waiting', 'working'],
-  waiting: ['waiting', 'walking', 'on_call'], on_call: ['working', 'walking', 'on_call'], offline: [],
+  waiting: ['waiting', 'walking', 'on_call'], on_call: ['working', 'walking', 'on_call'], paused: ['working'], offline: [],
 };
 
 const transitions: Record<Invoice['kind'], Partial<Record<InvoiceState, InvoiceState[]>>> = {

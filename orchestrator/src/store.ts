@@ -1,7 +1,7 @@
 import type { Action, Badge, Context, Decision } from '@backroom/policy';
 
 export type Seat = Badge;
-export type AgentState = 'idle' | 'working' | 'walking' | 'waiting' | 'on_call' | 'offline';
+export type AgentState = 'idle' | 'working' | 'walking' | 'waiting' | 'on_call' | 'paused' | 'offline';
 export interface Agent {
   id: string; seatId: Seat; state: AgentState; room: string; targetAnchor?: string;
   pos: { x: number; y: number; z: number }; heartbeatAt: number;
@@ -9,13 +9,14 @@ export interface Agent {
 }
 export type EffectKind = 'dial' | 'crs' | 'apify' | 'nessie';
 export interface Step {
+  requiresModel?: boolean;
   kind: EffectKind; action: Action; context: Context; input: Record<string, unknown>;
 }
 export interface NewTask {
   id: string; seatId: Seat; refs: string[]; steps: Step[]; idempotencyKey?: string;
 }
 export interface Task extends NewTask {
-  kind: string; status: 'queued' | 'in_progress' | 'done' | 'denied' | 'failed';
+  kind: string; status: 'queued' | 'paused' | 'in_progress' | 'done' | 'denied' | 'failed';
   leaseOwner?: string; leaseExpiresAt?: number; leaseToken: number;
   cursor: number; escalationId?: string;
 }
@@ -27,7 +28,7 @@ export interface Escalation {
 }
 export interface AuditInput {
   ts: number; actor: 'code' | 'local_model' | 'claude' | 'human' | 'client' | 'system';
-  seat: Seat; action: string; ruleIds: string[]; policyVersion: number; refs: string[];
+  seat: Seat | 'controller'; action: string; ruleIds: string[]; policyVersion: number; refs: string[];
   route: string; decision?: Decision['kind']; inputs?: Record<string, unknown>;
   latencyMs: number; costUsd: number;
 }
@@ -43,6 +44,11 @@ export interface Invoice { id: string; kind: 'ar' | 'ap'; state: InvoiceState }
  * appendAudit is append-only and assigns sequence/hash atomically.
  */
 export interface StateStore {
+  /** Global model gate; adapters map to runtime_control[global] in #15. */
+  readonly llmEnabled: boolean;
+  /** Aborted on OFF; a new signal on ON fences results from the old generation. */
+  readonly llmSignal: AbortSignal;
+  setLlmEnabled(enabled: boolean): Promise<void>;
   registerAgent(id: string, seat: Seat, now: number): Promise<void>;
   getAgent(id: string): Promise<Agent | undefined>;
   heartbeat(id: string, now: number): Promise<void>;
@@ -54,6 +60,7 @@ export interface StateStore {
   reapExpired(now: number): Promise<void>;
   setAgentState(lease: Lease, state: AgentState, now: number): Promise<void>;
   setAgentTarget(lease: Lease, targetAnchor: string, now: number): Promise<void>;
+  pauseTask(lease: Lease, now: number): Promise<void>;
   advanceTask(lease: Lease, now: number): Promise<void>;
   completeTask(lease: Lease, status: 'done' | 'denied' | 'failed', now: number): Promise<void>;
   createEscalation(lease: Lease, decision: Extract<Decision, { kind: 'ESCALATE' }>, now: number): Promise<Escalation>;

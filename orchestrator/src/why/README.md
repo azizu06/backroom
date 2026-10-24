@@ -1,10 +1,9 @@
 # Ask why (server only)
 
 `askWhy(question, entries, options?)` retrieves up to 12 relevant records, asks
-Claude through OpenRouter, and returns `{ answer, citations, source }`. The default
-model is `anthropic/claude-haiku-4.5`; pass `options.model` for demo routing.
+the shared model router, and returns `{ answer, citations, source }`. Model defaults follow the router; pass `options.model` for an explicit override.
 `OPENROUTER_API_KEY` and `OPENROUTER_BASE_URL` are existing server-side env vars.
-No key or no relevant evidence means no network request. A provider failure or two
+LLM OFF, no key, or no relevant evidence means no network request. A provider failure or two
 invalid outputs produces a code-templated response. `source: "ungrounded"` has no
 citations and explicitly declines to ground the answer.
 
@@ -17,7 +16,7 @@ without ids, keyword matching selects evidence. No embeddings or GX10 dependency
 is needed in this demo path. Citation validity proves record identity, not semantic
 entailment; the model's explanation still needs the demo's human review.
 
-The strict model response is JSON:
+The router wraps this strict output JSON in its `{output, confidence}` envelope:
 
 ```json
 {"answer":"Invoice was held as a duplicate [entry:212].","citations":["212"]}

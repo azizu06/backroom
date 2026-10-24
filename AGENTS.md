@@ -66,4 +66,13 @@ Team sponsor keys live in `/srv/team/backroom.env` on the GX10. From the repo ro
 
 ## 9. Layout
 
+For model calls, the OFF switch, or the #15 state adapter, read `docs/llm-control.md` first.
+
 `web/` Next.js + R3F, `orchestrator/` Node TS, `policy/` pure TS (`evaluate`), `spacetime/` module (placeholder), `fixtures/`, `tools/board`. Install `pnpm install`; check `pnpm -r build`, `pnpm -r test`.
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.

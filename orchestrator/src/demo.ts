@@ -1,6 +1,6 @@
-import { FakeEffects, MemoryStateStore, SeatWorker, type NewTask, type Seat } from './index';
+import { FakeEffects, getStateStore, SeatWorker, type NewTask, type Seat } from './index';
 
-const store = new MemoryStateStore();
+const store = getStateStore();
 const effects = new FakeEffects();
 const seats: Seat[] = ['collections', 'payables', 'vendor_onboarding'];
 const tasks: NewTask[] = [
