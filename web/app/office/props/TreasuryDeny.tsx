@@ -45,7 +45,7 @@ function drawSign(ctx: CanvasRenderingContext2D, text: string) {
 }
 
 /** One played moment for one DENY receipt; unmounts (via onEnd) when it is over. */
-function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: number; reduced: boolean; onEnd: () => void }) {
+function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: number; reduced: boolean; onEnd: (auditId: string) => void }) {
   const invalidate = useThree(state => state.invalidate);
   const root = useRef<Group>(null);
   const echo = useRef<Group>(null);
@@ -59,15 +59,27 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
   useEffect(() => { sign.map = texture; sign.needsUpdate = true; }, [sign, texture]);
   useEffect(() => { ghost.color.set(receipt.color); }, [ghost, receipt.color]);
   useEffect(() => () => { ring.dispose(); sign.dispose(); post.dispose(); ghost.dispose(); }, [ring, sign, post, ghost]);
-  useEffect(() => { invalidate(); }, [receipt.auditId, invalidate]);
+  useEffect(() => { invalidate(); }, [receipt.auditId, reduced, invalidate]);
+  // Reduced motion holds one pose: render it once, then end on a timer instead of redrawing every frame.
+  useEffect(() => {
+    if (!reduced) return;
+    const timer = setTimeout(() => {
+      ended.current = true;
+      if (root.current) root.current.visible = false;
+      onEnd(receipt.auditId);
+      invalidate();
+    }, Math.max(0, DENY_MOMENT_MS - (Date.now() - at)));
+    return () => clearTimeout(timer);
+  }, [reduced, at, onEnd, invalidate, receipt.auditId]);
   useFrame(state => {
     if (ended.current || !root.current) return;
     // Ages clamp at 0 inside denyPose: clock skew can put a row's `at` ahead of this clock.
     const age = Date.now() - at;
     if (age >= DENY_MOMENT_MS) {
+      if (reduced) return;
       ended.current = true;
       root.current.visible = false;
-      onEnd();
+      onEnd(receipt.auditId);
       return;
     }
     const current = denyPose(age, reduced, pose.current);
@@ -80,7 +92,7 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
       echo.current.position.set(current.echo.x, 0, current.echo.z);
       echo.current.rotation.y = current.echo.heading;
     }
-    state.invalidate();
+    if (!reduced) state.invalidate();
   });
   const [x] = TREASURY_DOOR;
   return <group ref={root} name='prop:treasury-deny' visible={false}>
@@ -111,6 +123,5 @@ export function TreasuryDeny({ snapshot }: { snapshot: OfficeSnapshot }) {
   const denial = TREASURY_DOOR_INTERACTION.visible(snapshot) ? matchingDenial(snapshot, 'treasury') : undefined;
   const receipt = denial ? denyReceipt(snapshot) : null;
   if (!denial || !receipt || endedId === denial.auditId) return null;
-  const auditId = denial.auditId;
-  return <Moment key={auditId} receipt={receipt} at={denial.at} reduced={reduced} onEnd={() => setEndedId(auditId)} />;
+  return <Moment key={denial.auditId} receipt={receipt} at={denial.at} reduced={reduced} onEnd={setEndedId} />;
 }
