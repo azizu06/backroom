@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { AuditEntry, ChainStatus, WhyAnswer } from '@backroom/orchestrator';
+import { auditUnlockMessage, CODE_REJECTED, ORIGIN_REJECTED } from '../lib/audit/session-message';
 import { jsonObject, NETWORK_MESSAGE, outageMessage, serverError } from '../lib/http/response';
 import './AuditWall.css';
 
@@ -42,11 +43,14 @@ function policyQuote(entry: AuditEntry, entries: AuditEntry[]) {
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 /** A DOM panel: mount alongside the lobby canvas, or in a drei Html surface. */
-export function AuditWall({ recording, onChainChange, showAsk = true, headingLevel = 1 }: {
+export function AuditWall({ recording, onChainChange, showAsk = true, headingLevel = 1, originRejected = ORIGIN_REJECTED, codeRejected = CODE_REJECTED }: {
   recording?: AuditSnapshot;
   onChainChange?: (valid: boolean) => void;
   showAsk?: boolean;
   headingLevel?: 1 | 2 | 3;
+  /** Unlock copy. A refused page and a refused code stay different sentences. */
+  originRejected?: string;
+  codeRejected?: string;
 } = {}) {
   const Heading = `h${headingLevel}` as 'h1' | 'h2' | 'h3';
   const PanelHeading = `h${headingLevel + 1}` as 'h2' | 'h3' | 'h4';
@@ -95,7 +99,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
   async function unlock(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try { await api('session', { code }); setCode(''); setLocked(false); setRevision(n => n + 1); }
-    catch (e) { setError(message(e)); }
+    catch (e) { setError(auditUnlockMessage(message(e), { origin: originRejected, code: codeRejected })); }
     finally { setBusy(false); }
   }
   async function ask(event: FormEvent) {

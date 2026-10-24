@@ -21,3 +21,8 @@ export function testnetAccount(role: 'payer' | 'vendor', create = false) {
   if (result.status !== 0 || !/^0x[0-9a-f]{64}$/i.test(key)) throw new Error('X402_KEYCHAIN_KEY_MISSING');
   return privateKeyToAccount(key as `0x${string}`);
 }
+/** Presence only: omits `-w`, so the secret never enters this process. */
+export function testnetKeyPresent(role: 'payer' | 'vendor') {
+  if (process.platform !== 'darwin') return false;
+  return spawnSync('/usr/bin/security', ['find-generic-password', '-s', service, '-a', role], { stdio: 'ignore' }).status === 0;
+}

@@ -14,6 +14,8 @@ const equal = (a: string, b: string) => {
 /** Read permission only. This cookie cannot authorize an approval or a tool. */
 export function createAuditHTTP(options: {
   store: () => StateStore; secret: () => string | undefined; origin: () => string | undefined;
+  /** Host office `http://127.0.0.1:<DEMO_PORT>`, accepted beside `origin`. No other localhost. */
+  loopbackOrigin?: () => string | undefined;
   whyOptions?: WhyOptions; now?: () => number;
 }) {
   const now = options.now ?? Date.now;
@@ -21,8 +23,9 @@ export function createAuditHTTP(options: {
     const secret = options.secret(), origin = options.origin();
     if (!secret || !origin) return json({ error: 'Audit access is not configured.' }, 503);
     const sign = (expires: string) => createHmac('sha256', secret).update(`audit-read:${expires}`).digest('hex');
-    const cookieFlags = `Path=/api/audit; HttpOnly; SameSite=Strict${origin.startsWith('https:') ? '; Secure' : ''}`;
-    if (request.method === 'POST' && request.headers.get('origin') !== origin) return json({ error: 'Origin rejected.' }, 403);
+    const requestOrigin = request.headers.get('origin');
+    const loopback = options.loopbackOrigin?.();
+    if (request.method === 'POST' && requestOrigin !== origin && requestOrigin !== loopback) return json({ error: 'Origin rejected.' }, 403);
     if (action === 'session' && request.method === 'POST') {
       if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ error: 'JSON required.' }, 415);
       const raw = await request.text();
@@ -31,6 +34,7 @@ export function createAuditHTTP(options: {
       try { body = JSON.parse(raw); } catch { return json({ error: 'Invalid JSON.' }, 400); }
       if (!body || typeof body.code !== 'string' || !equal(body.code, secret)) return json({ error: 'Operator code rejected.' }, 403);
       const expires = String(now() + SESSION_MS);
+      const cookieFlags = `Path=/api/audit; HttpOnly; SameSite=Strict${requestOrigin?.startsWith('https:') ? '; Secure' : ''}`;
       return json({ authorized: true }, 200, { 'Set-Cookie': `${COOKIE}=${expires}.${sign(expires)}; ${cookieFlags}; Max-Age=${SESSION_MS / 1000}` });
     }
     const token = request.headers.get('cookie')?.split(';').map(part => part.trim()).find(part => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);

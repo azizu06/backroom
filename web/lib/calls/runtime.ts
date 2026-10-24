@@ -2,6 +2,7 @@ import { getStateStore } from '@backroom/orchestrator';
 import { getGatewayStore } from '../gateway/runtime';
 import { voiceCallLifecycle } from './lifecycle';
 import { MAX_CALL_MS, projectVoiceCall, type CallProjectionRow } from './projection';
+import { declaredLoopbackOfficeOrigin } from './loopback-origin';
 import { createCallRequestHTTP } from './request';
 
 const ENDED_VISIBLE_MS = 2 * 60_000;
@@ -28,10 +29,7 @@ export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = (acti
   origin: () => process.env.WEBAUTHN_ORIGIN,
   // The tunnel office cannot open ws://127.0.0.1. The host office can, so the dial route
   // accepts that exact loopback origin and no other. Public origins stay on WEBAUTHN_ORIGIN.
-  loopbackOrigin: () => {
-    const port = process.env.DEMO_PORT || '3000';
-    return /^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535 ? `http://127.0.0.1:${Number(port)}` : undefined;
-  },
+  loopbackOrigin: () => declaredLoopbackOfficeOrigin(),
   // demo:up starts the relay on loopback and shares its admin secret with this host only.
   relay: () => process.env.DEMO_VOICE_RUNNING === '1' && process.env.VOICE_ADMIN_SECRET
     ? { url: `http://127.0.0.1:${Number(process.env.VOICE_PORT || 8788)}/_admin/dial`, secret: process.env.VOICE_ADMIN_SECRET } : undefined,
