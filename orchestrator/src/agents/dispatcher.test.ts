@@ -62,6 +62,14 @@ describe('Dispatcher', () => {
     expect(await missing.runCase(ar!)).toMatchObject({ status: 'held', reason: 'ROLE_NOT_REGISTERED:AUDITOR' });
   });
 
+  it('holds an Auditor close-out without a recorded summary and keeps its usage receipt', async () => {
+    const t = await setup({ ...DEMO_SCRIPTS, auditor: () => [{ tool: 'read_audit', args: {} }] });
+    const result = await t.dispatcher.runCase(ar!);
+    expect(result).toMatchObject({ status: 'held', reason: 'HUMAN_HOLD' });
+    expect(result.activations.at(-1)).toMatchObject({ role: 'auditor', kind: 'held', usage: { costUsd: 0.0004 } });
+    expect(result.usage?.unknownSettlements).toBe(0);
+  });
+
   it('pauses on global OFF with no model call, then resumes the same role on ON', async () => {
     const t = await setup();
     await t.control.setLlmEnabled(false);

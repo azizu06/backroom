@@ -70,12 +70,14 @@ export function auditorRole(deps: AuditDependencies): RoleModule {
     specialist: ctx => createAuditor(ctx, deps),
     // A close-out without a recorded summary, or a refused correction, holds for a human.
     async run(runtime, _spec, ctx, input) {
-      try { return await runAuditor(runtime, ctx, input, deps); }
+      let last: ActivationResult | undefined; // keep the receipt if runAuditor's post-check throws
+      const capture: AgentRuntime = { run: async (...args) => (last = await runtime.run(...args)) };
+      try { return await runAuditor(capture, ctx, input, deps); }
       catch (error) {
         const code = error instanceof Error ? error.message : '';
-        if (code === 'AUDITOR_SUMMARY_REQUIRED' || code === 'AUDITOR_CORRECTION_NOT_ALLOWED') return { kind: 'held', artifactRefs: [], // Usage was lost with the throw: unknown, charged at the reservation.
-          usage: { activationId: ctx.activation.activationId, sessionId: '', costUsd: Number.NaN, modelUsage: {}, wallMs: 0, initMs: 0 } };
-        throw error;
+        if (code !== 'AUDITOR_SUMMARY_REQUIRED' && code !== 'AUDITOR_CORRECTION_NOT_ALLOWED') throw error;
+        const usage = last?.usage ?? { activationId: ctx.activation.activationId, sessionId: '', costUsd: Number.NaN, modelUsage: {}, wallMs: 0, initMs: 0 };
+        return { kind: 'held', artifactRefs: [], usage };
       }
     },
     beforeCommit: (ctx, request) => validateAuditorCorrection(ctx, request, deps),
