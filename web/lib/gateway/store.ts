@@ -168,6 +168,10 @@ export class MemoryGatewayStore implements GatewayStore {
           throw new GatewayError(409, "WEBHOOK_ID_REUSED");
         }
       }
+      for (const link of copy.links) {
+        if (link.shortCode && [...this.calls.values()].some(other => other.links.some(row => row.id !== link.id && row.shortCode === link.shortCode)))
+          throw new GatewayError(409, 'PAYMENT_CODE_COLLISION');
+      }
       // Prepare every potentially throwing clone/check before appending evidence.
       // The call rows retain their existing UUIDs; the shared chain uses those
       // same IDs so gateway citations resolve through StateStore.getAudit.

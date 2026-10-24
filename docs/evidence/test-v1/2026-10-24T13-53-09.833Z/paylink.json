@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-24T13:53:13.191Z",
+  "bank": "mock",
+  "phoneDialed": false,
+  "qrDecoded": true,
+  "amountCents": 247500,
+  "status": "partially_paid",
+  "privateRegistration": true,
+  "steps": [
+    {
+      "name": "paylink-01-qr",
+      "detail": "Decoded the rendered QR pixels into the public HTTPS short URL"
+    },
+    {
+      "name": "paylink-02-reconciled",
+      "detail": "Mock Nessie HTTP and exact reducer reconciliation; receipt survives reload"
+    }
+  ]
+}

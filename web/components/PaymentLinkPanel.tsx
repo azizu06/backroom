@@ -20,14 +20,14 @@ export default function PaymentLinkPanel() {
     return () => { stopped = true; controller.abort(); clearInterval(timer); };
   }, []);
   const active = delivery && delivery.expiresAt > Date.now() ? delivery : null;
-  return <section aria-label="Call payment link">
+  return <section aria-label="Call payment link" style={{ maxWidth: 360, padding: 20, background: "#161a20", color: "#f2f2f2", border: "1px solid #343b46", borderRadius: 12, fontFamily: "system-ui, sans-serif" }}>
     <h2>Scan to pay</h2>
     {error ? <p role="status">Payment link unavailable. Reconnecting…</p> : active ? <>
       {/* QR is generated locally; the payment capability is never sent to an image service. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={active.qr} width={256} height={256} alt="Scan to open your authorized payment page" />
       <p>Code: <strong>{active.code}</strong></p>
-      <a href={active.url} rel="noreferrer">{active.url}</a>
+      <a href={active.url} rel="noreferrer" style={{ color: "#9dc2ff", overflowWrap: "anywhere" }}>{active.url}</a>
       <p>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(active.amountCents / 100)} · Expires {new Date(active.expiresAt).toLocaleTimeString()}</p>
       <p>Nessie sandbox · simulated card</p>
     </> : <p role="status">Waiting for an authorized payment plan…</p>}
