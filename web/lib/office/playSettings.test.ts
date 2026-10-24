@@ -16,9 +16,21 @@ function memory() {
 }
 
 describe("play settings", () => {
+  it("stores the movement-feel switches and falls back per field", () => {
+    const off = { smoothMove: false, headBob: false, fovKick: false };
+    expect(parsePlaySettings(JSON.stringify(off))).toEqual({ ...DEFAULT_PLAY_SETTINGS, ...off });
+    expect(parsePlaySettings(JSON.stringify({ headBob: false, smoothMove: "no", fovKick: 1 }))).toEqual({ ...DEFAULT_PLAY_SETTINGS, headBob: false });
+    expect(parsePlaySettings(JSON.stringify({ sensitivity: 2 }))).toMatchObject({ smoothMove: true, headBob: true, fovKick: true });
+    const storage = memory();
+    expect(savePlaySettings(storage, { ...DEFAULT_PLAY_SETTINGS, ...off })).toBe(true);
+    expect(loadPlaySettings(storage)).toEqual({ ...DEFAULT_PLAY_SETTINGS, ...off });
+    expect(savePlaySettings(storage, { ...DEFAULT_PLAY_SETTINGS, fovKick: false })).toBe(true);
+    expect(storage.data.has(PLAY_SETTINGS_KEY)).toBe(true);
+  });
+
   it("parses stored settings and clamps them into range", () => {
-    expect(parsePlaySettings(JSON.stringify({ sensitivity: 2, invertY: true, speed: 1.5 }))).toEqual({ sensitivity: 2, invertY: true, speed: 1.5 });
-    expect(parsePlaySettings(JSON.stringify({ sensitivity: 99, speed: -4 }))).toEqual({ sensitivity: SENSITIVITY_RANGE.max, invertY: false, speed: SPEED_RANGE.min });
+    expect(parsePlaySettings(JSON.stringify({ sensitivity: 2, invertY: true, speed: 1.5 }))).toEqual({ ...DEFAULT_PLAY_SETTINGS, sensitivity: 2, invertY: true, speed: 1.5 });
+    expect(parsePlaySettings(JSON.stringify({ sensitivity: 99, speed: -4 }))).toEqual({ ...DEFAULT_PLAY_SETTINGS, sensitivity: SENSITIVITY_RANGE.max, speed: SPEED_RANGE.min });
     expect(parsePlaySettings(JSON.stringify({ sensitivity: 1.3 })).sensitivity).toBe(1.25);
   });
 
@@ -33,8 +45,8 @@ describe("play settings", () => {
 
   it("round-trips through storage and removes the key for defaults", () => {
     const storage = memory();
-    expect(savePlaySettings(storage, { sensitivity: 0.5, invertY: true, speed: 2 })).toBe(true);
-    expect(loadPlaySettings(storage)).toEqual({ sensitivity: 0.5, invertY: true, speed: 2 });
+    expect(savePlaySettings(storage, { ...DEFAULT_PLAY_SETTINGS, sensitivity: 0.5, invertY: true, speed: 2 })).toBe(true);
+    expect(loadPlaySettings(storage)).toEqual({ ...DEFAULT_PLAY_SETTINGS, sensitivity: 0.5, invertY: true, speed: 2 });
     savePlaySettings(storage, DEFAULT_PLAY_SETTINGS);
     expect(storage.data.has(PLAY_SETTINGS_KEY)).toBe(false);
     expect(loadPlaySettings(storage)).toEqual(DEFAULT_PLAY_SETTINGS);
