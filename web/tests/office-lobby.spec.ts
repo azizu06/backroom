@@ -42,6 +42,15 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(errors).toEqual([]);
 });
 
+test('office shows the lobby summary and agent roster without page errors', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+  await expect(page.locator('.lobby-v2-roster > li').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('office ask-why pauses on a broken chain and resumes when verified', async ({ page }) => {
   let valid = false;
   await page.route('**/api/audit/entries', route => route.fulfill({ json: {
