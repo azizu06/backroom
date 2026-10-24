@@ -102,7 +102,7 @@ it('sends only the context text, not the image, when a scanned document with tex
   const h = harness({ router: { fallback: route }, readDocument: async () => ({ text: TEXT, attachment: { mediaType: 'image/png', bytes } }) });
   await h.call('read_document', { documentRef: 'case-1:document', chunk: 0 });
   expect(await h.call('local_extract', { documentRef: 'case-1:document' })).toMatchObject({ decision: 'ALLOW', route: 'cloud_fallback' });
-  expect(route).toHaveBeenCalledWith('field_extraction', TEXT, EXTRACTION_SCHEMA);
+  expect(route).toHaveBeenCalledWith('field_extraction', TEXT, EXTRACTION_SCHEMA, { signal: expect.any(AbortSignal) });
 });
 
 it('the OFF switch and a lost activation still fence the fallback', async () => {
@@ -159,4 +159,27 @@ it('audits to the shared StateStore when a caller supplies no audit sink', async
   await h.call('local_extract', { documentRef: 'case-1:document' });
   const rows = (await getStateStore().listAudit()).slice(before).filter(row => row.action === 'extraction_routed');
   expect(rows).toEqual([expect.objectContaining({ route: 'cloud_fallback', ruleIds: ['ROUTE_FALLBACK'], costUsd: 0.002 })]);
+});
+
+it('a link that drops while the GX10 body streams falls back; a malformed body does not', async () => {
+  const dropped: typeof fetch = async () => new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"choi')); }, pull(c) { c.error(new TypeError('terminated')); } }), { status: 200 });
+  const fallback = vi.fn<ExtractionRouter['fallback']>(async () => ({ output: invoice, route: 'cloud_fallback' as const, model: 'claude-sonnet-5-5', latencyMs: 1, costUsd: 0.001 }));
+  const h = harness({ router: { fallback }, fetch: dropped });
+  await h.call('read_document', { documentRef: 'case-1:document', chunk: 0 });
+  expect(await h.call('local_extract', { documentRef: 'case-1:document' })).toMatchObject({ decision: 'ALLOW', route: 'cloud_fallback' });
+  expect(fallback).toHaveBeenCalledTimes(1);
+
+  const malformed = vi.fn<ExtractionRouter['fallback']>();
+  const m = harness({ router: { fallback: malformed }, fetch: async () => new Response('<html>oops</html>', { status: 200 }) });
+  await m.call('read_document', { documentRef: 'case-1:document', chunk: 0 });
+  expect(await m.call('local_extract', { documentRef: 'case-1:document' })).toMatchObject({ decision: 'DENY', errors: ['LOCAL_EXTRACTION_FAILED'] });
+  expect(malformed).not.toHaveBeenCalled();
+});
+
+it('passes the activation signal to the cloud fallback', async () => {
+  const fallback = vi.fn<ExtractionRouter['fallback']>(async () => ({ output: invoice, route: 'cloud_fallback' as const, model: 'claude-sonnet-5-5', latencyMs: 1, costUsd: 0.001 }));
+  const h = harness({ router: { fallback } });
+  await h.call('read_document', { documentRef: 'case-1:document', chunk: 0 });
+  await h.call('local_extract', { documentRef: 'case-1:document' });
+  expect(fallback.mock.calls[0]![3]?.signal).toBe(h.ctx.activation.signal);
 });

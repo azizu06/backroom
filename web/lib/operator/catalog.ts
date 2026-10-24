@@ -12,6 +12,9 @@ export const operatorActions = {
   warm: ['Warm GX10 model', 'One local token on the configured model. Requires host opt-in and LLM ON.'],
   llm_on: ['Enable models', 'Allows model work through the existing global switch. Providers may incur costs.'],
   llm_off: ['Turn models OFF', 'Aborts model work through the existing global switch. Code policy remains active.'],
+  x402_simulated: ['Pay vendor with x402 · SIMULATED', 'Approved $1,250.00 Acme Supply invoice through PayablesSeat. Mock vendor and facilitator in this process: no keys, chain or real money.'],
+  x402_testnet: ['Pay vendor with x402 · TESTNET', 'Approved $0.01 Acme Supply invoice in worthless Base Sepolia test USDC. Host opt-in (X402_LIVE=1) and macOS Keychain signer only; once per host process.'],
+  x402_blocked: ['Try blocked x402 invoice · SIMULATED', '$2,450.00 Acme Supply invoice over the $2,000 Payables limit. Policy holds it with zero signing and zero vendor requests.'],
 } as const;
 export type OperatorAction = keyof typeof operatorActions;
 export function isOperatorAction(value: string): value is OperatorAction { return Object.hasOwn(operatorActions, value); }

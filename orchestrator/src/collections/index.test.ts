@@ -200,3 +200,11 @@ describe('phone mismatch (C17)', () => {
     expect((await audit()).some((entry: AuditInput) => entry.action === 'phone_mismatch_warn')).toBe(false);
   });
 });
+
+it('a phone mismatch on a call blocked by an unavailable OFAC check leaves no ALLOW warning row', async () => {
+  const { deps, audit } = harness();
+  deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: false, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+  deps.credit.check = vi.fn(async () => { throw new Error('CRS down'); });
+  expect(await runPreCall(input(), deps)).toMatchObject({ status: 'blocked' });
+  expect((await audit()).some((entry: AuditInput) => entry.action === 'phone_mismatch_warn')).toBe(false);
+});
