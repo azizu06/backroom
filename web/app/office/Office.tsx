@@ -53,7 +53,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray }: 
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null } } => ({ input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null } }));
-  const presence = usePresence({ mode, hud: play.hud });
+  const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
   function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
