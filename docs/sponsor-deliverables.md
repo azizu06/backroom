@@ -32,6 +32,7 @@ tap, a live CRS/OFAC probe, or a Nessie settlement.
 | Demo inbox agent team | 1/1 | Scripted QueryFn. `VENDOR_CRS` is pinned fake for the run. Not the Cedar passkey write |
 | C5 judge calls | 7/7 | Unrecognized requests escalate and are tagged `scenario_source: judge` |
 | Live-call approval expiry and one re-escalation | 14/14 | Injected clock. Not a human passkey tap |
+| P12 GX10 cut over keyed AP steps | 10/10 | P10 has no keyed AP invoice step, so it is outside this row. Mock transport, not a live link cut |
 | Scenarios with no unexecuted integration step | 22/34 | The other 12 stay partial |
 
 ## Release checklist

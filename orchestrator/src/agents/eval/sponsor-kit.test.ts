@@ -11,7 +11,7 @@ it('cites the committed scoreboard rows in the sponsor kit', () => {
   const kit = read('docs/sponsor-deliverables.md');
   const fraction = (rate: { numerator: number; denominator: number }) => `${rate.numerator}/${rate.denominator}`;
   const rates = scoreboard.rates;
-  for (const key of ['arConversations', 'precallStops', 'callButton', 'inboxTeam', 'judgeCalls', 'approvalExpiry', 'legacyCompleteScenarios'] as const) {
+  for (const key of ['arConversations', 'precallStops', 'callButton', 'inboxTeam', 'judgeCalls', 'approvalExpiry', 'gx10Failover', 'legacyCompleteScenarios'] as const) {
     expect(kit, key).toContain(fraction(rates[key]));
   }
   const pdf = rates.sourceDocumentExtractionAccuracy;
