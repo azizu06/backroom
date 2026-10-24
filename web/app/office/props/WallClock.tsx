@@ -5,40 +5,34 @@ import type { OfficeSnapshot } from '../../../lib/office/state';
 import { CLOCK_INTERACTION, clockFace, msUntilNextMinute } from '../../../lib/office/props/clock';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 
-const RADIUS = 0.4, FACE = RADIUS - 0.04, TEX = 256;
-/** Texture pixels per world unit on the face. */
-const PX = TEX / 2 / FACE;
-/** The text sits below this radius (px from centre); hand tips stay inside it so no hand ever covers it. */
-const TEXT_TOP = 74;
+const RADIUS = 0.65, FACE = RADIUS - 0.04, TEX = 512;
+const FACE_UNITS = 256;
 const HAND_BACK = 0.03;
-const MINUTE_LENGTH = (TEXT_TOP - 8) / PX + HAND_BACK, HOUR_LENGTH = MINUTE_LENGTH * 0.7;
+const MINUTE_LENGTH = FACE * 0.74, HOUR_LENGTH = MINUTE_LENGTH * 0.68;
 
-function drawFace(ctx: CanvasRenderingContext2D, text: string, receipts: number) {
-  const c = TEX / 2;
+function drawFace(ctx: CanvasRenderingContext2D) {
+  ctx.scale(TEX / FACE_UNITS, TEX / FACE_UNITS);
+  const c = FACE_UNITS / 2;
   ctx.fillStyle = '#f1ede2';
   ctx.beginPath();
   ctx.arc(c, c, c, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#303d34';
   ctx.lineCap = 'round';
-  // No 6 o'clock tick: the time and receipt text sit there.
   for (let i = 0; i < 12; i++) {
-    if (i === 6) continue;
-    const angle = i * Math.PI / 6, major = i % 3 === 0;
-    const inner = major ? c - 34 : c - 24;
-    ctx.lineWidth = major ? 7 : 4;
+    if (i % 3 === 0) continue;
+    const angle = i * Math.PI / 6;
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(c + Math.sin(angle) * inner, c - Math.cos(angle) * inner);
-    ctx.lineTo(c + Math.sin(angle) * (c - 12), c - Math.cos(angle) * (c - 12));
+    ctx.moveTo(c + Math.sin(angle) * (c - 20), c - Math.cos(angle) * (c - 20));
+    ctx.lineTo(c + Math.sin(angle) * (c - 10), c - Math.cos(angle) * (c - 10));
     ctx.stroke();
   }
   ctx.fillStyle = '#303d34';
   ctx.textAlign = 'center';
-  ctx.font = `600 20px ${PROP_FONT}`;
-  ctx.fillText(text, c, c + TEXT_TOP + 16);
-  ctx.fillStyle = '#6b6f63';
-  ctx.font = `500 14px ${PROP_FONT}`;
-  ctx.fillText(`receipts ${receipts}`, c, c + TEXT_TOP + 34);
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 70px ${PROP_FONT}`;
+  for (const [text, x, y] of [['12', c, 42], ['3', 216, c], ['6', c, 216], ['9', 40, c]] as const) ctx.fillText(text, x, y);
 }
 
 function Hand({ angle, length, width, z }: { angle: number; length: number; width: number; z: number }) {
@@ -49,7 +43,7 @@ function Hand({ angle, length, width, z }: { angle: number; length: number; widt
   </group>;
 }
 
-function Clock({ receipts }: { receipts: number }) {
+function Clock() {
   const [now, setNow] = useState(() => Date.now());
   // One state change per minute, aligned to the boundary; no frame loop and no second hand (same under reduced motion).
   useEffect(() => {
@@ -58,24 +52,27 @@ function Clock({ receipts }: { receipts: number }) {
   }, [now]);
   const face = clockFace(now);
   // Redrawing the face invalidates once, which also renders the new hand angles.
-  const texture = useCanvasTexture(TEX, TEX, ctx => drawFace(ctx, face.text, receipts), [face.text, receipts]);
-  return <group name='prop:clock' position={[-7.9, 1.75, 0.6]} rotation={[0, Math.PI / 2, 0]}>
-    <mesh position={[0, -RADIUS - 0.1, -0.02]} receiveShadow>
-      <boxGeometry args={[0.06, 0.3, 0.04]} /><meshStandardMaterial color='#5a6156' />
+  const texture = useCanvasTexture(TEX, TEX, drawFace, [face.text]);
+  return <group name='prop:clock' position={[-7.9, 1.75, 0.6]}>
+    <mesh position={[0.26, 0, 0]} receiveShadow>
+      <boxGeometry args={[0.52, 0.08, 0.08]} /><meshStandardMaterial color='#5a6156' />
     </mesh>
-    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-      <cylinderGeometry args={[RADIUS, RADIUS, 0.08, 32]} /><meshStandardMaterial color='#3c4d47' roughness={0.7} />
-    </mesh>
-    <mesh position={[0, 0, 0.041]} receiveShadow>
-      <circleGeometry args={[FACE, 32]} />
-      <meshStandardMaterial map={texture} emissiveMap={texture} emissive='#ffffff' emissiveIntensity={0.3} roughness={1} />
-    </mesh>
-    <Hand angle={face.hourAngle} length={HOUR_LENGTH} width={0.035} z={0.05} />
-    <Hand angle={face.minuteAngle} length={MINUTE_LENGTH} width={0.022} z={0.058} />
+    {/* Fixed wall bracket with a tilted face; its normal follows the overview's (13, 15, 17) direction. */}
+    <group position={[0.52, 0, 0]} rotation={[-Math.atan2(15, Math.hypot(13, 17)), Math.atan2(13, 17), 0, 'YXZ']}>
+      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[RADIUS, RADIUS, 0.08, 32]} /><meshStandardMaterial color='#3c4d47' roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 0, 0.041]} receiveShadow>
+        <circleGeometry args={[FACE, 32]} />
+        <meshStandardMaterial map={texture} emissiveMap={texture} emissive='#ffffff' emissiveIntensity={0.3} roughness={1} />
+      </mesh>
+      <Hand angle={face.hourAngle} length={HOUR_LENGTH} width={0.035} z={0.05} />
+      <Hand angle={face.minuteAngle} length={MINUTE_LENGTH} width={0.022} z={0.058} />
+    </group>
   </group>;
 }
 
-/** Left-wall clock above the Lobby/Collections aisle, facing +x. */
+/** Left-wall clock on a fixed bracket, angled toward overview. Exact time and receipts remain in its panel. */
 export function WallClock({ snapshot }: { snapshot: OfficeSnapshot }) {
-  return CLOCK_INTERACTION.visible(snapshot) ? <Clock receipts={snapshot.audit.length} /> : null;
+  return CLOCK_INTERACTION.visible(snapshot) ? <Clock /> : null;
 }

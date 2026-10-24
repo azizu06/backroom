@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeAgent, type OfficeAudit, type OfficeSnapshot } from '../state';
-import { MONITOR_DESKS, MONITOR_LINE_MAX, monitorInteraction, monitorScreen, monitorScreenKey } from './monitors';
+import { MONITOR_DESKS, MONITOR_LINE_MAX, monitorInteraction, monitorOverview, monitorScreen, monitorScreenKey } from './monitors';
 import { OFFICE_PROP_INTERACTIONS, propInteractions } from './index';
 
 const agent = (patch: Partial<OfficeAgent> = {}): OfficeAgent => ({
@@ -13,6 +13,22 @@ const snapshot = (patch: Partial<OfficeSnapshot> = {}): OfficeSnapshot => ({ ...
 const withRooms = (...ids: AnchorId[]) => snapshot({ rooms: ids.map(id => ({ id, rowId: `row:${id}` })) });
 
 describe('monitorScreen', () => {
+  it('uses two compact overview rows while keeping full task data intact', () => {
+    const screen = monitorScreen(snapshot({ agents: [agent({ state: 'Matching' })] }), 'collections');
+    expect(monitorOverview(screen)).toEqual(['Alex', 'Matching']);
+    expect(screen.lines[0]!.text).toBe('Alex · Matching');
+    expect(monitorOverview(monitorScreen(snapshot(), 'payables'))).toEqual(['Idle', 'Idle']);
+    expect(monitorOverview(monitorScreen(snapshot(), 'dana'))).toEqual(['Dana', 'Wait: 0']);
+  });
+
+  it('shows receipt decisions in overview without inferring business outcomes', () => {
+    for (const [decision, label] of [['ALLOW', 'ALLOW'], ['DENY', 'DENY'], ['ESCALATE', 'HOLD'], ['RECORDED', 'LOGGED']] as const) {
+      expect(monitorOverview(monitorScreen(snapshot({ audit: [row('1', decision)] }), 'collections'))[1]).toBe(label);
+    }
+    expect(monitorOverview(monitorScreen(snapshot({ agents: [agent({ targetAnchor: 'treasury' })] }), 'collections'))[1]).toBe('Away');
+    expect(monitorOverview(monitorScreen(snapshot({ agents: [agent({ targetAnchor: 'dana', escalationId: 'e1' })] }), 'collections'))[1]).toBe('Folder');
+  });
+
   it('shows the seated agent name and state under the seat name', () => {
     const screen = monitorScreen(snapshot({ agents: [agent({ state: 'Matching' })] }), 'collections');
     expect(screen.heading).toBe('Collections');
