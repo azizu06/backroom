@@ -32,3 +32,10 @@ it('updates existing tools without the create-only type field', async () => {
   });
   await provisionVoice({ apiKey: 'test', relayOrigin: 'https://relay.test', toolSecret: 'tool', eventSecret: 'event', resources, save: async () => undefined, http });
 });
+
+it('requires the agent to submit requested terms before verbal policy decisions', () => {
+  const instructions = managedConfig(['proposal-tool']).instructions;
+  expect(instructions).toContain('Before offering, refusing, or negotiating any payment terms, call propose_plan and wait for its result.');
+  expect(instructions).toContain('Submit the caller\'s requested terms even when they exceed the envelope, including four installments or a fee waiver.');
+  expect(instructions).toContain('If a number is ambiguous (for example "for" versus "four"), ask for clarification before choosing installments.');
+});
