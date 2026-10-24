@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { GET as precallRoute } from '../../app/api/calls/precall/route';
-import { installDemoPrecallEvidence } from '../demo/services';
-import { precallCard, precallRows, type PrecallSignal } from './precall';
+import { installPrecallEvidence, precallCard, precallRows, type PrecallSignal } from './precall';
 
 const MAPS_URL = 'https://www.google.com/maps/place/?q=place_id:abc';
 const row = (type: string, value: unknown, label: string, extra: Partial<PrecallSignal> = {}): PrecallSignal =>
   ({ source: 'apify', type, value, observedAt: '2026-10-24T18:05:09.000Z', label, sourceUrl: MAPS_URL, ...extra });
 
-afterEach(() => installDemoPrecallEvidence(undefined as never));
+afterEach(() => installPrecallEvidence(undefined));
 
 describe('desk phone pre-call card', () => {
   it('shows a live Apify run as open with its run id, host, time and phone match', () => {
@@ -59,10 +58,10 @@ describe('desk phone pre-call card', () => {
     let response = await precallRoute();
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect((await response.json()).card).toMatchObject({ business: 'unknown', status: 'not prepared' });
-    installDemoPrecallEvidence(() => ({ preCall: { status: 'ready' }, signals: [row('apify_maps_status', 'operating', 'Apify: live run run_R')] }));
+    installPrecallEvidence(() => ({ preCall: { status: 'ready' }, signals: [row('apify_maps_status', 'operating', 'Apify: live run run_R')] }));
     response = await precallRoute();
     expect((await response.json()).card).toMatchObject({ business: 'open', source: 'Apify: live run run_R', sourceHost: 'www.google.com' });
-    installDemoPrecallEvidence(() => { throw new Error('host down'); });
+    installPrecallEvidence(() => { throw new Error('host down'); });
     response = await precallRoute();
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'PRECALL_UNAVAILABLE' });

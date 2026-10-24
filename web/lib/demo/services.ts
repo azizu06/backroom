@@ -6,13 +6,10 @@ import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHeal
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
 import type { PrecallEvidence } from '../calls/precall';
 
-const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services']; backroomDemoPrecall?: () => PrecallEvidence };
+const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
 /** Safe server-only observation for the real-vs-sim route; never initiates a probe. */
 export const getDemoHostServices = () => root.backroomDemoServiceStatus?.() ?? null;
 export function installDemoServiceStatus(read: () => DemoStatus['services']) { root.backroomDemoServiceStatus = read; }
-/** The desk phone's pre-call card source: evidence already fetched by prepare(). Never starts a check. */
-export const getDemoPrecallEvidence = () => root.backroomDemoPrecall?.() ?? null;
-export function installDemoPrecallEvidence(read: () => PrecallEvidence) { root.backroomDemoPrecall = read; }
 
 /** Adapters belong to the web host, survive company resets, and never serialize credentials. */
 export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; modelRoute?: typeof route } = {}) {

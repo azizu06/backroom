@@ -5,6 +5,11 @@ export interface PrecallEvidence {
   preCall?: { status: string; reason?: string; warnings?: unknown };
   signals?: readonly PrecallSignal[];
 }
+const root = globalThis as typeof globalThis & { backroomDemoPrecall?: () => PrecallEvidence };
+/** The demo host installs its prepare() evidence here. Kept out of lib/demo so the public route does not trace the host. */
+export const getPrecallEvidence = () => root.backroomDemoPrecall?.() ?? null;
+export function installPrecallEvidence(read: (() => PrecallEvidence) | undefined) { root.backroomDemoPrecall = read; }
+
 export interface PrecallCard {
   business: 'open' | 'closed' | 'unknown';
   businessDetail: string;
