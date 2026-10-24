@@ -85,7 +85,7 @@ export interface StateStore {
   getEscalation(id: string): Promise<Escalation | undefined>;
   createCallEscalation(input: CallEscalation, now: number): Promise<Escalation>;
   decideEscalation(approval: VerifiedApproval, now: number): Promise<Escalation>;
-  /** Closes due rows. Pass callId when that live call has ended so its pending rows close immediately. */
+  /** Closes due rows. Pass callId when that live call has ended so its rows close immediately. An already-expired row still records pending_owner once. */
   expireEscalations(now: number, callId?: string): Promise<void>;
   // Approval writes belong to the controller/passkey service, not to workers.
   appendAudit(entry: AuditInput): Promise<AuditEntry>;

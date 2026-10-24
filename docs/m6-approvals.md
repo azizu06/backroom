@@ -68,7 +68,9 @@ still install a populated `GatewayStore` via `installGatewayStore`.
   refused (`ESCALATION_OPEN`). Voice cannot approve. On an open call,
   `check_approval` never says Dana will confirm by email. Rows with no `callId`
   still close at 60 seconds as `pending_owner`. When a live call ends, a
-  matching AR invoice in `in_collection`/`escalated` moves to `pending_owner`.
+  matching AR invoice in `in_collection`/`escalated` moves to `pending_owner`,
+  including a row that already expired during the call. That follow-up is
+  written once and does not repeat `escalation_expired`.
   Reads, gateway polls and the call-end hook enforce expiry; no browser timer
   is trusted. Late assertions cannot approve an `expired` row. The approval
   card's after-call `pending_owner` line remains “Dana will confirm by email

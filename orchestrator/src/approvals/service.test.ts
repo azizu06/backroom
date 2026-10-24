@@ -113,6 +113,27 @@ describe('M6 server-verified controller authority', () => {
     expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(0);
   });
 
+  it('records pending_owner when the call ends after the window already expired', async () => {
+    const { store, advance } = await setup();
+    const windowMs = approvalWindowMs();
+    advance(windowMs);
+    const at = 1000 + windowMs;
+    await store.expireEscalations(at);
+    expect((await store.getEscalation('e1'))?.status).toBe('expired');
+    expect((await store.listAudit()).filter(e => e.action === 'escalation_expired')).toHaveLength(1);
+    expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(0);
+    await store.registerAgent('worker', 'collections', at);
+    await store.enqueueTask({ id: 'follow-up', seatId: 'collections', refs: ['1042'], steps: [] });
+    const lease = (await store.claimTask('worker', at, 10_000))!;
+    await expect(store.transitionInvoice(lease, '1042', 'pending_owner', 'promised', at)).rejects.toThrow('INVALID_INVOICE_TRANSITION');
+    await store.expireEscalations(at, 'c1');
+    await store.expireEscalations(at, 'c1');
+    expect((await store.getEscalation('e1'))?.status).toBe('expired');
+    expect((await store.listAudit()).filter(e => e.action === 'escalation_expired')).toHaveLength(1);
+    expect((await store.listAudit()).filter(e => e.action === 'pending_owner')).toHaveLength(1);
+    await store.transitionInvoice(lease, '1042', 'pending_owner', 'promised', at);
+  });
+
   it('expires a live call when the call ends and still rejects a passkey that is not a valid assertion', async () => {
     const { service, auth, store, advance } = await setup();
     advance(1_000);

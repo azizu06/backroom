@@ -204,16 +204,19 @@ export class ReducerEngine {
     for (const escalation of this.escalations.values()) {
       const liveCall = typeof escalation.callId === 'string' && escalation.callId.length > 0;
       const ended = liveCall && endedCallId !== undefined && escalation.callId === endedCallId;
-      if (escalation.status !== 'pending' || (!ended && now < escalation.expiresAt)) continue;
+      const pending = escalation.status === 'pending';
+      // A window timeout leaves the row expired and the invoice alone. Call end still records follow-up once.
+      const followUp = ended && escalation.status === 'expired';
+      if ((!pending && !followUp) || (pending && !ended && now < escalation.expiresAt)) continue;
       const seat = this.agents.get(escalation.fromAgent)?.seatId ?? 'collections';
       const audit = (action: string) => this.append({ ts: now, actor: 'system', seat, action, ruleIds: escalation.ruleIds,
         policyVersion: escalation.policyVersion, refs: [escalation.id, ...escalation.evidenceRefs], route: 'code', latencyMs: 0, costUsd: 0 });
-      if (liveCall) {
-        // Distinct from pending_owner so a live caller can be asked once. Email follow-up waits until the call ends.
+      if (liveCall && pending) {
         escalation.status = 'expired';
         audit('escalation_expired');
         if (!ended) continue;
-      } else escalation.status = 'pending_owner';
+      } else if (!liveCall) escalation.status = 'pending_owner';
+      if (this.audit.list().some(entry => entry.action === 'pending_owner' && entry.refs[0] === escalation.id)) continue;
       const invoice = escalation.invoiceId && this.invoices.get(escalation.invoiceId);
       if (invoice && invoice.kind === 'ar' && ['in_collection', 'escalated'].includes(invoice.state)) invoice.state = 'pending_owner';
       audit('pending_owner');

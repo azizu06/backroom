@@ -99,7 +99,7 @@ export default function ApprovalCard({ id }: { id: string }) {
         </section>
         {closed ? <section className={styles.result} aria-live="polite">
           <h2>{row.status === 'pending_owner' ? 'Dana will confirm by email today.' : row.status === 'expired' ? 'This request expired.' : 'Your decision is recorded.'}</h2>
-          <p>{row.method === 'passkey' ? 'Confirmed with Dana’s passkey. The clerk can now relay your decision on the call.' : row.status === 'expired' ? 'No terms were approved. The clerk may ask once to send a fresh request.' : 'The review window ended. No terms were approved.'}</p>
+          <p>{row.method === 'passkey' ? 'Confirmed with Dana’s passkey. The clerk can now relay your decision on the call.' : row.status === 'expired' ? 'No terms were approved.' : 'The review window ended. No terms were approved.'}</p>
           {row.decision?.kind === 'Counter' && <p>{row.decision.terms.installments} payments · {row.decision.terms.firstPaymentPct}% first · {row.decision.terms.durationDays} days</p>}
         </section> : <section className={styles.section}>
           {!registered && <p className={styles.error}>Dana’s passkey is not set up. <a href="/controller">Set up the controller passkey</a> before reviewing requests.</p>}
