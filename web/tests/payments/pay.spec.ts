@@ -13,6 +13,8 @@ test('mobile sandbox pay page uses fixed ALLOW amount, posts once, and reloads i
   await page.reload();
   await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
   await page.screenshot({ path: testInfo.outputPath('pay-mobile-after.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Refresh payment status', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('pay-mobile-bank-readback.png') });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: testInfo.outputPath('pay-desktop-after.png'), fullPage: true });
 });
