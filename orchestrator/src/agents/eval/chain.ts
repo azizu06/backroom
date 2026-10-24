@@ -15,7 +15,7 @@ import { MemoryVendorEvidenceStore, type VendorToolDeps } from '../tools/vendor'
 import { ApifyBudget } from '../tools/vendor-apify';
 import { MemoryStateStore } from '../../store';
 import { createNorthfieldRepository, northfield, northfieldInvoice, northfieldSource, PayablesSeat } from '../../payables';
-import type { InvoiceFields } from '../../payables';
+import type { FinanceRepository, InvoiceFields } from '../../payables';
 
 const fixtureRoot = fileURLToPath(new URL('../../../../fixtures/', import.meta.url));
 export interface Trace { role: Role; tool: string; output: Json }
@@ -51,11 +51,11 @@ export async function auditCase(store: MemoryStateStore, id: string, refs: strin
 }
 
 export async function runInvoice(id: string, options: { caseId?: string; pendingBankChange?: boolean; senderDomain?: string;
-  candidate?: InvoiceFields } = {}) {
+  candidate?: InvoiceFields; repository?: FinanceRepository; state?: MemoryStateStore } = {}) {
   const caseId = options.caseId ?? `ap:${id}`;
   const trace: Trace[] = [];
-  const repository = await createNorthfieldRepository();
-  const state = new MemoryStateStore();
+  const repository = options.repository ?? await createNorthfieldRepository();
+  const state = options.state ?? new MemoryStateStore();
   const fields = northfieldInvoice(id);
   const source = { ...northfieldSource(id), ...(options.senderDomain && { senderDomain: options.senderDomain }) };
   const seedInvoice = northfield.apInvoices.find(row => row.id === id)!;
@@ -76,15 +76,17 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
     }) } }] }), { status: 200 }) };
   const verifier: VendorToolDeps = { loadCase: async () => ({ vendorId: fields.vendorId, kind: 'invoice',
     senderDomain: source.senderDomain, claimedAccountId: fields.bankAccountId }), vendors: repository,
-    bankChangeRisk: { check: async () => ({ score: 0, label: 'FAKE offline fixture; not checked', checkedAt: northfield.snapshotAt }) },
+    bankChangeRisk: { check: async () => ({ score: 0, label: 'FAKE: synthetic fraud risk (not checked)' }) },
     publicRecords: async () => ({ bankruptcies: 0, evidenceRef: 'mock:public-records-clear' }),
     health: { check: async () => ({ signals: [{ type: 'website_reachable', value: vendor.footprint.websiteReachable,
       sourceUrl: `https://${vendor.knownDomain}/`, observedAt: northfield.snapshotAt }] }) },
     contact: async () => { throw new Error('OFFLINE_CONTACT_NOT_CONFIGURED'); },
     budget: new ApifyBudget(), evidence: new MemoryVendorEvidenceStore(), now: () => Date.parse(northfield.snapshotAt) };
   const receipts: string[] = [];
-  const seat = new PayablesSeat({ repository, state, controller,
-    nessie: { payInvoice: async () => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt); return { id: receipt, status: 'completed' }; } } });
+  const destinations: string[] = [];
+  const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'nessie', bankChangeRisk: verifier.bankChangeRisk,
+    nessie: { payInvoice: async payment => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt);
+      destinations.push(payment.destinationAccountId); return { id: receipt, status: 'completed' }; } } });
   const store = new MemoryHandoffStore({ audit: state });
   const ledger = new MemoryUsageLedger();
   const roles = createRoleRegistry({ intake, extractor, vendor: verifier,
@@ -136,7 +138,7 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
   return { id, caseId, vendorDecision, historical: seedInvoice.status === 'paid',
     actual: ['failed', 'paused', 'cancelled'].includes(dispatched.status) ? 'ERROR' as const
       : result.status === 'paid' ? 'ALLOW' as const : 'HOLD' as const,
-    extraction: extraction?.fields, assessment, vendor: verdict, result, mockDebits: receipts.length, trace,
+    extraction: extraction?.fields, assessment, vendor: verdict, result, mockDebits: receipts.length, destinations, trace,
     runtime: { status: dispatched.status, reason: dispatched.reason,
       activations: dispatched.activations.map(row => ({ role: row.role, kind: row.kind, reason: row.reason, model: row.model })),
       handoffs: dispatched.handoffs.map(row => ({ from: row.from, to: row.to, status: row.status })),
