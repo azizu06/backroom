@@ -1,0 +1,25 @@
+/* "Enter the office" splash: covers the whole viewport until the viewer picks Play or the overview. */
+.office-shell .play-splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: #1b2119d9; backdrop-filter: blur(3px); color: #d0d6c6; animation: play-splash-in .35s ease-out both; }
+.play-splash-card { width: min(520px, 100%); text-align: center; background: #272f25f2; border: 1px solid #8b987b; padding: 32px 28px 24px; box-shadow: 0 10px 40px #0007; animation: play-splash-rise .45s ease-out both; }
+.play-splash-kicker { margin: 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8b987b; }
+.play-splash h2 { margin: 6px 0 10px; font-size: 44px; font-weight: 600; letter-spacing: -1px; color: #f3dfb9; }
+.play-splash-pitch { margin: 0 auto 22px; max-width: 400px; font-size: 15px; color: #d0d6c6; }
+.office-shell .play-splash-enter { display: block; width: 100%; padding: 14px 20px; font-size: 20px; font-weight: 700; letter-spacing: .5px; background: #f3dfb9; color: #272f25; border: 1px solid #f3dfb9; border-radius: 4px; }
+.office-shell .play-splash-enter:hover { background: #fff0cf; }
+.play-splash-controls { list-style: none; margin: 20px 0 14px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font-size: 12px; }
+.play-splash-controls li { display: flex; align-items: center; gap: 6px; }
+.play-splash-controls kbd { font: 11px/1 'SFMono-Regular', Consolas, monospace; padding: 4px 6px; border: 1px solid #8b987b; border-radius: 3px; background: #30382d; color: #f3dfb9; }
+.office-shell .play-splash-overview { background: transparent; border: 0; padding: 4px 6px; font-size: 13px; color: #d0d6c6; text-decoration: underline; text-underline-offset: 3px; }
+.office-shell .play-splash-overview:hover { background: transparent; color: #f3dfb9; }
+/* Toolbar entry back into first person while in the overview. */
+.office-shell .office-enter-play { order: -1; background: #f3dfb9; color: #272f25; border-color: #f3dfb9; font-weight: 700; }
+.office-shell .office-enter-play:hover { background: #fff0cf; }
+@keyframes play-splash-in { from { opacity: 0; } }
+@keyframes play-splash-rise { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) {
+  .office-shell .play-splash, .play-splash-card { animation: none; }
+}
+@media (max-width: 760px) {
+  .play-splash h2 { font-size: 34px; }
+  .play-splash-card { padding: 24px 18px 18px; }
+}

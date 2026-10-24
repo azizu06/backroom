@@ -23,6 +23,8 @@ import { FloorPlan } from './FloorPlan';
 import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
 import { ViewBoundary } from './ViewBoundary';
+import { PlaySplash } from './PlaySplash';
+import { COMPACT_QUERY, readStartView, saveStartView, startView } from '../../lib/office/start-mode';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
 import './a11y.css';
@@ -59,7 +61,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
-  function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
+  function exitPlay() { saveStartView('overview'); setLookOnEnter(false); pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
+  // First person is the default start; the splash supplies the user gesture pointer lock and audio need.
+  const [splash, setSplash] = useState(false);
+  const [lookOnEnter, setLookOnEnter] = useState(false);
+  function enterPlay() { setSplash(false); saveStartView('play'); setLookOnEnter(true); pickMode('play'); }
+  function enterOverview() { setSplash(false); saveStartView('overview'); document.getElementById('office-view')?.focus(); }
+  function chooseView(next: ViewMode) { saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next); }
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
   useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
@@ -114,6 +122,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
+    if (storyStart || source.getSnapshot().connection === 'replay') return;
+    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') setSplash(true);
+  // Decided once on mount; later prop changes never reopen the splash.
   }, []);
   const inspectorOpener = useRef<HTMLElement | null>(null);
   const closeInspector = useCallback(() => {
@@ -131,13 +142,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     <header className='office-toolbar'>
       <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
       <div className='office-tools'>
+        {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Enter first person</button>}
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
         <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
-        <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
+        <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
           {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
         </select></label>
       </div>
@@ -171,7 +183,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           })}
         </>}
       </ViewBoundary>
-      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} />}
+      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} lookOnStart={lookOnEnter} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Fixed camera · smooth walks' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
@@ -179,6 +191,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
+    {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     <footer className='office-footer'>
       <ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
       <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
