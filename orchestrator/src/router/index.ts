@@ -1,3 +1,6 @@
+import { getStateStore } from '../runtime';
+import type { StateStore } from '../store';
+
 /** Server-side model routing. Models suggest; policy and reducers own decisions. */
 export const TASK_ROUTES = {
   inbox_classification: 'local',
@@ -23,7 +26,14 @@ export interface RouteResult<T = unknown> {
   latencyMs: number;
   costUsd: number;
 }
+export interface LlmOffResult {
+  kind: 'LLM_OFF'; route: 'code'; model: 'none'; latencyMs: 0; costUsd: 0;
+  output?: never;
+}
+const llmOff = (): LlmOffResult => ({ kind: 'LLM_OFF', route: 'code', model: 'none', latencyMs: 0, costUsd: 0 });
+export const isLlmOff = (result: RouteResult | LlmOffResult): result is LlmOffResult => 'kind' in result && result.kind === 'LLM_OFF';
 export interface RouterOptions {
+  stateStore?: Pick<StateStore, 'llmEnabled' | 'llmSignal'>;
   localBaseUrl?: string;
   localModel?: string;
   cloudBaseUrl?: string;
@@ -45,6 +55,7 @@ type Completion = {
 };
 export function createRouter(options: RouterOptions = {}) {
   const http = options.fetch ?? fetch;
+  const state = () => options.stateStore ?? getStateStore();
   const now = options.now ?? (() => performance.now());
   let localBaseUrl = options.localBaseUrl ?? process.env.GX10_BASE_URL ?? 'http://100.117.44.20:11434/v1';
   const localModel = options.localModel ?? process.env.GX10_MODEL ?? 'gpt-oss:20b';
@@ -62,7 +73,7 @@ export function createRouter(options: RouterOptions = {}) {
   };
   const offline = () => { available = false; healthyPings = 0; };
   async function healthPing() {
-    if (checking || !enabled) return;
+    if (checking || !enabled || !state().llmEnabled) return;
     checking = true;
     try {
       const start = now();
@@ -74,12 +85,14 @@ export function createRouter(options: RouterOptions = {}) {
     } catch { offline(); }
     finally { checking = false; }
   }
-  async function complete(local: boolean, taskType: TaskType, input: unknown, schema?: OutputSchema<unknown>) {
+  async function complete(local: boolean, taskType: TaskType, input: unknown, schema: OutputSchema<unknown> | undefined, signal: AbortSignal) {
+    signal.throwIfAborted();
+    if (!state().llmEnabled) throw new Error('LLM_OFF');
     const base = local ? localBaseUrl : options.cloudBaseUrl ?? process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
     const apiKey = local ? 'ollama' : options.cloudApiKey ?? process.env.OPENROUTER_API_KEY;
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is required for cloud routing');
     const response = await http(`${base.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST', signal: AbortSignal.timeout(options.timeoutMs ?? (local ? 8000 : 30000)),
+      method: 'POST', signal: AbortSignal.any([signal, AbortSignal.timeout(options.timeoutMs ?? (local ? 8000 : 30000))]),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model: local ? localModel : cloudModel, temperature: 0, max_tokens: 2048,
         ...(local ? { reasoning_effort: localModel.startsWith('gpt-oss') ? 'low' : 'none' } : {}),
@@ -98,7 +111,9 @@ export function createRouter(options: RouterOptions = {}) {
     if (typeof confidence !== 'number' || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) throw new Error('Invalid confidence');
     return { output: schema ? schema.parse(envelope.output) : envelope.output as T, confidence };
   }
-  async function route<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>): Promise<RouteResult<T>> {
+  async function route<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>): Promise<RouteResult<T> | LlmOffResult> {
+    const signal = state().llmSignal;
+    if (!state().llmEnabled || signal.aborted) return llmOff();
     if (!Object.hasOwn(TASK_ROUTES, taskType)) throw new Error(`Unsupported task type: ${taskType}; in-call speech belongs to Cartesia`);
     const start = now();
     const preferredLocal = TASK_ROUTES[taskType] === 'local';
@@ -106,21 +121,28 @@ export function createRouter(options: RouterOptions = {}) {
       for (let attempt = 0; attempt < 2; attempt++) {
         let response: Completion;
         const requestStart = now();
-        try { response = await complete(true, taskType, input, schema); }
-        catch { offline(); break; }
+        try { response = await complete(true, taskType, input, schema, signal); }
+        catch { if (signal.aborted || !state().llmEnabled) return llmOff(); offline(); break; }
+        if (signal.aborted || !state().llmEnabled) return llmOff();
         samples.push(now() - requestStart);
         samples = samples.slice(-20);
         if (median() > 5000) offline();
         try {
           const result = decode(response, schema);
           if (result.confidence < (options.confidenceThreshold ?? 0.7)) break;
+          if (signal.aborted || !state().llmEnabled) return llmOff();
           return {output: result.output, route:'local', model:localModel, latencyMs:now()-start, costUsd:0};
         } catch { if (!available) break; /* Two schema failures escalate; never trust invalid output. */ }
       }
     }
-    const response = await complete(false, taskType, input, schema);
+    if (signal.aborted || !state().llmEnabled) return llmOff();
+    let response: Completion;
+    try { response = await complete(false, taskType, input, schema, signal); }
+    catch (error) { if (signal.aborted || !state().llmEnabled) return llmOff(); throw error; }
+    if (signal.aborted || !state().llmEnabled) return llmOff();
     const result = decode(response, schema);
     if (result.confidence < (options.confidenceThreshold ?? 0.7)) throw new Error('Cloud model confidence too low; human review required');
+    if (signal.aborted || !state().llmEnabled) return llmOff();
     const usage = response.usage;
     const estimate = ((usage?.prompt_tokens ?? 0) * (options.cloudInputUsdPerMillion ?? 3) + (usage?.completion_tokens ?? 0) * (options.cloudOutputUsdPerMillion ?? 15)) / 1_000_000;
     // OpenRouter reports actual cost when available. Rates are configurable estimates otherwise.

@@ -146,3 +146,9 @@ pnpm --filter @backroom/orchestrator exec tsx src/router/demo-fallback.ts
 ```
 
 The smoke script breaks only its own client endpoint (`127.0.0.1:1`) after ten synthetic scenario calls and asserts `cloud_fallback` on the very next call. It does not stop, restart, or alter the shared GPU server. Network-free Vitest tests cover the task table, schema/low-confidence escalation, same-call fallback, actual/estimated cost, polling/recovery, and cloud-only mode. The smoke receipt records the actual local share including the forced fallback in `fixtures/t10/router-smoke.json`. The UI consumes this API in its own stream; this package does not write the audit wall. The smoke loads a root `.env.local` via an absolute path and skips clearly if the key is absent.
+
+## Global LLM control
+
+Before wiring workers, the office toggle, or a durable adapter, read
+[the control contract](../docs/llm-control.md). It defines the shared StateStore,
+typed `LLM_OFF` router result, authenticated endpoint, and #15 row mapping.
