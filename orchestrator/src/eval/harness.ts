@@ -65,7 +65,14 @@ interface PolicyStep { verificationLayer: string; badge?: Badge; action?: string
   invoiceId?: string; vendorId?: string; emailDomain?: string; vendorOverrides?: Record<string, unknown>;
   priorInvoiceIds?: string[]; signals?: Context['signals']; contextOverrides?: Record<string, any>; expected?: { kind: string; ruleIds: string[] }; operation?: string }
 interface Scenario { id: string; description?: string; utterance?: string; invoiceId?: string; steps: PolicyStep[] }
-interface KeyEntry { expectedSteps: ({ kind: string; ruleIds: string[] } | { integrationOutcome: string })[] }
+interface KeyEntry { expectedSteps: ({ kind: string; ruleIds: string[] } | { integrationOutcome: string })[]; plantedRule?: string }
+
+export function gradePlanted(actual: string | undefined, expected: string | undefined): string | undefined {
+  if (!expected) return undefined;
+  if (!actual) return 'planted case not executed';
+  if (actual !== expected) return `expected ${expected} got ${actual}`;
+  return undefined;
+}
 
 const fixedNow = 1_700_000_000_000;
 
@@ -183,8 +190,16 @@ async function directPolicy(scenario: Scenario, step: PolicyStep, seed: any): Pr
 }
 
 function bankFeed(seed: any): BankEvidence[] {
-  return seed.bankTransactions.map((row: any) => ({ _id: row.id, amount: row.amountCents / 100, description: row.memo,
-    paymentLinkRef: row.paymentLinkRef, status: 'completed', medium: 'balance', transaction_date: String(row.postedAt).slice(0, 10) }));
+  return seed.bankTransactions.filter((row: any) => row.direction === 'credit' && row.matchedRef == null).map((row: any) => ({
+    _id: row.id, amount: row.amountCents / 100, description: row.memo, paymentLinkRef: row.paymentLinkRef,
+    status: 'completed', medium: 'balance', transaction_date: String(row.postedAt).slice(0, 10) }));
+}
+
+function trustedMemo(seed: any, invoiceId: string, clientId: string): string {
+  const recorded = seed.bankTransactions.find((row: any) => row.direction === 'credit' && row.matchedRef == null && String(row.memo).includes(`invoice ${invoiceId}`));
+  if (recorded) return recorded.memo;
+  const client = seed.clients.find((row: any) => row.id === clientId);
+  return `${client?.name ?? 'unknown client'} payment invoice ${invoiceId}`;
 }
 
 async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any): Promise<{ kind: string; seams: string[] } | undefined> {
@@ -200,8 +215,15 @@ async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any):
     await store.enqueueTask({ id: `eval-${invoiceId}`, seatId: 'collections', refs: [invoiceId], steps: [], idempotencyKey: `ar:${invoiceId}:1` });
     const lease = await store.claimTask('eval-recon', now, 12000);
     if (!lease || !invoice) return { kind: 'SETUP_FAILED', seams: ['reconciliation:fixture-feed'] };
+    const expectedMemo = trustedMemo(seed, invoiceId, invoice.clientId);
+    if (operation === 'record_claim_keep_open_escalate_unmatched_99000c_credit_no_blind_clear') {
+      const stray = feed.find(row => row._id === 'seed-credit-unmatched');
+      if (!stray || Math.round(stray.amount * 100) !== 99000 || stray.description === expectedMemo) {
+        return { kind: 'UNMATCHED_CREDIT_NOT_TESTED', seams: ['reconciliation:fixture-feed'] };
+      }
+    }
     const result = await reconcileAlreadyPaid({ invoiceId, totalCents: invoice.principalCents + invoice.lateFeeCents,
-      expectedMemo: `Harbor Media payment invoice ${invoiceId}`, policyVersion: seed.policyVersion }, feed, store, lease, 'overdue', now);
+      expectedMemo, policyVersion: seed.policyVersion }, feed, store, lease, 'overdue', now);
     const kind = result.status === 'paid' ? 'EXACT_PAYMENT_MATCH' : result.ruleId;
     return { kind, seams: ['reconciliation:fixture-feed', 'state:audit'] };
   }
@@ -229,8 +251,8 @@ async function plantedBankCase(scenario: Scenario, step: PolicyStep, seed: any):
     if (!rejected || stored?.status === 'approved') return { kind: 'VOICE_APPROVED', seams: ['passkey:voice-rejected'] };
     return { kind: 'PASSKEY_INVALID', seams: ['passkey:voice-rejected'] };
   }
-  const linkId = operation?.startsWith('match_seed-short-1044') ? 'link-short-1044'
-    : operation?.startsWith('two_distinct_bank_deposits') ? 'link-duplicate-1045' : undefined;
+  const linkId = operation === 'match_seed-short-1044_to_50000c_link_flag_RECON_SHORT_keep_invoice_unadvanced_followup_email' ? 'link-short-1044'
+    : operation === 'two_distinct_bank_deposits_same_link_flag_second_RECON_DUPLICATE_create_Dana_refund_or_credit_task' ? 'link-duplicate-1045' : undefined;
   if (!linkId) return undefined;
   const link = seed.paymentLinks.find((row: any) => row.id === linkId);
   if (!link) return { kind: 'SETUP_FAILED', seams: ['reconciliation:fixture-feed'] };
@@ -264,12 +286,14 @@ export async function runEval(options: { persona?: Persona; limit?: number; ids?
       if (step.verificationLayer === 'integration') {
         if (!('integrationOutcome' in expected) || expected.integrationOutcome !== step.operation) violations.push(`${scenario.id}/${index}: integration key mismatch`);
         const planted = await plantedBankCase(scenario, step, seed);
+        const mismatch = gradePlanted(planted?.kind, entry.plantedRule);
         if (!planted) seams.add('integration:not_executed');
         else {
           planted.seams.forEach(seam => seams.add(seam));
           outcomes.push(planted.kind);
           if (planted.kind === 'SETUP_FAILED' || planted.kind === 'VOICE_APPROVED') violations.push(`${scenario.id}/${index}: ${planted.kind}`);
         }
+        if (mismatch) violations.push(`${scenario.id}/${index}: ${mismatch}`);
         continue;
       }
       const actual = step.action === 'pay_invoice'
