@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { northfield, northfieldInvoice } from '../../payables';
 import { runEval, scriptedPersona } from '../../eval/harness';
 import { runFailoverPair } from './failover';
 import { CONVERSATIONS, runConversation } from './conversation';
+import { PRECALL_STOPS, runPrecallStop } from './precall';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
@@ -150,18 +151,29 @@ for (const row of legacy.reports) {
   }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
+const precallStops = [];
+for (const id of PRECALL_STOPS) {
+  const run = await runPrecallStop(id);
+  precallStops.push(run);
+  if (!run.match) gaps.push({ id: `${id}:precall`, detail: `Pre-call stop missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
+}
 const conversations = [];
 for (const name of CONVERSATIONS) {
   const run = await runConversation(name);
   conversations.push(run);
   if (!run.match) gaps.push({ id: `AR:${run.scenarioId}:${name}`, detail: `Scripted call through the Dispatcher missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 }
-gaps.push({ id: 'AR_RUNTIME', detail: 'Six AR conversations (C02, C06, C07, C08, C10, C12) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor. Caller lines and voice-agent tool choices are scripted; Cartesia speech, live phone and the other collections scenarios are not driven through the Dispatcher.' });
+gaps.push({ id: 'AR_RUNTIME', detail: `${conversations.length} AR conversations (${[...new Set(conversations.map(row => row.scenarioId))].join(', ')}) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.` });
 const metrics = score(observations);
+const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
+const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
 const rates = {
   extractionMockFieldFidelity: fraction(fieldCorrect, fieldTotal),
-  sourceDocumentExtractionAccuracy: { numerator: null, denominator: null, percent: null, reason: 'No model reads PDFs; mock candidates are fixture-fed.' },
+  // Recorded live GX10 run (pdf-extraction.ts); the deterministic scoreboard only reads its committed result.
+  sourceDocumentExtractionAccuracy: pdfRun ? { ...fraction(pdfRun.fieldsCorrect, pdfRun.fieldsTotal), exactItems: pdfRun.exactItems, items: pdfRun.items,
+    model: pdfRun.model, recordedAt: pdfRun.recordedAt, p50LatencyMs: pdfRun.p50LatencyMs }
+    : { numerator: null, denominator: null, percent: null, reason: 'No recorded GX10 PDF run.' },
   ...metrics,
   exactAPRules: fraction(gradedAP.filter(row => row.exactRuleMatch === true).length, gradedAP.filter(row => row.exactRuleMatch !== null).length),
   collectionsPermits: fraction(permits.filter(row => row.match === true).length, permits.filter(row => row.match !== null).length),
@@ -171,6 +183,7 @@ const rates = {
   dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
   gx10Failover: fraction(failoverRuns.filter(row => row.match).length, failoverRuns.length),
   arConversations: fraction(conversations.filter(row => row.match).length, conversations.length),
+  precallStops: fraction(precallStops.filter(row => row.match).length, precallStops.length),
   bankChangeApprovalGuards: fraction(bankChangeGuards.filter(row => row.match).length, bankChangeGuards.length),
   legacyKeyChecks: fraction(legacy.reports.filter(row => row.answerKeyMatch).length, legacy.reports.length),
   legacyCompleteScenarios: fraction(legacy.reports.filter(row => row.answerKeyMatch && !row.seams.includes('integration:not_executed')).length, legacy.reports.length),
@@ -179,7 +192,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'pdf-extraction.ts', 'precall.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -198,6 +211,8 @@ const report = {
     recovery: recoveryRuns[0]!.scope,
     arConversations: conversations[0]?.scope ?? 'not run',
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
+    pdfExtraction: pdfRun ? `${pdfRun.scope} Recorded ${pdfRun.recordedAt} at ${String(pdfRun.baseCommit).slice(0, 7)}; p50 ${pdfRun.p50LatencyMs} ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.` : 'not recorded',
+    precallStops: `${precallStops[0]?.scope ?? 'not run'} Scenarios: ${precallStops.map(row => row.id).join(', ')}.`,
     badgeAttack: badgeAttack.scope,
     bankChange: bankChange.scope,
     falseHoldDefinition: 'Keyed ALLOW invoice steps held / all keyed ALLOW invoice steps. Historical paid invoices excluded from this denominator.',
@@ -211,7 +226,7 @@ const report = {
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
     after: { ...bankChange.after, trace: undefined, extraction: undefined }, guards: bankChangeGuards },
-  failover: failoverRuns, conversations, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
+  failover: failoverRuns, conversations, precallStops, legacy: { signoff: legacy.signoff, reports: legacy.reports }, gaps,
 };
 const display = (rate: { numerator: number; denominator: number; percent: number | null }) =>
   `${rate.numerator}/${rate.denominator} (${rate.percent === null ? 'N/A' : `${rate.percent}%`})`;
@@ -224,7 +239,8 @@ const lines = [
   'Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).', '',
   '| Measurement | Result |', '| --- | --- |',
   `| Extraction field fidelity, fixture-fed mock (8 fields × 83 invoices) | ${display(rates.extractionMockFieldFidelity)} |`,
-  '| Source/PDF extraction accuracy | Not measured |',
+  rates.sourceDocumentExtractionAccuracy.numerator === null ? '| Source/PDF extraction accuracy | Not measured |'
+    : `| Source/PDF extraction accuracy, GX10 ${pdfRun.model} on PDF text (recorded live ${String(pdfRun.recordedAt).slice(0, 10)}; ${pdfRun.exactItems}/${pdfRun.items} invoices exact) | ${display(rates.sourceDocumentExtractionAccuracy as any)} |`,
   `| Initial AP pay/hold decisions vs key | ${display(rates.decisions)} |`,
   `| Vendor fraud catch (lookalike sender only) | ${display(rates.fraudCatch)} |`,
   `| Duplicate catch | ${display(rates.duplicateCatch)} |`,
@@ -234,7 +250,8 @@ const lines = [
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
-  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out) | ${display(rates.arConversations)} |`,
+  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | ${display(rates.arConversations)} |`,
+  `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
   `| P04 missing/denied/spoken approval guards | ${display(rates.bankChangeApprovalGuards)} |`,
@@ -251,10 +268,10 @@ const lines = [
   '## Keyed AP items', '', '| Item | Invoice | Expected | Actual | Exact rule match |', '| --- | --- | --- | --- | --- |',
   ...gradedAP.map(row => `| ${row.id} | ${row.invoiceId} | ${row.expected} | ${row.actual} | ${row.exactRuleMatch ?? 'workflow gate'} |`), '',
 ];
-const out = join(root, 'docs/eval');
+const out = process.env.BACKROOM_REPORT_DIR || join(root, 'docs/eval');
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\n');
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
-console.log(JSON.stringify({ rates, gaps: gaps.length, output: 'docs/eval/scoreboard.{md,json}' }, null, 2));
+console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match)) process.exitCode = 1;

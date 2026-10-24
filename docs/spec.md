@@ -156,7 +156,7 @@ None of the parts is new on its own. The combination, live, is:
 - `ESCALATE` creates an `escalation` row and sets the agent's target to Dana's desk. The avatar walks there with the folder. Dana's phone (mobile web route) shows the card with the evidence: Approve / Deny / Counter, confirmed with a **WebAuthn passkey**. The agent polls `check_approval` and relays the result.
 - **AC:**
   - Escalation row created ≤1 s after `ESCALATE`.
-  - A decision made within 60 s is relayed on the same call. Otherwise: "Dana will confirm by email today", logged `pending_owner`.
+  - A passkey decision made while the call is live is relayed on that call. The request stays open for the call, up to `APPROVAL_WINDOW_MS` (default 5 minutes, cap 15), and closes when the call ends. `check_approval` then returns `expired`. If the caller asks to send it again, the agent calls `propose_plan` once more for the same terms. A second re-ask is refused. `check_approval` does not promise email while the call is open. After the call, follow-up is `pending_owner` ("Dana will confirm by email today").
   - An approval without a valid passkey assertion is rejected by the server.
   - Voice can never approve anything (S18-style injection test, §7).
 

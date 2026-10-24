@@ -1,9 +1,10 @@
 // Opt-in local demo; no dialing occurs on import, setup, or serve.
 import { createServer } from 'node:http';
-import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createDemoVoiceBridge } from './demo-bridge';
-import { dialCollectionCall, type DialInput } from './index';
+import { createAdminDial } from './admin-dial';
+import { createDemoVoiceBridge, type VoiceCallEvent } from './demo-bridge';
+import { dialCollectionCall, type DialInput, type VoiceSession } from './index';
 import { provisionVoice, type VoiceTool } from './tools';
 import { createVoiceHandler, VoiceJournal } from './server';
 
@@ -32,33 +33,55 @@ if (command === 'setup') {
     controlSecret: required('DEMO_CONTROL_SECRET'), publicOrigin: required('DEMO_PUBLIC_URL') });
   const gatewaySecret = required('TOOL_GATEWAY_SECRET');
   const gateway = bridge.gateway;
-  const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId });
+  const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId,
+    onCallEnded: sessionId => bridge.endCall(sessionId) });
   const adminDigest = createHash('sha256').update(`Bearer ${required('VOICE_ADMIN_SECRET')}`).digest();
+  const audit = async (entry: object) => { appendFileSync(`${root}/audit.jsonl`, JSON.stringify(entry) + '\n', { mode: 0o600 }); };
+  // Reads go through the serialized journal; an unknown session holds nothing.
+  const journalSession = (find: (session: VoiceSession) => boolean) => journal.transact(data => data.sessions.find(find));
+  const adminDial = createAdminDial({ bridge, audit,
+    sessionStopped: async id => (await journalSession(s => s.id === id))?.stopped ?? true,
+    dial: async (sessionId, signals, providerRequest) => {
+      const t1 = JSON.parse(readFileSync('.env.t1/resources.json', 'utf8')) as { number_id: string; callback_number: string };
+      // The destination is server configuration only; no request supplies it.
+      const number = required('T1_DIAL_TO');
+      const demo = process.env.DEMO_OVERRIDE === 'true';
+      if (demo) console.log('DEMO_OVERRIDE visible: consenting demo outside normal calling hours; permit audit persisted.');
+      const input: DialInput = { sessionId, agentId: resources.agentId!, fromNumberId: t1.number_id,
+        clientId: 'northfield-jordan', invoiceId: '1042', businessName: 'Northfield Studio', contactName: 'Jordan', callbackNumber: t1.callback_number,
+        client: { type: 'business', number, timeZone: 'America/Los_Angeles', dnc: false,
+          consent: { number, source: required('T1_CONSENT_SOURCE'), text: required('T1_CONSENT_TEXT'), timestamp: required('T1_CONSENT_AT') } },
+        // The host's pre-call signals: `evaluate` re-checks stops and narrows the envelope at the dial boundary.
+        signals, demoOverride: demo ? { visible: true } : undefined };
+      const result = await dialCollectionCall(input, { apiKey: required('CARTESIA_API_KEY'), allowDemoOverride: demo, audit,
+        http: (url, init) => { providerRequest(); return fetch(url, init); },
+        prepare: async (session, trusted) => {
+          // Synthetic demo invoice; amounts go ONLY into the identity-gated server store.
+          await bridge.register(session.id);
+          await journal.register(session);
+          writeFileSync(`${root}/consent-${session.id}.json`, JSON.stringify({ ...trusted.client.consent, number: undefined, number_reference: '.env.local:T1_DIAL_TO' }), { mode: 0o600 });
+        } });
+      await journal.bind(result.sessionId, result.callId);
+      return result;
+    } });
+  const lifecycle: Record<string, VoiceCallEvent> = { call_started: 'started', call_completed: 'completed', call_failed: 'failed' };
+  /** Best effort after the journal committed the event; the office phone times out on its own. */
+  const forwardLifecycle = async (raw: Buffer) => {
+    const event = JSON.parse(raw.toString('utf8')) as { type?: unknown; call_id?: unknown };
+    const kind = typeof event.type === 'string' && Object.hasOwn(lifecycle, event.type) ? lifecycle[event.type] : undefined;
+    if (!kind || typeof event.call_id !== 'string') return;
+    const session = await journalSession(s => s.providerCallId === event.call_id);
+    if (session) await bridge.callEvent(session.id, kind);
+  };
   createServer(withVoiceEvidence(async (req, res) => {
     try {
       if (req.method === 'GET' && req.url === '/health') { res.end('ok'); return; }
       if (req.method === 'POST' && req.url === '/_admin/dial') {
         if (!timingSafeEqual(createHash('sha256').update(req.headers.authorization || '').digest(), adminDigest)) { res.writeHead(401).end(); return; }
-        if (await bridge.clientStopped()) { res.writeHead(409).end('CLIENT_STOPPED'); return; }
-        const t1 = JSON.parse(readFileSync('.env.t1/resources.json', 'utf8')) as { number_id: string; callback_number: string };
-        const number = required('T1_DIAL_TO');
-        const demo = process.env.DEMO_OVERRIDE === 'true';
-        if (demo) console.log('DEMO_OVERRIDE visible: consenting demo outside normal calling hours; permit audit persisted.');
-        const input: DialInput = { sessionId: randomUUID(), agentId: resources.agentId!, fromNumberId: t1.number_id,
-          clientId: 'northfield-jordan', invoiceId: '1042', businessName: 'Northfield Studio', contactName: 'Jordan', callbackNumber: t1.callback_number,
-          client: { type: 'business', number, timeZone: 'America/Los_Angeles', dnc: false,
-            consent: { number, source: required('T1_CONSENT_SOURCE'), text: required('T1_CONSENT_TEXT'), timestamp: required('T1_CONSENT_AT') } },
-          demoOverride: demo ? { visible: true } : undefined };
-        const result = await dialCollectionCall(input, { apiKey: required('CARTESIA_API_KEY'), allowDemoOverride: demo,
-          audit: async entry => { appendFileSync(`${root}/audit.jsonl`, JSON.stringify(entry) + '\n', { mode: 0o600 }); },
-          prepare: async (session, trusted) => {
-            // Synthetic demo invoice; amounts go ONLY into the identity-gated server store.
-            await bridge.register(session.id);
-            await journal.register(session);
-            writeFileSync(`${root}/consent-${session.id}.json`, JSON.stringify({ ...trusted.client.consent, number: undefined, number_reference: '.env.local:T1_DIAL_TO' }), { mode: 0o600 });
-          } });
-        await journal.bind(result.sessionId, result.callId);
-        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(result)); return;
+        const { status, body } = await adminDial();
+        if (typeof body === 'string') res.writeHead(status).end(body);
+        else res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+        return;
       }
       let raw = Buffer.alloc(0);
       for await (const chunk of req) { raw = Buffer.concat([raw, chunk]); if (raw.length > 65_536) { res.writeHead(413).end(); return; } }
@@ -66,6 +89,7 @@ if (command === 'setup') {
       for (const name of ['authorization', 'x-webhook-secret', 'content-type']) { const v = req.headers[name]; if (typeof v === 'string') headers.set(name, v); }
       const result = await handler(new Request(`http://localhost:${port}${req.url}`, { method: req.method, headers,
         ...(req.method !== 'GET' && req.method !== 'HEAD' ? { body: raw } : {}) }));
+      if (result.status === 200 && new URL(req.url || '/', 'http://relay').pathname === '/api/voice/cartesia') void forwardLifecycle(raw).catch(() => undefined);
       res.writeHead(result.status, Object.fromEntries(result.headers)); res.end(await result.text());
     } catch { res.writeHead(503).end('VOICE_UNAVAILABLE'); }
   }, line => appendFileSync(`${root}/http-evidence.jsonl`, line + '\n', { mode: 0o600 }))).listen(port, '127.0.0.1', () => console.log(`M4 local synthetic demo listening on ${port}. No call placed.`));

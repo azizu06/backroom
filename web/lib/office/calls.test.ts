@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { callFromProjection, callReducer, callStore, IDLE_CALL, isMockCalls, requestCall, type CallEvent } from './calls';
+import { callFromProjection, callReducer, callStore, IDLE_CALL, isMockCalls, pollCallFeed, requestCall, type CallEvent } from './calls';
 import { createMockCallFeed } from './calls-mock';
 
 describe('call state', () => {
@@ -31,10 +31,27 @@ describe('call state', () => {
     expect(callFromProjection({ id: 'c', status: 'live', direction: 'inbound', transcript: [{ id: 'l', speaker: 'agent', text: 'hello' }, {}] })).toMatchObject({ callId: 'c', status: 'live', transcript: [{ id: 'l', text: 'hello' }] });
     expect(callFromProjection({ id: {}, status: 'nope' })).toBeNull();
   });
-  it('does not fetch while the request endpoint is unset', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch');
-    await expect(requestCall()).resolves.toEqual({ ok: false, reason: 'unavailable', message: 'Call requests not available yet' });
-    expect(fetch).not.toHaveBeenCalled();
+  it('posts only the line to the host request endpoint and flags a locked operator session', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ ok: true, message: 'Ringing' }))
+      .mockResolvedValueOnce(Response.json({ ok: false, message: 'Calls are locked.' }, { status: 401 }));
+    await expect(requestCall()).resolves.toEqual({ ok: true, message: 'Ringing' });
+    expect(fetch).toHaveBeenCalledWith('/api/calls/request', expect.objectContaining({ method: 'POST', body: '{"line":"collections"}' }));
+    await expect(requestCall()).resolves.toEqual({ ok: false, reason: 'locked', message: 'Calls are locked.' });
+    vi.stubGlobal('window', { location: { search: '?calls=mock' } });
+    await expect(requestCall()).resolves.toEqual({ ok: false, reason: 'unavailable', message: 'Mock preview: no call placed' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+  it('maps the polled host projection into phone state and keeps it through a failed poll', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ call: { callId: 'call-1', status: 'live', direction: 'outbound',
+      transcript: [{ id: 'a1', speaker: 'agent', agentId: 'collections', text: 'propose_plan → DENY FEES_NON_WAIVABLE', at: 1 }] } }))
+      .mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(Response.json({ call: null }));
+    const states: string[] = [];
+    const stop = pollCallFeed(state => states.push(state.status), 1000);
+    await vi.advanceTimersByTimeAsync(2500);
+    stop();
+    expect(states).toEqual(['live', 'idle']);
   });
   it('runs mock calls in ringing, live, ended, idle order', () => {
     vi.useFakeTimers();
