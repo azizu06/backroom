@@ -151,7 +151,9 @@ export class CrsClient {
             this.#token = undefined;
             await this.login();
           }
-        } catch {
+        } catch (error) {
+          // A refresh that hits an outage keeps the refresh token and can retry once CRS is back.
+          if (isCrsOutage(error)) throw error;
           this.#token = undefined;
           this.#refreshToken = undefined;
           this.#authFailed = true;

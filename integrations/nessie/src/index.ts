@@ -80,24 +80,30 @@ export class NessieClient {
     const attempts = method === 'GET' ? (this.options.readAttempts ?? 3) : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
       const started = performance.now();
+      let response: Response;
       try {
-        const response = await this.fetcher(url, { method, headers: { 'Content-Type': 'application/json' },
+        response = await this.fetcher(url, { method, headers: { 'Content-Type': 'application/json' },
           body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(this.options.timeoutMs ?? 10000) });
-        // Never propagate provider response text or fetch errors: they may contain the key-bearing URL.
-        if (!response.ok) {
-          if (method === 'GET' && (response.status === 429 || response.status >= 500) && attempt + 1 < attempts) {
-            await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue;
-          }
-          throw new NessieError(`${method} ${path} failed`, response.status, response.status === 429 || response.status >= 500);
-        }
-        const result = await response.json();
-        this.options.observe?.({ method, path, status: response.status, elapsedMs: Math.round(performance.now() - started), shape: result });
-        return result as T;
-      } catch (error) {
-        if (error instanceof NessieError) throw error;
+      } catch {
+        // Network failure or timeout: the only transport outage. Never propagate fetch errors: they may contain the key-bearing URL.
         if (method === 'GET' && attempt + 1 < attempts) { await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue; }
         throw new NessieError(`${method} ${path} response uncertain`, undefined, true);
       }
+      if (!response.ok) {
+        if (method === 'GET' && (response.status === 429 || response.status >= 500) && attempt + 1 < attempts) {
+          await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt)); continue;
+        }
+        throw new NessieError(`${method} ${path} failed`, response.status, response.status === 429 || response.status >= 500);
+      }
+      // A reachable bank that answers with a body we cannot read is invalid data, not an outage.
+      let result: unknown;
+      try { result = await response.json(); } catch {
+        if (method !== 'GET') throw new NessieError(`${method} ${path} response uncertain`);
+        throw new NessieError(`${method} ${path} returned an unreadable body`);
+      }
+      try { this.options.observe?.({ method, path, status: response.status, elapsedMs: Math.round(performance.now() - started), shape: result }); }
+      catch { /* An observer must never change the bank result. */ }
+      return result as T;
     }
     throw new NessieError('read attempts exhausted', undefined, true);
   }
