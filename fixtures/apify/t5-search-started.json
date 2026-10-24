@@ -1,0 +1,27 @@
+{
+  "observedAt": "2026-10-24T07:48:29.086Z",
+  "actor": "apify~google-search-scraper",
+  "run": {
+    "runId": "cbeY9kR5A5W31hAk8",
+    "status": "READY",
+    "buildId": "G3YvRcwtJopIgVcSA",
+    "startedAt": "2026-10-24T07:48:30.455Z",
+    "finishedAt": null,
+    "durationSecs": null,
+    "costUsd": 0,
+    "chargedEventCounts": {
+      "search-page-scraped": 0,
+      "ai-overview-scraped": 0,
+      "ai-mode-result-scraped": 0,
+      "perplexity-ai-result-scraped": 0,
+      "chatgpt-result-scraped": 0,
+      "copilot-result-scraped": 0,
+      "gemini-result-scraped": 0,
+      "lead-scraped": 0,
+      "lead-email-verified": 0,
+      "ads-scraped": 0,
+      "website-content-scraped": 0,
+      "apify-actor-start": 1
+    }
+  }
+}

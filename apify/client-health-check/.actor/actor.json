@@ -1,0 +1,19 @@
+{
+  "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+  "actorSpecification": 1,
+  "name": "client-health-check",
+  "title": "Client health check — T5 scaffold",
+  "description": "Unpublished TypeScript scaffold. T5 provider smoke passed; client-health-check implementation and publication belong to issue 26.",
+  "version": "0.0",
+  "buildTag": "latest",
+  "meta": {
+    "templateId": "ts-empty",
+    "generatedBy": "OpenAI Codex (GPT-6)"
+  },
+  "inputSchema": "./input_schema.json",
+  "outputSchema": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile"
+}

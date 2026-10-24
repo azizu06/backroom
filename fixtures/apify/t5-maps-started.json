@@ -1,0 +1,26 @@
+{
+  "observedAt": "2026-10-24T07:48:29.086Z",
+  "actor": "compass~crawler-google-places",
+  "run": {
+    "runId": "g2nGZ2liBXaf6zuUy",
+    "status": "READY",
+    "buildId": "EH35UvIrsV0hnZG0Y",
+    "startedAt": "2026-10-24T07:48:30.557Z",
+    "finishedAt": null,
+    "durationSecs": null,
+    "costUsd": 0,
+    "chargedEventCounts": {
+      "place-scraped": 0,
+      "filter-applied": 0,
+      "place-details-scraped": 0,
+      "contact-details-scraped": 0,
+      "lead-scraped": 0,
+      "lead-email-verified": 0,
+      "social-profile-scraped": 0,
+      "review-scraped": 0,
+      "image-scraped": 0,
+      "competitor-analyzed": 0,
+      "apify-actor-start": 4
+    }
+  }
+}
