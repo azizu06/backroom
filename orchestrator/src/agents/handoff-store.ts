@@ -16,6 +16,8 @@ export interface AgentCaseStore extends HandoffStore {
   recordArtifacts(ctx: ToolContext, refs: string[]): Promise<void>;
   /** Throws HandoffRejectedError after persisting the rejected row; ownership stays with the source. */
   commit(ctx: ToolContext, request: HandoffRequest): Promise<HandoffRecord>;
+  /** Persist a guard-rejected offer; returns the rejected record. */
+  reject(ctx: ToolContext, request: HandoffRequest, errorCode: string): Promise<HandoffRecord>;
   finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string): Promise<void>;
   stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string): Promise<void>;
   resumeCase(caseId: string): Promise<void>;
@@ -69,6 +71,12 @@ export class MemoryHandoffStore implements AgentCaseStore {
     if (!result.ok) throw new HandoffRejectedError(result.record);
     return result.record;
   }
+  async reject(ctx: ToolContext, request: HandoffRequest, errorCode: string): Promise<HandoffRecord> {
+    const record = await this.apply(ctx.activation.caseId, s =>
+      engine.rejectHandoff(s, { ...claim(ctx.activation), request, errorCode, now: this.now(), sequence: this.sequence + 1 }));
+    this.sequence = Math.max(this.sequence, record.sequence);
+    return record;
+  }
   finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string) {
     return this.apply(ctx.activation.caseId, s => engine.finishActivation(s, { ...claim(ctx.activation), outcome, reason, now: this.now() }));
   }
@@ -98,6 +106,9 @@ export class SpacetimeHandoffStore implements AgentCaseStore {
     const result = await this.call<engine.CommitResult>('agentCommitHandoff', [ctx.activation.caseId, claim(ctx.activation), request]);
     if (!result.ok) throw new HandoffRejectedError(result.record);
     return result.record;
+  }
+  reject(ctx: ToolContext, request: HandoffRequest, errorCode: string) {
+    return this.call<HandoffRecord>('agentRejectHandoff', [ctx.activation.caseId, claim(ctx.activation), request, errorCode]);
   }
   async finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string) {
     await this.call('agentFinishActivation', [ctx.activation.caseId, claim(ctx.activation), outcome, reason ?? null]);

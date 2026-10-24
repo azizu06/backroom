@@ -20,8 +20,8 @@ const CORRECTIONS: Readonly<Partial<Record<Role, readonly Role[]>>> = {
   extractor: ['intake'], vendor: ['extractor'], payables: ['extractor', 'vendor'],
   reconciler: ['collections'], auditor: ROLES.filter(role => role !== 'auditor'),
 };
-/** Only these roles may finish a case without handing off. */
-export const TERMINAL_ROLES: readonly Role[] = ['auditor'];
+/** Only these roles may finish a case without handing off (collections: code-owned opt-out stop). */
+export const TERMINAL_ROLES: readonly Role[] = ['auditor', 'collections'];
 export const CASE_LIMITS = { maxActivations: 10, maxCorrections: 2 } as const;
 export const ROLE_VOICE: Readonly<Record<Role, HandoffRole>> = {
   intake: 'intake_sorter', extractor: 'extractor', vendor: 'vendor_verifier', payables: 'payables',
@@ -63,7 +63,9 @@ export type CommitResult = { ok: true; record: HandoffRow; replayed: boolean } |
 
 export class AgentStateError extends Error {}
 const fail = (code: string): never => { throw new AgentStateError(code); };
-const REF = /^[A-Za-z0-9][A-Za-z0-9:._/#-]{0,199}$/;
+/** Shape every artifact ref must have; tool outputs with other strings are simply not citable. */
+export const ARTIFACT_REF = /^[A-Za-z0-9][A-Za-z0-9:._/#-]{0,199}$/;
+const REF = ARTIFACT_REF;
 
 export function openCase(prior: CaseState | undefined, input: { caseId: string; role: Role; artifactRefs: string[]; displayId?: string; now: number }): CaseState {
   if (prior) return prior.activations[0]?.role === input.role ? prior : fail('AGENT_CASE_EXISTS');
@@ -149,6 +151,14 @@ export function commitHandoff(state: CaseState, claim: LeaseClaim & { request: H
   state.handoffs.push(record);
   state.activeActivationId = undefined; state.queuedActivationId = target.activationId;
   return { ok: true, record: { ...record }, replayed: false };
+}
+
+/** A code-owned role guard refused the staged offer before commit: record it for the office, keep ownership. */
+export function rejectHandoff(state: CaseState, claim: LeaseClaim & { request: HandoffRequest; errorCode: string; now: number; sequence: number }): HandoffRow {
+  const source = assertActive(state, claim);
+  const record = row(state, source, claim.request, claim, 'rejected', safeText(claim.errorCode, 80));
+  state.handoffs.push(record);
+  return { ...record };
 }
 
 function row(state: CaseState, source: ActivationRow, request: HandoffRequest, claim: { leaseToken: number; now: number; sequence: number },

@@ -5,4 +5,4 @@ export * from './handoff-store';
 export * from './runtime';
 export * from './tools';
 export * from './usage';
-export { specialists } from './roles';
+export * from './roles';

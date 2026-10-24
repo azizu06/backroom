@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import type { DomainTool, HandoffRequest, Json, Role, Specialist, ToolContext } from './contracts';
-import { ALLOWED_GRAPH } from './handoff-engine';
+import { ALLOWED_GRAPH, ARTIFACT_REF } from './handoff-engine';
 
 export const MCP_SERVER = 'backroom';
 export const mcpName = (name: string) => `mcp__${MCP_SERVER}__${name}`;
@@ -24,11 +24,16 @@ export function heldOutput(output: Json): ActivationSession['held'] {
   if (!output || typeof output !== 'object' || Array.isArray(output) || output.outcome !== 'held') return undefined;
   return { artifactRefs: refsIn(output), ruleIds: Array.isArray(output.ruleIds) ? output.ruleIds.map(String) : [] };
 }
-/** Code-owned refs: top-level `artifactRef` and `artifactRefs` of a tool output. */
+/** Code-owned refs: top-level `ref`/`*Ref` strings and `refs`/`*Refs` string arrays of a tool output
+ * (artifactRef, verdictRef, evidenceRefs, allowedRefs, ...). Model arguments never become refs. */
 export function refsIn(output: Json): string[] {
   if (!output || typeof output !== 'object' || Array.isArray(output)) return [];
-  const refs = [output.artifactRef, ...(Array.isArray(output.artifactRefs) ? output.artifactRefs : [])];
-  return refs.filter((ref): ref is string => typeof ref === 'string' && ref.length > 0);
+  const refs: string[] = [];
+  for (const [key, value] of Object.entries(output)) {
+    if (/^(ref|.+Ref)$/.test(key) && typeof value === 'string') refs.push(value);
+    if (/^(refs|.+Refs)$/.test(key) && Array.isArray(value)) refs.push(...value.filter((v): v is string => typeof v === 'string'));
+  }
+  return [...new Set(refs.filter(ref => ARTIFACT_REF.test(ref)))];
 }
 const text = (value: unknown, isError = false) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }], ...(isError ? { isError: true } : {}) });
 const errorCode = (error: unknown) => {
