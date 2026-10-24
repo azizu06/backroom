@@ -1,9 +1,17 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { disclosureItems, getDisclosureStatus, type DemoStatus } from '../lib/real-vs-sim';
+import { disclosureItems, getDisclosureStatus, NARROW_PANEL_QUERY, panelExpanded, toggledPanel, type DemoStatus } from '../lib/real-vs-sim';
 import './RealVsSim.css';
+
+function useMediaQuery(query: string, serverValue: boolean) {
+  return useSyncExternalStore(onChange => {
+    const media = window.matchMedia(query);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, () => window.matchMedia(query).matches, () => serverValue);
+}
 
 export function RealVsSim(props: { detailed?: boolean }) {
   return <Suspense fallback={null}><RealVsSimContent {...props} /></Suspense>;
@@ -16,6 +24,13 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
   const panel = useRef<HTMLElement>(null);
   const [panelHeight, setPanelHeight] = useState(280);
   const hidden = !detailed && pathname === '/real-vs-sim';
+  const officeView = pathname === '/' || pathname.startsWith('/office');
+  // Server renders docked so phones never paint the panel over office controls before hydration.
+  const officeFlows = useMediaQuery('(max-width: 1100px)', true);
+  const narrow = useMediaQuery(NARROW_PANEL_QUERY, false);
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
+  const expanded = panelExpanded({ detailed, narrow, userExpanded });
+  const bodyId = useId();
 
   useEffect(() => {
     if (hidden || replay || detailed || !panel.current) return;
@@ -57,12 +72,18 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
   if (hidden) return null;
   return (
     <>
-    {!detailed && pathname !== '/' && !pathname.startsWith('/office') && <div aria-hidden="true" style={{ height: panelHeight, background: '#1c1c1e' }} />}
-    <aside ref={panel} className={`real-sim ${detailed ? 'real-sim-detail' : 'real-sim-overlay'}`} aria-label="Real versus simulated disclosure">
+    {!detailed && !officeView && <div aria-hidden="true" style={{ height: panelHeight, background: '#1c1c1e' }} />}
+    <aside ref={panel} className={`real-sim ${detailed ? 'real-sim-detail' : `real-sim-overlay${officeView && officeFlows ? ' real-sim-docked' : ''}`}`} data-expanded={expanded} aria-label="Real versus simulated disclosure">
       <header className="real-sim-header">
         {detailed ? <h1>Real vs. simulated</h1> : <h2>Real vs. simulated</h2>}
-        {!detailed && <a href="/real-vs-sim">Details ↗</a>}
+        {!detailed && <div className="real-sim-actions">
+          <a href="/real-vs-sim">Details ↗</a>
+          <button type="button" className="real-sim-toggle" aria-expanded={expanded} aria-controls={bodyId} onClick={() => setUserExpanded(toggledPanel(expanded))}>
+            {expanded ? 'Hide' : 'Show'}<span className="real-sim-visually-hidden"> real versus simulated status</span>
+          </button>
+        </div>}
       </header>
+      <div id={bodyId} hidden={!expanded}>
       {detailed && <p className="real-sim-intro">A real integration can be offline. Status describes current evidence, not a successful end-to-end demo.</p>}
       <div className="real-sim-groups">
         {(['real', 'sandbox'] as const).map(kind => (
@@ -83,8 +104,9 @@ function RealVsSimContent({ detailed = false }: { detailed?: boolean }) {
           </section>
         ))}
       </div>
+      </div>
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
-      {detailed && <p className="real-sim-note">Status refreshes every 10 seconds. GX10 health and LLM control reflect this server process; separate processes need the shared state adapter. Unverified means no fresh observation is available.</p>}
+      {detailed && <p className="real-sim-note">Status refreshes every 10 seconds. GX10 health and LLM control reflect this server process; separate processes need the shared state adapter. Unverified means no fresh observation is available. Not probed in this process means this server never checks that service, so no status is claimed.</p>}
     </aside>
     </>
   );
