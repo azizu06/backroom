@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStateStore } from '@backroom/orchestrator';
 import { createAuditHTTP } from './http';
+import { operatorSessionCookie } from '../operator/sign-in';
 
 const origin = 'http://localhost:3031';
 const secret = 'private-test-operator-code';
@@ -18,8 +19,7 @@ async function setup() {
   const network = vi.fn(() => { throw new Error('Unexpected network'); });
   const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => origin,
     whyOptions: { apiKey: '', fetch: network, stateStore: store } });
-  const login = await handle('session', request('session', { code: secret }));
-  const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+  const cookie = operatorSessionCookie(secret, origin).split(';')[0]!;
   return { store, handle, cookie, network };
 }
 
@@ -31,14 +31,13 @@ describe('private audit HTTP boundary', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toMatchObject({ chain: { valid: true, length: 1 }, entries: [{ id: 'audit:1', decision: 'ESCALATE' }] });
     expect(JSON.stringify(await (await handle('entries', request('entries', undefined, cookie))).json())).not.toContain(secret);
-    const wrongCode = await handle('session', request('session', { code: 'wrong' }));
-    expect(wrongCode.status).toBe(403);
-    expect(await wrongCode.json()).toEqual({ error: 'Operator code rejected.' });
-    const crossOrigin = request('session', { code: secret });
+    // The code is accepted only by the shared, rate-limited sign-in; this route mints nothing.
+    const direct = await handle('session', request('session', { code: secret }));
+    expect(direct.status).toBe(401);
+    expect(direct.headers.get('set-cookie')).toBeNull();
+    const crossOrigin = request('why', { question: 'why?' }, cookie);
     crossOrigin.headers.set('origin', 'https://attacker.example');
-    const foreign = await handle('session', crossOrigin);
-    expect(foreign.status).toBe(403);
-    expect(await foreign.json()).toEqual({ error: 'Origin rejected.' });
+    expect((await handle('why', crossOrigin)).status).toBe(403);
     expect((await handle('entries', request('entries', undefined, `${cookie}forged`))).status).toBe(401);
   });
 
@@ -46,10 +45,8 @@ describe('private audit HTTP boundary', () => {
     const store = new MemoryStateStore();
     let clock = 1000;
     const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => origin, now: () => clock });
-    const login = await handle('session', request('session', { code: secret }));
-    const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
-    expect(login.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Strict');
-    expect(login.headers.get('set-cookie')).not.toContain('Secure');
+    const cookie = operatorSessionCookie(secret, origin, clock).split(';')[0]!;
+    expect((await handle('entries', request('entries', undefined, cookie))).status).toBe(200);
     clock += 8 * 60 * 60 * 1000;
     expect((await handle('entries', request('entries', undefined, cookie))).status).toBe(401);
     const unavailable = createAuditHTTP({ store: () => store, secret: () => undefined, origin: () => origin });
@@ -60,39 +57,31 @@ describe('private audit HTTP boundary', () => {
 describe('audit session origins', () => {
   const PUBLIC = 'https://demo.example';
   const LOOPBACK = 'http://127.0.0.1:3477';
-  const post = (handle: Awaited<ReturnType<typeof setup>>['handle'], code: string, originHeader: string) => handle('session', new Request(`${PUBLIC}/api/audit/session`, {
-    method: 'POST', headers: { origin: originHeader, 'content-type': 'application/json' }, body: JSON.stringify({ code }),
+  // The code itself is checked by the shared sign-in (operator/sign-in.test.ts); here, the cookie and POST origins.
+  const ask = (handle: Awaited<ReturnType<typeof setup>>['handle'], cookie: string, originHeader: string) => handle('why', new Request(`${PUBLIC}/api/audit/why`, {
+    method: 'POST', headers: { origin: originHeader, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ question: 'Why?' }),
   }));
 
-  it('authorizes the declared loopback office with the operator code and an http cookie', async () => {
+  it('serves the declared loopback office with its http operator session', async () => {
     const store = new MemoryStateStore();
-    const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC, loopbackOrigin: () => LOOPBACK });
-    const login = await post(handle, secret, LOOPBACK);
-    expect(login.status).toBe(200);
-    expect(await login.json()).toEqual({ authorized: true });
-    const setCookie = login.headers.get('set-cookie')!;
-    expect(setCookie).toContain('HttpOnly; SameSite=Strict');
-    expect(setCookie).not.toContain('Secure');
-    const cookie = setCookie.split(';')[0]!;
+    const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC, loopbackOrigin: () => LOOPBACK,
+      whyOptions: { apiKey: '', fetch: vi.fn(), stateStore: store } });
+    const cookie = operatorSessionCookie(secret, LOOPBACK).split(';')[0]!;
     expect((await handle('entries', new Request(`${LOOPBACK}/api/audit/entries`, { headers: { cookie } }))).status).toBe(200);
-    const wrong = await post(handle, 'wrong', LOOPBACK);
-    expect(wrong.status).toBe(403);
-    expect(await wrong.json()).toEqual({ error: 'Operator code rejected.' });
+    expect((await ask(handle, cookie, LOOPBACK)).status).not.toBe(403);
   });
 
-  it('rejects every other origin and still secures the public https session', async () => {
+  it('rejects every other POST origin, and loopback when none is declared', async () => {
     const store = new MemoryStateStore();
     const handle = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC, loopbackOrigin: () => LOOPBACK });
+    const cookie = operatorSessionCookie(secret, PUBLIC).split(';')[0]!;
     for (const originHeader of ['https://attacker.example', 'http://localhost:3477', 'http://127.0.0.1:3478', 'https://127.0.0.1:3477', 'http://127.0.0.2:3477']) {
-      const rejected = await post(handle, secret, originHeader);
+      const rejected = await ask(handle, cookie, originHeader);
       expect(rejected.status).toBe(403);
       expect(await rejected.json()).toEqual({ error: 'Origin rejected.' });
     }
-    const login = await post(handle, secret, PUBLIC);
-    expect(login.status).toBe(200);
-    expect(login.headers.get('set-cookie')).toContain('Secure');
     const unset = createAuditHTTP({ store: () => store, secret: () => secret, origin: () => PUBLIC });
-    expect((await post(unset, secret, LOOPBACK)).status).toBe(403);
+    expect((await ask(unset, cookie, LOOPBACK)).status).toBe(403);
   });
 });
 

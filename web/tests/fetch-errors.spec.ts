@@ -20,7 +20,7 @@ test('policy unlock explains an HTML 502 and a dropped connection instead of a J
 
 test('audit wall explains an HTML 502 on unlock and recovers its poll after an outage', async ({ page }) => {
   let entries = 0;
-  await page.route('**/api/audit/session', route => route.fulfill(badGateway));
+  await page.route('**/api/session', route => route.fulfill(badGateway));
   await page.route('**/api/audit/entries', route => ++entries === 1
     ? route.fulfill({ status: 401, json: { error: 'Open the audit wall with your operator code.' } })
     : entries === 2 ? route.fulfill(badGateway)
@@ -30,8 +30,8 @@ test('audit wall explains an HTML 502 on unlock and recovers its poll after an o
   await page.getByRole('button', { name: 'Open audit wall' }).click();
   await expect(alert(page)).toContainText(outage);
   // A good unlock bumps the poll: first an outage, then the wall loads and the banner clears.
-  await page.unroute('**/api/audit/session');
-  await page.route('**/api/audit/session', route => route.fulfill({ json: { ok: true } }));
+  await page.unroute('**/api/session');
+  await page.route('**/api/session', route => route.fulfill({ json: { ok: true } }));
   await page.getByRole('button', { name: 'Open audit wall' }).click();
   // Prove the entries 502 itself was shown, not the stale session alert.
   await expect.poll(() => entries).toBeGreaterThanOrEqual(2);

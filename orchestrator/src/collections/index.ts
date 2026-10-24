@@ -68,14 +68,15 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   const checked = evaluate('collections', { type: 'call_client' }, context);
   await audit('pre_call_permit', { decision: checked.kind, ruleIds: checked.ruleIds, inputs: { decision: checked } });
   if (checked.kind !== 'ALLOW') return stop(checked);
-  // C17: the call may proceed, but Dana sees a warning and identity comes before any invoice detail.
-  const warnings = context.signals?.active?.includes('phone_mismatch') ? ['PHONE_MISMATCH_WARN'] : [];
-  if (warnings.length) await audit('phone_mismatch_warn', { decision: 'ALLOW', ruleIds: warnings,
-    inputs: { identityCaution: true, ownerWarning: 'The number on file differs from the public listing; confirm identity before any invoice detail.' } });
   if (!credit || credit.ofacStatus !== 'clear') {
     await audit('pre_call_blocked', { decision: 'DENY', inputs: { reason: 'Credit/OFAC check unavailable' } });
     return { status: 'blocked', reason: 'Credit/OFAC check unavailable' };
   }
+  // C17: the call may proceed, but Dana sees a warning and identity comes before any invoice detail.
+  // Recorded only once the call can still go ahead, so a blocked call never leaves an ALLOW row.
+  const warnings = context.signals?.active?.includes('phone_mismatch') ? ['PHONE_MISMATCH_WARN'] : [];
+  if (warnings.length) await audit('phone_mismatch_warn', { decision: 'ALLOW', ruleIds: warnings,
+    inputs: { identityCaution: true, ownerWarning: 'The number on file differs from the public listing; confirm identity before any invoice detail.' } });
   const envelope = computeEnvelope(policy, context.signals?.active);
   await audit('envelope', { inputs: { envelope } });
   const planStarted = now();
