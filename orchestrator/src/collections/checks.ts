@@ -21,7 +21,7 @@ export function projectHealthResult(value: unknown): HealthResult {
     }
     throw new Error('Invalid health signal');
   });
-  return { signals };
+  return { signals, ...(typeof value.apifyRunId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(value.apifyRunId) ? { apifyRunId: value.apifyRunId } : {}) };
 }
 
 export async function boundedCreditCheck(check: CreditCheck, testIdentityId: number): Promise<CreditResult | undefined> {

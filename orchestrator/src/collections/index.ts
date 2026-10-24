@@ -6,6 +6,7 @@ import type { PreCallInput, PreCallDependencies, PreCallResult } from './types';
 export type * from './types';
 export { createCallPlanner } from './planner';
 export { createCrsCreditCheck, createApifyHealthCheck } from './adapters';
+export { createApifyRunner, createPreCallHealthCheck, APIFY_DEMO_COMPANY } from './apify';
 export { fakeCreditCheck, fakeHealthCheck } from './fakes';
 
 /** Prepares a plan only. The dial boundary must re-read state and evaluate call_client again. */
@@ -45,7 +46,7 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
       return result;
     }),
     boundedHealthCheck(deps.health, input.company).then(async result => {
-      await audit('health_check', { latencyMs: now() - healthStart, inputs: { status: result ? 'complete' : 'pending', signals: result?.signals ?? [] } });
+      await audit('health_check', { latencyMs: now() - healthStart, inputs: { status: result ? 'complete' : 'pending', label: result?.apifyRunId ? `Apify: live run ${result.apifyRunId}` : deps.health.label ?? 'provided', ...(result?.apifyRunId ? { runId: result.apifyRunId } : {}), signals: result?.signals ?? [] } });
       return result;
     }),
   ]);
