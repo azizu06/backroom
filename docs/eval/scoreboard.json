@@ -4,7 +4,13 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "f9b3b41c90d3f73fd093ef6dd12c4f5452b15134",
+    "baseCommit": "a3ced0195ba5e187b18f1c9dfd3d5fd91c437b95",
+    "evaluatorSources": {
+      "orchestrator/src/agents/eval/chain.ts": "a7b2d22a6ff25de0f2b4c7545a246f010f5ccba8d53a0fe6332dc22b826f9440",
+      "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
+      "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
+      "orchestrator/src/agents/eval/scoreboard.ts": "38dd4784f18ade0dfeff3d85db22875ba350350123a0c633bd47fbb9b3985543"
+    },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
       "fixtures/answer-key/expected.json": "486033e930a903ad6b63bee06a5b9c267bd3300bcf5746a95cc0443c4a61606f",

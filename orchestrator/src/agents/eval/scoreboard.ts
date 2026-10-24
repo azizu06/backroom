@@ -117,7 +117,10 @@ const rates = {
 };
 const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
-  provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
+    evaluatorSources: Object.fromEntries(['chain.ts', 'runtime.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+      const path = `orchestrator/src/agents/eval/${name}`; return [path, sha(path)];
+    })),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json'].map(path => [path, sha(path)])),
     keyVersion: key.version, signoff: key.signoff, authorship: key.authorship },
