@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { evaluate, type Context, type Decision } from '@backroom/policy';
 import { MemoryStateStore, SeatWorker, FakeEffects, routeInboxItem, createRouter } from '../index';
+import { northfield } from '../payables';
 import { askWhy, type WhyAuditEntry } from '../why';
 import type { AuditEntry } from '../store';
 import { runPreCall, createCallPlanner, fakeCreditCheck, fakeHealthCheck } from '../collections';
@@ -14,9 +15,11 @@ import { FakeDemoBank, reconcile, type DemoBank } from './bank';
 const NOW = Date.parse('2026-10-24T18:00:00Z');
 const callId = 'demo-core-1042';
 const secret = 'demo-only-in-process-secret';
-const receivable = { principalCents: 480000, lateFeeCents: 15000 };
-const baseCall = (): GatewayCall => ({ callId, agentId: 'collections-demo', invoiceId: '1042', clientId: 'jordan', contactName: 'Jordan',
-  companyName: 'Demo Client LLC', amountCents: 495000, receivable, currency: 'USD', policyVersion: 1,
+const arInvoice = northfield.arInvoices.find(row => row.id === '1042')!;
+const seedClient = northfield.clients.find(row => row.id === arInvoice.clientId)!;
+const receivable = { principalCents: arInvoice.principalCents, lateFeeCents: arInvoice.lateFeeCents };
+const baseCall = (): GatewayCall => ({ callId, agentId: 'collections-demo', invoiceId: '1042', clientId: seedClient.id, contactName: 'Jordan',
+  companyName: seedClient.name, amountCents: receivable.principalCents + receivable.lateFeeCents, receivable, currency: 'USD', policyVersion: 1,
   identityConfirmed: false, status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} });
 const terms = (installments: number, waive_fee = false) => ({ installments, first_payment_pct: 50,
   duration_days: 30, waive_fee, discount_pct: 0 });
@@ -71,9 +74,8 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
   requireThat(lease, 'collection lease missing');
   await store.insertInvoice({ id: '1042', kind: 'ar', state: 'overdue' });
   // Real #17 pipeline with explicit synthetic CRS/Apify/model transports.
-  const context: Context = { client: { type: 'business', phoneNumber: '+12025550101', dnc: false,
-    localWeekday: 6, localHour: 11, consent: { source: 'synthetic-test-fixture', text: 'Synthetic B2B call consent',
-      timestamp: '2026-10-24T18:00:00Z', number: '+12025550101' } },
+  if (seedClient.type !== 'business' && seedClient.type !== 'consumer') throw new Error('CORE_DEMO: invalid seed client type');
+  const context: Context = { client: { ...seedClient, type: seedClient.type, localWeekday: 6, localHour: 11 },
     demoOverride: { visible: true, logged: true }, signals: {} };
   transcript.push('DEMO_OVERRIDE visible + logged: synthetic Saturday call. Pre-call signals: FAKE clear CRS/Apify.');
   await store.appendAudit({ ts: NOW, actor: 'system', seat: 'collections', action: 'fake_pre_call_signals',
@@ -84,8 +86,8 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
       confidence: 1, output: { tone: 'neutral', offerOrder: ['pay_in_full', 'installments'],
         plan: { installments: 2, firstPaymentPct: 50, totalDays: 30, waiveFees: false, discountPct: 0 } },
     }) } }], usage: { cost: 0 } }) });
-  const preCall = await runPreCall({ clientId: 'jordan', invoiceId: '1042', testIdentityId: 7,
-    company: { name: 'Synthetic Demo Client LLC', website: 'https://example.com' }, context }, {
+  const preCall = await runPreCall({ clientId: seedClient.id, invoiceId: '1042', testIdentityId: 7,
+    company: { name: seedClient.name, website: 'https://example.com' }, context }, {
     credit: fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] }),
     health: fakeHealthCheck({ signals: [] }), planner: createCallPlanner({ cloudRoute: fixtureRouter.route }),
     audit: { appendAudit: entry => store.appendAudit(entry.action === 'call_plan'
@@ -141,7 +143,7 @@ export async function runCoreDemo(options: { bank?: DemoBank; accountId?: string
   const link = await gatewayStore.transact(callId, call => call.links.find(link => link.planId === allowed.plan_id));
   requireThat(link && link.amountCents === 247500 && linkResult.amount_cents === link.amountCents, 'link amount differs from allowed plan');
   transcript.push('Pay page/delivery SIMULATED: consuming stored link, never a client-supplied amount.');
-  const payment = { accountId: options.accountId ?? 'fake-operating', invoiceId: '1042', installment: 1, amountCents: link.amountCents };
+  const payment = { accountId: options.accountId ?? 'receivables', invoiceId: '1042', installment: 1, amountCents: link.amountCents };
   const balanceBeforeCents = Math.round(await bank.readBalance(payment.accountId) * 100);
   const deposit = await bank.deposit(payment);
   const feed = await bank.listDeposits(payment.accountId);
@@ -183,10 +185,12 @@ export async function runInboxTrap({ llmOff = false } = {}) {
   const effects = new FakeEffects();
   const worker = new SeatWorker({ id: 'payables-demo', seat: routing.seat, store, effects, now: () => NOW });
   await worker.start();
-  const vendor = { id: 'acme', approved: true, inMaster: true, pendingBankChange: true,
-    knownDomain: 'acme-supply.com', sourceDomain: 'acme-supp1y.com' };
-  const invoice = { id: '4471', vendorId: 'acme', amountCents: 64000, poMatched: true, account: 'operating',
-    lineItems: [{ description: 'Office supplies', quantity: 1, unitPriceCents: 64000 }] };
+  const change = northfield.bankChanges.find(row => row.id === 'bc-lookalike')!;
+  const known = northfield.vendors.find(row => row.id === change.vendorId)!;
+  const vendor = { ...known, sourceDomain: change.senderDomain };
+  const seedInvoice = northfield.apInvoices.find(row => row.id === change.invoiceId)!;
+  const invoice = { id: seedInvoice.id, vendorId: seedInvoice.vendorId, amountCents: seedInvoice.amountCents,
+    poMatched: seedInvoice.poMatched, account: seedInvoice.account, lineItems: seedInvoice.lineItems };
   await store.insertInvoice({ id: '4471', kind: 'ap', state: 'extracted' }); // typed fixture replaces extraction
   await store.enqueueTask({ id: 'trap-4471', seatId: routing.seat, refs: ['4471', vendor.sourceDomain, vendor.knownDomain],
     idempotencyKey: '4471-installment-1', steps: [{ kind: 'nessie', action: { type: 'pay_invoice' },

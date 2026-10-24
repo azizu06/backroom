@@ -6,14 +6,14 @@ export interface InboxSource { id: string; source: 'seed' | 'judge'; senderDomai
 export interface FinanceInboxItem extends InboxSource { kind: 'email' | 'invoice'; text: string }
 export interface InvoiceFields {
   kind: 'invoice'; invoiceId: string; vendorId: string; poId: string | null;
-  amountCents: number; currency: 'USD'; bankAccountId: string; lineItems: LineItem[];
+  amountCents: number; adjustmentCents?: number; currency: 'USD'; bankAccountId: string; lineItems: LineItem[];
 }
 export interface VendorFields {
   kind: 'bank_change' | 'vendor'; vendorId: string; domain: string; bankAccountId: string;
 }
 export interface ApprovedVendor {
   id: string; domain: string; accountId: string; approved: boolean; revision: number;
-  ofacHit?: boolean;
+  ofacHit?: boolean; inMaster?: boolean; pendingBankChange?: boolean;
 }
 export interface PurchaseOrder { id: string; vendorId: string; amountCents: number; lineItems: LineItem[] }
 export interface SeatResult {

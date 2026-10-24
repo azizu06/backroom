@@ -1,3 +1,4 @@
+import { northfield } from '../payables/northfield';
 /** Thin structural subset of #21's NessieClient; dollars at its read/feed boundary. */
 export interface DemoPayment { accountId: string; invoiceId: string; installment: number; amountCents: number }
 export interface DemoDeposit { _id: string; amount: number; description: string; status: string }
@@ -10,7 +11,7 @@ export const memo = (p: DemoPayment) => `backroom:invoice=${encodeURIComponent(p
 
 /** SIMULATED Nessie. Not a real deposit or evidence for the T4 sponsor gate. */
 export class FakeDemoBank implements DemoBank {
-  private balance = 10000;
+  private balance = northfield.bankAccounts.find(row => row.id === 'receivables')!.balanceCents / 100;
   private deposits: DemoDeposit[] = [];
   async readBalance() { return this.balance; }
   async listDeposits() { return structuredClone(this.deposits); }

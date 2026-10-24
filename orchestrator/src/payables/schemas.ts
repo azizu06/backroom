@@ -1,8 +1,8 @@
 import { domain, validDomain } from './decisions';
 import type { InboxSource, InvoiceFields, VendorFields } from './types';
 export interface Schema<T> { parse(value: unknown): T; jsonSchema: unknown }
-function record(value: unknown, keys: readonly string[]): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== keys.length ||
+function record(value: unknown, keys: readonly string[], optional: readonly string[] = []): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !keys.includes(key) && !optional.includes(key)) ||
       !keys.every(key => Object.hasOwn(value, key))) throw new Error('INVALID_FIELDS');
   return value as Record<string, unknown>;
 }
@@ -21,12 +21,15 @@ function host(value: unknown): string {
 const identifier = { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,99}$' };
 const objectSchema = (properties: Record<string, unknown>) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const lineProperties = { description: { type: 'string', minLength: 1, maxLength: 200 }, quantity: { type: 'number', exclusiveMinimum: 0, maximum: 1000000 }, unitPriceCents: { type: 'integer', minimum: 1 } };
+const invoiceProperties = { kind: { const: 'invoice' }, invoiceId: identifier, vendorId: identifier,
+  poId: { anyOf: [identifier, { type: 'null' }] }, amountCents: { type: 'integer', minimum: 1 },
+  currency: { const: 'USD' }, bankAccountId: identifier,
+  lineItems: { type: 'array', minItems: 1, maxItems: 100, items: objectSchema(lineProperties) } };
 export const invoiceSchema: Schema<InvoiceFields> = {
-  jsonSchema: objectSchema({ kind: { const: 'invoice' }, invoiceId: identifier, vendorId: identifier,
-    poId: { anyOf: [identifier, { type: 'null' }] }, amountCents: { type: 'integer', minimum: 1 },
-    currency: { const: 'USD' }, bankAccountId: identifier, lineItems: { type: 'array', minItems: 1, maxItems: 100, items: objectSchema(lineProperties) } }),
+  jsonSchema: { ...objectSchema(invoiceProperties),
+    properties: { ...invoiceProperties, adjustmentCents: { type: 'integer', minimum: 0 } } },
   parse(value) {
-    const row = record(value, ['kind', 'invoiceId', 'vendorId', 'poId', 'amountCents', 'currency', 'bankAccountId', 'lineItems']);
+    const row = record(value, ['kind', 'invoiceId', 'vendorId', 'poId', 'amountCents', 'currency', 'bankAccountId', 'lineItems'], ['adjustmentCents']);
     if (row.kind !== 'invoice' || row.currency !== 'USD' || !Array.isArray(row.lineItems) || !row.lineItems.length || row.lineItems.length > 100) throw new Error('INVALID_INVOICE');
     const lineItems = row.lineItems.map(value => {
       const item = record(value, ['description', 'quantity', 'unitPriceCents']);
@@ -35,9 +38,11 @@ export const invoiceSchema: Schema<InvoiceFields> = {
       return { description: item.description.trim(), quantity: item.quantity, unitPriceCents: cents(item.unitPriceCents) };
     });
     const amountCents = cents(row.amountCents);
-    if (Math.round(lineItems.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0)) !== amountCents) throw new Error('TOTAL_MISMATCH');
+    const adjustmentCents = Object.hasOwn(row, 'adjustmentCents') ? row.adjustmentCents : 0;
+    if (!Number.isSafeInteger(adjustmentCents) || Number(adjustmentCents) < 0) throw new Error('INVALID_ADJUSTMENT');
+    if (Number(adjustmentCents) + Math.round(lineItems.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0)) !== amountCents) throw new Error('TOTAL_MISMATCH');
     return { kind: 'invoice', invoiceId: id(row.invoiceId), vendorId: id(row.vendorId), poId: row.poId === null ? null : id(row.poId),
-      amountCents, currency: 'USD', bankAccountId: id(row.bankAccountId), lineItems };
+      amountCents, ...(row.adjustmentCents !== undefined && { adjustmentCents: Number(adjustmentCents) }), currency: 'USD', bankAccountId: id(row.bankAccountId), lineItems };
   },
 };
 export const vendorSchema: Schema<VendorFields> = {
