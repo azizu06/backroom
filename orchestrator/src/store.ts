@@ -3,6 +3,8 @@ import type { VerifiedApproval } from './approvals/verified';
 import type { Action, Badge, Context, Decision, Policy } from '@backroom/policy';
 import type { ChainStatus } from './audit';
 
+/** How the owner authenticated a policy save; recorded on its audit row. */
+export type PolicySaveMethod = 'demo_pin' | 'operator_session';
 export interface PolicyLimits {
   maxInstallments: number; minFirstPct: number; maxPlanDays: number; maxPaymentCents: number;
 }
@@ -61,7 +63,7 @@ export interface StateStore {
   getPolicy(version?: number): Promise<Policy>;
   /** Trusted owner transport only. Atomically compare version, append snapshot + human audit.
    * Never expose this reducer through agent/voice tool schemas. */
-  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number): Promise<Policy>;
+  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number, method?: PolicySaveMethod): Promise<Policy>;
   /** Global model gate; adapters map to runtime_control[global] in #15. */
   readonly llmEnabled: boolean;
   /** Aborted on OFF; a new signal on ON fences results from the old generation. */

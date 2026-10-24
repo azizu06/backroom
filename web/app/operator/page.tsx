@@ -4,6 +4,7 @@ import { operatorActions, type OperatorAction } from '../../lib/operator/catalog
 import ControllerQr from './ControllerQr';
 import PaymentStep from './PaymentStep';
 import '../office/lobby.css';
+import { signInOperator } from '../../lib/operator/sign-in-client';
 import styles from './operator.module.css';
 
 type Receipt = { result?: unknown; error?: string; auditHref?: string; requestId?: string };
@@ -28,22 +29,31 @@ function X402Summary({ receipt }: { receipt: X402Receipt }) {
 }
 export default function OperatorPage() {
   const [authorized, setAuthorized] = useState(false), [busy, setBusy] = useState('');
-  const [offBusy, setOffBusy] = useState(false);
+  const [offBusy, setOffBusy] = useState(false), [code, setCode] = useState('');
   const [error, setError] = useState(''), [receipt, setReceipt] = useState<Receipt>();
   const [links, setLinks] = useState<Links>({}), [confirm, setConfirm] = useState<OperatorAction>();
   const [resetDone, setResetDone] = useState(false);
   const [testnet, setTestnet] = useState<{ available: boolean; reason?: string }>();
   async function session() {
-    const response = await fetch('/api/operator/session', { cache: 'no-store' });
-    setAuthorized(response.ok);
-    if (response.ok) setTestnet((await response.json() as { x402Testnet?: { available: boolean; reason?: string } }).x402Testnet);
+    const response = await fetch('/api/operator/session', { cache: 'no-store' }).catch(() => undefined);
+    setAuthorized(!!response?.ok);
+    if (response?.ok) setTestnet((await response.json() as { x402Testnet?: { available: boolean; reason?: string } }).x402Testnet);
+    return !!response?.ok;
   }
   useEffect(() => { void session(); }, []);
+  async function signIn() {
+    setBusy('session'); setError('');
+    try {
+      await signInOperator(code); setCode('');
+      if (!await session()) throw new Error('Signed in, but this host’s console is unavailable. The audit wall, desk phone and policy editor are unlocked.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sign-in failed.'); }
+    finally { setBusy(''); }
+  }
   async function unlock() {
     setBusy('session'); setError('');
     try {
       const response = await fetch('/__operator/session', { method: 'POST' });
-      if (!response.ok) throw new Error('Unlock is available only at http://127.0.0.1:<demo port>/operator on the host. Public links cannot unlock controls.');
+      if (!response.ok) throw new Error('Code-free unlock works only at http://127.0.0.1:<demo port>/operator on the host. Use the operator code here instead.');
       await session();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Console unavailable.'); }
     finally { setBusy(''); }
@@ -81,8 +91,13 @@ export default function OperatorPage() {
     <h1>Demo operator</h1>
     <p className={styles.lede}>Run the demo top to bottom. Every action is audited; approvals still need Dana&rsquo;s passkey.</p>
     {error && <p role='alert' className={styles.error}>{error}</p>}
-    {!authorized ? <section className={styles.card}><h2>Unlock on this host</h2><p>Open this page at the demo host&rsquo;s numeric loopback address. Sessions expire after eight hours or a host restart.</p>
-      <button className={styles.primary} disabled={!!busy} onClick={() => void unlock()}>Unlock local operator session</button></section> : <>
+    {!authorized ? <><section className={styles.card}><h2>Operator sign-in</h2><p>One sign-in for the whole demo: this console, the office desk phone&rsquo;s Request call, the audit wall and the policy editor. It expires after eight hours. It never approves a payment; approvals still need Dana&rsquo;s passkey.</p>
+      <form className={styles.row} onSubmit={e => { e.preventDefault(); void signIn(); }}>
+        <label>Operator code <input type='password' autoComplete='off' required value={code} onChange={e => setCode(e.target.value)} /></label>
+        <button className={styles.primary} disabled={!!busy || !code}>{busy === 'session' ? 'Signing in…' : 'Sign in'}</button>
+      </form></section>
+      <section className={styles.card}><h2>On the host itself</h2><p>At the demo host&rsquo;s numeric loopback address you can unlock this console without the code.</p>
+      <button disabled={!!busy} onClick={() => void unlock()}>Unlock local operator session</button></section></> : <>
       <div className={styles.session}><p role='status'>{busy ? `${operatorActions[busy as OperatorAction]?.[0] || 'Working'}…` : offBusy ? 'Turning models OFF…' : 'Operator session active.'}</p>
         <button disabled={!!busy || offBusy} onClick={() => { void fetch('/api/operator/logout', { method: 'POST' }).then(response => { if (response.ok) setAuthorized(false); }); }}>Lock console</button></div>
       {confirm && <section className={styles.card} role='alertdialog' aria-modal='false' aria-labelledby='confirm-title'><h2 id='confirm-title'>{operatorActions[confirm][0]}?</h2><p>{operatorActions[confirm][1]}</p>
