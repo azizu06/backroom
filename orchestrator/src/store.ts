@@ -1,6 +1,7 @@
 import type { ControllerDecision, ApprovalTerms } from './approvals/types';
 import type { VerifiedApproval } from './approvals/verified';
 import type { Action, Badge, Context, Decision } from '@backroom/policy';
+import type { ChainStatus } from './audit';
 
 export type Seat = Badge;
 export type AgentState = 'idle' | 'working' | 'walking' | 'waiting' | 'on_call' | 'paused' | 'offline';
@@ -34,6 +35,8 @@ export interface Escalation {
 }
 export type CallEscalation = Omit<Escalation, 'status' | 'decision' | 'decidedAt' | 'method' | 'credentialId' | 'createdAt' | 'expiresAt'> & { seat: Seat };
 export interface AuditInput {
+  /** Optional stable event id for gateway dedupe; otherwise audit:<seq>. */
+  id?: string;
   ts: number; actor: 'code' | 'local_model' | 'claude' | 'human' | 'client' | 'system';
   seat: Seat | 'controller'; action: string; ruleIds: string[]; policyVersion: number; refs: string[];
   route: string; decision?: Decision['kind']; inputs?: Record<string, unknown>;
@@ -77,7 +80,11 @@ export interface StateStore {
   expireEscalations(now: number): Promise<void>;
   // Approval writes belong to the controller/passkey service, not to workers.
   appendAudit(entry: AuditInput): Promise<AuditEntry>;
-  listAudit(): Promise<AuditEntry[]>;
+  /** Atomic batch: either every entry is appended in order or none are. */
+  appendAudits(entries: readonly AuditInput[]): Promise<AuditEntry[]>;
+  listAudit(sinceSeq?: number): Promise<AuditEntry[]>;
+  getAudit(id: string): Promise<AuditEntry | undefined>;
+  verifyAuditChain(): Promise<ChainStatus>;
   getPayment(key: string): Promise<PaymentReceipt | undefined>;
   reservePayment(lease: Lease, key: string, fingerprint: string, now: number): Promise<PaymentReceipt | undefined>;
   recordPayment(lease: Lease, receipt: PaymentReceipt, now: number): Promise<void>;

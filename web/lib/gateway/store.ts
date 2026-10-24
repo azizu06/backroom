@@ -2,6 +2,7 @@ import type {
   GatewayPolicyDecision,
   GatewayPolicyState,
 } from "./policy-adapter";
+import { getStateStore, type StateStore } from "@backroom/orchestrator";
 
 export interface GatewayCall {
   callId: string;
@@ -108,7 +109,9 @@ export class GatewayError extends Error {
 export class MemoryGatewayStore implements GatewayStore {
   private calls = new Map<string, GatewayCall>();
   private tail: Promise<unknown> = Promise.resolve();
-  constructor(calls: GatewayCall[] = []) {
+  constructor(calls: GatewayCall[] = [],
+    private readonly auditStore: Pick<StateStore, 'appendAudits'> | (() => Pick<StateStore, 'appendAudits'>) = getStateStore,
+  ) {
     for (const call of calls)
       this.calls.set(call.callId, structuredClone(call));
   }
@@ -132,8 +135,27 @@ export class MemoryGatewayStore implements GatewayStore {
           throw new GatewayError(409, "WEBHOOK_ID_REUSED");
         }
       }
-      this.calls.set(callId, structuredClone(copy));
-      return structuredClone(result);
+      // Prepare every potentially throwing clone/check before appending evidence.
+      // The call rows retain their existing UUIDs; the shared chain uses those
+      // same IDs so gateway citations resolve through StateStore.getAudit.
+      const saved = structuredClone(copy);
+      const response = structuredClone(result);
+      const previousIds = new Set(current.audits.map(entry => entry.id));
+      const inputs = saved.audits.filter(entry => !previousIds.has(entry.id)).map(entry => ({
+        id: entry.id, ts: Date.now(), actor: entry.actor, seat: 'collections' as const,
+        action: entry.action, ruleIds: entry.ruleIds, policyVersion: entry.policyVersion,
+        refs: [saved.callId, saved.invoiceId, saved.clientId], route: 'code',
+        decision: entry.kind === 'RECORDED' ? undefined : entry.kind,
+        inputs: { kind: entry.kind, webhookRequestId: entry.webhookRequestId,
+          invoiceId: saved.invoiceId, plan: entry.plan, decision: entry.decision },
+        latencyMs: 0, costUsd: 0,
+      }));
+      if (inputs.length) {
+        const audit = typeof this.auditStore === 'function' ? this.auditStore() : this.auditStore;
+        await audit.appendAudits(inputs);
+      }
+      this.calls.set(callId, saved);
+      return response;
     });
     this.tail = run.catch(() => undefined);
     return run;
