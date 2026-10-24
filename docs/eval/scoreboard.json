@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "3094f8a16e1d8d91af0015ec886f2b429a3b0c92",
+    "baseCommit": "6ede37a2ae7190b58175fea6757f5809590d96fa",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
@@ -22,7 +22,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "6482d84ff6a276908a6b53188678f5218c21b45e557e2bcafa77372844fdbe4e"
+      "orchestrator/src/agents/eval/scoreboard.ts": "607c1f4b125a73db948e4cecb3e160de2640f991d8ddf87ab0e81f90a55bb01c"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -15440,6 +15440,10 @@
   },
   "gaps": [
     {
+      "id": "AR_RUNTIME",
+      "detail": "10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
+    },
+    {
       "id": "P01",
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
     },
@@ -15480,16 +15484,8 @@
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
     },
     {
-      "id": "C17",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
       "id": "C21",
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
-      "id": "AR_RUNTIME",
-      "detail": "10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     }
   ]
 }
