@@ -14,10 +14,11 @@ const payment: NewTask = {
 };
 
 describe('Payables recovery', () => {
-  it('takes over at the exact lease expiry and links prior audit evidence', async () => {
+  it.each([true, false])('takes over at exact lease expiry with models enabled=%s', async modelsEnabled => {
     let now = 0;
     const store = new MemoryStateStore();
     const effects = new FakeEffects();
+    await store.setLlmEnabled(modelsEnabled);
     const worker = (id: string) => new SeatWorker({ id, seat: 'payables', store, effects,
       now: () => now, leaseMs: 1000, heartbeatMs: 100 });
     await store.enqueueTask(payment);
@@ -34,9 +35,10 @@ describe('Payables recovery', () => {
     expect((await store.listAudit()).find(entry => entry.action === 'task_resumed')).toMatchObject({
       refs: ['invoice:recovery:1', 'recovery:1'], inputs: {
         taskId: payment.id, workerId: 'replacement', leaseToken: 2, cursor: 0,
-        priorAuditIds: ['audit:1', 'audit:2'],
+        priorAuditIds: modelsEnabled ? ['audit:1', 'audit:2'] : ['audit:2', 'audit:3'],
       },
     });
+    if (!modelsEnabled) expect((await store.listAudit()).every(entry => entry.actor === 'code')).toBe(true);
     await expect(old.tick()).rejects.toThrow('LEASE_LOST');
     await store.enqueueTask({ ...payment, id: 'replay' });
     await replacement.tick();

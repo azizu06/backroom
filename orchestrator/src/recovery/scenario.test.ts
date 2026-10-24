@@ -11,6 +11,7 @@ describe('real SIGKILL recovery demo (simulated independent services)', () => {
       expect(result.kills).toBe(2);
       expect(result.signals.slice(0, 2)).toEqual(['SIGKILL', 'SIGKILL']);
       expect(result.before).toHaveLength(2);
+      expect(result.after.every(entry => entry.actor === 'code')).toBe(true);
       expect(result.tasks.map(task => task.status)).toEqual(['done', 'done', 'done']);
       expect(result.tasks.map(task => task.cursor)).toEqual([1, 1, 1]);
       expect(result.tasks.every(task => !task.leaseOwner && !task.leaseExpiresAt)).toBe(true);

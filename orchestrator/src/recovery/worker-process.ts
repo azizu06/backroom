@@ -16,7 +16,13 @@ process.on('disconnect', () => {
   pending.clear();
 });
 function remote<T extends object>(target: 'store' | 'effects'): T {
-  return new Proxy({}, { get: (_object, method: string) => (...args: unknown[]) =>
+  // The parent pins this payment-only demo OFF. These synchronous fields are not RPC methods.
+  // This is not a subscription adapter for the production global switch.
+  const offSignal = AbortSignal.abort('RECOVERY_DEMO_MODELS_OFF');
+  return new Proxy({}, { get: (_object, method: string) => {
+    if (target === 'store' && method === 'llmEnabled') return false;
+    if (target === 'store' && method === 'llmSignal') return offSignal;
+    return (...args: unknown[]) =>
     new Promise<unknown>((resolve, reject) => {
       const id = ++sequence;
       pending.set(id, { resolve, reject });
@@ -28,7 +34,8 @@ function remote<T extends object>(target: 'store' | 'effects'): T {
       process.send!({ id, target, method, args: wireArgs }, error => {
         if (error) { pending.delete(id); reject(error); }
       });
-    }) }) as T;
+    });
+  } }) as T;
 }
 const worker = new SeatWorker({ id: process.argv[2]!, seat: 'payables',
   store: remote<StateStore>('store'), effects: remote<Effects>('effects'),

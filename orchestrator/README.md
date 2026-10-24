@@ -161,6 +161,9 @@ but before its receipt reaches the worker, then starts a replacement. It prints
 the before/after audit logs and a `PASS recovery` line only after every task is
 `done`, all leases are released, and exactly one simulated payment exists per
 invoice. Failures exit nonzero. No credentials, browser, network, or models are used.
+The parent pins the global model switch OFF for the demo's lifetime; its IPC
+worker exposes the corresponding synchronous OFF fields. Recovery and completion
+audit entries use `actor=code`. This demo adapter does not subscribe to switch changes.
 
 The parent process hosts the reference StateStore and simulated payment provider;
 those services survive the worker crash. The replacement runs the ordinary

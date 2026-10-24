@@ -45,6 +45,8 @@ export async function runRecovery(options: RecoveryOptions = {}): Promise<Recove
     heartbeatMs <= 0 || heartbeatMs >= 15000 || leaseMs <= heartbeatMs || timeoutMs <= leaseMs ||
     !Object.hasOwn(killMethods, killPoint)) throw new Error('INVALID_RECOVERY_OPTIONS');
   const store = new MemoryStateStore();
+  // This demo runs only deterministic payments; keep models OFF for its entire lifetime.
+  await store.setLlmEnabled(false);
   const effects = new FakeEffects();
   const batch = Array.from({ length: batchSize }, (_, index) => paymentTask(index + 1));
   for (const task of batch) await store.enqueueTask(task);

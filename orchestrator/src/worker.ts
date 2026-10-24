@@ -51,7 +51,7 @@ export class SeatWorker {
             entry.inputs?.taskId === claimed.id ||
             (entry.action === 'lease_expired' && entry.refs.includes(claimed.id)));
           await store.assertLease(claimed, this.now());
-          await store.appendAudit({ ts: this.now(), actor: 'system', seat, action: 'task_resumed',
+          await store.appendAudit({ ts: this.now(), actor: store.llmEnabled ? 'system' : 'code', seat, action: 'task_resumed',
             ruleIds: ['LEASE_EXPIRED'], policyVersion: claimed.steps[claimed.cursor]?.context.policyVersion ?? 0,
             refs: [...claimed.refs, claimed.id], route: 'code', latencyMs: 0, costUsd: 0,
             inputs: { taskId: claimed.id, workerId: id, leaseToken: claimed.leaseToken,
