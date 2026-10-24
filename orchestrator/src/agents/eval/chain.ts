@@ -180,13 +180,11 @@ export async function runReceivable(id: string, caseId = `ar:${id}`) {
   return { id, result, audit, trace };
 }
 
-/** Only the pre-call permit seam is measured here. Scenario speech is exercised by the legacy harness. */
-export async function runCollectionsPermit(id: string, invoiceId: string, overrides: Record<string, any> = {}) {
+/** Network-forbidden dependencies for the production Collections planner. */
+export function collectionsPlannerFixture(id: string, invoiceId: string, overrides: Record<string, any> = {}) {
   const invoice = northfield.arInvoices.find(row => row.id === invoiceId)!;
   const client = northfield.clients.find(row => row.id === invoice.clientId)!;
   const state = new MemoryStateStore();
-  const trace: Trace[] = [];
-  const ctx = context(id, 'collections', [`ar_invoice:${invoiceId}`]);
   const { spec } = createCollectionsPlannerSpecialist({
     cases: { load: async () => ({ sessionId: `mock:${id}`, invoice: { amountCents: invoice.principalCents + invoice.lateFeeCents,
       currency: 'USD', daysPastDue: 30 }, precall: { clientId: client.id, invoiceId, testIdentityId: 0,
@@ -201,6 +199,14 @@ export async function runCollectionsPermit(id: string, invoiceId: string, overri
       health: { check: async () => { throw new Error('OFFLINE_HEALTH_FORBIDDEN'); } },
       planner: { draft: async () => { throw new Error('OFFLINE_MODEL_FORBIDDEN'); } } },
   });
+  return { spec, state };
+}
+
+/** Only the pre-call permit seam is measured here. Scenario speech is exercised by the legacy harness. */
+export async function runCollectionsPermit(id: string, invoiceId: string, overrides: Record<string, any> = {}) {
+  const trace: Trace[] = [];
+  const ctx = context(id, 'collections', [`ar_invoice:${invoiceId}`]);
+  const { spec } = collectionsPlannerFixture(id, invoiceId, overrides);
   await call(spec, ctx, trace, 'get_invoice_context');
   const result = await call(spec, ctx, trace, 'can_call');
   return { id, result, trace };
