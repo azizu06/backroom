@@ -58,6 +58,26 @@ describe('desk phone call projection', () => {
     const uncertain = await played('uncertain');
     expect(texts(projectVoiceCall(uncertain, {}, { now: 0 }))).toEqual(['Identity not confirmed · amounts stay hidden']);
   });
+  it('hides plan terms and amounts until identity is confirmed', () => {
+    const plan = { installments: 3, firstPaymentPct: 40, durationDays: 45, waiveFee: true, discountPct: 15 };
+    const call = voiceCall({
+      identityConfirmed: false,
+      audits: [
+        { actor: 'code', id: 'audit-1', action: 'propose_plan', kind: 'ALLOW', ruleIds: [], policyVersion: 1, webhookRequestId: 'w1', plan },
+        { actor: 'code', id: 'audit-2', action: 'send_payment_link', kind: 'ALLOW', ruleIds: [], policyVersion: 1, webhookRequestId: 'w2' },
+      ],
+      plans: [{ ...plan, id: 'plan-1', auditId: 'audit-1', totalCents: 420000, firstPaymentCents: 168000 }],
+      links: [{ id: 'link-1', planId: 'plan-1', auditId: 'audit-2', amountCents: 168000, path: '/pay/secret-path', shortCode: 'secret-code' }],
+    });
+    const hidden = texts(projectVoiceCall(call, { registeredAt: 1 }, { now: 2 })).join('\n');
+    expect(hidden).toContain('first $•••');
+    expect(hidden).toContain('first payment $•••');
+    expect(hidden).not.toMatch(/\$\d|%|fee waived|\d+ payments?/);
+    expect(hidden).not.toMatch(/\b(15|40|45)\b/);
+    const shown = texts(projectVoiceCall({ ...call, identityConfirmed: true }, { registeredAt: 1 }, { now: 2 })).join('\n');
+    expect(shown).toContain('3 payments, fee waived, 15% off, first $1,680.00');
+    expect(shown).toContain('Payment link queued · first payment $1,680.00');
+  });
   it('maps lifecycle and gateway stops to ringing, live and ended', () => {
     expect(projectVoiceCall(voiceCall(), { registeredAt: 1000 }, { now: 2000 })).toMatchObject({ status: 'ringing', startedAt: 1000 });
     expect(projectVoiceCall(voiceCall(), { registeredAt: 1000 }, { now: 1001 + RING_TIMEOUT_MS }))
