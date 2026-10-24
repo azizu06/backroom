@@ -278,7 +278,10 @@ export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): strin
 export interface PlayBridge {
   readonly input: PlayInput;
   /** Live handoff choreography, when handoff rows exist; its agents become interact targets. */
-  readonly handoffs?: { sample(now: number, reduced?: boolean): { actors: readonly { id: string; position: Vec2 }[]; human: boolean } };
+  readonly handoffs?: {
+    sample(now: number, reduced?: boolean): { actors: readonly { id: string; position: Vec2 }[]; human: boolean };
+    readonly current: readonly { readonly from: string; readonly to: string }[];
+  };
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };
 }

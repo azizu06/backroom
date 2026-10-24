@@ -77,7 +77,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, handoffs }: P
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
     const handoff = handoffs?.sample(Date.now(), reduced.current);
-    const handoffAgents = handoff ? handoff.actors.filter(actor => actor.id !== 'human' || handoff.human) : [];
+    // Only agents with a handoff to show are targets (Dana only while she is at her desk).
+    const handoffAgents = handoff ? handoff.actors.filter(actor => (actor.id !== 'human' || handoff.human)
+      && handoffs!.current.some(row => row.from === actor.id || row.to === actor.id)) : [];
     const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }

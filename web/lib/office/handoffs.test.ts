@@ -74,3 +74,12 @@ describe('handoff adapter (provisional contract)', () => {
     expect(handoffFlag('?handoffs=live&handoffSpeed=x')).toEqual({ mock: false, speed: 1 });
   });
 });
+
+describe('handoff adapter without a timestamp column', () => {
+  it('keeps the first-seen time per id so re-projection does not replay the row', () => {
+    const first = handoffFromRow({ id: 'no-ts-1', from: 'intake', to: 'extractor' }, 1000)!;
+    const again = handoffFromRow({ id: 'no-ts-1', from: 'intake', to: 'extractor', status: 'failed' }, 9000)!;
+    expect(first.at).toBe(1000);
+    expect(again.at).toBe(1000);
+  });
+});
