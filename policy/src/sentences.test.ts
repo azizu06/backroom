@@ -24,3 +24,16 @@ it("maps every rule to exactly one exact sentence in the owner document", () => 
     expect(decision.reason).toContain(decision.quote.text);
   }
 });
+
+it('keeps the frozen owner quote and annotates saved numeric limits honestly', async () => {
+  const { DEFAULT_POLICY, savePolicy } = await import('./index');
+  const draft = structuredClone(DEFAULT_POLICY);
+  draft.badges.collections.limits.maxInstallments = 3;
+  const policy = savePolicy(DEFAULT_POLICY, draft);
+  const decision = evaluate('collections', { type: 'propose_plan', plan: { installments: 4, firstPaymentPct: 50, totalDays: 30, waiveFees: false, discountPct: 0 } }, { policy, identityConfirmed: true });
+  expect(decision.kind).toBe('ESCALATE');
+  if (decision.kind !== 'ALLOW') {
+    expect(decision.quote.text).toBe(`${POLICY_SENTENCES['NF-012']} Saved maximum installment count: 3 in v2.`);
+    expect(decision.reason).toContain('3 in v2');
+  }
+});
