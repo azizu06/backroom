@@ -42,6 +42,8 @@ which consumes the same subscribed snapshot.
   notification/cleanup, continuous aisle travel/arrival, and retargeting with a
   clamped resumed frame. No network calls. Test file: 55 lines; no repeated setup
   or snapshot assertions.
+- The web test command enables Vitest globals for the gateway tests inherited
+  from main; together the two suites pass 26 tests. Gateway files are unchanged.
 - `pnpm --filter @backroom/web typecheck` and `pnpm --filter @backroom/web build`.
 - Real signed-in Chrome via `chrome-devtools-axi`, `pnpm --filter @backroom/web dev
   --port 3109`: both desk targets, fixed camera, 2D retargeting, and simulated WebGL
