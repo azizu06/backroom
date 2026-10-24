@@ -6,6 +6,7 @@ import type { PlayTarget } from '../../../lib/office/play';
 import { agentTalkPanel } from './AgentTalkPanel';
 import { coworkerPanel } from './CoworkerPanel';
 import { deskPanel } from './DeskPanel';
+import { inboxPanel } from './InboxPanel';
 import { paylinkPanel } from './PaylinkPanel';
 import { phonePanel } from './PhonePanel';
 import { serverPanel } from './ServerPanel';
@@ -22,4 +23,5 @@ export const PLAY_PANEL_VIEWS: Partial<Record<PlayTarget['kind'], PlayPanelView>
   server: serverPanel,
   phone: phonePanel,
   coworker: coworkerPanel,
+  inbox: inboxPanel,
 };
