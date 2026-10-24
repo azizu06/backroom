@@ -130,6 +130,29 @@ export const InboxItem = __t.object("InboxItem", {
 });
 export type InboxItem = __Infer<typeof InboxItem>;
 
+export const OfficePresence = __t.object("OfficePresence", {
+  viewerId: __t.string(),
+  name: __t.string(),
+  x: __t.f32(),
+  z: __t.f32(),
+  yaw: __t.f32(),
+  mode: __t.string(),
+  at: __t.u64(),
+});
+export type OfficePresence = __Infer<typeof OfficePresence>;
+
+export const OfficePresenceOwner = __t.object("OfficePresenceOwner", {
+  viewerId: __t.string(),
+  owner: __t.identity(),
+});
+export type OfficePresenceOwner = __Infer<typeof OfficePresenceOwner>;
+
+export const OfficePresenceSchedule = __t.object("OfficePresenceSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type OfficePresenceSchedule = __Infer<typeof OfficePresenceSchedule>;
+
 export const OperationResult = __t.object("OperationResult", {
   id: __t.string(),
   result: __t.string(),
