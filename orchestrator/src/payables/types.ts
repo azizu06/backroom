@@ -4,7 +4,7 @@ import type { StateStore } from '../store';
 
 export interface InboxSource { id: string; source: 'seed' | 'judge'; senderDomain: string }
 /** senderDomain comes from trusted envelope metadata, never extraction output. */
-export interface FinanceInboxItem extends InboxSource { kind: 'email' | 'invoice'; text: string }
+export interface FinanceInboxItem extends InboxSource { kind: 'email' | 'invoice'; text: string; attachment?: import('./document').InvoiceAttachment }
 export interface InvoiceFields {
   kind: 'invoice'; invoiceId: string; vendorId: string; poId: string | null;
   amountCents: number; adjustmentCents?: number; currency: 'USD'; bankAccountId: string; lineItems: LineItem[];

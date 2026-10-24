@@ -1,0 +1,20 @@
+import { expect, it } from 'vitest';
+import { northfieldInvoice } from '../payables';
+import type { route } from '../router';
+import { runVisionCase, visionCases, visionMetricRow } from './vision';
+it('scores extraction errors independently of safety holds and keeps simulated effects explicit', async () => {
+  const c = visionCases().find(row => row.id === 'rotated-photo')!;
+  const fields = northfieldInvoice('4401');
+  fields.lineItems = [{ description: 'wrong service description', quantity: 1, unitPriceCents: 64000 }];
+  const modelRoute = (async () => ({ output: fields, route: 'local', model: 'mock', latencyMs: 12, costUsd: 0 })) as typeof route;
+  const sample = await runVisionCase(c, modelRoute);
+  expect(sample.exact).toBe(false);
+  expect(sample.fieldMatches.lineItems).toBe(false);
+  expect(sample.fieldMatches.amountCents).toBe(true);
+  expect(sample.ruleIds).toContain('NO_PO');
+  expect(sample.ruleMatch).toBe(false);
+  expect(sample.mockPayments).toBe(0);
+  const row = visionMetricRow({ version: 1, complete: true, expectedSamples: 1, measuredAt: '2026-10-24', sourceSha: 'synthetic', host: 'mock', model: 'mock', hashes: {}, scope: 'test', samples: [sample] });
+  expect(row[1]).toContain('0/1 exact');
+  expect(row[2]).toContain('0/1 expected code rules');
+});
