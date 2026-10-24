@@ -12,7 +12,7 @@ try {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
-    const disclosure = page.getByRole('complementary', {name:'Real versus simulated disclosure'});
+    const disclosure = page.getByRole('complementary', {name:'Demo disclosure'});
     await disclosure.waitFor();
     await page.locator('canvas').waitFor();
     await page.waitForTimeout(500);
@@ -21,7 +21,6 @@ try {
     const control = await button.boundingBox();
     const panel = await disclosure.boundingBox();
     assert(control.y + control.height < panel.y, JSON.stringify({name,control,panel}));
-    assert.equal(await disclosure.locator('li').count(),10);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await button.click();
     await page.waitForTimeout(200);
@@ -37,7 +36,7 @@ try {
     await page.getByRole('button',{name:'Return to Collections'}).click();
     await page.getByText('Target: Collections',{exact:false}).waitFor();
     assert.deepEqual(errors,[]);
-    console.log(`PASS ${name}: office motion, both fallbacks, 10 disclosure entries, controls above panel, no overflow or page errors`);
+    console.log(`PASS ${name}: office motion, both fallbacks, demo pill, controls above pill, no overflow or page errors`);
     await page.close();
   }
 } finally { await browser.close(); }

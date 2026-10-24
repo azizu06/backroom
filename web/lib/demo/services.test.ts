@@ -153,6 +153,7 @@ it('records FAKE CRS and fixture health signals, replays as a no-op, and still r
   expect(expected.every(row => row.subjectRef === '1042' && row.source === 'crs_fixture' && row.label === 'FAKE: CRS fixture, test identity #1')).toBe(true);
   expect(expected.some(row => /live run/i.test(row.label))).toBe(false);
   expect(await state.listSignals()).toEqual(expected);
+  expect(services.precall()).toEqual({ preCall: { status: 'ready', signals: expect.any(Object) }, signals: expected.filter(row => row.source === 'apify') });
   await services.prepare(state);
   expect(await state.listSignals()).toEqual(expected);
   expect(http).not.toHaveBeenCalled();
