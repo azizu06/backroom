@@ -1,5 +1,5 @@
 export interface DemoStatus {
-  live?: boolean; bank?: 'mock' | 'nessie_sandbox'; services?: { model: { mode: string; cloud: string }; nessie: { mode: string }; apify: { mode: string; status: string; runId?: string }; crs: { mode: string; status: string; products: string[]; ofac: string; businessCredit: string } };
+  live?: boolean; bank?: 'mock' | 'nessie_sandbox'; services?: { preCall?: { status: string; reason?: string }; model: { mode: string; cloud: string }; nessie: { mode: string }; apify: { mode: string; status: string; runId?: string }; crs: { mode: string; status: string; products: string[]; ofac: string; businessCredit: string } };
   llmEnabled: boolean; stateStore: 'memory' | 'spacetime'; voice: boolean;
   approvePath?: string; payPath?: string; workersHealthy?: boolean; tunnelUrl?: string;
 }

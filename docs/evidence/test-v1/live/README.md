@@ -54,5 +54,12 @@ walkthrough passed. Unit tests mock network traffic. All owned demo processes
 were stopped; sponsor deposits and durable claims were retained.
 
 The new host adapter records synthetic pre-call evidence in the same audit
-store. Actual dial readiness and the separate CRS pre-call/vendor policy wiring
-remain outside this phone-free take; unknown OFAC is never represented as clear.
+store. After this browser take, #113 merged and the host now consumes its exported
+`createPreCallCreditCheck()`/`runPreCall()` flow, using cached Apify results.
+Credentialed live mode also enables the vendor fraud checks. A mocked integration
+regression proves bankruptcy blocks before model planning; final workspace
+build/typechecks and **651 tests** pass. The headless capture and health snapshot
+precede that last factory hookup. No third Actor run was made for recapture.
+Actual dial readiness and a credentialed CRS probe remain outside this take;
+unknown OFAC is never represented as clear. Synthetic gateway rehearsal links
+are separate from the pre-call permit.

@@ -35,7 +35,8 @@ it('live payments use real Nessie HTTP and reuse invoice memos across new hosts'
 it('caches even an ambiguous Actor start across resets and reports it without leaking provider text', async () => {
   const http = vi.fn<typeof fetch>(async () => { throw new Error('private-provider-error'); });
   const services = await createDemoServices({ env: { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private',
-    NESSIE_ACCOUNT_ID: 'sandbox-account', APIFY_TOKEN: 'private-token' }, fetch: http });
+    NESSIE_ACCOUNT_ID: 'sandbox-account', APIFY_TOKEN: 'private-token' }, fetch: http,
+    modelRoute: async () => ({ kind: 'LLM_OFF', route: 'code', model: 'none', latencyMs: 0, costUsd: 0 }) });
   const { MemoryStateStore } = await import('@backroom/orchestrator');
   const first = new MemoryStateStore(), reset = new MemoryStateStore();
   await services.prepare(first);
@@ -47,4 +48,23 @@ it('caches even an ambiguous Actor start across resets and reports it without le
   const audit = await reset.listAudit();
   expect(audit[0]?.inputs).toMatchObject({ noDial: true, crsLabel: 'FAKE: test identity #1', ofac: 'unknown' });
   expect(JSON.stringify([audit, services.status()])).not.toContain('private');
+});
+
+it('consumes the CRS pre-call factory and blocks bankruptcy before model planning', async () => {
+  const http: typeof fetch = async url => {
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/users/login')) return Response.json({ token: 'test-session' });
+    if (path.includes('/pp/')) return Response.json({ Report: { Summary: { BankruptciesFound: '1', JudgmentsFound: '0', LiensFound: '0' } } });
+    if (path.includes('/fraud-finder/')) return Response.json({ risk: { score: 88, tumbling_risk: 0 } });
+    throw new Error('Unexpected network');
+  };
+  const modelRoute = vi.fn();
+  const services = await createDemoServices({ env: { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private',
+    NESSIE_ACCOUNT_ID: 'sandbox-account', CRS_USERNAME: 'test-user', CRS_PASSWORD: 'test-pass' }, fetch: http, modelRoute });
+  const { MemoryStateStore } = await import('@backroom/orchestrator');
+  const state = new MemoryStateStore();
+  await services.prepare(state);
+  expect(services.status().services.preCall).toMatchObject({ status: 'blocked' });
+  expect((await state.listAudit()).some(row => row.ruleIds.includes('BANKRUPTCY_STOP'))).toBe(true);
+  expect(modelRoute).not.toHaveBeenCalled();
 });
