@@ -28,3 +28,5 @@
 @media (max-width: 760px) {
   .play-panel { top: 8px; left: 8px; width: min(300px, calc(100% - 16px)); }
 }
+/* PaymentLinkPanel QR inside the narrow Play dialog. */
+.play-panel img { display: block; max-width: 100%; height: auto; }
