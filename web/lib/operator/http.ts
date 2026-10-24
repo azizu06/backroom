@@ -45,8 +45,10 @@ export function createOperatorHTTP(options: {
     try {
       await audit('started'); // Fail closed before effects if the audit adapter is unavailable.
       const result = await options.run(action);
-      const entry = await audit('completed');
-      return json({ result, requestId, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}` });
+      const failed = !!result && typeof result === 'object' && 'failed' in result && result.failed === true;
+      const entry = await audit(failed ? 'failed' : 'completed');
+      return json({ result, requestId, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}`,
+        ...(failed ? { error: 'Proof run failed. See the retained output.' } : {}) }, failed ? 422 : 200);
     } catch {
       try { await audit('failed'); } catch { /* Never return untrusted adapter details. */ }
       return json({ error: 'Action failed or its completion could not be recorded. Check the audit before retrying.', requestId }, 503);

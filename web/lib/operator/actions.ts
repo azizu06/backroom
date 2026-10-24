@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -8,6 +8,24 @@ import { probeDependencies, type DemoStatus, type HealthRow } from '../../../too
 import { preflight } from '../../../orchestrator/src/demo-ops/preflight';
 import { demoControl, operatorRoot } from './control';
 import type { OperatorAction } from './catalog';
+
+/** Nonzero proof exits are evidence, not transport errors. Never relay stderr or provider exceptions. */
+export async function collectProofResult(child: ChildProcess, reportFile?: string) {
+  const { stdout, exitCode } = await new Promise<{ stdout: string; exitCode: number }>((resolve, reject) => {
+    let text = '';
+    child.stdout?.on('data', chunk => { text += chunk; if (text.length > 2_000_000) child.kill(); });
+    child.on('error', () => reject(new Error('OPERATOR_CLI_FAILED')));
+    child.on('close', code => code === null ? reject(new Error('OPERATOR_CLI_FAILED')) : resolve({ stdout: text, exitCode: code }));
+  });
+  let report = stdout;
+  if (reportFile) {
+    try { report = await readFile(reportFile, 'utf8'); }
+    catch { if (exitCode === 0) throw new Error('OPERATOR_REPORT_MISSING'); }
+  }
+  return { scope: 'Synthetic rehearsal; no dial, live bank writes or human approval. Historical evidence retains its date.',
+    output: report.slice(0, 200_000) || 'No proof report was produced.', truncated: report.length > 200_000,
+    exitCode, failed: exitCode !== 0 };
+}
 
 async function runCLI(action: 'core' | 'eval' | 'metrics' | 'scoreboard' | 'burst_plan' | 'burst') {
   const root = operatorRoot(), out = join(root, '.demo/operator', randomUUID());
@@ -22,18 +40,9 @@ async function runCLI(action: 'core' | 'eval' | 'metrics' | 'scoreboard' | 'burs
   const env: NodeJS.ProcessEnv = { NODE_ENV: 'test', PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR,
     STATE_STORE: 'memory', PRECALL_APIFY: 'fake', PRECALL_CRS: 'fake', GX10_ENABLED: 'false',
     BACKROOM_REPORT_DIR: out, GX10_BASE_URL: process.env.GX10_BASE_URL };
-  const output = await new Promise<string>((resolve, reject) => {
-    let text = '';
-    const child = spawn(process.execPath, ['--import', loader, join(root, 'orchestrator/src', scripts[action]), ...args],
-      { cwd: root, env, signal, stdio: ['ignore', 'pipe', 'ignore'] });
-    child.stdout.on('data', chunk => { text += chunk; if (text.length > 2_000_000) child.kill(); });
-    child.on('error', () => reject(new Error('OPERATOR_CLI_FAILED')));
-    child.on('close', code => code === 0 ? resolve(text) : reject(new Error('OPERATOR_CLI_FAILED')));
-  });
-  const report = action === 'metrics' ? await readFile(join(out, 'metrics.md'), 'utf8')
-    : action === 'scoreboard' ? await readFile(join(out, 'scoreboard.md'), 'utf8') : output;
-  return { scope: 'Synthetic rehearsal; no dial, live bank writes or human approval. Historical evidence retains its date.',
-    output: report.slice(0, 200_000), truncated: report.length > 200_000 };
+  const child = spawn(process.execPath, ['--import', loader, join(root, 'orchestrator/src', scripts[action]), ...args],
+    { cwd: root, env, signal, stdio: ['ignore', 'pipe', 'ignore'] });
+  return collectProofResult(child, action === 'metrics' ? join(out, 'metrics.md') : action === 'scoreboard' ? join(out, 'scoreboard.md') : undefined);
 }
 export async function runOperatorAction(action: OperatorAction): Promise<unknown> {
   if (action === 'llm_on' || action === 'llm_off') {

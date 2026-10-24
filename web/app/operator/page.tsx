@@ -8,6 +8,7 @@ type Receipt = { result?: unknown; error?: string; auditHref?: string; requestId
 type Links = { approvePath?: string; payPath?: string; stateStore?: string; bank?: string; llmEnabled?: boolean; publicUrl?: string };
 export default function OperatorPage() {
   const [authorized, setAuthorized] = useState(false), [busy, setBusy] = useState('');
+  const [offBusy, setOffBusy] = useState(false);
   const [error, setError] = useState(''), [receipt, setReceipt] = useState<Receipt>();
   const [links, setLinks] = useState<Links>({}), [confirm, setConfirm] = useState<OperatorAction>();
   useEffect(() => { void fetch('/api/operator/session', { cache: 'no-store' }).then(response => setAuthorized(response.ok)); }, []);
@@ -21,7 +22,9 @@ export default function OperatorPage() {
     finally { setBusy(''); }
   }
   async function run(action: OperatorAction) {
-    setBusy(action); setError(''); setConfirm(undefined);
+    const off = action === 'llm_off';
+    if (off) setOffBusy(true); else setBusy(action);
+    setError(''); setConfirm(undefined);
     try {
       const response = await fetch(`/api/operator/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const data = await response.json() as Receipt;
@@ -31,12 +34,12 @@ export default function OperatorPage() {
       if (action === 'status' || action === 'reset') setLinks(data.result as Links);
       if (action === 'llm_on' || action === 'llm_off') setLinks(current => ({ ...current, ...(data.result as Links) }));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Action unavailable. Check the audit before retrying.'); }
-    finally { setBusy(''); }
+    finally { if (off) setOffBusy(false); else setBusy(''); }
   }
   function button(action: OperatorAction) {
     const [label, detail] = operatorActions[action];
     return <div className={styles.action} key={action}><div><strong>{label}</strong><p>{detail}</p></div>
-      <button disabled={!!busy && action !== 'llm_off'} onClick={() => action === 'reset' || action === 'llm_on' || action === 'warm' || action === 'burst' ? setConfirm(action) : void run(action)}>{busy === action ? 'Running…' : label}</button></div>;
+      <button disabled={action === 'llm_off' ? offBusy : !!busy || offBusy} onClick={() => action === 'reset' || action === 'llm_on' || action === 'warm' || action === 'burst' ? setConfirm(action) : void run(action)}>{busy === action || action === 'llm_off' && offBusy ? 'Running…' : label}</button></div>;
   }
   return <main className={styles.page}><div className={styles.content}>
     <header><a href='/office'>Back to office</a><a href='/real-vs-sim'>Real vs simulated</a></header>
@@ -46,10 +49,10 @@ export default function OperatorPage() {
     {error && <p role='alert' className={styles.error}>{error}</p>}
     {!authorized ? <section><h2>Unlock on this host</h2><p>Open this page at the demo host’s numeric loopback address. The host issues a private session without sending its control key to the browser. Sessions expire after eight hours or a host restart.</p>
       <button disabled={!!busy} onClick={() => void unlock()}>Unlock local operator session</button></section> : <>
-      <p role='status'>{busy ? `${operatorActions[busy as OperatorAction]?.[0] || 'Working'}…` : 'Operator session active.'} {links.stateStore && `State: ${links.stateStore} · Bank: ${links.bank} · LLM ${links.llmEnabled ? 'ON' : 'OFF'}`}</p>
-      <button disabled={!!busy} onClick={() => { void fetch('/api/operator/logout', { method: 'POST' }).then(response => { if (response.ok) setAuthorized(false); }); }}>Lock console</button>
+      <p role='status'>{busy ? `${operatorActions[busy as OperatorAction]?.[0] || 'Working'}…` : offBusy ? 'Turning models OFF…' : 'Operator session active.'} {links.stateStore && `State: ${links.stateStore} · Bank: ${links.bank} · LLM ${links.llmEnabled ? 'ON' : 'OFF'}`}</p>
+      <button disabled={!!busy || offBusy} onClick={() => { void fetch('/api/operator/logout', { method: 'POST' }).then(response => { if (response.ok) setAuthorized(false); }); }}>Lock console</button>
       {confirm && <section role='alertdialog' aria-modal='false' aria-labelledby='confirm-title'><h2 id='confirm-title'>{operatorActions[confirm][0]}?</h2><p>{operatorActions[confirm][1]}</p>
-        <button autoFocus disabled={!!busy} onClick={() => void run(confirm)}>Confirm {operatorActions[confirm][0].toLowerCase()}</button> <button onClick={() => setConfirm(undefined)}>Cancel</button></section>}
+        <button autoFocus disabled={!!busy || offBusy} onClick={() => void run(confirm)}>Confirm {operatorActions[confirm][0].toLowerCase()}</button> <button onClick={() => setConfirm(undefined)}>Cancel</button></section>}
       <section><h2>Host and company</h2>{(['status', 'health', 'preflight', 'reset'] as const).map(button)}
         {(links.approvePath || links.payPath) && <p>{links.approvePath && <a href={`${links.publicUrl || ''}${links.approvePath}`}>Current seeded approval</a>} {' · '}
           {links.payPath && <a href={`${links.publicUrl || ''}${links.payPath}`}>Current seeded payment</a>} · <a href='/office'>Reload office after reset</a></p>}
@@ -59,6 +62,8 @@ export default function OperatorPage() {
       <section><h2>Model controls</h2>{(['llm_off', 'llm_on', 'warm', 'burst'] as const).map(button)}</section>
       <section><h2>Authorized call payment</h2><PaymentLinkPanel /></section>
       {receipt && <section aria-label='Latest action receipt'><h2>Latest receipt</h2>{receipt.auditHref && <p><a href={receipt.auditHref}>Open action audit</a></p>}
+        {!!receipt.result && typeof receipt.result === 'object' && 'exitCode' in receipt.result && typeof receipt.result.exitCode === 'number'
+          && <p>Exit status: {receipt.result.exitCode} · {receipt.result.exitCode === 0 ? 'passed' : 'failed'}</p>}
         <pre>{receipt.result && typeof receipt.result === 'object' && 'output' in receipt.result && typeof receipt.result.output === 'string'
           ? receipt.result.output : JSON.stringify(receipt, null, 2)}</pre></section>}
     </>}
