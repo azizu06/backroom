@@ -69,8 +69,8 @@ not claim Maincloud/network latency. Initial or reconnect snapshots do not count
 fresh writes; use the live script's fresh run ID when evaluating samples.
 
 The page only subscribes. Reducers perform permission checks with the renderer closed
-or open; no UI event triggers authority or changes room permissions. Full §4.9 audit
-parity needs the forthcoming full schema and orchestrator adapter, and is not claimed here.
+or open; no UI event triggers authority or changes room permissions. This original T8 run did not measure full §4.9 audit parity; the later full-module
+Maincloud evidence below supersedes that limitation.
 
 ## Maincloud: VERIFIED
 
@@ -129,16 +129,15 @@ silently substitute simulated state.
 
 ## Scope and continuation
 
-This ships T8 first. The full §4.7 table/reducer set plus durable orchestration semantics
-is larger than a 45-minute safe extension: #15 must implement the exported #16
-`StateStore` seam (`orchestrator/src/store.ts` in the orchestrator work), atomic
-leases/fencing, idempotent effects/receipts, audit chaining, policy transitions and
-controller/passkey approval checks. T8's private publisher controller is a spike
-boundary, not a substitute for those product approvals.
+The original T8 spike established the module/policy/subscription path. The full
+§4.7 schema and `StateStore` adapter have since landed; see
+[`spacetime/README.md`](../spacetime/README.md) for their reducer, lease, fencing,
+audit and server-verified approval contracts. The Maincloud verification above
+uses that full module and its existing generated bindings without schema changes.
 
-The generated client and reducer signatures are documented in `spacetime/README.md`.
-No Convex code or full-StateStore compatibility is claimed. Keep network I/O in the
-orchestrator; the module performs deterministic state writes and policy evaluation.
+Keep network I/O in the orchestrator; reducers perform deterministic state writes
+and policy evaluation. Hosted office parity does not establish live voice,
+real human passkey hardware, bank reconciliation or GX10 web hosting.
 
 Primary references: [official TypeScript quickstart](https://spacetimedb.com/docs/quickstarts/typescript/),
 [official installation/local server guide](https://spacetimedb.com/docs/).
