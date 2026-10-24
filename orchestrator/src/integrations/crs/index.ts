@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 
 export const CRS_SANDBOX_URL = 'https://api-sandbox.stitchcredit.com/api';
 export class CrsError extends Error {
-  constructor(public readonly code: 'AUTH' | 'HTTP' | 'RESPONSE' | 'TRANSPORT' | 'CONFIGURATION', public readonly status?: number) {
-    super(`CRS ${code}${status === undefined ? '' : ` (${status})`}`);
+  constructor(public readonly code: 'AUTH' | 'HTTP' | 'RESPONSE' | 'TRANSPORT' | 'CONFIGURATION', public readonly status?: number, step?: string) {
+    super(`CRS ${code}${status === undefined ? '' : ` (${status})`}${step ? ` at ${step}` : ''}`);
     this.name = 'CrsError';
   }
 }
@@ -97,10 +97,10 @@ export class CrsClient {
         try {
           const body = await this.#json(await this.#post('/users/login', this.#credentials));
           this.#setTokens(body);
-        } catch {
+        } catch (error) {
           // CRS warns repeated failed logins disable the account. New client required after correction.
           this.#authFailed = true;
-          throw new CrsError('AUTH');
+          throw new CrsError('AUTH', error instanceof CrsError ? error.status : undefined);
         }
       })().finally(() => { this.#authentication = undefined; });
     }
