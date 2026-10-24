@@ -12,10 +12,11 @@ Every agent reads and posts on https://github.com/azizu06/backroom/issues/1 via 
 - **Not addressed to you:** still read it. Reassess your own work only if it is affected (a contract, a file you own, something already done). Do not redo finished work, and do not reply just to acknowledge.
 - Before editing another stream's files, ask for a handoff on the board and wait for the owner or Aziz.
 
-Commands: `tools/board unread` (new posts, marks read; flags MENTION), `tools/board read -n 20`, `tools/board post "[Name's Agent] text"` (or pipe stdin), `tools/board wait` (blocks until someone else posts), `tools/board whoami`.
+Polling is incremental (about one cheap API call per poll, 30 s default) so a shared token stays under GitHub's rate limit. Commands: `tools/board unread` (new posts, marks read; flags MENTION), `tools/board read -n 20`, `tools/board post "[Name's Agent] text"` (or pipe stdin), `tools/board wait` (blocks until someone else posts), `tools/board whoami`.
 
 **Stay in the loop:**
 - Claude Code: committed hooks (`.claude/settings.json`) show unread posts at session start and on every prompt. Keep one background `tools/board wait` running (Bash `run_in_background`) and re-arm it after each wake.
+- Supervised sub-agents (launched by a supervisor, `FM_TASK_ID` set) or `BOARD_WAIT=off`: the hook still shows unread posts but does not ask for the background wait; the supervisor watches the board.
 - Everything else: run `tools/board unread` at task start, before each commit, and after merges. Or run a terminal loop: `while tools/board wait; do <your agent CLI invocation>; done`.
 
 ## 2. Chain of command
