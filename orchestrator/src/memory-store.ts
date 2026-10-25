@@ -59,6 +59,7 @@ export class MemoryStateStore implements StateStore {
   async completeTask(...args: Parameters<ReducerEngine['completeTask']>) { return this.engine.execute('completeTask', args); }
   async createEscalation(...args: Parameters<ReducerEngine['createEscalation']>) { return this.engine.execute('createEscalation', args); }
   async createCallEscalation(...args: Parameters<ReducerEngine['createCallEscalation']>) { return this.engine.execute('createCallEscalation', args); }
+  async setCallPresence(...args: Parameters<ReducerEngine['setCallPresence']>) { return this.engine.execute('setCallPresence', args); }
   async expireEscalations(...args: Parameters<ReducerEngine['expireEscalations']>) { return this.engine.execute('expireEscalations', args); }
   async getEscalation(...args: Parameters<ReducerEngine['getEscalation']>) { return this.engine.execute('getEscalation', args); }
   async appendAudit(...args: Parameters<ReducerEngine['appendAudit']>) { return this.engine.execute('appendAudit', args); }

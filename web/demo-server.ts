@@ -71,6 +71,7 @@ async function main() {
             const body = JSON.parse(raw);
             if (!body || Object.keys(body).length !== 2 || typeof body.sessionId !== 'string' || !['started', 'completed', 'failed'].includes(body.event)) throw new Error('INVALID_EVENT');
             recordVoiceCallEvent(body.sessionId, body.event);
+            await runtime.voiceCallEvent(body.sessionId, body.event);
             res.end('{"ok":true}'); return;
           }
           res.writeHead(405).end('{}');

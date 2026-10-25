@@ -40,3 +40,24 @@ test('agent reducers fence a stale lease and reject a forged evidence ref with a
   expect([...h.db.agent_handoff_public.iter()][0]).toMatchObject({ status: 'rejected', errorCode: 'HANDOFF_UNKNOWN_REF' });
   await expect(store.commit(ctx, { to: 'vendor', reason: 'r', summary: 's', artifactRefs: ['doc:1'] })).rejects.toThrow('HANDOFF_ALREADY_REJECTED');
 });
+
+test('a live call escalation publishes collections -> Dana once and resolves it, and the voice agent stays online', async () => {
+  const { h, transport, store: state } = harnessStore();
+  const store = new SpacetimeHandoffStore(transport);
+  await state.setCallPresence('voice:collections', 'collections', true, 1_000);
+  expect(await state.getAgent('voice:collections')).toMatchObject({ state: 'on_call', heartbeatAt: 1_000 });
+  await expect(state.setCallPresence('voice:collections', 'payables', true, 1_000)).rejects.toThrow('INVALID_BADGE');
+  const input = { caseId: 'call:c1', displayId: '1042', from: 'collections' as const, escalationId: 'esc-1', toHuman: 'Dana',
+    ruleIds: ['MAX_INSTALLMENTS'], artifactRefs: ['esc-1', 'ar_invoice:1042'] };
+  const offered = await store.escalateToHuman(input);
+  expect(await store.escalateToHuman(input)).toMatchObject({ handoffId: offered.handoffId, sequence: offered.sequence });
+  expect([...h.db.agent_handoff_public.iter()].map(r => `${r.fromRole}>${r.toRole}:${r.status}:${r.decisionRef}`)).toEqual(['collections>human:offered:esc-1']);
+  expect(await store.resolveHumanEscalation('call:c1', 'esc-1', 'approved')).toMatchObject({ status: 'completed' });
+  expect(await store.resolveHumanEscalation('call:missing', 'esc-1', 'approved')).toBeUndefined();
+  expect([...h.db.agent_handoff_public.iter()].map(r => r.status)).toEqual(['completed']);
+  expect([...h.db.agent_case.iter()][0]!.status).toBe('done');
+  expect([...h.db.audit_entry.iter()].map(a => a.action)).toEqual(expect.arrayContaining(['agent_handoff_offered', 'agent_handoff_completed']));
+  await state.setCallPresence('voice:collections', 'collections', false, 2_000);
+  expect(await state.getAgent('voice:collections')).toMatchObject({ state: 'idle' });
+  expect((await state.verifyAuditChain()).valid).toBe(true);
+});

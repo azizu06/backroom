@@ -2,7 +2,7 @@ import type { StateTransport } from '../spacetime-store';
 import type { StateStore } from '../store';
 import type { Activation, HandoffRecord, HandoffRequest, HandoffStore, Role, ToolContext } from './contracts';
 import * as engine from './handoff-engine';
-import type { ActivationRow, AgentHandoffPublic, CaseState, FinishOutcome, HandoffRow } from './handoff-engine';
+import type { ActivationRow, AgentHandoffPublic, CaseState, FinishOutcome, HandoffRow, HumanEscalationInput, HumanOutcome } from './handoff-engine';
 
 export class HandoffRejectedError extends Error {
   constructor(readonly record: HandoffRecord & { errorCode?: string }) { super(record.errorCode ?? 'HANDOFF_REJECTED'); }
@@ -30,6 +30,10 @@ export interface AgentCaseStore extends HandoffStore {
   recoverExpired?(caseId: string): Promise<boolean>;
   getCase(caseId: string): Promise<CaseState | undefined>;
   listPublic(sinceSequence?: number): Promise<AgentHandoffPublic[]>;
+  /** Trusted call host: publish a policy escalation from a live call to a human desk. Idempotent per escalation. */
+  escalateToHuman(input: HumanEscalationInput): Promise<AgentHandoffPublic>;
+  /** Trusted call host: close that row from the persisted decision; undefined when it was never published. */
+  resolveHumanEscalation(caseId: string, escalationId: string, outcome: HumanOutcome): Promise<AgentHandoffPublic | undefined>;
 }
 const claim = (a: Activation) => ({ activationId: a.activationId, leaseOwner: a.leaseOwner, leaseToken: a.leaseToken });
 
@@ -50,12 +54,28 @@ export class MemoryHandoffStore implements AgentCaseStore {
     if (!current) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
     const draft = structuredClone(current);
     const result = op(draft);
-    const audits = engine.handoffAudits(draft, current.handoffs, this.now());
-    this.cases.set(caseId, draft);
-    if (audits.length) await this.options.audit?.appendAudits(audits);
-    const changed = new Map(current.handoffs.map(r => [r.handoffId, r.status]));
-    for (const r of draft.handoffs) if (changed.get(r.handoffId) !== r.status) for (const l of this.listeners) l(engine.toPublicHandoff(draft, r));
+    await this.publish(current.handoffs, draft);
     return result;
+  }
+  private async publish(before: readonly HandoffRow[], draft: CaseState) {
+    const audits = engine.handoffAudits(draft, before, this.now());
+    this.cases.set(draft.caseId, draft);
+    if (audits.length) await this.options.audit?.appendAudits(audits);
+    const changed = new Map(before.map(r => [r.handoffId, r.status]));
+    for (const r of draft.handoffs) if (changed.get(r.handoffId) !== r.status) for (const l of this.listeners) l(engine.toPublicHandoff(draft, r));
+  }
+  async escalateToHuman(input: HumanEscalationInput) {
+    const current = this.cases.get(input.caseId);
+    const { state, record, created } = engine.escalateToHuman(current && structuredClone(current), { ...input, now: this.now(), sequence: this.sequence + 1 });
+    if (created) { this.sequence = record.sequence; await this.publish(current?.handoffs ?? [], state); }
+    return engine.toPublicHandoff(state, record);
+  }
+  async resolveHumanEscalation(caseId: string, escalationId: string, outcome: HumanOutcome) {
+    if (!this.cases.has(caseId)) return undefined;
+    return this.apply(caseId, s => {
+      const row = engine.resolveHumanEscalation(s, { escalationId, outcome, now: this.now() });
+      return row && engine.toPublicHandoff(s, row);
+    });
   }
   async openCase(input: { caseId: string; role: Role; artifactRefs: string[]; displayId?: string }) {
     const state = engine.openCase(this.cases.get(input.caseId), { ...input, now: this.now() });
@@ -166,4 +186,8 @@ export class SpacetimeHandoffStore implements AgentCaseStore {
   async resumeCase(caseId: string) { await this.call('agentResumeCase', [caseId]); }
   async getCase(caseId: string) { return await this.call<CaseState | null>('agentGetCase', [caseId]) ?? undefined; }
   listPublic(sinceSequence = 0) { return this.call<AgentHandoffPublic[]>('agentListPublic', [sinceSequence]); }
+  escalateToHuman(input: HumanEscalationInput) { return this.call<AgentHandoffPublic>('agentEscalateToHuman', [input]); }
+  async resolveHumanEscalation(caseId: string, escalationId: string, outcome: HumanOutcome) {
+    return await this.call<AgentHandoffPublic | null>('agentResolveHumanEscalation', [caseId, escalationId, outcome]) ?? undefined;
+  }
 }

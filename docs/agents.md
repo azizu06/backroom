@@ -78,6 +78,24 @@ If the dispatcher already made a case terminal between reset's read and stop,
 reset confirms that state and continues; storage failures remain retryable.
 Narration failures cannot replace or delay the recorded inbox HTTP response.
 
+### Live collections calls
+
+When the voice relay reports a call ended (`/__demo/voice-call-ended`), the same host
+runs the AR chain collections → reconciler → auditor on the gateway's recorded call
+(`submitCallOutcome`, once per call) with the same OFF switch, ledger and `mode: 'demo'`.
+Stops and pending approvals stay code-owned holds with no handoff. The reconciler holds
+a fresh Collections task lease (`demo:agent-reconciler`) on the host's claim queue only
+for its own activation.
+
+During the call, `voice:collections` is `on_call` from registration until the call ends
+(`setCallPresence`, pulsed every 5s and on each gateway tool call), keeps walking to
+Dana's desk while her decision is pending, and is `idle` after. Each policy escalation
+is published code-side through the shared handoff store (`escalateToHuman`, case
+`call:<callId>`) as one `collections → human` row: `offered` while Dana decides,
+`completed` on a passkey approval, `rejected` (`DENIED`, `COUNTER_OFFER`,
+`ESCALATION_EXPIRED`, `PENDING_OWNER`) otherwise. No model or role can write that row.
+Projection failures are logged and never change a tool result or call end.
+
 Verification (mocked QueryFn; no paid calls):
 
 ```sh
@@ -100,14 +118,14 @@ same row shape from `MemoryHandoffStore.subscribe`. Matching `audit_entry` rows 
 | `handoffId`, `sequence` (u64) | Stable id; global order for catch-up |
 | `caseDisplayId` | Short case label |
 | `fromAgentId`, `toAgentId` | `<role>-agent` |
-| `fromRole`, `toRole` | `intake`, `extractor`, `vendor`, `payables`, `collections`, `reconciler`, `auditor` |
+| `fromRole`, `toRole` | `intake`, `extractor`, `vendor`, `payables`, `collections`, `reconciler`, `auditor`; `toRole` is `human` (Dana's desk, `toAgentId` `human:Dana`) for a live-call escalation |
 | `fromVoiceRole`, `toVoiceRole` | Keys of `orchestrator/src/voice/voices.ts` (`intake_sorter`, `vendor_verifier`, `collections_caller`, …) |
 | `status` | `offered` (A walks to B with the folder), `accepted` (B starts), `completed` (B finished its turn), `rejected` (return trip) |
 | `correction` | Backward edge (missing evidence / fix request) |
 | `reason`, `summary` | Redacted text (no control chars or `<>`, digit runs and emails masked), ≤120 and ≤160 chars |
 | `line` | Author’s speech line; while `offered`, POST `{ role: fromVoiceRole, text: line }` to `/api/handoff` |
 | `createdAt`, `acceptedAt?`, `completedAt?` | ms timestamps (database time) |
-| `decisionRef?`, `errorCode?` | Target activation id; rule code on `rejected` |
+| `decisionRef?`, `errorCode?` | Target activation id (escalation id for a `human` row); rule code on `rejected` |
 
 Packets, artifact refs, documents, contacts and bank data stay in the private `agent_handoff` table.
 Animation never commits ownership. A future call-state projection can sit beside this table as its own table.
