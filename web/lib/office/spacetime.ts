@@ -1,13 +1,15 @@
+import { projectHandoffRows } from './handoff-subscription';
 import { DbConnection } from '@backroom/orchestrator/spacetime-client';
-import type { Agent, AuditEntry, Badge, Escalation, Room, Seat, RuntimeControl } from '@backroom/orchestrator/spacetime-client/types';
+import type { Agent, AgentHandoffPublic, AuditEntry, Badge, Escalation, Room, Seat, RuntimeControl } from '@backroom/orchestrator/spacetime-client/types';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot, type OfficeAudit, type SeatId } from './state';
 
 export interface OfficeConnectionConfig { uri: string; database: string }
-export const OFFICE_QUERIES = ['agent', 'room', 'seat', 'badge', 'escalation', 'audit_entry', 'runtime_control']
+export const OFFICE_QUERIES = ['agent', 'room', 'seat', 'badge', 'escalation', 'audit_entry', 'runtime_control', 'agent_handoff_public']
   .map(table => `SELECT * FROM ${table}`);
 export interface OfficeRows {
   agents: Agent[]; rooms: Room[]; seats: Seat[]; badges: Badge[];
   escalations: Escalation[]; audit: AuditEntry[]; control: RuntimeControl[];
+  handoffs?: readonly AgentHandoffPublic[];
 }
 function anchor(value: string): AnchorId | undefined {
   const id = value.toLowerCase().replace(/[-_]desk$/, '');
@@ -50,6 +52,7 @@ export function projectOfficeRows(rows: OfficeRows): OfficeSnapshot {
   });
   const inboxReceipts = audit.filter(row => ['submit_inbox_item', 'judge_inbox_decision', 'route_inbox_item'].includes(row.action));
   return { agents, rooms, badges, audit, denials, inboxReceipts, inboxCount: inboxReceipts.length,
+    ...(rows.handoffs ? { handoffs: projectHandoffRows(rows.handoffs) } : {}),
     connection: 'live', llmEnabled: rows.control.find(row => row.id === 'global')?.llmEnabled ?? null };
 }
 
@@ -67,6 +70,7 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
   };
   return {
     getSnapshot: () => snapshot,
+    getPresenceConnection: () => snapshot.connection === 'live' ? connection : undefined,
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     disconnect,
     connect() {
@@ -84,11 +88,14 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
         try {
           publish(projectOfficeRows({ agents: [...db.db.agent.iter()], rooms: [...db.db.room.iter()],
             seats: [...db.db.seat.iter()], badges: [...db.db.badge.iter()], escalations: [...db.db.escalation.iter()],
-            audit: [...db.db.auditEntry.iter()], control: [...db.db.runtimeControl.iter()] }));
+            audit: [...db.db.auditEntry.iter()], control: [...db.db.runtimeControl.iter()],
+            handoffs: [...db.db.agentHandoffPublic.iter()],
+          }));
         } catch { failed(); }
       };
       try {
-        connection = DbConnection.builder().withUri(config.uri).withDatabaseName(config.database).withAutomaticReconnect()
+        // A same-origin path (the demo host's state proxy) resolves against this page's address.
+        connection = DbConnection.builder().withUri(new URL(config.uri, globalThis.location?.href)).withDatabaseName(config.database).withAutomaticReconnect()
           .onConnect(db => {
             if (generation !== current) return;
             applied = false;
@@ -98,7 +105,9 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
               queueMicrotask(() => { queued = false; refresh(db); });
             };
             if (!hooked) {
-              for (const table of [db.db.agent, db.db.room, db.db.seat, db.db.badge, db.db.escalation, db.db.auditEntry, db.db.runtimeControl]) {
+              for (const table of [db.db.agent, db.db.room, db.db.seat, db.db.badge, db.db.escalation, db.db.auditEntry, db.db.runtimeControl,
+                db.db.agentHandoffPublic,
+              ]) {
                 table.onInsert(changed); table.onUpdate(changed); table.onDelete(changed);
               }
               hooked = true;

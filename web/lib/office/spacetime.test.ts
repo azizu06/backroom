@@ -17,6 +17,7 @@ function rows(): OfficeRows {
       inputs: '{"agentId":"sam","room":"treasury"}', decision: 'DENY', ruleIds: ['NOT_IN_BADGE'], refs: ['sam', 'treasury'],
       policyVersion: 1, route: 'code', latencyMs: 0, costUsd: 0, hash: 'h', prevHash: 'p' }],
     control: [{ id: 'global', llmEnabled: false, generation: 2n, heartbeatAt: new Timestamp(1000000n) }],
+    handoffs: [],
   };
 }
 afterEach(() => vi.restoreAllMocks());
@@ -68,36 +69,41 @@ describe('anonymous office projection', () => {
     let connected: (db: DbConnection) => void = () => {};
     let disconnected = () => {};
     const changed: (() => void)[] = [];
-    const table = (key: keyof OfficeRows) => ({ iter: () => data[key].values(),
+    const table = (key: keyof OfficeRows) => ({ iter: () => data[key]!.values(),
       onInsert: (cb: () => void) => changed.push(cb), onUpdate: (cb: () => void) => changed.push(cb), onDelete: (cb: () => void) => changed.push(cb) });
     let applied = () => {};
     const subscribe = vi.fn(() => applied());
     const subscription = { onApplied(cb: () => void) { applied = cb; return this; }, onError() { return this; }, subscribe };
     const db = { db: { agent: table('agents'), room: table('rooms'), seat: table('seats'), badge: table('badges'),
-      escalation: table('escalations'), auditEntry: table('audit'), runtimeControl: table('control') },
+      escalation: table('escalations'), auditEntry: table('audit'), runtimeControl: table('control'), agentHandoffPublic: table('handoffs') },
       subscriptionBuilder: () => subscription, disconnect: vi.fn() } as unknown as DbConnection;
     const builder = { withUri() { return this; }, withDatabaseName() { return this; }, withAutomaticReconnect() { return this; },
       onConnect(cb: typeof connected) { connected = cb; return this; }, onConnectError() { return this; },
       onDisconnect(cb: () => void) { disconnected = cb; return this; }, build: () => db };
     vi.spyOn(DbConnection, 'builder').mockReturnValue(builder as unknown as ReturnType<typeof DbConnection.builder>);
     const source = createSpacetimeOfficeState({ uri: 'ws://test', database: 'test' });
+    expect(source.getPresenceConnection()).toBeUndefined();
     const listener = vi.fn(); source.subscribe(listener);
     source.connect(); connected(db);
     expect(subscribe).toHaveBeenCalledWith(OFFICE_QUERIES);
     expect(source.getSnapshot().connection).toBe('live');
+    expect(source.getPresenceConnection()).toBe(db);
     listener.mockClear();
     data.control[0]!.llmEnabled = true;
     changed.forEach(cb => cb()); await Promise.resolve();
     expect(listener).toHaveBeenCalledTimes(1);
     expect(source.getSnapshot().llmEnabled).toBe(true);
     disconnected();
+    expect(source.getPresenceConnection()).toBeUndefined();
     expect(source.getSnapshot()).toMatchObject({ connection: 'disconnected', llmEnabled: null });
     data.agents[0]!.targetAnchor = 'payables_desk';
     changed.forEach(cb => cb()); await Promise.resolve();
     expect(source.getSnapshot().agents[0]?.targetAnchor).toBe('dana');
     connected(db);
+    expect(source.getPresenceConnection()).toBe(db);
     expect(source.getSnapshot().agents[0]?.targetAnchor).toBe('payables');
     source.disconnect();
+    expect(source.getPresenceConnection()).toBeUndefined();
     connected(db); await Promise.resolve();
     expect(source.getSnapshot().connection).toBe('disconnected');
   });

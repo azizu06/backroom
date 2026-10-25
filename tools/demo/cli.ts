@@ -6,9 +6,11 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, closeSync, unlinkSync, appendFileSync, chmodSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { demoBindHost, externalState } from './host';
 import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
-import { probeDependencies, type DemoStatus, type HealthRow } from './health';
+import { probeAttackDemo, probeDependencies, type DemoStatus, type HealthRow } from './health';
+import { demoPublicTarget } from './public-url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
@@ -30,6 +32,7 @@ async function control<T = DemoStatus & { publicUrl: string; localUrl: string }>
 function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string }) {
   console.log(`Local office: ${status.localUrl}/office`);
   for (const [label, path] of Object.entries({ Office: '/office', 'Audit wall': '/audit', 'Inbox tray': '/inbox',
+    'Attack demo': '/attack',
     'Policy editor': '/policy', Controller: '/controller', Approve: status.approvePath, Pay: status.payPath, 'Real vs simulated': '/real-vs-sim' })) {
     console.log(`${label}: ${status.publicUrl}${path || '/ (not seeded)'}`);
   }
@@ -40,15 +43,14 @@ async function waitFor(check: () => Promise<boolean>, ms: number) {
   while (Date.now() < deadline) { if (await check()) return; await delay(250); }
   throw new Error('DEMO_START_TIMEOUT');
 }
-async function available(port: number) {
+async function available(port: number, host = '127.0.0.1') {
   await new Promise<void>((resolve, reject) => {
     const probe = netServer(); probe.once('error', () => reject(new Error('DEMO_PORT_IN_USE')));
-    probe.listen(port, '127.0.0.1', () => probe.close(() => resolve()));
+    probe.listen(port, host, () => probe.close(() => resolve()));
   });
 }
 async function supervise() {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  closeSync(openSync(lockFile, 'wx', 0o600));
   const token = randomBytes(32).toString('hex');
   const env: NodeJS.ProcessEnv = { ...process.env, STATE_STORE: process.env.STATE_STORE || 'spacetime',
     BACKROOM_DEMO: '1', BACKROOM_APPROVAL_DEMO: '0', BACKROOM_PAYMENT_DEMO: '0', DEMO_CONTROL_SECRET: token };
@@ -60,6 +62,9 @@ async function supervise() {
   let stopping = false;
   let base = '', publicUrl = '';
   const database = localSpacetime(root, env, children);
+  closeSync(openSync(lockFile, 'wx', 0o600));
+  let remote: ReturnType<typeof externalState>;
+  let bindHost = '127.0.0.1';
   let stateConfig: Awaited<ReturnType<typeof database.publish>> | undefined;
   let resetting = false;
   const queryWeb = async (action: string) => {
@@ -76,6 +81,7 @@ async function supervise() {
       if (req.url === '/down' && req.method === 'POST') { res.end('{}'); void stop(); return; }
       if (((req.url === '/status' || req.url === '/health') && req.method === 'GET') || (req.url === '/reset' && req.method === 'POST')) {
         if (req.url === '/reset') {
+          if (remote) { res.writeHead(409).end(); return; }
           if (resetting) { res.writeHead(409).end(); return; }
           resetting = true;
           try { if (env.STATE_STORE === 'spacetime') stateConfig = await database.publish(); }
@@ -85,7 +91,8 @@ async function supervise() {
         let status: DemoStatus;
         try { status = await queryWeb(req.url === '/reset' ? 'reset' : 'status'); }
         finally { if (req.url === '/reset') resetting = false; }
-        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
+        const attackDemo = await probeAttackDemo(env);
+        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, attackDemo, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
       }
       res.writeHead(404).end();
     } catch { res.writeHead(503).end(); }
@@ -98,26 +105,39 @@ async function supervise() {
   }
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { void stop(); });
   try {
+    remote = externalState(env); bindHost = demoBindHost(env);
     if (!['memory', 'spacetime'].includes(env.STATE_STORE)) throw new Error('DEMO_INVALID_STATE_STORE');
     const port = Number(env.DEMO_PORT || 3000), voicePort = Number(env.VOICE_PORT || 8788);
-    await available(port); base = `http://127.0.0.1:${port}`;
+    const attackPort = Number(env.ATTACK_DEMO_PORT || 8790);
+    await available(port, bindHost);
+    if (bindHost !== '127.0.0.1') await available(port);
+    base = `http://${bindHost.includes(':') ? `[${bindHost}]` : bindHost}:${port}`;
     if (env.DEMO_VOICE === '1') await available(voicePort);
+    await available(attackPort);
+    env.ATTACK_DEMO_PORT = String(attackPort);
+    env.ATTACK_DEMO_BASE_URL = `http://127.0.0.1:${attackPort}`;
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('DEMO_CONTROL_BIND');
     writeFileSync(recordFile, JSON.stringify({ port: address.port, token, pid: process.pid }), { mode: 0o600 });
-    if (env.STATE_STORE === 'spacetime') {
-      await available(database.port); await database.start();
-      await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${database.port}/v1/ping`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
+    if (remote) {
+      stateConfig = remote;
+    } else if (env.STATE_STORE === 'spacetime') {
+      if (database.mode === 'local') await available(database.port, database.host);
+      await database.start();
+      await waitFor(async () => { try { return (await fetch(`${database.http}/v1/ping`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
       stateConfig = await database.publish();
       env.SPACETIMEDB_URI = stateConfig.uri; env.SPACETIMEDB_DATABASE = stateConfig.database; env.SPACETIMEDB_TOKEN = stateConfig.token;
     }
     // Each owned process gets separate logs. Never forward provider output into shared status.
     const stateMode = env.STATE_STORE; env.STATE_STORE = 'memory';
-    await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
+    if (env.DEMO_PREBUILT !== '1') await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
     env.STATE_STORE = stateMode;
-    publicUrl = `http://localhost:${port}`;
-    if (env.DEMO_TUNNEL !== '0') {
+    // WebAuthn allows a non-HTTPS origin only for hostname localhost. The listen socket stays on the bind address.
+    // A preset HTTPS origin (Tailscale Funnel) is the public URL. demo:up has no other external-URL flag, so this skips cloudflared.
+    const target = demoPublicTarget(env, port, base);
+    publicUrl = target.publicUrl;
+    if (target.startCloudflared) {
       const log = join(dir, 'tunnel.log'); writeFileSync(log, '', { mode: 0o600 });
       children.start('cloudflared', ['tunnel', '--url', base, '--no-autoupdate'], log);
       await waitFor(async () => {
@@ -134,12 +154,30 @@ async function supervise() {
       .map(name => `${name}=${randomBytes(24).toString('hex')}`).join('\n') + '\n', { mode: 0o600 });
     const existing = { ...process.env }; process.loadEnvFile(privateEnv);
     for (const name of ['TOOL_GATEWAY_SECRET', 'CONTROLLER_ENROLLMENT_SECRET', 'POLICY_DEMO_PIN']) env[name] = existing[name] || process.env[name];
+    // Same private bearer as the web proxy. Live analysis remains explicitly opt-in.
+    // Mock imports must not open a second writer on a database that reset rotates.
+    const attackStateMode = env.STATE_STORE;
+    if (env.ATTACK_DEMO_LIVE !== '1') env.STATE_STORE = 'memory';
+    children.start(process.execPath, ['--import', loader, 'orchestrator/src/attack-demo/server.ts'], join(dir, 'attack.log'));
+    env.STATE_STORE = attackStateMode;
+    await waitFor(async () => (await probeAttackDemo(env)).ok, 20000);
+    if (env.DEMO_VOICE === '1') {
+      const voicePrivate = join(dir, 'voice-private.env');
+      const names = ['VOICE_TOOL_SECRET', 'VOICE_ADMIN_SECRET', 'CARTESIA_WEBHOOK_SECRET'];
+      if (!existsSync(voicePrivate)) writeFileSync(voicePrivate, names.map(name => `${name}=${randomBytes(24).toString('hex')}`).join('\n') + '\n', { mode: 0o600 });
+      const prior = { ...process.env }; process.loadEnvFile(voicePrivate);
+      for (const name of names) env[name] = env[name] || prior[name] || process.env[name];
+    }
     env.VOICE_PUBLIC_URL = `${publicUrl}/_cartesia`;
     writeFileSync(join(dir, 'voice.env'), `VOICE_PUBLIC_URL=${env.VOICE_PUBLIC_URL}\n`, { mode: 0o600 });
     if (env.DEMO_VOICE === '1') {
       if (env.DEMO_TUNNEL === '0') throw new Error('DEMO_VOICE_REQUIRES_TUNNEL');
-      await children.run(process.execPath, ['--import', loader, 'orchestrator/src/voice/live.ts', 'setup'], join(dir, 'voice-setup.log'));
+      // Voice owns a separate file journal. Avoid opening an unused StateStore subscription
+      // on import (which otherwise keeps the one-shot setup process alive forever).
+      const webStateMode = env.STATE_STORE; env.STATE_STORE = 'memory';
+      if (env.DEMO_VOICE_SETUP !== '0') await children.run(process.execPath, ['--import', loader, 'orchestrator/src/voice/live.ts', 'setup'], join(dir, 'voice-setup.log'));
       children.start(process.execPath, ['--import', loader, 'orchestrator/src/voice/live.ts', 'serve'], join(dir, 'voice.log'));
+      env.STATE_STORE = webStateMode;
       await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${voicePort}/health`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
       env.DEMO_VOICE_RUNNING = '1';
     }

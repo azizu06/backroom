@@ -1,0 +1,13 @@
+.desk-phone-panel { display: grid; gap: .65rem; }
+.desk-phone-panel p { margin: 0; }
+.desk-phone-panel ol { margin: 0; padding-left: 1.35rem; max-height: 12rem; overflow: auto; }
+.desk-phone-panel li + li { margin-top: .35rem; }
+.desk-phone-panel button { justify-self: start; }
+.desk-phone-precall { border: 1px solid var(--office-lavender); border-left: 4px solid var(--office-slate); border-radius: 8px; padding: .5rem .65rem; }
+.desk-phone-precall[data-business='closed'], .desk-phone-precall[data-precall='blocked'] { border-left-color: var(--office-coral); }
+.desk-phone-precall h3 { margin: 0 0 .25rem; font-size: 13px; color: var(--office-navy); }
+.desk-phone-precall dl { margin: 0; }
+.desk-phone-precall dt { font-weight: 600; }
+.desk-phone-precall dd { text-align: right; overflow-wrap: anywhere; }
+.desk-phone-panel button[aria-disabled='true'] { cursor: not-allowed; opacity: .55; border-style: dashed; }
+.desk-phone-gate { border-left: 3px solid var(--office-coral); padding-left: .45rem; color: var(--office-navy); font-size: 13px; font-weight: 600; }

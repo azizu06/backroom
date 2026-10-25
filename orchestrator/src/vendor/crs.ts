@@ -17,14 +17,21 @@ export function createCrsBankChangeRisk(client: Pick<CrsClient, 'getFraudRisk'>,
     assertCrsEvidence(evidence, 'fraudRisk', id!);
     const score = evidence.summary.fraudRiskScore;
     if (score === undefined || !Number.isFinite(score) || score < 0 || score > 100) throw new Error('Invalid CRS fraud risk');
-    return { score, label: `CRS sandbox: test identity #${id}`, checkedAt: evidence.checkedAt, responseHash: evidence.responseHash };
+    return { score, label: fraudLabel(id!, evidence), checkedAt: evidence.checkedAt, responseHash: evidence.responseHash };
   } };
+}
+/** Cached outage evidence keeps its clock. A fresh read never wears the cached label. */
+function fraudLabel(id: number, evidence: { label: string; cached?: true }): string {
+  if (evidence.cached !== true) return `CRS sandbox: test identity #${id}`;
+  const at = evidence.label.match(/\(cached at (\d\d:\d\d) UTC\)$/)?.[1];
+  if (!at) throw new Error('Invalid CRS evidence');
+  return `CRS sandbox: test identity #${id} (cached at ${at} UTC)`;
 }
 const seedIdentity = (vendorId: string): number | undefined => {
   const mapping = seed.vendors.find(vendor => vendor.id === vendorId)?.crsIdentityMapping;
   return mapping?.status === 'mapped' && typeof mapping.sandboxIdentityId === 'number' ? mapping.sandboxIdentityId : undefined;
 };
-export function createBankChangeRiskCheck(options: { env?: NodeJS.ProcessEnv; fetch?: typeof fetch; identityForVendor?: (vendorId: string) => number | undefined } = {}): BankChangeRisk {
+export function createBankChangeRiskCheck(options: { env?: Record<string, string | undefined>; fetch?: typeof fetch; identityForVendor?: (vendorId: string) => number | undefined } = {}): BankChangeRisk {
   const env = options.env ?? process.env;
   if (env.VENDOR_CRS !== 'live') return { async check() { return { score: 0, label: 'FAKE: synthetic fraud risk (not checked)' }; } };
   const client = createCrsClientFromEnv(env, options.fetch);
@@ -37,7 +44,7 @@ export async function assessBankChangeRisk(check: BankChangeRisk, vendorId: stri
   try {
     const result = await check.check(vendorId);
     if (!Number.isFinite(result.score) || result.score < 0 || result.score > 100 ||
-        !/^(CRS sandbox: test identity #[1-9][0-9]*|FAKE: synthetic fraud risk \(not checked\))$/.test(result.label)) throw new Error('Invalid risk');
+        !/^(CRS sandbox: test identity #[1-9][0-9]*( \(cached at \d\d:\d\d UTC\))?|FAKE: synthetic fraud risk \(not checked\))$/.test(result.label)) throw new Error('Invalid risk');
     if (result.label.startsWith('CRS sandbox') && (!result.responseHash || !/^[a-f0-9]{64}$/.test(result.responseHash) || !result.checkedAt || !Number.isFinite(Date.parse(result.checkedAt)))) throw new Error('Invalid evidence');
     const decision = evaluate('vendor_onboarding', { type: 'propose_bank_change', emailDomain: knownDomain }, {
       vendor: { id: vendorId, knownDomain, inMaster: true, approved: true, pendingBankChange: true }, signals: { fraudRiskScore: result.score },

@@ -1,0 +1,169 @@
+import type { StateTransport } from '../spacetime-store';
+import type { StateStore } from '../store';
+import type { Activation, HandoffRecord, HandoffRequest, HandoffStore, Role, ToolContext } from './contracts';
+import * as engine from './handoff-engine';
+import type { ActivationRow, AgentHandoffPublic, CaseState, FinishOutcome, HandoffRow } from './handoff-engine';
+
+export class HandoffRejectedError extends Error {
+  constructor(readonly record: HandoffRecord & { errorCode?: string }) { super(record.errorCode ?? 'HANDOFF_REJECTED'); }
+}
+export interface StartedActivation { activation: ActivationRow; inbound?: HandoffRow }
+/** The dispatcher's whole durable seam. Every method is one atomic transaction. */
+export interface AgentCaseStore extends HandoffStore {
+  openCase(input: { caseId: string; role: Role; artifactRefs: string[]; displayId?: string }): Promise<CaseState>;
+  startActivation(caseId: string, leaseOwner: string): Promise<StartedActivation>;
+  assertActive(activation: Activation): Promise<void>;
+  /** Synchronous check against the last committed state, for effect fences. Required with
+   * `recoverExpired`; a store without takeover has no stale runner to fence (fence: not_applicable). */
+  assertActiveNow?(activation: Activation): void;
+  recordArtifacts(ctx: ToolContext, refs: string[]): Promise<void>;
+  /** Throws HandoffRejectedError after persisting the rejected row; ownership stays with the source. */
+  commit(ctx: ToolContext, request: HandoffRequest): Promise<HandoffRecord>;
+  /** Persist a guard-rejected offer; returns the rejected record. */
+  reject(ctx: ToolContext, request: HandoffRequest, errorCode: string): Promise<HandoffRecord>;
+  finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string): Promise<void>;
+  stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string): Promise<void>;
+  /** Atomic activation-owned stop, implemented beside memory expiry recovery. */
+  stopActiveCase?(activation: Activation, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string): Promise<void>;
+  resumeCase(caseId: string): Promise<void>;
+  /** Explicit expiry takeover. Optional until a durable adapter implements the same contract. */
+  recoverExpired?(caseId: string): Promise<boolean>;
+  getCase(caseId: string): Promise<CaseState | undefined>;
+  listPublic(sinceSequence?: number): Promise<AgentHandoffPublic[]>;
+}
+const claim = (a: Activation) => ({ activationId: a.activationId, leaseOwner: a.leaseOwner, leaseToken: a.leaseToken });
+
+/** Process-local reference store. Ops are synchronous on one object, so each is atomic. */
+export class MemoryHandoffStore implements AgentCaseStore {
+  private readonly cases = new Map<string, CaseState>();
+  private sequence = 0;
+  private readonly listeners = new Set<(row: AgentHandoffPublic) => void>();
+  constructor(private readonly options: { audit?: StateStore; now?: () => number; activationLeaseMs?: number } = {}) {
+    const ms = options.activationLeaseMs ?? 120_000;
+    if (!Number.isSafeInteger(ms) || ms <= 0) throw new engine.AgentStateError('INVALID_ACTIVATION_LEASE');
+  }
+  /** Office/voice feed for the in-process demo; SpacetimeDB clients subscribe to the table instead. */
+  subscribe(listener: (row: AgentHandoffPublic) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  private now() { return (this.options.now ?? Date.now)(); }
+  private async apply<T>(caseId: string, op: (state: CaseState) => T): Promise<T> {
+    const current = this.cases.get(caseId);
+    if (!current) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
+    const draft = structuredClone(current);
+    const result = op(draft);
+    const audits = engine.handoffAudits(draft, current.handoffs, this.now());
+    this.cases.set(caseId, draft);
+    if (audits.length) await this.options.audit?.appendAudits(audits);
+    const changed = new Map(current.handoffs.map(r => [r.handoffId, r.status]));
+    for (const r of draft.handoffs) if (changed.get(r.handoffId) !== r.status) for (const l of this.listeners) l(engine.toPublicHandoff(draft, r));
+    return result;
+  }
+  async openCase(input: { caseId: string; role: Role; artifactRefs: string[]; displayId?: string }) {
+    const state = engine.openCase(this.cases.get(input.caseId), { ...input, now: this.now() });
+    this.cases.set(input.caseId, state);
+    return structuredClone(state);
+  }
+  startActivation(caseId: string, leaseOwner: string) { return this.apply(caseId, s => engine.startActivation(s,
+    { leaseOwner, now: this.now(), leaseMs: this.options.activationLeaseMs ?? 120_000 })); }
+  private async fenced<T>(a: Activation, operation: string, work: () => Promise<T>): Promise<T> {
+    try { return await work(); }
+    catch (error) {
+      if (error instanceof engine.AgentStateError && ['AGENT_LEASE_EXPIRED', 'AGENT_LEASE_STALE',
+        'AGENT_ACTIVATION_NOT_ACTIVE', 'AGENT_CASE_NOT_OPEN'].includes(error.message)) {
+        await this.options.audit?.appendAudit({ ts: this.now(), actor: 'code', seat: 'controller',
+          action: 'agent_activation_write_rejected', ruleIds: [error.message], policyVersion: 0,
+          refs: [a.caseId, a.activationId], route: 'code', latencyMs: 0, costUsd: 0,
+          inputs: { operation, rejectedToken: a.leaseToken, currentToken: this.cases.get(a.caseId)?.leaseToken } });
+      }
+      throw error;
+    }
+  }
+  async assertActive(a: Activation) { await this.fenced(a, 'assert', () => this.apply(a.caseId, s => { engine.assertActive(s, claim(a), this.now()); })); }
+  /** `apply` commits each op synchronously, so this sees every takeover already made. */
+  assertActiveNow(a: Activation) {
+    const state = this.cases.get(a.caseId);
+    if (!state) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
+    engine.assertActive(state, claim(a), this.now());
+  }
+  recordArtifacts(ctx: ToolContext, refs: string[]) { return this.fenced(ctx.activation, 'record_artifacts', () => this.apply(ctx.activation.caseId, s => {
+    engine.assertActive(s, claim(ctx.activation), this.now());
+    engine.recordArtifacts(s, claim(ctx.activation), refs);
+  })); }
+  async commit(ctx: ToolContext, request: HandoffRequest): Promise<HandoffRecord> {
+    const result = await this.fenced(ctx.activation, 'commit', () => this.apply(ctx.activation.caseId, s =>
+      engine.commitHandoff(s, { ...claim(ctx.activation), request, now: this.now(), sequence: this.sequence + 1 })));
+    if (!result.ok || !result.replayed) this.sequence = Math.max(this.sequence, result.record.sequence);
+    if (!result.ok) throw new HandoffRejectedError(result.record);
+    return result.record;
+  }
+  async reject(ctx: ToolContext, request: HandoffRequest, errorCode: string): Promise<HandoffRecord> {
+    const record = await this.fenced(ctx.activation, 'reject', () => this.apply(ctx.activation.caseId, s =>
+      engine.rejectHandoff(s, { ...claim(ctx.activation), request, errorCode, now: this.now(), sequence: this.sequence + 1 })));
+    this.sequence = Math.max(this.sequence, record.sequence);
+    return record;
+  }
+  finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string) {
+    return this.fenced(ctx.activation, 'finish', () => this.apply(ctx.activation.caseId,
+      s => engine.finishActivation(s, { ...claim(ctx.activation), outcome, reason, now: this.now() })));
+  }
+  stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string) {
+    return this.apply(caseId, s => engine.stopCase(s, { status, reason, now: this.now() }));
+  }
+  stopActiveCase(activation: Activation, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string) {
+    return this.fenced(activation, 'stop', () => this.apply(activation.caseId, s => {
+      engine.assertActive(s, claim(activation), this.now());
+      engine.stopCase(s, { status, reason, now: this.now() });
+    }));
+  }
+  resumeCase(caseId: string) { return this.apply(caseId, s => engine.resumeCase(s)); }
+  async recoverExpired(caseId: string): Promise<boolean> {
+    const current = this.cases.get(caseId);
+    if (!current) throw new engine.AgentStateError('AGENT_CASE_NOT_FOUND');
+    const draft = structuredClone(current);
+    const recovered = engine.recoverExpiredActivation(draft, this.now());
+    if (!recovered) return false;
+    this.cases.set(caseId, draft); // fences the old token at once
+    try {
+      await this.options.audit?.appendAudit({ ts: this.now(), actor: 'code', seat: 'controller',
+        action: 'agent_activation_recovered', ruleIds: ['LEASE_EXPIRED'], policyVersion: 0, refs: [caseId, recovered.expiredActivationId],
+        route: 'code', latencyMs: 0, costUsd: 0, inputs: recovered });
+    } catch (error) {
+      // Unaudited takeover is undone so a retry can recover; lease expiry alone still fences the old runner.
+      if (this.cases.get(caseId) === draft) this.cases.set(caseId, current);
+      throw error;
+    }
+    return true;
+  }
+  async getCase(caseId: string) { const s = this.cases.get(caseId); return s && structuredClone(s); }
+  async listPublic(sinceSequence = 0) {
+    return [...this.cases.values()].flatMap(s => s.handoffs.map(r => engine.toPublicHandoff(s, r)))
+      .filter(r => r.sequence > sinceSequence).sort((a, b) => a.sequence - b.sequence);
+  }
+}
+
+/** Durable store over the additive `agent_*` reducers in spacetime/src/index.ts.
+ * Reducers run the same engine with database time; the office reads `agent_handoff_public`. */
+export class SpacetimeHandoffStore implements AgentCaseStore {
+  constructor(private readonly transport: StateTransport) {}
+  private async call<T>(method: string, values: unknown[]): Promise<T> {
+    return await this.transport.invoke(method, values) as T;
+  }
+  openCase(input: { caseId: string; role: Role; artifactRefs: string[]; displayId?: string }) { return this.call<CaseState>('agentOpenCase', [input]); }
+  startActivation(caseId: string, leaseOwner: string) { return this.call<StartedActivation>('agentStartActivation', [caseId, leaseOwner]); }
+  async assertActive(a: Activation) { await this.call('agentAssertActive', [a.caseId, claim(a)]); }
+  async recordArtifacts(ctx: ToolContext, refs: string[]) { await this.call('agentRecordArtifacts', [ctx.activation.caseId, claim(ctx.activation), refs]); }
+  async commit(ctx: ToolContext, request: HandoffRequest): Promise<HandoffRecord> {
+    const result = await this.call<engine.CommitResult>('agentCommitHandoff', [ctx.activation.caseId, claim(ctx.activation), request]);
+    if (!result.ok) throw new HandoffRejectedError(result.record);
+    return result.record;
+  }
+  reject(ctx: ToolContext, request: HandoffRequest, errorCode: string) {
+    return this.call<HandoffRecord>('agentRejectHandoff', [ctx.activation.caseId, claim(ctx.activation), request, errorCode]);
+  }
+  async finish(ctx: ToolContext, outcome: FinishOutcome, reason?: string) {
+    await this.call('agentFinishActivation', [ctx.activation.caseId, claim(ctx.activation), outcome, reason ?? null]);
+  }
+  async stopCase(caseId: string, status: 'paused' | 'held' | 'failed' | 'cancelled', reason: string) { await this.call('agentStopCase', [caseId, status, reason]); }
+  async resumeCase(caseId: string) { await this.call('agentResumeCase', [caseId]); }
+  async getCase(caseId: string) { return await this.call<CaseState | null>('agentGetCase', [caseId]) ?? undefined; }
+  listPublic(sinceSequence = 0) { return this.call<AgentHandoffPublic[]>('agentListPublic', [sinceSequence]); }
+}

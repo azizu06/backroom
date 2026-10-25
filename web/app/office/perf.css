@@ -1,0 +1,9 @@
+.office-perf { position: absolute; right: 12px; bottom: 42px; width: 222px; max-width: calc(100% - 24px); box-sizing: border-box; padding: 10px 12px; background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 10px; color: var(--office-navy); font: 12px/1.4 'SFMono-Regular', Consolas, monospace; pointer-events: none; }
+.office-perf strong { color: var(--office-navy); }
+.office-perf dl { margin: 6px 0; }
+.office-perf dl div { display: flex; justify-content: space-between; gap: 12px; }
+.office-perf dd { margin: 0; font-variant-numeric: tabular-nums; }
+.office-perf small { display: block; font-size: 10px; }
+@media (max-width: 760px) {
+  .office-perf { right: 8px; bottom: 44px; width: 204px; padding: 8px; font-size: 11px; }
+}

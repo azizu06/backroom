@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { getStateStore, MemoryStateStore } from '@backroom/orchestrator';
+import { NessieClient, paymentMemo } from '@backroom/nessie';
+import { getStateStore, MemoryStateStore, PaymentService } from '@backroom/orchestrator';
 import { getPaymentService } from '../payments/runtime';
 import { createDemoRuntime } from './runtime';
 
@@ -52,4 +53,107 @@ it('registers an unverified voice call into the same gateway and reconciles its 
   expect((await getPaymentService().pay(id)).status).toBe('partially_paid');
   expect((await getStateStore().getPayment('ar:1042:1'))?.result.amountCents).toBe(247500);
   delete process.env.TOOL_GATEWAY_SECRET;
+});
+
+it('mirrors the bank feed after pay and reconcile, and a replay does not add a row', async () => {
+  runtime = await createDemoRuntime();
+  const store = getStateStore() as MemoryStateStore;
+  const record = vi.spyOn(store, 'recordBankTxn');
+  const linkId = runtime.status().payPath!.split('/').at(-1)!;
+  expect((await getPaymentService().pay(linkId)).status).toBe('partially_paid');
+  expect(record).toHaveBeenCalledTimes(2);
+  expect(record.mock.calls[0]![0]).toEqual(record.mock.calls[1]![0]);
+  expect(await store.listBankTxns()).toEqual([record.mock.calls[0]![0]]);
+  record.mockClear();
+  expect((await getPaymentService().pay(linkId)).status).toBe('partially_paid');
+  expect(record).not.toHaveBeenCalled();
+  expect(await store.listBankTxns()).toHaveLength(1);
+});
+
+it('schedules one pending-reconciliation sweep and clears it when the host stops', async () => {
+  const scheduled: Array<() => void> = [];
+  const realSet = globalThis.setInterval;
+  const setSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: TimerHandler, ms?: number, ...rest: unknown[]) => {
+    if (ms === 5_000 && typeof fn === 'function') { scheduled.push(() => { fn(); }); return 1 as unknown as ReturnType<typeof setInterval>; }
+    return realSet(fn as never, ms as never, ...(rest as []));
+  }) as unknown as typeof setInterval);
+  const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    runtime = await createDemoRuntime();
+    expect(scheduled).toHaveLength(1);
+    const service = getPaymentService();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let calls = 0;
+    const pending = vi.spyOn(service, 'retryPending').mockImplementation(() => { calls += 1; return gate.then(() => []); });
+    scheduled[0]!();
+    scheduled[0]!();
+    expect(calls).toBe(1);
+    const flush = () => new Promise(resolve => setImmediate(resolve));
+    release();
+    await gate;
+    await flush();
+    scheduled[0]!();
+    expect(calls).toBe(2);
+    await flush();
+    pending.mockReset();
+    pending.mockRejectedValue(new Error('retry-down'));
+    scheduled[0]!();
+    await flush();
+    expect(logged).toHaveBeenCalledWith('demo pending reconciliation retry failed', expect.any(Error));
+    expect(runtime.status().workersHealthy).toBe(true);
+    await runtime.stop();
+    expect(clearSpy).toHaveBeenCalled();
+    scheduled[0]!();
+    expect(calls).toBe(2);
+  } finally {
+    setSpy.mockRestore();
+    clearSpy.mockRestore();
+    logged.mockRestore();
+  }
+});
+
+it('recovers the active pay link before the pending sweep starts', async () => {
+  const events: string[] = [];
+  const original = PaymentService.prototype.recover;
+  const recover = vi.spyOn(PaymentService.prototype, 'recover').mockImplementation(function (this: PaymentService, linkIds, store) {
+    events.push('recover');
+    return original.call(this, linkIds, store);
+  });
+  const realSet = globalThis.setInterval;
+  vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: TimerHandler, ms?: number, ...rest: unknown[]) => {
+    if (ms === 5_000) { events.push('arm'); return 1 as unknown as ReturnType<typeof setInterval>; }
+    return realSet(fn as never, ms as never, ...(rest as []));
+  }) as unknown as typeof setInterval);
+  runtime = await createDemoRuntime();
+  const linkId = runtime.status().payPath!.split('/').at(-1)!;
+  expect(events).toEqual(['recover', 'arm']);
+  expect(recover).toHaveBeenCalledWith([linkId], expect.anything());
+});
+
+it('keeps booting when payment recovery throws', async () => {
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  let armed = false;
+  const realSet = globalThis.setInterval;
+  vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: TimerHandler, ms?: number, ...rest: unknown[]) => {
+    if (ms === 5_000) { armed = true; return 1 as unknown as ReturnType<typeof setInterval>; }
+    return realSet(fn as never, ms as never, ...(rest as []));
+  }) as unknown as typeof setInterval);
+  vi.spyOn(PaymentService.prototype, 'recover').mockRejectedValue(new Error('recover-down'));
+  runtime = await createDemoRuntime();
+  expect(logged).toHaveBeenCalledWith('demo payment recovery failed', expect.any(Error));
+  expect(armed).toBe(true);
+  expect(runtime.status().workersHealthy).toBe(true);
+});
+
+it('does not give a new pay link a deposit that already existed for invoice 1042 installment 1', async () => {
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const deposit = { _id: 'old-deposit', amount: 2475, description: paymentMemo({ invoiceId: '1042', installment: 1 }),
+    status: 'completed', medium: 'balance', transaction_date: '2026-10-24' };
+  vi.spyOn(NessieClient.prototype, 'listDeposits').mockResolvedValue([deposit]);
+  runtime = await createDemoRuntime();
+  const linkId = runtime.status().payPath!.split('/').at(-1)!;
+  expect((await getPaymentService().view(linkId)).payment).toBeUndefined();
+  expect(logged).toHaveBeenCalledWith('demo payment recovery skipped', { linkId, reason: 'NEW_LINK_EXISTING_DEPOSIT' });
 });

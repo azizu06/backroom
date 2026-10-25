@@ -4,8 +4,105 @@ This is the rehearsal host for spec §6.2, §6.3 and the three §8.2 dress rehea
 It is **local SpacetimeDB state + mock bank transport + synthetic, already verified caller**.
 `STATE_STORE=memory` is available for tests/offline rehearsal.
 The office subscribes to the selected StateStore in SpacetimeDB mode; memory
-mode retains its labeled preview. The local voice relay and external sponsor
-checks are still separate integration paths. Keep the rehearsal banner visible.
+mode retains its labeled preview. The optional voice relay forwards tools to the
+web host's gateway; external sponsor checks remain separate. Keep the rehearsal banner visible.
+
+## In-app operator console and external-action inventory
+
+After starting the owned host once, open **Operator** in the office toolbar (or
+Play HUD) on the printed public URL. Enter the operator code
+(`CONTROLLER_ENROLLMENT_SECRET` in `.env.local` or `.demo/private.env`) once and
+press **Sign in**. The host issues one eight-hour HttpOnly, SameSite=Strict
+(Secure on HTTPS) session cookie, `backroom_session`. That one session unlocks this
+console, the office desk phone's **Request call**, the audit wall and the policy
+editor; each still checks the cookie and its own origin rule on the server. The code
+is checked in constant time at `POST /api/session` only, and five wrong codes lock
+that client out for a minute. Only the declared public origin (`DEMO_PUBLIC_URL` /
+`WEBAUTHN_ORIGIN`) and the host's own `http://127.0.0.1:<DEMO_PORT>` are accepted;
+any other origin is rejected. On the host itself, **Unlock local operator session**
+still works without the code: the host checks the socket, exact numeric loopback
+Host and Origin before minting a console-only cookie with its server-held
+`DEMO_CONTROL_SECRET`. A normal `next dev` server cannot unlock the console.
+Neither session is approval authority: `/controller` and approval pages keep
+Dana's passkey checks, and the pay page is unchanged.
+
+All console actions require the configured host origin and operator session,
+accept no arbitrary commands or arguments, serialize against each other (OFF
+remains available to abort model work), and
+record started/completed/failed receipts in the canonical audit chain. Reset
+uses the **same private supervisor endpoint as `demo:reset`**, including fresh
+publish and seed; its completion receipt goes into the replacement state.
+Reset does not reverse sandbox money or clear persisted voice stops. Reload
+the office and refresh demo links after resetting; old links are stale.
+
+Inventory checked against this runbook, `tools/demo/cli.ts`, package scripts and
+spec §6. CLI commands remain available. Coverage and deliberate exclusions:
+
+| External action before this change | In-app coverage / reason to retain outside setup |
+| --- | --- |
+| `demo:up`, `demo:down`, build/install, tunnels, voice relay/attack-server startup | Retained as host bootstrap/recovery: a stopped app cannot start itself; process lifecycle belongs to the owned supervisor. Attack startup is another worker's task. |
+| `demo:up:gx10`, `demo:down:gx10`, SSH deploy, warm Mac provisioning, callback rebinding / host failover | Retained as deployment operations, never browser-driven shared infrastructure changes. Keep a prepared fallback URL. |
+| `demo:reset`, local `state:seed`, fresh approval/pay URLs | **Reset company** and **Refresh demo links**. Reset owns publish + seed + gateway setup. No separate seed button against a live database. Maincloud reset stays rejected by the existing supervisor. |
+| `demo:health [--live]`, `demo:health:gx10 --live`, `demo:preflight` | **Check dependencies** / **Run preflight**, using the same functions and running host's adapters. Probe results are reachability, not call/inference/payment proof. |
+| `demo:core` offline scenarios | **Run core scenarios**, the same CLI in an isolated memory process; output shown in console, not projected as live office state. |
+| `eval:run` scripted run | **Run scripted eval**, same CLI, no GX10 persona or graded/signoff override. Software authenticators and fake transports are labeled. |
+| `metrics`, agent `scoreboard.ts` generation shown to judges | **Run offline metrics** / **Run agent scoreboard**, same CLIs; private per-run output directory, no overwrite of checked-in reports. Historical evidence keeps its dates and gaps. |
+| `demo:burst --plan`, GX10 month burst | **Preview month burst** (25 companies, no models); **Run small GX10 burst** (one company/item/worker). Full 25-company live runs remain CLI-only to bound shared GPU work. |
+| GX10 model warm-up and global LLM toggle | **Warm GX10 model**, **Enable models**, **Turn models OFF**. Warm/burst require server `BACKROOM_OPERATOR_LOCAL_MODELS=1` and LLM ON; OFF aborts them. One-token warm-up never falls back to cloud. Host/model installation stays setup. |
+| Pre-call company/credit refresh, consent and phone dial | Link to **Office · Request call**; owned by the call-button worker. Host pre-call evidence remains one-shot to avoid rebilling Apify; console health does not refresh it or manufacture consent/dial authority. |
+| Judge inbox / invoice submission and frozen trap runs | Link to existing **Judge inbox** form; raw submissions still traverse `/api/inbox`, policy and audit. No second intake pipeline. |
+| Controller enrollment, phone inbox and approve/deny | Link to **Controller inbox**; owned by the controller worker. Each approval stays bound to a passkey and its original expiry. |
+| Payment-link creation and pay/reconcile | **Refresh demo links** exposes seeded gateway links; **Authorized call payment** reuses the existing active-link/QR component. Actual link generation stays in the policy gateway; payment stays on its existing page. |
+| `x402:live` Payables vendor payment (#7) | **Pay vendor with x402 · SIMULATED** (in-process mock vendor/facilitator), **Try blocked x402 invoice · SIMULATED** (policy hold, zero signing) and **Pay vendor with x402 · TESTNET** (only with host `X402_LIVE=1`, macOS Keychain wallet; $0.01 Base Sepolia test USDC, once per host process). `x402:wallet` setup and faucet funding stay outside. See [x402](x402.md#in-the-app-operator-console). |
+| Attack-demo triggers | Link to existing **Attack demo** page, whose server is started by the other worker. The console does not bypass its live/mock controls. |
+| Policy edits, audit unlock, cited ask-why, replay and real-vs-sim disclosure | Links to existing app views. Their own authorization and provenance labels remain in force. |
+| `demo:live --confirm-sandbox`, live vision/inbox benchmarks, measurements, `state:live`, `demo:parity`, automated rehearsals / recordings | Retained as engineering evidence tools: can provision databases, write receipts or contact services; not needed to operate the judge-facing app. No browser sandbox-deposit or software-passkey shortcut. |
+
+Offline scenario/eval/report processes receive no sponsor/cloud/voice credentials
+and cannot replace the running host's globals. Results are synthetic evidence,
+not a live call, real human approval or settlement receipt. The console neither
+dials nor approves nor creates a bank instruction. No provider/model warm-up or
+outbound call is needed to validate the console.
+
+## Table-side recovery card
+
+Start on the Mac first; bring the owned state server up before the web/orchestrator
+host, then the optional voice relay. `demo:up` performs that order for you.
+Run from the repo root, with private `.env.local` already configured:
+
+```sh
+DEMO_TUNNEL=0 pnpm demo:up  # local SpacetimeDB + mock bank, LLM OFF
+pnpm demo:preflight        # six bounded read-only checks; exit 1 if any RED
+pnpm demo:reset            # fresh DB, seed_company, scripted public gateway/reducer setup
+```
+
+For a phone passkey use `pnpm demo:up` with the default HTTPS tunnel instead.
+Reset immediately before the pitch, reopen the printed approval/pay URLs, and
+reload the office. The approval stays open for the live call, up to five minutes, and closes when the call ends. It starts during reset. A fresh publish
+can take longer than a few seconds: keep the labeled offline replay ready.
+Stop only this worktree's host with `pnpm demo:down` before changing modes.
+
+| Failure / RED row | Recovery at the table |
+| --- | --- |
+| Orchestrator | Inspect private `.demo/supervisor.log` and `.demo/web.log`; stop/start this owned host. Re-enroll the passkey if the origin changed. Never kill shared processes. |
+| SpacetimeDB | Confirm the publisher config and CLI 2.13.0. Maincloud unavailable: stop and restart with `DEMO_SPACETIME=local`, retaining a local CLI. Last fallback: `STATE_STORE=memory DEMO_TUNNEL=0 pnpm demo:up`, visibly labeled preview. |
+| Web | Use the printed port; close an unrelated listener only with its owner's permission, or select `DEMO_PORT=3300`. If only 3D fails, use 2D plan or `/audit`. |
+| Cartesia | Continue the deterministic text take or labeled recorded voice; no automatic redial. A GREEN catalog read proves API access, not call readiness. |
+| Nessie | Stop/start with `DEMO_LIVE=0` for the mock bank. Reset does not undo sandbox transactions; never replay an ambiguous payment. |
+| GX10 Ollama | Keep the Mac host and set `DEMO_LLM=off` for the deterministic take. Cloud inference requires a separately verified opt-in route; preflight makes no inference. |
+
+Preflight runs GETs in parallel (4-second provider timeouts), reads the owned
+host's authenticated status (5-second timeout, including a StateStore policy
+read), checks the web ping, Cartesia voice catalog, Nessie account and configured
+Ollama model listing. It prints all six rows even when the host is down, with
+no URLs, tokens or provider response bodies. Provider keys come from this
+command's private environment; run it on the actual host with the same config.
+Mock/memory/offline rehearsal intentionally leaves unused dependencies RED.
+GREEN reachability does not claim a completed call, inference or deposit.
+
+For GX10 deployment and a warm Mac fallback use [GX10 host operations](#gx10-production-host-and-warm-mac-fallback-refs-29-32).
+Keep Anthropic credentials Mac-only; do not copy a Mac `.env.local` containing
+them to GX10. Do not reset a shared host while another presenter is using it.
 
 ## Bring up / reset / shut down
 
@@ -17,7 +114,8 @@ board posts, client props or screenshots. Retrieve the team env as documented in
 AGENTS.md only if needed. No command here dials a phone.
 
 ```sh
-pnpm demo:up           # local DB + publish/import, production web, seats, quick tunnel
+pnpm demo:up           # local DB + publish/import, production web, seats, mock attack server, quick tunnel
+pnpm demo:preflight    # six read-only reachability checks, nonzero on RED
 pnpm demo:health       # local status + configured/missing; no external probes
 pnpm demo:health --live # read-only, bounded GX10 /models, Nessie account, tunnel probes
 pnpm demo:reset        # fresh local DB + scripted starting state; reprint fresh approve/pay links
@@ -31,11 +129,49 @@ public: share only the intended judging URLs. Controller, operator and tool
 secrets stay private. The printed **public** origin is the one configured for
 passkeys and policy/audit authentication; use that origin consistently.
 
+`DEMO_PUBLIC_URL` is an optional preset public origin. It must be `https`, with no username, password, path, query, or hash; `demo:up` stores `url.origin` as `DEMO_PUBLIC_URL` and as the passkey origin (`WEBAUTHN_ORIGIN` / RP ID). Cloudflare quick tunnels are skipped while it is set. Leave it unset to keep the quick-tunnel default (`cloudflared` on PATH). `DEMO_TUNNEL=0` still forces `http://localhost:<port>` and does not start a tunnel. Invalid values stop startup with `DEMO_PUBLIC_URL_INVALID`.
+
+The live host uses Tailscale Funnel instead of a quick tunnel (those returned 429 and a new hostname each time):
+
+```sh
+tailscale funnel --bg 3000
+DEMO_PUBLIC_URL=https://backroom.tail289372.ts.net pnpm demo:up
+```
+
+The passkey is bound to that Funnel origin. Re-enroll it if the origin changes. Funnel must already forward to `127.0.0.1:3000` (or the chosen `DEMO_PORT`).
+
+The printed URLs include `/attack` for the judge's hostile-document proof.
+The supervisor owns its private loopback server on port 8790 (`ATTACK_DEMO_PORT`
+overrides it), checks that port before starting, and sets `ATTACK_DEMO_BASE_URL`
+for the web proxy. It shares the private `TOOL_GATEWAY_SECRET` server-side only.
+`demo:health` performs an authenticated GET and prints **Attack demo: reachable
+(mock)** without a response body. No model call is made. `ATTACK_DEMO_LIVE` is
+unset by default; live analysis requires explicit opt-in. `demo:down` stops this
+child with the other owned process groups. The default mock child uses isolated
+memory state, so it never opens a writer on the web host's rotating database.
+Explicit live opt-in retains the configured StateStore for the LLM OFF gate.
+If its port is busy, choose a free
+`ATTACK_DEMO_PORT`; never stop another worker's listener. Its private log is
+`.demo/attack.log`.
+
 For a fully offline, phone-free rehearsal:
 
 ```sh
-STATE_STORE=memory DEMO_TUNNEL=0 DEMO_PORT=3300 pnpm demo:up
+DEMO_AGENTS=0 STATE_STORE=memory DEMO_TUNNEL=0 DEMO_PORT=3300 pnpm demo:up
 ```
+
+The existing agent team narrates accepted `/inbox` submissions by default on the
+demo host (`BACKROOM_DEMO=1`). `DEMO_AGENTS=0` disables it; change the flag by
+stopping/starting this owned host. `DEMO_AGENTS=1 DEMO_LLM=on` explicitly enables
+narration with the Mac host's own `ANTHROPIC_API_KEY`. Keep that key Mac-only.
+Global LLM OFF still prevents all SDK queries. Narration can hold, never pay or
+approve, and cannot change the inbox receipt. Existing vendor guards can end the
+chain early (Northfield vendor CRS identities are currently unmapped); this is a
+hold, not vendor clearance. Handoff rows are published to `agent_handoff_public`;
+the office does not yet subscribe to that table, so the reducer test proves row
+publication, not visible handoff animation. See [agent host wiring and tests](agents.md#judge-inbox-host).
+The demo case cap is $0.50 and the persistent ledger hard stop is $40. The mocked
+five-role chain reports $0.002 in synthetic receipts with $0 actual spend.
 
 The state mode defaults to `STATE_STORE=spacetime`. The supervisor owns a loopback
 SpacetimeDB instance on port 3115 (`DEMO_STATE_PORT` overrides it), a private CLI
@@ -62,8 +198,9 @@ running with mock effects. No fixture consent is permission to call a real perso
 
 Reset preserves controller enrollment in the running process, the tunnel URL and
 server secrets. It replaces the installed StateStore, approvals, payment links, receipts and
-mock deposits; reopen the new printed links. The approval request expires after
-**60 seconds**: reset immediately before the pitch and decide early. Stop/start
+mock deposits; reopen the new printed links. The seeded approval stays open for
+the call, up to five minutes (`APPROVAL_WINDOW_MS`), and closes when the call
+ends: reset immediately before the pitch. Stop/start
 loses process-local passkey enrollment and changes the quick-tunnel origin;
 enroll again. Reset does **not** cancel a real call, clear a real opt-out, delete
 `.env.voice/`, touch `.nessie-state/`, or undo sponsor bank transactions.
@@ -101,32 +238,70 @@ latency and an internet dependency. Describe the deployment as “web and
 orchestration on GX10; state hosted on SpacetimeDB Maincloud” when that is the
 actual topology. Do not claim all stack components run on GX10 in this mode.
 
-A seed is idempotent import and cannot reset completed work. Hosted rehearsals
-must publish fresh owned databases for clean takes; never delete or overwrite
-shared state to reset the demo. To return to local, stop this owned demo and
-restart with the local default after removing hosted state configuration;
-verify the connection indicator again. Keep the local CLI 2.13.0 installed.
+The owned demo host now supports fresh Maincloud databases too. Authenticate a
+SpacetimeDB CLI 2.13.0 config privately first (the same publisher config used by
+`demo:parity`). Then select the hosted lane at **startup**:
+
+```sh
+DEMO_SPACETIME=maincloud DEMO_MAINCLOUD=1 \
+  SPACETIME_CONFIG=/absolute/private/cli.toml pnpm demo:up
+pnpm demo:reset
+pnpm demo:preflight
+```
+
+`BACKROOM_DEMO=1` is set by the owned supervisor. Hosted mode additionally
+requires `DEMO_MAINCLOUD=1`, a private authenticated `SPACETIME_CONFIG`, and the
+fixed Maincloud endpoint. An existing `SPACETIMEDB_DATABASE` value must be named
+`backroom-demo-*` or startup refuses it; remove the legacy shared database
+selection from the private environment before starting this fresh-database lane.
+It never resets `backrooms-calhacks13` or any other existing shared DB. The
+separate `DEMO_STATE_REMOTE=1` host mode still attaches to existing shared state
+and refuses reset; do not combine it with `DEMO_SPACETIME=maincloud`.
+
+Each reset publishes a new `backroom-demo-<time>-<random>` module, then the
+existing private reset API stops the old seat workers, imports the seed company
+via `seed_company`, installs the new StateStore and recreates the scripted
+approval/pay scenario through public gateway/reducer APIs. No reducer changes,
+SQL deletes, clear-database flags, or fixture edits are involved. Old local and
+hosted databases remain for inspection; this is a clean **active run**, not data
+erasure. The runtime integration seam remains `/__demo/reset` with
+`{uri,database,token}`. The inbox agent host calls its existing
+`AgentCaseStore.stopCase(caseId, 'cancelled', 'DEMO_RESET')` and drains active
+queries before switching the installed store. See [agents.md](agents.md).
+This command does not stop independent agent runtime processes or clear separate voice/usage journals. Preserve the
+real `FileUsageLedger` at `.env.agents/usage-ledger.json`: resetting the demo must
+never reset credential-owner spend accounting or its budget limits.
+
+Keep the same backend for the lifetime of a host; changing shell variables on
+`demo:reset` does not retarget an already running host. To return to local,
+`pnpm demo:down`, then `DEMO_SPACETIME=local DEMO_MAINCLOUD=0 pnpm demo:up`.
+Reload the office and verify **State connected**. Maincloud publishing is opt-in
+network activity; preflight itself is read-only and makes no model calls.
 
 ## Phone / operator setup
 
-- Demo operator: big screen; use the printed **local** `/office` URL on the laptop
-  for its anonymous SpacetimeDB subscription, and public `/audit`, `/policy` and
-  `/inbox` as needed. Reload the office after reset so it subscribes to the new DB.
-  The DB WebSocket remains loopback-only: a phone/public-origin office on another
-  device is not connected through the web tunnel. Dana and pay pages use HTTPS
-  HTTP APIs and do not need that WebSocket. Memory mode remains a labeled preview.
-  Confirm the office connection indicator before judging.
+- Demo operator: big screen; open the printed public **Office** URL and sign in once
+  at **Operator** (see above). Every other view is a click away: the office toolbar
+  links Operator, whose steps link the office, Dana's controller QR, the payment
+  link, Inbox, Audit wall and Attack demo, with Controller inbox and Policy editor
+  under **Advanced**. The office's state socket goes through the web host's own origin
+  (`/__state/`, `web/lib/demo/state-proxy.ts`), so the public page shows **State
+  connected**. Reload the office after reset so it subscribes to the new DB. Memory
+  mode remains a labeled preview. Confirm the office connection indicator before judging.
 - Dana: open public `/controller` on the passkey phone. Use the private
   `CONTROLLER_ENROLLMENT_SECRET` from `.env.local` or generated `.demo/private.env`;
-  never display it. Complete registration before resetting for the pitch.
-- Audit operator: unlock `/audit` with the private `CONTROLLER_ENROLLMENT_SECRET` from the
-  same source. Policy operator: use the separate `POLICY_DEMO_PIN`.
+  never display it. Complete registration before resetting for the pitch, then tap
+  **Sign in with passkey** and leave the page open (screen on, volume up): each new
+  escalation chimes and opens on that screen by itself, so nobody shares a link
+  during the call. See `docs/m6-approvals.md` "Live controller inbox".
+- Audit and policy: already unlocked by the operator sign-in on the same browser.
+  The separate `POLICY_DEMO_PIN` remains a fallback on `/policy`.
 - Network operator: hotspot/wired internet, charged backup phone, audible volume,
   both laptop and phone on the exact public HTTPS origin. Localhost belongs to
   the laptop; a phone cannot use it. Check the Sunday `DEMO_OVERRIDE` indicator
   and the logged permit on any real call; never infer consent from the fixture.
 
-Voice is opt-in because the managed relay has its own persisted gateway/journal
+Voice is opt-in because the managed relay has its own persisted voice journal
 and a live dial still needs fresh authorization. With the private voice secrets
 configured per `orchestrator/src/voice/README.md`:
 
@@ -138,27 +313,47 @@ This provisions/updates the agent webhook configuration with the new tunnel URL,
 starts the relay on `VOICE_PORT` (8788), and forwards `/_cartesia/*` to it. It
 places **no call**. Do not start another relay writer on `.env.voice/`. A real
 phone take requires the README's consent/target/number setup and fresh explicit
-`VOICE_DIAL_GO=yes` authorization. The relay's current file store is separate
-from Next's rehearsal runtime: its escalations and links are **not** wired into these
-pages. Do not promise the full phone → Dana → bank loop until #15/integration
-work and a real end-to-end receipt establish it. The echo T1 test is not that
-receipt. Browser voice's current smoke command is documented in `docs/t1-cartesia.md`.
+`VOICE_DIAL_GO=yes` authorization. The voice receiver registers the synthetic call
+in the web host and forwards authenticated tools to its GatewayStore. The
+phone → Dana → pay loop is wired: approvals, payment links/QR, pay pages and
+reconciliation use the web host's shared gateway and installed StateStore.
+See [payment delivery](payment-delivery.md) for the verified headless QR/pay
+receipt and the process-local link lifetime. A live phone end-to-end receipt is
+still pending A0; the echo T1 test is not that receipt. Browser voice's current
+smoke command is documented in `docs/t1-cartesia.md`.
+
+## Single-URL click script
+
+1. Open the printed public **Office** URL on the big screen. Check **State connected**.
+2. Click **Operator**, enter the operator code once, **Sign in**, then **Reset company**
+   when the script calls for it.
+3. **Open the office**, walk to the Collections desk phone and press **Request call**
+   (rings only with `DEMO_VOICE=1`; otherwise it says no call placed).
+4. Dana's phone scans the console's controller QR (public `/controller`) and signs in
+   with the passkey, the only approval authority.
+5. From the console, open **Inbox**, **Audit wall** and **Attack demo**; **Advanced**
+   holds **Policy editor**. None asks for the code again. `/real-vs-sim` stays at its
+   printed URL until the shared nav lands.
+
+Proof against an owned host: `SINGLE_ORIGIN_URL=<public origin> pnpm --filter
+@backroom/web exec playwright test --config playwright.single-origin.config.ts`.
 
 ## Three-minute sequence (truthful current checkout)
 
 Assign people before the take: **presenter**, **Dana**, **demo operator**,
 **network/backup operator**. Any teammate may fill each role; do not assume whose
-phone holds the passkey. Run `demo:reset` immediately before the opening.
+phone holds the passkey. Use **Operator → Reset company** immediately before the
+opening (or the retained `demo:reset` CLI), refresh demo links and reload the office.
 
 | Time | Speaker / operator | Action and claim |
 | --- | --- | --- |
-| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” Open the new approval URL on Dana's enrolled phone. |
-| 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion before the 60-second request expires. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
+| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” The seeded request rings on Dana's signed-in `/controller` page; no link is opened. |
+| 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion while the request is open. It stays open for the call, up to five minutes, and closes when the call ends. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
 | 0:45–1:15 | Demo operator; presenter | Open the printed pay URL, press Pay with simulated card, then show `partially_paid` and the exact-match reconciliation audit. “The real policy, SDK and reducer path ran over an in-memory mock HTTP transport.” No card data and no real money. |
-| 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Use the frozen #4419 or #4471 preset for the trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
+| 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Open the printed `/attack` URL for the hostile-document proof (mock by default; assessment only, no payment). Use the frozen #4419 or #4471 preset for the inbox trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
 | 1:45–2:15 | Presenter; audit operator | On `/audit`, select a cited event and ask why. LLM defaults OFF, so this is a cited deterministic answer. Show saved policy text and code/human attribution. Do not claim cloud narration was exercised. |
-| 2:15–2:45 | Network operator; presenter | Show `pnpm demo:health` and `/real-vs-sim`. Separate configured key, reachable API, routed model call, and actual call/deposit receipts. Red means unavailable or unverified; say it plainly. |
-| 2:45–3:00 | Presenter | “The renderer is a view. Code owns the money and the record; a passkey owns approvals.” State remaining phone/shared-state integration gaps and invite policy Q&A. Report only actual eval receipt numbers. |
+| 2:15–2:45 | Network operator; presenter | Show Operator → Check dependencies and `/real-vs-sim`. Separate configured key, reachable API, routed model call, and actual call/deposit receipts. Red means unavailable or unverified; say it plainly. |
+| 2:45–3:00 | Presenter | “The renderer is a view. Code owns the money and the record; a passkey owns approvals.” State that the phone → Dana → pay loop is wired and the live phone receipt is still pending A0; invite policy Q&A. Report only actual eval receipt numbers. |
 
 The target §6.2 sequence is live consent/company intake → judge call → Dana
 passkey → pay/reconcile → judge inbox → cited why. Run that pitch only after all
@@ -322,3 +517,156 @@ The [one-item live smoke receipt](evidence/burst/smoke.json) measured 3.24 secon
 and one simulated payment on `gpt-oss:20b`. It is a connectivity/path smoke, not
 a 925-item throughput result. The runner's `tokensPerSecond` includes input plus
 output; `outputTokensPerSecond` isolates generated output.
+
+## GX10 production host and warm Mac fallback (Refs #29 #32)
+
+`pnpm demo:up:gx10` bootstraps private Linux ARM64 tools, clones/fetches clean
+`main` into `~/work/backroom-judge-host/app`, installs the lockfile, runs
+`pnpm -r build`, then starts the existing detached demo supervisor. SSH logout
+leaves it running. No sudo, system services, shared jobs or Ollama changes.
+`GX10_HOST` selects the SSH alias; `GX10_DEPLOY_DIR=work/<name>` selects a different
+owned directory. `GX10_REF` is for explicitly testing a candidate branch; the
+judging default is `main`. A running host is reused without updating its checkout;
+stop it before deploying a new release. Dirty tracked files fail closed.
+
+```sh
+pnpm demo:up:gx10
+pnpm demo:health:gx10 --live
+pnpm demo:down:gx10
+```
+
+The wrapper reads Mac Keychain item `backroom-anthropic-key` and transfers it over
+SSH stdin to private `~/work/backroom-judge-host/anthropic.env` (0600). The key is
+never printed, passed in command arguments, added to the shared team env, or
+copied into the app's `.env.local`. Sponsor settings come from the GX10 team env.
+Keep `host.env` and `state.env` under that same private host directory, mode 0600;
+they are dotenv data, never sourced shell scripts. Inspect private host logs on
+the GX10 (`build.log`, `install.log`, `app/.demo/*.log`); do not paste raw logs.
+
+`host.env` defaults to the real sandbox adapter path and receiver (no dial), and may override these settings:
+
+```dotenv
+DEMO_LIVE=1
+DEMO_VOICE=1
+```
+
+Voice setup creates/updates this checkout's private Cartesia agent/tools, then
+starts the receiver. It never invokes `dial`. Receiver and control listeners
+remain loopback-only. Its file-backed gateway is still separate from the web
+StateStore; hosting does not prove phone → passkey → payment integration.
+
+Actual callbacks `/api/voice/tools/*` and `/api/voice/cartesia` also proxy to the
+authenticated receiver; `/_cartesia/*` remains available for relay health.
+
+Web binds **100.117.44.20:3340** and **127.0.0.1:3340** with the same
+handler/authentication. The loopback socket is required by the private voice
+bridge; both listeners close together. Local fallback DB binds **100.117.44.20:3341**,
+voice **127.0.0.1:3342**. Startup prints `ss -ltn`; the runner checks each selected
+port before launch. The quick tunnel forwards HTTPS pages and `/_cartesia/*` to
+web. From the Mac, use the printed Tailscale `/office` URL when the DB is local:
+a public HTTPS office cannot subscribe to an insecure private `ws://` DB. Phone
+approval/pay pages use the HTTPS tunnel and server APIs. Maincloud uses WSS and
+makes the public office subscription accessible too.
+
+If the Maincloud worker has published a **fresh database for this host**, place
+its private settings in `~/work/backroom-judge-host/state.env`:
+
+```dotenv
+DEMO_STATE_REMOTE=1
+STATE_STORE=spacetime
+SPACETIMEDB_URI=wss://maincloud.spacetimedb.com
+SPACETIMEDB_DATABASE=<fresh host database>
+SPACETIMEDB_TOKEN=<private publisher token>
+```
+
+The host never publishes/deletes/resets external databases. `demo:reset` returns
+409 in this mode. Seed is idempotent, so restarting against an already advanced
+scripted database is not a clean rehearsal; obtain a fresh one from the state
+operator. Without `state.env`, the host owns its own GX10 SpacetimeDB server and
+fresh `backroom-demo-*` database. Never point two hosts at the same demo database.
+
+The honest pitch is “the application server stack and routine inference run on
+GX10; durable state is Maincloud when configured; Cartesia, Anthropic, Nessie and
+Apify remain external services.” Do not say every provider runs on GX10.
+
+### Switch in under one minute
+
+Prepare the Mac **before** judging: install dependencies and SpacetimeDB 2.13.0,
+copy sponsor env privately as in AGENTS.md, build once with `pnpm -r build`, then
+keep a separate warm standby running:
+
+```sh
+DEMO_LIVE=1 DEMO_VOICE=1 DEMO_VOICE_SETUP=0 DEMO_PREBUILT=1 \
+DEMO_PORT=3350 DEMO_STATE_PORT=3351 VOICE_PORT=3352 pnpm demo:up
+```
+
+Copy the already-provisioned voice resource IDs/secrets as described below before
+starting this receiver. These flags use a separate local database, live sandbox
+adapters, LLM ON and an existing-agent receiver; callbacks stay on GX10 until the
+explicit setup command below. Save both hosts' public URLs and enroll Dana's
+passkey on each origin in advance. Startup can make one capped Apify attempt.
+For a labeled offline standby instead, select `DEMO_LIVE=0 DEMO_VOICE=0`; this
+uses mock bank + LLM OFF. Never let two receiver writers use the same `.env.voice`
+directory.
+
+1. If GX10 degrades, open the already-warm Mac `/office` and the saved Mac public
+   approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
+   credential copy or passkey registration belongs in this minute.
+2. For fresh seeded links, run `pnpm demo:reset` on the **local** standby, then
+   reopen its printed links (the approval stays open for the call, up to five minutes, and closes when the call ends).
+3. When GX10 health recovers, switch back to its saved URLs after a read-only
+   health check. Do not stop/restart either origin during a live take.
+
+This is a URL/origin switch, not transparent failover. Process-local finance and
+voice state do not migrate. Complete an in-flight approval/payment on its original
+host; never replay a possibly completed bank operation on the fallback.
+
+For an equivalent warm live Mac receiver without allocating a second Cartesia
+agent, copy **only** the GX10's private `.env.voice/resources.json` and
+`.demo/voice-private.env` into those same paths in the separate Mac checkout
+(mode 0600). Do not copy journals, gateway state or bank idempotency claims.
+Start with `DEMO_LIVE=1 DEMO_VOICE=1 DEMO_VOICE_SETUP=0` plus the Mac ports above.
+This does not update the active GX10 agent's webhook destinations. A fresh
+second-agent attempt returned HTTP 402 during testing; do not keep retrying it
+or purchase credits as part of switching hosts.
+
+To direct **new sessions** to the prepared Mac receiver, update the existing
+agent's tools/webhook explicitly from the Mac repo root:
+
+```sh
+STATE_STORE=memory node --env-file=.env.local --env-file=.demo/private.env \
+  --env-file=.demo/voice-private.env --env-file=.demo/voice.env \
+  --import ./orchestrator/node_modules/tsx/dist/loader.mjs \
+  orchestrator/src/voice/live.ts setup
+```
+
+Measured existing-resource callback update: 6.3 seconds to Mac, 11.6 seconds to
+restore GX10 (see the receipt). That updates existing IDs, never dials and must
+finish before the receiver is
+called active. Copy the current `.demo/voice.env` into the Node command only as
+shown; it contains the warm Mac's public origin. Return traffic to GX10 by
+running the same setup under the GX10 private env/current voice.env. Do not
+switch a live call between separate journals. Hardware failure still needs
+Cartesia/internet access to update callbacks; if those are down, say so and
+continue with the web/text fallback.
+
+Measured host latency and scope live in [the GX10 hosting receipt](evidence/gx10-host/README.md).
+The reproducible opt-in `tools/demo/measure-hosts.ts` writes synthetic duplicate
+inbox/audit rows only; it requires `MAC_PUBLIC_URL` / `GX10_PUBLIC_URL` for the
+same-origin decision endpoints. Page loads use direct host URLs. It performs
+no model inference, bank request, approval or dial.
+
+After a host/listener change, exercise the authenticated bridge as well as health.
+Run from the Mac repo root; the probe streams to the existing clean checkout
+without replacing runtime sources:
+
+```sh
+ssh gx10 'cd ~/work/backroom-judge-host/app; PATH="$HOME/work/backroom-judge-host/.runtime/bin:$PATH" BACKROOM_ROOT="$PWD" node --import ./orchestrator/node_modules/tsx/dist/loader.mjs --input-type=module - --confirm-owned-demo' < tools/demo/voice-bridge-live.ts
+```
+
+This calls the private loopback client-stop read and an authenticated
+`get_invoice_context` for seeded synthetic invoice 1042 (200 `CONTEXT`), plus the signed
+public voice-tool callback for an unknown session (404 `SESSION_NOT_FOUND`). It
+records one synthetic gateway delivery receipt but never registers a call, dials,
+approves, pays, mutates a live call, or contacts a provider. A relay `/health` or
+unsigned 401 alone does not prove bridge → web connectivity.

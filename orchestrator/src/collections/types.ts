@@ -68,4 +68,8 @@ export type PreCallResult =
   | { status: 'paused'; reason: 'LLM_OFF' }
   | { status: 'blocked'; reason: string; decision?: Decision }
   | { status: 'ready'; envelope: CollectionEnvelope; plan: CallPlan; summary: string;
-      healthCheckPending: boolean; route: string; model: string; evidenceRefs: string[] };
+      healthCheckPending: boolean; route: string; model: string; evidenceRefs: string[];
+      /** The checked signals, so the dial boundary re-evaluates the same stops and envelope. */
+      signals: NonNullable<Context['signals']>;
+      /** Owner warnings that do not stop the call, e.g. PHONE_MISMATCH_WARN. */
+      warnings?: string[] };

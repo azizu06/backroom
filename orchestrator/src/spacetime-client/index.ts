@@ -36,6 +36,17 @@ import {
 // Import all reducer arg schemas
 import AckResultReducer from "./ack_result_reducer";
 import AdvanceTaskReducer from "./advance_task_reducer";
+import AgentAssertActiveReducer from "./agent_assert_active_reducer";
+import AgentCommitHandoffReducer from "./agent_commit_handoff_reducer";
+import AgentFinishActivationReducer from "./agent_finish_activation_reducer";
+import AgentGetCaseReducer from "./agent_get_case_reducer";
+import AgentListPublicReducer from "./agent_list_public_reducer";
+import AgentOpenCaseReducer from "./agent_open_case_reducer";
+import AgentRecordArtifactsReducer from "./agent_record_artifacts_reducer";
+import AgentRejectHandoffReducer from "./agent_reject_handoff_reducer";
+import AgentResumeCaseReducer from "./agent_resume_case_reducer";
+import AgentStartActivationReducer from "./agent_start_activation_reducer";
+import AgentStopCaseReducer from "./agent_stop_case_reducer";
 import AppendAuditReducer from "./append_audit_reducer";
 import AppendAuditsReducer from "./append_audits_reducer";
 import ApplyBankChangeReducer from "./apply_bank_change_reducer";
@@ -56,6 +67,8 @@ import GetTaskReducer from "./get_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
 import InsertInvoiceReducer from "./insert_invoice_reducer";
 import ListAuditReducer from "./list_audit_reducer";
+import OfficePresenceLeaveReducer from "./office_presence_leave_reducer";
+import OfficePresenceUpsertReducer from "./office_presence_upsert_reducer";
 import PauseTaskReducer from "./pause_task_reducer";
 import ReapExpiredReducer from "./reap_expired_reducer";
 import RecordBankTxnReducer from "./record_bank_txn_reducer";
@@ -85,9 +98,11 @@ import VerifyBankChangeReducer from "./verify_bank_change_reducer";
 
 // Import all table schema definitions
 import AgentRow from "./agent_table";
+import AgentHandoffPublicRow from "./agent_handoff_public_table";
 import AuditEntryRow from "./audit_entry_table";
 import BadgeRow from "./badge_table";
 import EscalationRow from "./escalation_table";
+import OfficePresenceRow from "./office_presence_table";
 import PolicyRow from "./policy_table";
 import RoomRow from "./room_table";
 import RuntimeControlRow from "./runtime_control_table";
@@ -109,6 +124,17 @@ const tablesSchema = __schema({
       { name: 'agent_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AgentRow),
+  agentHandoffPublic: __table({
+    name: 'agent_handoff_public',
+    indexes: [
+      { accessor: 'handoffId', name: 'agent_handoff_public_handoff_id_idx_btree', algorithm: 'btree', columns: [
+        'handoffId',
+      ] },
+    ],
+    constraints: [
+      { name: 'agent_handoff_public_handoff_id_key', constraint: 'unique', columns: ['handoffId'] },
+    ],
+  }, AgentHandoffPublicRow),
   auditEntry: __table({
     name: 'audit_entry',
     indexes: [
@@ -146,6 +172,17 @@ const tablesSchema = __schema({
       { name: 'escalation_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EscalationRow),
+  officePresence: __table({
+    name: 'office_presence',
+    indexes: [
+      { accessor: 'viewerId', name: 'office_presence_viewer_id_idx_btree', algorithm: 'btree', columns: [
+        'viewerId',
+      ] },
+    ],
+    constraints: [
+      { name: 'office_presence_viewer_id_key', constraint: 'unique', columns: ['viewerId'] },
+    ],
+  }, OfficePresenceRow),
   policy: __table({
     name: 'policy',
     indexes: [
@@ -203,6 +240,17 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("ack_result", AckResultReducer),
   __reducerSchema("advance_task", AdvanceTaskReducer),
+  __reducerSchema("agent_assert_active", AgentAssertActiveReducer),
+  __reducerSchema("agent_commit_handoff", AgentCommitHandoffReducer),
+  __reducerSchema("agent_finish_activation", AgentFinishActivationReducer),
+  __reducerSchema("agent_get_case", AgentGetCaseReducer),
+  __reducerSchema("agent_list_public", AgentListPublicReducer),
+  __reducerSchema("agent_open_case", AgentOpenCaseReducer),
+  __reducerSchema("agent_record_artifacts", AgentRecordArtifactsReducer),
+  __reducerSchema("agent_reject_handoff", AgentRejectHandoffReducer),
+  __reducerSchema("agent_resume_case", AgentResumeCaseReducer),
+  __reducerSchema("agent_start_activation", AgentStartActivationReducer),
+  __reducerSchema("agent_stop_case", AgentStopCaseReducer),
   __reducerSchema("append_audit", AppendAuditReducer),
   __reducerSchema("append_audits", AppendAuditsReducer),
   __reducerSchema("apply_bank_change", ApplyBankChangeReducer),
@@ -223,6 +271,8 @@ const reducersSchema = __reducers(
   __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("insert_invoice", InsertInvoiceReducer),
   __reducerSchema("list_audit", ListAuditReducer),
+  __reducerSchema("office_presence_leave", OfficePresenceLeaveReducer),
+  __reducerSchema("office_presence_upsert", OfficePresenceUpsertReducer),
   __reducerSchema("pause_task", PauseTaskReducer),
   __reducerSchema("reap_expired", ReapExpiredReducer),
   __reducerSchema("record_bank_txn", RecordBankTxnReducer),
@@ -255,8 +305,12 @@ const proceduresSchema = __procedures(
 
 type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "tables"> & {
   tables: typeof tablesSchema.schemaType.tables & {
+    /** @deprecated Use `agentHandoffPublic` instead. This alias will be removed in the next major version. */
+    readonly "agent_handoff_public": Omit<typeof tablesSchema.schemaType.tables["agentHandoffPublic"], "accessorName"> & { readonly accessorName: "agent_handoff_public" };
     /** @deprecated Use `auditEntry` instead. This alias will be removed in the next major version. */
     readonly "audit_entry": Omit<typeof tablesSchema.schemaType.tables["auditEntry"], "accessorName"> & { readonly accessorName: "audit_entry" };
+    /** @deprecated Use `officePresence` instead. This alias will be removed in the next major version. */
+    readonly "office_presence": Omit<typeof tablesSchema.schemaType.tables["officePresence"], "accessorName"> & { readonly accessorName: "office_presence" };
     /** @deprecated Use `runtimeControl` instead. This alias will be removed in the next major version. */
     readonly "runtime_control": Omit<typeof tablesSchema.schemaType.tables["runtimeControl"], "accessorName"> & { readonly accessorName: "runtime_control" };
     /** @deprecated Use `serverResults` instead. This alias will be removed in the next major version. */
@@ -279,7 +333,9 @@ const REMOTE_MODULE = {
 >;
 
 const tableAccessorAliases = {
+  "agent_handoff_public": "agentHandoffPublic",
   "audit_entry": "auditEntry",
+  "office_presence": "officePresence",
   "runtime_control": "runtimeControl",
   "server_results": "serverResults",
 } as const;
@@ -302,8 +358,12 @@ function __withTableAccessorAliases<T extends object>(target: T, freeze = false)
 
 type __DbViewBase = __DbConnectionImpl<typeof REMOTE_MODULE>["db"];
 export type DbView = __DbViewBase & {
+  /** @deprecated Use `agentHandoffPublic` instead. This alias will be removed in the next major version. */
+  readonly "agent_handoff_public": __DbViewBase["agentHandoffPublic"];
   /** @deprecated Use `auditEntry` instead. This alias will be removed in the next major version. */
   readonly "audit_entry": __DbViewBase["auditEntry"];
+  /** @deprecated Use `officePresence` instead. This alias will be removed in the next major version. */
+  readonly "office_presence": __DbViewBase["officePresence"];
   /** @deprecated Use `runtimeControl` instead. This alias will be removed in the next major version. */
   readonly "runtime_control": __DbViewBase["runtimeControl"];
   /** @deprecated Use `serverResults` instead. This alias will be removed in the next major version. */
@@ -312,8 +372,12 @@ export type DbView = __DbViewBase & {
 
 type __TablesBase = __QueryBuilder<typeof tablesSchema.schemaType>;
 export type Tables = __TablesBase & {
+  /** @deprecated Use `agentHandoffPublic` instead. This alias will be removed in the next major version. */
+  readonly "agent_handoff_public": __TablesBase["agentHandoffPublic"];
   /** @deprecated Use `auditEntry` instead. This alias will be removed in the next major version. */
   readonly "audit_entry": __TablesBase["auditEntry"];
+  /** @deprecated Use `officePresence` instead. This alias will be removed in the next major version. */
+  readonly "office_presence": __TablesBase["officePresence"];
   /** @deprecated Use `runtimeControl` instead. This alias will be removed in the next major version. */
   readonly "runtime_control": __TablesBase["runtimeControl"];
   /** @deprecated Use `serverResults` instead. This alias will be removed in the next major version. */

@@ -5,7 +5,7 @@ import {
   type DecidePlan,
   type GatewayPolicyDecision,
 } from "./policy-adapter";
-import type { AuditEntry, GatewayCall, PlanTerms, ToolResult } from "./store";
+import type { AuditEntry, Escalation, GatewayCall, PlanTerms, ToolResult } from "./store";
 
 const sameTerms = (a: PlanTerms, b: PlanTerms) =>
   a.installments === b.installments &&
@@ -19,6 +19,53 @@ const deny = (rule: string, speak: string): ToolResult => ({
   speak,
   rule_ids: [rule],
 });
+/** One open escalation per call. After one expires, the same terms may be sent once more. */
+function repeatEscalation(
+  call: GatewayCall,
+  plan: PlanTerms,
+): { rule: string; speak: string } | undefined {
+  if (call.escalations.some((escalation) => escalation.status === "pending")) {
+    return {
+      rule: "ESCALATION_OPEN",
+      speak: "Dana is already reviewing a request on this call. I will keep waiting.",
+    };
+  }
+  const same = call.escalations.filter(
+    (escalation) => escalation.plan && sameTerms(escalation.plan, plan),
+  );
+  const closed = same.filter(
+    (escalation) =>
+      escalation.status === "expired" || escalation.status === "pending_owner",
+  );
+  if (closed.length >= 1 && same.length >= 2) {
+    return {
+      rule: "ESCALATION_RETRY_USED",
+      speak:
+        "I already asked Dana again for those terms. I cannot send another request on this call.",
+    };
+  }
+  return undefined;
+}
+function closedApproval(call: GatewayCall, escalation: Escalation): ToolResult {
+  const same = escalation.plan
+    ? call.escalations.filter(
+        (row) => row.plan && sameTerms(row.plan, escalation.plan!),
+      )
+    : [escalation];
+  const waiting = call.escalations.some((row) => row.status === "pending");
+  const mayReask = !waiting && same.length < 2;
+  return {
+    kind: "RECORDED",
+    can_confirm: false,
+    approval_status: escalation.status === "pending_owner" ? "pending_owner" : "expired",
+    may_reask: mayReask,
+    speak: waiting
+      ? "Dana is already reviewing a request on this call. I will keep waiting."
+      : mayReask
+        ? "That approval request is closed. If the caller asks to send it again, call propose_plan again with those exact terms. If they have not asked, ask once. You cannot approve it yourself."
+        : "That approval request is closed, and Dana was already asked again on this call. Do not send another request. You cannot approve it yourself.",
+  };
+}
 function audit(
   call: GatewayCall,
   input: Invocation,
@@ -81,10 +128,12 @@ export function executeTool(
     input.tool === "report_already_paid"
   ) {
     const [status, speak] = stops[input.tool];
-    // Opt-out is sticky even if a later tool classifies the call differently.
-    if (call.status !== "opted_out") call.status = status;
+    // Opt-out sets opted_out from any status. A human hold stays until that opt-out.
+    if (input.tool === "record_opt_out") call.status = "opted_out";
+    else if (call.status !== "opted_out" && call.status !== "human_requested") call.status = status;
     call.outbox.push({ type: input.tool });
-    audit(call, input, "RECORDED", [input.tool.toUpperCase()]);
+    // Asking for a human is how the voice agent handles anything it does not recognize: escalate.
+    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED", [input.tool.toUpperCase()]);
     return { kind: "RECORDED", can_confirm: false, speak };
   }
   if (!call.identityConfirmed)
@@ -115,8 +164,8 @@ export function executeTool(
         "ESCALATION_NOT_FOUND",
         "I cannot find that approval request.",
       );
+    if (escalation.status === "expired" || escalation.status === "pending_owner") return closedApproval(call, escalation);
     const status =
-      escalation.status === "pending_owner" ? "pending_owner" :
       escalation.status === "pending" || escalation.method !== "passkey"
         ? "pending"
         : escalation.status;
@@ -127,10 +176,8 @@ export function executeTool(
       can_confirm: false,
       approval_status: status,
       speak:
-        status === "pending_owner"
-          ? "Dana will confirm by email today."
-          : status === "pending"
-          ? "I am still waiting for Dana. Dana will confirm by email today if needed."
+        status === "pending"
+          ? "I am still waiting for Dana."
           : status === "denied"
             ? "Dana did not approve those terms."
             : "Dana has reviewed the request. I must check the exact terms before confirming.",
@@ -154,6 +201,13 @@ export function executeTool(
       );
     const decision = decide(call, plan, plan.firstPaymentCents);
     if (decision.kind !== "ALLOW") {
+      if (decision.kind === "ESCALATE") {
+        const blocked = repeatEscalation(call, plan);
+        if (blocked) {
+          const checked = audit(call, input, "DENY", [blocked.rule], plan, decision);
+          return { ...deny(blocked.rule, blocked.speak), audit_id: checked.id };
+        }
+      }
       const checked = audit(
         call,
         input,
@@ -217,6 +271,13 @@ export function executeTool(
   }
   if (input.tool === "propose_plan") {
     const decision = decide(call, input.plan);
+    if (decision.kind === "ESCALATE") {
+      const blocked = repeatEscalation(call, input.plan);
+      if (blocked) {
+        const refused = audit(call, input, "DENY", [blocked.rule], input.plan, decision);
+        return { ...deny(blocked.rule, blocked.speak), audit_id: refused.id };
+      }
+    }
     const entry = audit(
       call,
       input,

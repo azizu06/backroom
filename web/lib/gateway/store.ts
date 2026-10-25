@@ -16,6 +16,8 @@ export interface GatewayCall {
   policyState?: GatewayPolicyState;
   currency: string;
   policyVersion: number;
+  /** Who supplied this call's scenario. A live judge caller is 'judge'; absent means seeded. */
+  scenarioSource?: "judge" | "seed";
   identityConfirmed: boolean;
   status:
     | "active"
@@ -66,7 +68,7 @@ export interface AllowedPlan extends PlanTerms {
 export interface Escalation {
   id: string;
   ruleIds: string[];
-  status: "pending" | "approved" | "denied" | "counter" | "pending_owner";
+  status: "pending" | "approved" | "denied" | "counter" | "pending_owner" | "expired";
   createdAt?: number; expiresAt?: number; decidedAt?: number;
   decision?: import("@backroom/orchestrator").ControllerDecision;
   toHuman: string;
@@ -99,6 +101,8 @@ export interface GatewayStore {
   clientStopped?(clientId: string): Promise<boolean>;
   findPaymentCode?(code: string): Promise<GatewayCall | undefined>;
   activePaymentCall?(): Promise<GatewayCall | undefined>;
+  /** Most recently registered live voice call (`voice:collections`), for the office's read-only projection. */
+  latestVoiceCall?(): Promise<GatewayCall | undefined>;
   findPaymentCall?(linkId: string): Promise<GatewayCall | undefined>;
   transact<T>(
     callId: string,
@@ -144,6 +148,10 @@ export class MemoryGatewayStore implements GatewayStore {
     return structuredClone([...this.calls.values()].filter(call => call.status === 'active' && call.links.length)
       .sort((a, b) => (b.links.at(-1)?.createdAt ?? 0) - (a.links.at(-1)?.createdAt ?? 0))[0]);
   }
+  async latestVoiceCall() {
+    await this.tail;
+    return structuredClone([...this.calls.values()].filter(call => call.agentId === 'voice:collections').at(-1));
+  }
   async findPaymentCall(linkId: string): Promise<GatewayCall | undefined> {
     await this.tail;
     return structuredClone([...this.calls.values()].find(call => call.links.some(link => link.id === linkId)));
@@ -168,6 +176,10 @@ export class MemoryGatewayStore implements GatewayStore {
           throw new GatewayError(409, "WEBHOOK_ID_REUSED");
         }
       }
+      // KNOWN GAP (fix after the demo, see Anthony's approved 9a0d89e): this scans `this.calls`, which still
+      // holds the pre-transaction copy of `callId`. A `work` that renames a link id while keeping its short
+      // code collides with its own stale row and gets a false PAYMENT_CODE_COLLISION. Conversely, two links
+      // that reuse both the same id and the same short code are not caught. Don't rename link ids in `work`.
       for (const link of copy.links) {
         if (link.shortCode && [...this.calls.values()].some(other => other.links.some(row => row.id !== link.id && row.shortCode === link.shortCode)))
           throw new GatewayError(409, 'PAYMENT_CODE_COLLISION');
@@ -184,7 +196,8 @@ export class MemoryGatewayStore implements GatewayStore {
         refs: [saved.callId, saved.invoiceId, saved.clientId], route: 'code',
         decision: entry.kind === 'RECORDED' ? undefined : entry.kind,
         inputs: { kind: entry.kind, webhookRequestId: entry.webhookRequestId,
-          invoiceId: saved.invoiceId, plan: entry.plan, decision: entry.decision },
+          invoiceId: saved.invoiceId, plan: entry.plan, decision: entry.decision,
+          scenario_source: saved.scenarioSource ?? 'seed' },
         latencyMs: 0, costUsd: 0,
       }));
       if (inputs.length) {

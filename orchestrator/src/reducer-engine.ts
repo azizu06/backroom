@@ -1,9 +1,10 @@
 import type { ControllerDecision } from './approvals/types';
+import { approvalWindowMs } from './approvals/window';
 export type ApprovalGrant = { id: string; human: string; decision: ControllerDecision; credentialId: string };
 import { AuditLog, cloneState } from './audit';
 import { DEFAULT_POLICY, savePolicy, type Decision, type Policy } from '@backroom/policy';
 import type { Agent, AgentState, AuditEntry, AuditInput, Escalation, Invoice, InvoiceState,
-  CallEscalation, Lease, NewTask, PaymentReceipt, Seat, Task, PolicyLimits } from './store';
+  CallEscalation, Lease, NewTask, PaymentReceipt, Seat, Task, PolicyLimits, PolicySaveMethod } from './store';
 
 const copy = <T>(value: T): T => cloneState(value);
 export { hashAudit } from './audit';
@@ -17,7 +18,7 @@ export class ReducerEngine {
     if (!policy) throw new Error('POLICY_NOT_FOUND');
     return copy(policy);
   }
-  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number): Policy {
+  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number, method: PolicySaveMethod = 'demo_pin'): Policy {
     if (expectedVersion !== this.currentPolicyVersion) throw new Error('POLICY_CONFLICT');
     if (!limits || Object.keys(limits).sort().join(',') !== 'maxInstallments,maxPaymentCents,maxPlanDays,minFirstPct'
       || !Number.isSafeInteger(limits.maxInstallments) || limits.maxInstallments < 1
@@ -33,7 +34,7 @@ export class ReducerEngine {
     // No await in this check/write section; audit failure leaves policy unchanged.
     this.append({ ts: now, actor: 'human', seat: 'controller', action: 'save_policy', ruleIds: ['POLICY_SAVED'],
       policyVersion: next.policyVersion, refs: [`policy:v${previous.policyVersion}`, `policy:v${next.policyVersion}`],
-      route: 'code', latencyMs: 0, costUsd: 0, inputs: { previousVersion: previous.policyVersion, limits: copy(limits), method: 'demo_pin' } });
+      route: 'code', latencyMs: 0, costUsd: 0, inputs: { previousVersion: previous.policyVersion, limits: copy(limits), method: method === 'operator_session' ? method : 'demo_pin' } });
     this.policies.set(next.policyVersion, next);
     this.currentPolicyVersion = next.policyVersion;
     return copy(next);
@@ -171,7 +172,9 @@ export class ReducerEngine {
         pos: { x: 0, y: 0, z: 0 }, heartbeatAt: now, modelRoute: 'code' };
       this.agents.set(agent.id, agent);
     }
-    const escalation: Escalation = { ...fields, createdAt: now, expiresAt: now + 60_000, status: 'pending' };
+    // A live call stays open for the call, up to APPROVAL_WINDOW_MS. Rows with no callId keep the 60s worker window.
+    const liveCall = typeof input.callId === 'string' && input.callId.length > 0;
+    const escalation: Escalation = { ...fields, createdAt: now, expiresAt: now + (liveCall ? approvalWindowMs() : 60_000), status: 'pending' };
     this.escalations.set(escalation.id, escalation);
     agent.state = 'walking'; agent.targetAnchor = `${input.toHuman}_desk`;
     this.append({ ts: now, actor: 'code', seat, action: 'create_escalation', ruleIds: input.ruleIds,
@@ -193,16 +196,30 @@ export class ReducerEngine {
       inputs: { decision: verified.decision, method: 'passkey' }, latencyMs: 0, costUsd: 0 });
     return copy(escalation);
   }
-  expireEscalations(now: number) { this.expire(now); }
-  private expire(now: number) {
+  expireEscalations(now: number, callId?: string) {
+    if (callId !== undefined && (typeof callId !== 'string' || callId.length === 0 || callId.length > 200)) throw new Error('INVALID_CALL');
+    this.expire(now, callId);
+  }
+  private expire(now: number, endedCallId?: string) {
     for (const escalation of this.escalations.values()) {
-      if (escalation.status !== 'pending' || now < escalation.expiresAt) continue;
-      escalation.status = 'pending_owner';
+      const liveCall = typeof escalation.callId === 'string' && escalation.callId.length > 0;
+      const ended = liveCall && endedCallId !== undefined && escalation.callId === endedCallId;
+      const pending = escalation.status === 'pending';
+      // A window timeout leaves the row expired and the invoice alone. Call end still records follow-up once.
+      const followUp = ended && escalation.status === 'expired';
+      if ((!pending && !followUp) || (pending && !ended && now < escalation.expiresAt)) continue;
+      const seat = this.agents.get(escalation.fromAgent)?.seatId ?? 'collections';
+      const audit = (action: string) => this.append({ ts: now, actor: 'system', seat, action, ruleIds: escalation.ruleIds,
+        policyVersion: escalation.policyVersion, refs: [escalation.id, ...escalation.evidenceRefs], route: 'code', latencyMs: 0, costUsd: 0 });
+      if (liveCall && pending) {
+        escalation.status = 'expired';
+        audit('escalation_expired');
+        if (!ended) continue;
+      } else if (!liveCall) escalation.status = 'pending_owner';
+      if (this.audit.list().some(entry => entry.action === 'pending_owner' && entry.refs[0] === escalation.id)) continue;
       const invoice = escalation.invoiceId && this.invoices.get(escalation.invoiceId);
       if (invoice && invoice.kind === 'ar' && ['in_collection', 'escalated'].includes(invoice.state)) invoice.state = 'pending_owner';
-      this.append({ ts: now, actor: 'system', seat: this.agents.get(escalation.fromAgent)?.seatId ?? 'collections',
-        action: 'pending_owner', ruleIds: escalation.ruleIds, policyVersion: escalation.policyVersion,
-        refs: [escalation.id, ...escalation.evidenceRefs], route: 'code', latencyMs: 0, costUsd: 0 });
+      audit('pending_owner');
     }
   }
   getEscalation(id: string) { return copy(this.escalations.get(id)); }
