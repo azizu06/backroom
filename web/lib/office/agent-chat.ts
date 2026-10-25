@@ -69,18 +69,24 @@ export function agentChatTimeline(plan: HandoffPlan, source: AgentChatSource): A
   });
 }
 
-/** One latest line per actor; half-open windows make the sender/reply boundary unambiguous. */
-export function sampleAgentChat(cues: readonly AgentChatCue[], now: number): AgentChatCue[] {
-  const latest = new Map<HandoffAgentId, AgentChatCue>();
+/** One latest line per actor; pass a reusable buffer on the render loop. Windows are half-open. */
+export function sampleAgentChat(cues: readonly AgentChatCue[], now: number, out: AgentChatCue[] = []): AgentChatCue[] {
+  let count = 0;
   for (const cue of cues) if (now >= cue.start && now < cue.end) {
-    const previous = latest.get(cue.actor);
-    if (!previous || cue.start >= previous.start) latest.set(cue.actor, cue);
+    let index = -1;
+    for (let i = 0; i < count; i++) if (out[i]!.actor === cue.actor) { index = i; break; }
+    if (index < 0) out[count++] = cue;
+    else if (cue.start >= out[index]!.start) out[index] = cue;
   }
-  return [...latest.values()];
+  out.length = count;
+  return out;
 }
 
 export function nextAgentChatChange(cues: readonly AgentChatCue[], now: number): number | null {
   let next = Infinity;
-  for (const cue of cues) for (const at of [cue.start, cue.end]) if (at > now && at < next) next = at;
+  for (const cue of cues) {
+    if (cue.start > now && cue.start < next) next = cue.start;
+    if (cue.end > now && cue.end < next) next = cue.end;
+  }
   return Number.isFinite(next) ? next : null;
 }

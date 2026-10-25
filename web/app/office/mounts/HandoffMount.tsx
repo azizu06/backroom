@@ -9,6 +9,6 @@ export function HandoffMount({ snapshot }: SceneMountProps) {
   const presentation = useHandoffPresentation();
   return snapshot.handoffs && presentation?.stage ? <>
     <HandoffLayer stage={presentation.stage} tag={presentation.tag} />
-    <AgentChatBubbles stage={presentation.stage} reduced={presentation.reduced} connection={snapshot.connection} />
+    <AgentChatBubbles stage={presentation.stage} reduced={presentation.reduced} connection={snapshot.connection} tag={presentation.tag} />
   </> : null;
 }

@@ -111,4 +111,13 @@ describe('dialogue follows the handoff choreography', () => {
     const tied = { ...newer, text: 'Latest' };
     expect(sampleAgentChat([cue, newer, tied], newer.start)).toEqual([tied]);
   });
+
+  it('reuses the caller buffer and clears expired cues without retaining stale entries', () => {
+    const cues = agentChatTimeline(planHandoffs([row()]), 'Simulated');
+    const out = [cues[1]!];
+    expect(sampleAgentChat(cues, cues[0]!.start, out)).toBe(out);
+    expect(out).toEqual([cues[0]]);
+    expect(sampleAgentChat(cues, cues[1]!.end, out)).toBe(out);
+    expect(out).toEqual([]);
+  });
 });
