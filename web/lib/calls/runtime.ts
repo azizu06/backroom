@@ -3,7 +3,7 @@ import { getGatewayStore } from '../gateway/runtime';
 import { voiceCallLifecycle } from './lifecycle';
 import { MAX_CALL_MS, projectVoiceCall, type CallProjectionRow } from './projection';
 import { declaredLoopbackOfficeOrigin } from './loopback-origin';
-import { createCallRequestHTTP, type CallFollowUpResult, type CallRequestAudit } from './request';
+import { createCallRequestHTTP, type CallFollowUpResult, type CallRequestAudit, type EmailOnlyScenario } from './request';
 
 const ENDED_VISIBLE_MS = 2 * 60_000;
 const POLICY_REFUSALS = new Set(['PRECALL_BLOCKED', 'CALL_DENIED', 'CLIENT_STOPPED']);
@@ -34,10 +34,15 @@ export async function activeCall(now = Date.now()): Promise<CallProjectionRow | 
 const root = globalThis as typeof globalThis & {
   backroomCallRequests?: ReturnType<typeof createCallRequestHTTP>;
   backroomCallRefusalFollowUp?: (entry: CallRequestAudit) => Promise<CallFollowUpResult | undefined>;
+  backroomEmailOnlyRefusal?: (scenario: EmailOnlyScenario) => Promise<string[] | undefined>;
 };
 /** Installed only by the trusted demo bootstrap; ordinary Next imports remain call-only. */
 export function installCallRefusalFollowUp(handler: typeof root.backroomCallRefusalFollowUp) {
   root.backroomCallRefusalFollowUp = handler;
+}
+/** Installed only by the trusted demo bootstrap; without it a seeded email-only request is refused as unavailable. */
+export function installEmailOnlyRefusal(handler: typeof root.backroomEmailOnlyRefusal) {
+  root.backroomEmailOnlyRefusal = handler;
 }
 export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = request => (root.backroomCallRequests ??= createCallRequestHTTP({
   secret: () => process.env.CONTROLLER_ENROLLMENT_SECRET,
@@ -49,6 +54,7 @@ export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = reque
     ? { url: `http://127.0.0.1:${Number(process.env.VOICE_PORT || 8788)}/_admin/dial`, secret: process.env.VOICE_ADMIN_SECRET } : undefined,
   currentCall: () => activeCall(),
   followUp: async entry => root.backroomCallRefusalFollowUp?.(entry),
+  emailOnlyRefusal: async scenario => root.backroomEmailOnlyRefusal?.(scenario),
   audit: async entry => {
     const store = getStateStore();
     const decision = officeCallAuditDecision(entry);

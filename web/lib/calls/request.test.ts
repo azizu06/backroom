@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCallRequestHTTP, type CallRequestAudit } from './request';
+import { createCallRequestHTTP, type CallRequestAudit, type EmailOnlyScenario } from './request';
 import { createOperatorSignIn, createSignInHTTP, operatorSessionCookie } from '../operator/sign-in';
 
 const ORIGIN = 'https://demo.example';
@@ -7,6 +7,7 @@ const LOOPBACK = 'http://127.0.0.1:3477';
 function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' }), extras?: {
   loopback?: string; relay?: false;
   followUp?: (entry: CallRequestAudit) => Promise<{ status: 'queued' | 'duplicate' } | undefined>;
+  emailOnlyRefusal?: (scenario: EmailOnlyScenario) => Promise<string[] | undefined>;
 }) {
   let clock = 1_000_000;
   let current: { status: 'ringing' | 'live' | 'ended'; endedAt?: number } | null = null;
@@ -14,7 +15,7 @@ function harness(relayResponse: () => Promise<Response> = async () => Response.j
   const relay = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => relayResponse());
   const handle = createCallRequestHTTP({ secret: () => 'operator-code', origin: () => ORIGIN, loopbackOrigin: () => extras?.loopback, now: () => clock,
     relay: extras?.relay === false ? () => undefined : () => ({ url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin-secret' }), currentCall: async () => current,
-    audit: async entry => { audits.push(entry); }, followUp: extras?.followUp, fetch: relay as typeof fetch });
+    audit: async entry => { audits.push(entry); }, followUp: extras?.followUp, emailOnlyRefusal: extras?.emailOnlyRefusal, fetch: relay as typeof fetch });
   // The desk phone has no code endpoint of its own: 'session' is the shared operator sign-in.
   const origins = () => [ORIGIN, ...(extras?.loopback ? [extras.loopback] : [])];
   const signIn = createSignInHTTP({ signIn: createOperatorSignIn({ code: () => 'operator-code', origins, now: () => clock }), signedIn: () => false, origins });
@@ -180,7 +181,42 @@ describe('office call request', () => {
     const response = await click(blocked, await blocked.unlock());
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ ok: false, error: 'CALL_DENIED',
-      message: 'Policy refused the call (B2B_ONLY_CALLS). No call placed. Email preview (simulated, not sent).' });
+      message: 'Policy refused the call (B2B_ONLY_CALLS). No call placed. Email preview (simulated, not sent).', email: 'queued' });
     expect(followUp).toHaveBeenCalledWith({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' });
+  });
+
+  it('refuses a seeded email-only client before any dial and shows the same-day dedupe', async () => {
+    let queued = false;
+    const followUp = vi.fn(async () => ({ status: queued ? 'duplicate' as const : (queued = true, 'queued' as const) }));
+    const emailOnlyRefusal = vi.fn(async (scenario: string) => scenario === 'consumer' ? ['B2B_ONLY_CALLS'] : ['DNC']);
+    const h = harness(undefined, { followUp, emailOnlyRefusal, relay: false });
+    const cookie = await h.unlock();
+    const first = await click(h, cookie, { line: 'collections', scenario: 'consumer' });
+    expect(first.status).toBe(409);
+    expect(await first.json()).toEqual({ ok: false, error: 'CALL_DENIED', email: 'queued',
+      message: 'Policy refused the call (B2B_ONLY_CALLS). No call placed. Email preview (simulated, not sent).' });
+    // No cooldown or voice relay applies: nothing was dialed, and the outbox owns the daily cap.
+    const second = await click(h, cookie, { scenario: 'opt_out' });
+    expect(await second.json()).toEqual({ ok: false, error: 'CALL_DENIED', email: 'duplicate',
+      message: 'Policy refused the call (DNC). No call placed. Email preview already queued today (simulated, not sent); no second email.' });
+    expect(h.audits).toEqual([{ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS', scenario: 'consumer' },
+      { outcome: 'refused', code: 'CALL_DENIED', detail: 'DNC', scenario: 'opt_out' }]);
+    expect(followUp).toHaveBeenNthCalledWith(1, h.audits[0]);
+    expect(h.relay).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown email-only client and reports a host without the seeded clients', async () => {
+    const h = harness();
+    const cookie = await h.unlock();
+    const unknown = await click(h, cookie, { scenario: '+12025550199' });
+    expect(unknown.status).toBe(400);
+    expect(await unknown.json()).toMatchObject({ error: 'INVALID_REQUEST' });
+    const missing = await click(h, cookie, { scenario: 'consumer' });
+    expect(missing.status).toBe(503);
+    expect(await missing.json()).toMatchObject({ error: 'SCENARIO_UNAVAILABLE', message: expect.stringContaining('No call placed') });
+    const allowed = harness(undefined, { emailOnlyRefusal: async () => undefined });
+    expect(await (await click(allowed, await allowed.unlock(), { scenario: 'opt_out' })).json()).toMatchObject({ error: 'SCENARIO_UNAVAILABLE' });
+    expect(h.relay).not.toHaveBeenCalled();
+    expect(allowed.relay).not.toHaveBeenCalled();
   });
 });

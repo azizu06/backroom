@@ -209,6 +209,37 @@ it('rebuilds only email-eligible refused calls as trusted planner cases', async 
   expect(await planner.caseFor({ outcome: 'refused', code: 'RELAY_REFUSED', detail: 'B2B_ONLY_CALLS' })).toBeUndefined();
 });
 
+it('refuses a seeded consumer or DNC client in pre-call and the production planner queues one simulated preview per day', async () => {
+  const http = vi.fn();
+  // Offline host: no lead preparation, no provider or model route.
+  const services = await createDemoServices({ env: { NODE_ENV: 'test' }, fetch: http });
+  const { MemoryStateStore } = await import('@backroom/orchestrator');
+  const { MemoryUsageLedger } = await import('@backroom/orchestrator/agents');
+  const { scriptedQuery } = await import('../../../orchestrator/src/agents/mock-query');
+  const { createInboxAgents } = await import('./agents');
+  const state = new MemoryStateStore();
+  await expect(services.emailOnlyRefusal(state, 'consumer')).resolves.toEqual(['B2B_ONLY_CALLS']);
+  await expect(services.emailOnlyRefusal(state, 'opt_out')).resolves.toEqual(['DNC']);
+  expect((await state.listAudit()).filter(row => row.action === 'can_call').map(row => [row.decision, row.ruleIds]))
+    .toEqual([['DENY', ['B2B_ONLY_CALLS']], ['DENY', ['DNC']]]);
+  const planner = services.collectionsPlanner(state);
+  const start = vi.spyOn(planner.voice, 'start');
+  const query = scriptedQuery(role => role === 'collections' ? [
+    { tool: 'get_invoice_context', args: {} }, { tool: 'can_call', args: {} },
+    { tool: 'run_precall', args: {} }, { tool: 'start_call', args: {} },
+  ] : []);
+  const host = createInboxAgents({ control: state, ledger: new MemoryUsageLedger(), query, credential: () => 'mock-key', collectionsPlanner: planner });
+  try {
+    await expect(host.submitCallRefusal({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' })).resolves.toEqual({ status: 'queued' });
+    await expect(host.submitCallRefusal({ outcome: 'refused', code: 'CALL_DENIED', detail: 'DNC' })).resolves.toEqual({ status: 'duplicate' });
+  } finally { await host.stop(); }
+  expect(host.emailOutbox.sent).toEqual([expect.objectContaining({ key: expect.stringMatching(/^email:1042:/), label: 'SIMULATED: email preview, not sent' })]);
+  expect((await state.listAudit()).filter(row => row.action.startsWith('email_followup_')).map(row => [row.action, row.ruleIds[0]]))
+    .toEqual([['email_followup_queued', 'B2B_ONLY_CALLS'], ['email_followup_duplicate', 'DNC']]);
+  expect(start).not.toHaveBeenCalled();
+  expect(http).not.toHaveBeenCalled();
+});
+
 it('records the live website signal for invoice 1042 and the card reads that same row', async () => {
   const runId = '7LJbWDdDqZkk5iRJh';
   const observedAt = '2026-10-24T23:54:18.992Z';
