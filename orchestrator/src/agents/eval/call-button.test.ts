@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllGlobals());
 it('refuses a blocked pre-call, rejects a phone number, and dials a ready gate once with no network', async () => {
   vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
   const run = await runCallButton();
-  expect(run.checks).toEqual({ blocked: true, invalid: true, ready: true, cooldown: true, foreign: true, loopback: true });
+  expect(run.checks).toEqual({ blocked: true, invalid: true, ready: true, cooldown: true, foreign: true, noConsent: true, loopback: true });
   expect(run.blocked).toMatchObject({ status: 409, error: 'PRECALL_BLOCKED', providerAttempts: 0,
     admin: { status: 409, body: 'PRECALL_BLOCKED:Credit/OFAC check unavailable' },
     audit: { outcome: 'refused', code: 'PRECALL_BLOCKED', detail: 'Credit/OFAC check unavailable' },
