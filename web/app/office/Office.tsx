@@ -236,7 +236,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   overviewKey.current = event => {
     if (!overview || event.defaultPrevented || !isOverviewKey(event) || event.repeat) return;
     const target = event.target instanceof HTMLElement ? event.target : null;
-    if (target && (target.isContentEditable || target.closest('input, textarea, select, [role=dialog], [role=menu], [role=alertdialog]'))) return;
+    if (target && (target.isContentEditable || target.closest('input, textarea, select, dialog, [aria-modal=true], [role=dialog], [role=menu], [role=alertdialog]'))) return;
     event.preventDefault();
     enterFirstPerson(play.last.current);
   };

@@ -136,3 +136,20 @@ test('Overview quick menu: Talk opens the agent talk panel without walking', asy
   await expect(page.locator('.room-inspector')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('O leaves the view unchanged while keyboard shortcuts has focus', async ({ page }) => {
+  await page.goto('/office?view=overview');
+  const select = page.getByLabel('Office view');
+  await expect(select).toHaveValue('walk');
+  await page.keyboard.press('?');
+  const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(help.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+  await page.keyboard.press('o');
+  await expect(help).toBeVisible();
+  await expect(select).toHaveValue('walk');
+  await expect(page.getByRole('application', { name: /First-person office/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(help).not.toBeVisible();
+  await page.keyboard.press('o');
+  await expect(select).toHaveValue('play');
+});
