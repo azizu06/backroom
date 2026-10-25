@@ -202,6 +202,11 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C05.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: ${run?.hostileEvidence?.dedicatedRuleRecorded ?? false}. One spoken de-escalation and provider end-call are not executed; keep the integration gap open.` });
     continue;
   }
+  if (row.id === 'C21' && row.seams.includes('integration:not_executed')) {
+    const run = conversations.find(run => run.scenarioId === 'C21');
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });
+    continue;
+  }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 const inboxTeam = await runInboxTeam();
@@ -250,6 +255,7 @@ const report = {
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
       const path = `orchestrator/src/agents/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
+    voicemailRuntimeSources: { 'orchestrator/src/voice/tools.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/voice/tools.ts'))) },
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json',
       ...(pdfRun ? [PDF_RESULT_PATH] : [])].map(path => [path, sha(path)])),

@@ -27,6 +27,13 @@ export function operatorSessionCookie(code: string, origin: string, now = Date.n
   const expires = String(now + OPERATOR_SESSION_MS);
   return `${OPERATOR_SESSION_COOKIE}=${expires}.${sign(code, expires)}; Path=/; HttpOnly; SameSite=Strict${origin.startsWith('https:') ? '; Secure' : ''}; Max-Age=${OPERATOR_SESSION_MS / 1000}`;
 }
+
+/** Code-free loopback bootstrap uses the same cookie as typed operator sign-in. */
+export function localOperatorSessionCookie(env: Env, origin: string, now = Date.now()) {
+  const code = env.CONTROLLER_ENROLLMENT_SECRET;
+  if (!code) throw new Error('OPERATOR_NOT_CONFIGURED');
+  return operatorSessionCookie(code, origin, now);
+}
 export const OPERATOR_SIGN_OUT_COOKIE = `${OPERATOR_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
 
 /** Cookie check only. Each surface still applies its own origin rule before trusting it. */
