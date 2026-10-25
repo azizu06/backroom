@@ -114,12 +114,27 @@ function validate(content: unknown, entries: WhyAuditEntry[]): WhyAnswer | undef
         typeof value.answer !== "string" || !value.answer.trim() || value.answer.length > 4000 ||
         !Array.isArray(value.citations) || !value.citations.length) return;
     const allowed = new Set(entries.map(entry => entry.id));
-    if (!value.citations.every(id => typeof id === "string" && allowed.has(id))) return;
-    const inline = [...value.answer.matchAll(/\[entry:([A-Za-z0-9_.:-]+)\]/g)].map(match => match[1]!);
-    const citations = [...new Set(value.citations as string[])];
+    // Models sometimes omit the audit namespace. Resolve only unique, colon-free
+    // suffixes from the retrieved evidence; unknown or ambiguous ids still fail.
+    const canonical = (id: unknown): string | undefined => {
+      if (typeof id !== "string") return;
+      if (allowed.has(id)) return id;
+      if (id.includes(":")) return;
+      const matches = entries.filter(entry => entry.id.endsWith(`:${id}`));
+      return matches.length === 1 ? matches[0]!.id : undefined;
+    };
+    const resolved = value.citations.map(canonical);
+    if (!resolved.every((id): id is string => id !== undefined)) return;
+    const answer = value.answer.replace(/\[entry:([A-Za-z0-9_.:-]+)\]/g,
+      (citation, id: string) => {
+        const resolvedId = canonical(id);
+        return resolvedId === undefined ? citation : `[entry:${resolvedId}]`;
+      });
+    const inline = [...answer.matchAll(/\[entry:([A-Za-z0-9_.:-]+)\]/g)].map(match => match[1]!);
+    const citations = [...new Set(resolved)];
     if (!inline.length || inline.some(id => !citations.includes(id)) || citations.some(id => !inline.includes(id)) ||
-        /entry\s*:/i.test(value.answer.replace(/\[entry:[A-Za-z0-9_.:-]+\]/g, ""))) return;
-    return { answer: value.answer, citations, source: "model" };
+        /entry\s*:/i.test(answer.replace(/\[entry:[A-Za-z0-9_.:-]+\]/g, ""))) return;
+    return { answer, citations, source: "model" };
   } catch { return; }
 }
 

@@ -34,6 +34,29 @@ describe("askWhy", () => {
     });
   });
 
+  it.each([{ citations: ["33"] }, { citations: ["audit:33"] }])("normalizes inline shorthand with citations $citations", async ({ citations }) => {
+    const entry = { ...entries[0]!, id: "audit:33" };
+    const fetcher = mockModel({ answer: "Held as a duplicate [entry:33].", citations });
+    const handler = createAskWhyHandler(async () => [entry], { apiKey: "test", fetch: fetcher });
+    const response = await handler(new Request("https://backroom.test/why", {
+      method: "POST", body: JSON.stringify({ question }),
+    }));
+    expect(await response.json()).toEqual({
+      answer: "Held as a duplicate [entry:audit:33].", citations: ["audit:33"], source: "model",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { ids: ["audit:33"], citation: "34" },
+    { ids: ["audit:33", "other:33"], citation: "33" },
+  ])("rejects missing or ambiguous shorthand: %j", async ({ ids, citation }) => {
+    const fetcher = mockModel({ answer: `Held [entry:${citation}].`, citations: [citation] });
+    const result = await askWhy(question, ids.map(id => ({ ...entries[0]!, id })), { apiKey: "test", fetch: fetcher });
+    expect(result.source).toBe("fallback");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it.each(answerKey)("grounds scripted question: $question", async scenario => {
     const fetcher = mockModel({ answer: scenario.modelAnswer, citations: scenario.correctIds });
     const result = await askWhy(scenario.question, entries, { apiKey: "test", fetch: fetcher });
