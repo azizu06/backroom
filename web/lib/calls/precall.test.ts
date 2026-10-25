@@ -9,6 +9,18 @@ const row = (type: string, value: unknown, label: string, extra: Partial<Precall
 afterEach(() => installPrecallEvidence(undefined));
 
 describe('desk phone pre-call card', () => {
+  it('shows a website-only live run label, host and time, and does not invent maps or phone', () => {
+    const label = 'Apify: live run 7LJbWDdDqZkk5iRJh';
+    const card = precallCard({ preCall: { status: 'ready' }, signals: [
+      row('apify_website_reachable', true, label, { sourceUrl: 'http://kimsislandsi.com/', observedAt: '2026-10-24T23:54:18.992Z' }),
+    ] });
+    expect(card).toEqual({ business: 'unknown', businessDetail: 'Not checked', source: label, sourceHost: 'kimsislandsi.com',
+      checkedAt: '23:54 UTC', phoneMatch: 'unknown', status: 'ready', warnings: [] });
+    expect(precallRows(card).map(item => item.value)).toEqual([
+      'Not checked', `${label} · kimsislandsi.com`, '23:54 UTC', 'unknown', 'ready',
+    ]);
+  });
+
   it('shows a live Apify run as open with its run id, host, time and phone match', () => {
     const label = 'Apify: live run run_AbC123';
     const card = precallCard({ preCall: { status: 'ready' }, signals: [row('apify_maps_status', 'operating', label), row('apify_phone_match', true, label)] });
