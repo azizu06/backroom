@@ -81,6 +81,57 @@ scripted turns, software passkeys and mocked sponsor HTTP. Its optional durable
 lane reads actual disposable SpacetimeDB rows; it does not prove live telephony
 or restart recovery.
 
+## Sponsor presentation routes
+
+These are presentation targets, not a timing receipt or verification of the
+uploaded video. Rehearse the actual host and check the submitted clip's opening
+separately. Prepare the consented target, signed-in controller and evidence tabs
+using **Before every take** before starting the clock.
+
+### Cartesia: two-minute route
+
+| Time | Show and say |
+| --- | --- |
+| 0:00-0:15 | Open the Collections desk and identify Cartesia Managed Agents as the live conversation path. State the host's actual mode; keep AI and recording disclosures visible. |
+| 0:15-0:40 | Follow **Call → Dana → payment → audit** steps 1-3 with the prepared target. Let the disclosure finish and confirm identity before amounts. Ask for the seven-installment exception. |
+| 0:40-1:05 | Show the policy escalation on Dana's controller. Dana checks the exact terms and approves with a human passkey. Voice cannot approve. |
+| 1:05-1:25 | Let the agent check approval and resume with the approved terms and payment-link offer. Allow the documented 15-second check; do not speak an approval into existence. |
+| 1:25-1:45 | Open the call's payment link and follow the prepared payment flow only when ready. Show the observed match and actual bank-mode label. |
+| 1:45-2:00 | Show the matching audit references, Cartesia setup/features/limitations in the root README, and the [evidence checklist](sponsor-deliverables.md). State any incomplete step plainly. |
+
+If a live step exceeds its slot, report where it stopped and show labeled
+historical evidence or replay. That fallback does not establish a new completed
+live call or a two-minute end-to-end result.
+
+### Hyphenate: open with the standout moment
+
+Open on the prepared, pending payment-plan exception on Dana's controller:
+“This collections seat stopped at its authority limit. Dana must approve the
+exact terms with a passkey before it continues.” Show the human decision and
+resumption first, then explain the setup. The business seats are supervised
+collections, payables and vendor verification for a small B2B studio.
+
+Next show the case's audit evidence and office handoff, then invite a judge's
+variation through **Inbox → Normal approved invoice** or **Attack lab**. Start
+with the prepared lookalike bank-change preset, keep **Scripted** visible for the
+deterministic route, and use the lab's scenario input for the judge's variation.
+An unfamiliar input may hold. Attack Lab assesses a scenario and has no payment
+execution adapter; do not imply that a lab result paid or blocked a real transfer.
+
+Keep [real versus simulated](../README.md#real-versus-simulated) and the
+[sponsor evidence checklist](sponsor-deliverables.md) ready beside the case.
+Separate synthetic company data, scripted assessment, historical provider
+receipts and the current live or sandbox result. Verify that the actual submitted
+video opens with this standout moment; this route alone does not prove it does.
+
+### Between judges
+
+**Reset company** clears prior cases and re-arms **Start the workday**. Wait for
+the reset to succeed and reload the office before the next take. The x402 action
+is once per server restart; company reset does not re-arm it. For audible office
+handoffs, open **Details → Agent Handoffs → Voices on**. Preserve the reset and
+external-state restrictions in **Before every take**.
+
 ## Other table moments
 
 | Moment | In-app click path and expected evidence |
