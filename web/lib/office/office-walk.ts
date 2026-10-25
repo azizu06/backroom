@@ -85,6 +85,53 @@ function inward(point: Vec2, b: Rect): Vec2 {
     .sort((a, c) => a.d - c.d)[0]!.n) as unknown as Vec2;
 }
 
+/** Follow the connected mount/trim footprint to its room-facing surface. The sight ray
+ * ends just outside that surface, so the board (or closed door) does not occlude itself.
+ * Disconnected fixtures remain sight blockers, even when they are close to the mount.
+ */
+function approachTarget(target: Vec2, normal: Vec2, colliders: readonly Rect[]): Vec2 {
+  const axis = normal[0] ? 0 : 1, along = axis === 0 ? 1 : 0, sign = normal[axis];
+  const intervals = colliders.filter(box => target[along] >= (along === 0 ? box.minX : box.minZ) - 1e-7
+      && target[along] <= (along === 0 ? box.maxX : box.maxZ) + 1e-7)
+    .map(box => {
+      const a = ((axis === 0 ? box.minX : box.minZ) - target[axis]) * sign;
+      const b = ((axis === 0 ? box.maxX : box.maxZ) - target[axis]) * sign;
+      return [Math.min(a, b), Math.max(a, b)] as const;
+    }).sort((a, b) => a[0] - b[0]);
+  let depth = 0;
+  for (const [start, end] of intervals) {
+    if (start > depth + 1e-7) break;
+    depth = Math.max(depth, end);
+  }
+  return [target[0] + normal[0] * (depth + 0.001), target[1] + normal[1] * (depth + 0.001)];
+}
+
+/** Search 10 cm tiles along the wall and in depth, nearest the nominal approach first.
+ * Every candidate is within 2 m of the mount and must have both body clearance and sight.
+ */
+function wallApproach(id: string, target: Vec2, normals: readonly Vec2[], offset: number,
+  layout: WalkLayout, clear: (point: Vec2) => boolean): Vec2 {
+  const candidates: { position: Vec2; aim: Vec2; cost: number }[] = [];
+  for (const normal of normals) {
+    const aim = approachTarget(target, normal, layout.colliders);
+    for (let depth = 1; depth <= 20; depth++) for (let side = -20; side <= 20; side++) {
+      const forward = depth / 10, lateral = side / 10;
+      if (Math.hypot(forward, lateral) > 2 + 1e-7) continue;
+      const position: Vec2 = [target[0] + normal[0] * forward - normal[1] * lateral,
+        target[1] + normal[1] * forward + normal[0] * lateral];
+      // Never stand behind the derived front surface, even if the mount is unusually deep.
+      if ((position[0] - aim[0]) * normal[0] + (position[1] - aim[1]) * normal[1] <= 0) continue;
+      candidates.push({ position, aim, cost: Math.hypot(forward - offset, lateral) });
+    }
+  }
+  candidates.sort((a, b) => a.cost - b.cost);
+  const found = candidates.find(({ position, aim }) => clear(position) && segmentClear(position, aim, layout.colliders, 0));
+  if (found) return found.position;
+  const nearby = layout.colliders.filter(box => distance(target,
+    [Math.max(box.minX, Math.min(box.maxX, target[0])), Math.max(box.minZ, Math.min(box.maxZ, target[1]))]) <= 2);
+  throw new Error(`No clear approach with sightline to ${id} within 2 m of ${target}; colliders: ${JSON.stringify(nearby)}`);
+}
+
 export function buildOfficeWalk(layout: WalkLayout): { hash: string; stops: WalkStop[] } {
   const { building, radius, chair, desk } = layout;
   const spots: WalkSpot[] = [];
@@ -120,18 +167,15 @@ export function buildOfficeWalk(layout: WalkLayout): { hash: string; stops: Walk
   for (const [id, anchor] of Object.entries(layout.anchors)) add(`anchor-${id}`, 'anchor', anchor.position, anchor.center);
   for (const board of layout.boards) {
     const n = inward(board.position, building);
-    add(`board-${board.id}`, 'board', [board.position[0] + n[0], board.position[1] + n[1]], board.position);
+    add(`board-${board.id}`, 'board', wallApproach(`board-${board.id}`, board.position, [n], 1, layout, clear), board.position);
   }
   for (const door of layout.doorways) {
-    // Some layouts retain logical doors inside pods. Visit the closest clear approach on the door normal.
+    // Logical interior doors may be approached from either side of their wall.
     const axis = door.axis === 'x' ? 1 : 0;
     const middle = axis === 0 ? (building.minX + building.maxX) / 2 : (building.minZ + building.maxZ) / 2;
     const sign = Math.sign(middle - door.at[axis]) || 1;
-    const candidates = [0.9, -0.9, 1.3, -1.3].map(offset => {
-      const p: [number, number] = [...door.at]; p[axis] += offset * sign; return p;
-    });
-    const position = candidates.find(clear);
-    if (!position) throw new Error(`No clear approach to doorway ${door.id}`);
+    const normal: Vec2 = axis === 0 ? [sign, 0] : [0, sign];
+    const position = wallApproach(`doorway-${door.id}`, door.at, [normal, [-normal[0], -normal[1]]], 0.9, layout, clear);
     add(`doorway-${door.id}`, 'doorway', position, door.at);
   }
   // Deterministic nearest-neighbour ordering limits backtracking between nearby destinations.

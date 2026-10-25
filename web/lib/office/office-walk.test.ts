@@ -26,14 +26,35 @@ function squareLayout(): WalkLayout {
 }
 
 describe('layout-derived office walkthrough', () => {
+  it('uses the merged square hall and avoids the northwest plant at the old notice approach', () => {
+    const layout = currentWalkLayout();
+    expect(layout.building).toEqual({ minX: -12, maxX: 12, minZ: -12, maxZ: 12 });
+    expect(new Set(layout.workstations.map(s => s.pod)).size).toBe(6);
+    expect(layout.spawn.position).toEqual([0, 10.8]);
+    const plant = { minX: -11.8, maxX: -10.8, minZ: -11.8, maxZ: -10.8 };
+    expect(layout.colliders).toContainEqual(plant);
+    expect(insideAny([-10.7, -10.89], [plant], layout.radius)).toBe(true);
+    const notice = buildOfficeWalk(layout).stops.find(s => s.spot.id === 'board-notice')!.spot;
+    expect(insideAny(notice.position, layout.colliders, layout.radius + 0.025)).toBe(false);
+    expect(notice.position[0]).toBeGreaterThan(-10.7);
+    expect(segmentClear(notice.position, layout.boards.find(b => b.id === 'notice')!.position, [plant], 0)).toBe(true);
+  });
+
   for (const [name, create] of [['current', currentWalkLayout], ['24 x 24 / six pods', squareLayout]] as const) {
     it(`covers every destination with collision-free continuous paths: ${name}`, () => {
       const layout = create(), walk = buildOfficeWalk(layout), spots = walk.stops.map(s => s.spot);
       expect(spots.filter(s => s.kind === 'aisle')).toHaveLength(new Set(layout.workstations.map(s => s.pod)).size * 4);
       expect(spots.filter(s => s.kind === 'seat').map(s => s.id).sort()).toEqual(layout.workstations.map(s => `seat-${s.id}`).sort());
       for (const id of Object.keys(layout.anchors)) expect(spots.find(s => s.id === `anchor-${id}`)?.position).toEqual(layout.anchors[id]!.position);
-      for (const door of layout.doorways) expect(spots.some(s => s.id === `doorway-${door.id}`)).toBe(true);
-      for (const board of layout.boards) expect(spots.some(s => s.id === `board-${board.id}`)).toBe(true);
+      for (const { id, target } of [
+        ...layout.doorways.map(d => ({ id: `doorway-${d.id}`, target: d.at })),
+        ...layout.boards.map(b => ({ id: `board-${b.id}`, target: b.position })),
+      ]) {
+        const spot = spots.find(s => s.id === id)!;
+        expect(spot).toBeDefined();
+        expect(Math.hypot(spot.position[0] - target[0], spot.position[1] - target[1])).toBeLessThanOrEqual(2);
+        expect(insideAny(spot.position, layout.colliders, layout.radius + 0.025)).toBe(false);
+      }
       expect(new Set(spots.map(s => s.id)).size).toBe(spots.length);
       expect(walk.stops[0]!.spot.position).toEqual(layout.spawn.position);
       let position = layout.spawn.position;
@@ -60,13 +81,57 @@ describe('layout-derived office walkthrough', () => {
     });
   }
 
-  it('is deterministic, hashes geometry changes and never mutates its input', () => {
-    const layout = squareLayout(), before = JSON.stringify(layout), first = buildOfficeWalk(layout);
-    expect(buildOfficeWalk(layout)).toEqual(first);
-    expect(JSON.stringify(layout)).toBe(before);
-    expect(buildOfficeWalk({ ...layout, eyeHeight: 1.6 }).hash).not.toBe(first.hash);
-    expect(buildOfficeWalk(currentWalkLayout()).hash).not.toBe(first.hash);
+  it('is deterministic, hashes geometry changes and never mutates either layout', () => {
+    for (const layout of [currentWalkLayout(), squareLayout()]) {
+      const before = JSON.stringify(layout), first = buildOfficeWalk(layout);
+      expect(buildOfficeWalk(layout)).toEqual(first);
+      expect(JSON.stringify(layout)).toBe(before);
+      expect(buildOfficeWalk({ ...layout, eyeHeight: 1.6 }).hash).not.toBe(first.hash);
+    }
+    expect(buildOfficeWalk(currentWalkLayout()).hash).not.toBe(buildOfficeWalk(squareLayout()).hash);
   });
+
+  for (const kind of ['board', 'doorway'] as const) {
+    const mount = { minX: -12, maxX: 12, minZ: -12.08, maxZ: -11.92 };
+    const approachLayout = (obstacles: WalkLayout['colliders']): WalkLayout => ({
+      ...squareLayout(), workstations: [], anchors: {}, colliders: [mount, ...obstacles],
+      boards: kind === 'board' ? [{ id: 'test', position: [0, -12] }] : [],
+      doorways: kind === 'doorway' ? [{ id: 'test', axis: 'x', at: [0, -12] }] : [],
+    });
+    const approach = (layout: WalkLayout) => buildOfficeWalk(layout).stops.find(s => s.spot.kind === kind)!.spot.position;
+
+    it(`finds the nearest clear tile along the wall for an occupied ${kind} approach`, () => {
+      const position = approach(approachLayout([{ minX: -0.15, maxX: 0.15, minZ: -11.4, maxZ: -10.8 }]));
+      expect(Math.abs(position[0])).toBeCloseTo(0.5);
+      expect(position[1]).toBeCloseTo(-12 + (kind === 'board' ? 1 : 0.9));
+    });
+
+    it(`rejects clear tiles with occluded sightlines to a ${kind}`, () => {
+      const obstacle = { minX: -0.2, maxX: 0.2, minZ: -11.55, maxZ: -11.45 };
+      const layout = approachLayout([obstacle]);
+      expect(insideAny([0, -11], layout.colliders, layout.radius + 0.025)).toBe(false);
+      expect(segmentClear([0, -11], [0, -11.919], layout.colliders, 0)).toBe(false);
+      const position = approach(layout);
+      expect(Math.abs(position[0])).toBeGreaterThan(0.2);
+      expect(segmentClear(position, [0, -11.919], layout.colliders, 0)).toBe(true);
+    });
+
+    it(`accounts for ${kind} depth and connected projecting trim`, () => {
+      const layout = approachLayout([
+        { minX: -1, maxX: 1, minZ: -12, maxZ: -11.3 },
+        { minX: -0.5, maxX: 0.5, minZ: -11.4, maxZ: -11.1 },
+      ]);
+      const position = approach(layout);
+      expect(position[1]).toBeGreaterThan(-11.1 + layout.radius + 0.025);
+      expect(segmentClear(position, [0, -11.099], layout.colliders, 0)).toBe(true);
+    });
+
+    it(`reports obstructing boxes only when no ${kind} approach with sight exists within 2 m`, () => {
+      const blocker = { minX: -2.1, maxX: 2.1, minZ: -11.55, maxZ: -11.45 };
+      expect(() => approach(approachLayout([blocker]))).toThrow(`No clear approach with sightline to ${kind}-test within 2 m`);
+      expect(() => approach(approachLayout([blocker]))).toThrow(JSON.stringify(blocker));
+    });
+  }
 
   it('routes around obstacles and fails loudly for blocked or disconnected destinations', () => {
     const layout = { building: { minX: -5, maxX: 5, minZ: -5, maxZ: 5 }, radius: 0.28,
