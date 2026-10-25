@@ -13,6 +13,27 @@ const completion = (value: unknown, confidence = 1) => new Response(JSON.stringi
 const mockModel = (value: unknown = valid) => vi.fn<typeof fetch>(async () => completion(value));
 
 describe("askWhy", () => {
+  it('cleans model prose only after validating and canonicalizing citations', async () => {
+    const entry = { ...entries[0]!, id: 'audit:MAX_INSTALLMENTS-212' };
+    const fetcher = mockModel({ answer: 'INV-4482 has requestedInstallments outside MAX_INSTALLMENTS [entry:audit:MAX_INSTALLMENTS-212].',
+      citations: ['audit:MAX_INSTALLMENTS-212'] });
+    expect(await askWhy(question, [entry], { apiKey: 'test', fetch: fetcher })).toEqual({ source: 'model',
+      answer: 'invoice 4482 has requested installments outside the installment limit [entry:audit:MAX_INSTALLMENTS-212].',
+      citations: ['audit:MAX_INSTALLMENTS-212'] });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps fixture evidence and citations intact in plain-language fallbacks', async () => {
+    const result = await askWhy(answerKey[2]!.question, entries, { apiKey: '' });
+    expect(result.source).toBe('fallback');
+    expect(result.answer).toContain('4 installments, with a recorded limit of 2');
+    expect(result.answer).toContain('the rule against waiving late fees');
+    expect(result.answer).toContain('[entry:215]');
+    expect(result.answer).toContain('[entry:216]');
+    expect(result.answer).not.toMatch(/MAX_INSTALLMENTS|FEES_NON_WAIVABLE/);
+    expect(result.citations).toEqual(['215', '216']);
+  });
+
   it('uses the default cloud router with only an Anthropic key', async () => {
     vi.stubEnv('LLM_CLOUD_PROVIDER', 'anthropic');
     vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-test');
@@ -169,7 +190,7 @@ describe("askWhy", () => {
     const result = await askWhy(answerKey[1]!.question, entries, { apiKey: "" });
     expect(result.answer).toContain("acme-supp1y.com");
     expect(result.answer).toContain("acme-supply.com");
-    expect(result.answer).toContain("Bank changed: true");
+    expect(result.answer).toContain("The bank details changed.");
   });
 
   it("retrieves by keywords when there is no invoice id", async () => {
