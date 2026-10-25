@@ -7,7 +7,7 @@ import { setBakedTalkingAgent } from '../../lib/office/baked-character';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
-  DEFAULT_PLAY_SETTINGS, MOTION_INTENSITY_RANGE, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, lookDelta, type PlaySettings,
+  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, lookDelta, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { crosshairView } from '../../lib/office/playFeel';
@@ -143,10 +143,6 @@ function PlaySettingsDialog({ settings, change, close, tryWalking }: {
       <label className='play-setting play-setting-check'>
         <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked }, `Field-of-view kick ${event.target.checked ? 'on' : 'off'}`)} /> Field-of-view kick
       </label>
-      <label className='play-setting'><span>Motion intensity <output>{formatMultiplier(settings.motionIntensity)}</output></span>
-        <input aria-label='Motion intensity' type='range' disabled={motionBlocked} min={MOTION_INTENSITY_RANGE.min} max={MOTION_INTENSITY_RANGE.max} step={MOTION_INTENSITY_RANGE.step} value={settings.motionIntensity}
-          onChange={event => change({ ...settings, motionIntensity: Number(event.target.value) })} />
-      </label>
       <label className='play-setting play-setting-check'>
         <input type='checkbox' role='switch' checked={settings.useMotionAnyway} onChange={event => change({ ...settings, useMotionAnyway: event.target.checked }, `Use motion anyway ${event.target.checked ? 'on' : 'off'}`)} /> Use motion anyway
       </label>
@@ -249,7 +245,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     };
   }, [hud, input]);
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
-  useEffect(() => { input.feel = feelFlags(settings); requestSceneFrame(); }, [input, settings]);
+  useEffect(() => { input.feel = feelFlags(settings); requestSceneFrame(); }, [input, settings.smoothMove, settings.headBob, settings.fovKick, settings.useMotionAnyway]);
   // The agent being talked to faces the player and listens until the dialog closes (view only).
   useEffect(() => {
     agentCues.setTalking(panel ? cueKeyFor(panel) : null);

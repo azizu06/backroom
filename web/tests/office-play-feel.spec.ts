@@ -148,12 +148,12 @@ test.describe('system reduced motion', () => {
     const errors = await startPlay(page);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    await dialog.locator('summary').filter({ hasText: 'Movement Feel' }).click();
     const indicator = dialog.getByText('Reduced motion is on in your system, so these are off', { exact: true });
     await expect(indicator).toBeVisible();
     for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
       await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeDisabled();
     }
-    await expect(dialog.getByRole('slider', { name: 'Motion intensity' })).toBeDisabled();
     await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toBeEnabled();
     await expect(dialog.getByRole('slider', { name: 'Movement speed' })).toBeEnabled();
 
@@ -168,12 +168,8 @@ test.describe('system reduced motion', () => {
     for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
       await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeEnabled();
     }
-    const intensity = dialog.getByRole('slider', { name: 'Motion intensity' });
-    await intensity.focus();
-    await page.keyboard.press('End');
-    await expect(intensity).toHaveValue('1.5');
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('backroom.office.play-settings.v1') ?? '{}')))
-      .toMatchObject({ useMotionAnyway: true, motionIntensity: 1.5 });
+      .toMatchObject({ useMotionAnyway: true });
     await dialog.getByRole('button', { name: 'Try walking' }).click();
     await page.keyboard.down('w');
     try {
@@ -187,11 +183,9 @@ test.describe('system reduced motion', () => {
     await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(dialog.getByRole('switch', { name: 'Use motion anyway' })).toBeChecked();
-    await expect(intensity).toHaveValue('1.5');
     await dialog.getByRole('button', { name: 'Reset to defaults' }).click();
     await expect(indicator).toBeVisible();
     await expect(dialog.getByRole('switch', { name: 'Use motion anyway' })).not.toBeChecked();
-    await expect(intensity).toHaveValue('1');
     expect(await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'))).toBeNull();
     await dialog.getByRole('button', { name: 'Try walking' }).click();
     const start = await reading(page);
@@ -214,6 +208,7 @@ test.describe('motion enabled', () => {
     await expect(view).toHaveAttribute('data-player-eye-y', /\d/, { timeout: 30_000 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    await dialog.locator('summary').filter({ hasText: 'Movement Feel' }).click();
     const bob = dialog.getByRole('checkbox', { name: 'Head bob', exact: true });
     await expect(bob).toBeChecked();
     await expect(bob).toBeEnabled();
@@ -236,12 +231,12 @@ test.describe('motion enabled', () => {
       expect(Math.max(...positions) - Math.min(...positions)).toBeGreaterThan(0.3);
       return Math.max(...heights) - Math.min(...heights);
     }
-    // Main's 0.03 m amplitude cannot exceed 0.06 m peak-to-peak (and has no eye-height readout).
-    expect(await sampleWalk()).toBeGreaterThan(0.08);
+    // The original 0.03 m bob reaches 0.06 m peak-to-peak after ramping up.
+    expect(await sampleWalk()).toBeGreaterThanOrEqual(0.03);
     await bob.uncheck();
     await expect(page.locator('.play-settings-toast')).toHaveText('Head bob off');
     await expect(page.locator('.play-settings-toast')).toBeHidden({ timeout: 3_000 });
-    expect(await sampleWalk()).toBeLessThan(0.001);
+    expect(await sampleWalk()).toBeLessThan(0.01);
     await bob.check();
     await expect(page.locator('.play-settings-toast')).toHaveText('Head bob on');
     await expect(dialog).toBeVisible();

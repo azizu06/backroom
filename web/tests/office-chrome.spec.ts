@@ -134,7 +134,9 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
         await expect(controls).toHaveAttribute('open', '');
         await expect(feel).not.toHaveAttribute('open');
         await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toBeFocused();
-        await expect(feel.getByText('All three stay off while your system asks to reduce motion.')).toBeVisible();
+        await expect(feel.getByText(reducedMotion === 'reduce'
+          ? 'Reduced motion is on in your system, so these are off'
+          : 'Motion applies while walking.', { exact: true })).toBeVisible();
         await expect(feel.getByRole('checkbox', { name: 'Head bob' })).toBeHidden();
         for (const name of ['Look sensitivity', 'Movement speed']) {
           await dialog.getByRole('slider', { name }).focus();
@@ -145,6 +147,12 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
         await feel.locator('summary').focus();
         await page.keyboard.press('Enter');
         await expect(feel).toHaveAttribute('open', '');
+        if (reducedMotion === 'reduce') {
+          for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+            await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeDisabled();
+          }
+          await dialog.getByRole('switch', { name: 'Use motion anyway' }).check();
+        }
         for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
           await dialog.getByRole('checkbox', { name, exact: true }).uncheck();
         }
