@@ -65,7 +65,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
   // Bundled footprints; appended only once the ?art=baked lobby is in the scene, so a failed load keeps the procedural set.
   const baked = useBakedLobbyReady();
   const colliders = useMemo(
-    () => withoutHiddenAuditBoard(officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX]), local.doors), baked),
+    () => withoutHiddenAuditBoard(officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX], location.search), local.doors), baked),
     [roomsKey, baked, local.doors],
   );
   const [spawn] = useState((): [number, number] => {

@@ -1,4 +1,6 @@
 import authored from '../../public/office-art/lobby.colliders.json';
+import { bakedArtRequested } from './baked-art';
+import { propkitColliderBoxes } from './propkit';
 
 /** Footprints baked with the lobby props (`web/public/office-art/lobby.colliders.json`). */
 export const LOBBY_COLLIDERS_URL = '/office-art/lobby.colliders.json';
@@ -54,11 +56,15 @@ export function parseLobbyColliders(data: unknown): ColliderBox[] {
 
 /**
  * Collision extras for Play. Without baked art the base list is returned unchanged
- * (the server-room box today). With it, the lobby prop footprints are appended.
+ * (the server-room box today). The lobby follows readiness; the prop kit follows
+ * the URL flag because its procedural fallback always occupies the same footprints.
  */
-export function lobbyCollisionExtras<T extends Footprint>(baked: boolean, lobby: readonly T[], base: readonly T[]): T[] {
-  return baked ? [...base, ...lobby] : [...base];
+export function lobbyCollisionExtras<T extends Footprint>(baked: boolean, lobby: readonly T[], base: readonly T[], search = ''): (T | ColliderBox)[] {
+  return [...base, ...(baked ? lobby : []), ...(bakedArtRequested(search) ? PROPKIT_PROP_BOXES : [])];
 }
+
+/** Bundled layout-derived boxes: never wait for a GLB or a fetch. */
+export const PROPKIT_PROP_BOXES: readonly ColliderBox[] = propkitColliderBoxes();
 
 /** Parsed at module load from the bake file. Play appends these only when `?art=baked` is set. */
 export const LOBBY_PROP_BOXES: readonly ColliderBox[] = parseLobbyColliders(authored);

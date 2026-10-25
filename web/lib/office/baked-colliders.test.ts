@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PLAYER_RADIUS, SERVER_ROOM_BOX, insideAny, movePlayer, officeColliders } from './play';
 import {
-  LOBBY_COLLIDERS_URL, LOBBY_PROP_BOXES, footprintToBox, loadLobbyColliderBoxes, lobbyCollisionExtras, parseLobbyColliders, type ColliderBox,
+  LOBBY_COLLIDERS_URL, LOBBY_PROP_BOXES, PROPKIT_PROP_BOXES, footprintToBox, loadLobbyColliderBoxes, lobbyCollisionExtras, parseLobbyColliders, type ColliderBox,
 } from './baked-colliders';
 
 const file = resolve(dirname(fileURLToPath(import.meta.url)), '../../public/office-art/lobby.colliders.json');
@@ -21,6 +21,18 @@ function boxNamed(boxes: readonly ColliderBox[], name: string): ColliderBox {
 }
 
 describe('lobby collider loader', () => {
+  it('includes prop-kit collision from the flag even when both GLBs are missing', () => {
+    const base = [SERVER_ROOM_BOX];
+    expect(lobbyCollisionExtras(false, LOBBY_PROP_BOXES, base, '?art=plain')).toEqual(base);
+    expect(lobbyCollisionExtras(false, LOBBY_PROP_BOXES, base, '?art=baked')).toEqual([...base, ...PROPKIT_PROP_BOXES]);
+    expect(lobbyCollisionExtras(true, LOBBY_PROP_BOXES, base, '?art=baked')).toEqual([...base, ...LOBBY_PROP_BOXES, ...PROPKIT_PROP_BOXES]);
+    const coffee = PROPKIT_PROP_BOXES.find(b => b.name === 'propkit:coffee_station')!;
+    const outside: [number, number] = [coffee.minX - 0.7, (coffee.minZ + coffee.maxZ) / 2];
+    const blocked = movePlayer(outside, [0.8, 0], lobbyCollisionExtras(false, [], base, '?art=baked'), PLAYER_RADIUS);
+    expect(blocked[0]).toBeCloseTo(coffee.minX - PLAYER_RADIUS, 3);
+    expect(insideAny(blocked, [coffee], PLAYER_RADIUS)).toBe(false);
+  });
+
   it('parses the authored footprints into collision boxes', () => {
     const boxes = parseLobbyColliders(authored);
     expect(boxes).toEqual(LOBBY_PROP_BOXES);
