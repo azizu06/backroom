@@ -327,7 +327,7 @@ describe("panels", () => {
     expect(panel.talk!.replies.stopped.text).toContain("preview-escalation-1042");
     expect(panel.talk!.replies.stopped.ruleIds).toEqual(["MAX_INSTALLMENTS"]);
     expect(panel.entries[0]).toMatchObject({ decision: "ESCALATE", ruleIds: ["MAX_INSTALLMENTS"] });
-    expect(targetLabel(snapshot, { kind: "agent", id: "collections-clerk" })).toBe("Talk to Alex");
+    expect(targetLabel(snapshot, { kind: "agent", id: "collections-clerk" })).toBe("Talk to Alex (needs you)");
     expect(playPanel(snapshot, { kind: "agent", id: "gone" })).toBeNull();
   });
 
