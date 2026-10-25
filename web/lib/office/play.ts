@@ -269,7 +269,9 @@ export interface PlayBridge {
   readonly hud: { readonly current: HTMLElement | null };
   /** Other viewers in Play (soft targets), read on each rig frame. */
   readonly coworkers?: { readonly current: readonly CoworkerSpot[] };
-  /** Where the next Play session starts (Overview "Go here" / room jump); read once when the rig mounts, then cleared. */
+  /** Changing this while mounted consumes the pending entry as a live teleport. */
+  readonly teleportNonce?: number;
+  /** Requested pose; consumed on mount (with intro) or on a live teleport, then cleared. */
   readonly entry?: { current: PlayEntry | null };
   /** The pose the last Play session ended at, so toggling Overview and back resumes there. */
   readonly last?: { current: PlayEntry | null };

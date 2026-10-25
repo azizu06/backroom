@@ -16,6 +16,7 @@ import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, interactCandidates, moveIntent, movePlayer, officeColliders,
   frameLookYaw, insideAny, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
+import { clearEntry } from '../../lib/office/overview';
 import { playSpawn } from '../../lib/office/play-spawn';
 import { useImmersiveRig } from './immersive/rig';
 import { interactionStore } from '../../lib/office/interactions';
@@ -33,11 +34,16 @@ function playEye([x, z]: readonly [number, number], yaw: number): IntroPose {
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, entry, last, story }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, entry, last, story, teleportNonce = 0 }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
   const get = useThree(state => state.get);
+  const canvas = useThree(state => state.gl.domElement);
+  // Owned by the rig: a HUD-only marker cannot detect camera rig remounts.
+  useEffect(() => {
+    canvas.dataset.playRigMountCount = String(Number(canvas.dataset.playRigMountCount ?? 0) + 1);
+  }, [canvas]);
   // The camera before Play (read before PerspectiveCamera makes itself the default).
   const [previous] = useState(() => get().camera);
   // The rig owns the camera/input handoff; scene mounts only receive the snapshot.
@@ -77,6 +83,31 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
   const storyMove = useRef<{ id: string; from: IntroPose; startedAt: number } | null>(null);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
+
+  // Only subsequent nonce changes teleport; the mount-time entry keeps its fly-in.
+  const lastTeleportNonce = useRef(teleportNonce);
+  useEffect(() => {
+    if (lastTeleportNonce.current === teleportNonce) return;
+    lastTeleportNonce.current = teleportNonce;
+    const requested = entry?.current;
+    if (!requested) return;
+    entry.current = null;
+    // Search the whole floor if nearby geometry is blocked; even an entirely blocked
+    // floor must consume the action at its requested destination instead of silently ignoring it.
+    const next = clearEntry(requested, latest.current.colliders) ?? requested;
+    position.current = [next.position[0], next.position[1]];
+    yaw.current = next.yaw;
+    pitch.current = 0;
+    velocity.current = [0, 0];
+    feel.current = INITIAL_FEEL;
+    feelSettling.current = false;
+    wasActive.current = false;
+    input.clear();
+    intro.done = true;
+    immersive.reset();
+    written.current = false;
+    invalidate();
+  }, [teleportNonce, entry, input, intro, immersive, invalidate]);
 
   // Clear held keys only when a tour starts, changes stop or ends: on a plain Play mount the rig can
   // mount after a key is already held, and clearing then would swallow that first press.
