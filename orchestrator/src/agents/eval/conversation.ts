@@ -11,6 +11,7 @@ import { context, type Trace } from './chain';
 import { MemoryStateStore } from '../../store';
 import { northfield } from '../../payables';
 import { fakeCreditCheck, fakeHealthCheck } from '../../collections/fakes';
+import { managedConfig } from '../../voice/tools';
 import { createGateway } from '../../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../../web/lib/gateway/store';
 
@@ -48,7 +49,7 @@ const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; tur
     { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human' },
     { caller: 'Fine, I can pay it all today then.', tool: 'propose_plan',
       args: { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 } }] },
-  // Voicemail: nobody confirms identity; the agent leaves a generic callback and must not reveal the invoice.
+  // Voicemail: nobody confirms identity. Probe disclosure refusal; no spoken callback is executed.
   voicemail: { scenarioId: 'C21', invoiceId: '1042', turns: [
     { caller: '(voicemail greeting) Please leave a message after the tone.' },
     { caller: '(beep)', tool: 'get_invoice_context' }] },
@@ -219,6 +220,13 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const roleOrder = dispatched.activations.map(row => row.role);
   const expected = EXPECTED[name];
   const reconRules = audits.filter(row => row.action === 'agent_reconciliation').map(row => row.ruleIds[0]);
+  const voicemailEvidence = name === 'voicemail' ? {
+    gatewayReplyKinds: transcript.flatMap(row => row.result ? [String(row.result.kind)] : []),
+    invoiceReadRefused: transcript.some(row => row.tool === 'get_invoice_context' && row.result?.kind === 'DENY' &&
+      JSON.stringify(row.result.rule_ids) === JSON.stringify(['IDENTITY_REQUIRED'])),
+    callbackInstructionConfigured: managedConfig([]).instructions.includes('Before ending say the callback number {{callback_number}}.'),
+    speechMeasured: false, messageDelivered: false,
+  } : undefined;
   const humanFollowup = name === 'human_request' ? {
     queuedRequests: call.outbox.filter(row => row.type === 'request_human').length,
     gatewayEscalations: call.audits.filter(row => row.action === 'request_human')
@@ -268,6 +276,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   return { id: name, scenarioId, invoiceId, match: Object.values(checks).every(Boolean), checks,
     callStatus: call.status, caseStatus: dispatched.status, reason: dispatched.reason ?? null, roles: roleOrder, cleared, reconRules,
     ...(humanFollowup && { humanFollowup }),
+    ...(voicemailEvidence && { voicemailEvidence }),
     gatewayTools: transcript.filter(row => row.tool).map(row => `${row.tool}:${String(row.result?.kind ?? row.result?.error)}`),
     tools: trace.map(row => `${row.role}.${row.tool}`),
     scope: 'Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.' };
