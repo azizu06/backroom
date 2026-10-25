@@ -72,9 +72,9 @@ export const ANCHOR_LAYOUT: Readonly<Record<LayoutAnchorId, { center: Vec2; posi
  * east wall so the view from the lobby out of its west windows stays clear.
  */
 export const LOBBY_KIOSK: Vec2 = [-7, 3.4];
-/** The live audit wall hangs on the lobby's solid east wall (an interior wall, no windows), facing west into the lobby. */
 /** The lobby's decision board (last three decisions and the deny stamp) stands against the corridor wall east of the lobby opening, facing into the lobby. */
 export const LOBBY_BOARD: Vec2 = [-7, CORRIDOR.maxZ + WALL_THICKNESS / 2 + 0.1];
+/** The live audit wall hangs on the lobby's solid east wall (an interior wall, no windows), facing west into the lobby. */
 export const LOBBY_AUDIT_WALL = { x: -6 - WALL_THICKNESS / 2 - 0.03, z: 5.3, rotationY: -Math.PI / 2 } as const;
 
 /** A point given relative to an anchor room's furniture centre. */
@@ -216,7 +216,9 @@ export function wallPieces(mode: 'full' | 'overview'): FurniturePiece[] {
   return pieces;
 }
 
-const FRAME = 0.07, FRAME_DEPTH = WALL_THICKNESS + 0.06;
+/** Window frame width; frames reach this far past each opening's edges along the wall. */
+export const WINDOW_FRAME = 0.07;
+const FRAME = WINDOW_FRAME, FRAME_DEPTH = WALL_THICKNESS + 0.06;
 /** Window frames (sill, head, jambs and a mullion) and the glass panes, one entry per window. */
 export function windowPieces(): { frames: FurniturePiece[]; glass: FurniturePiece[] } {
   const frames: FurniturePiece[] = [], glass: FurniturePiece[] = [];
@@ -268,30 +270,43 @@ export function wallColliders(): Rect[] {
   return boxes;
 }
 
-let SIGHT_WALLS: Rect[] | null = null;
+/** wallColliders() flattened once as [minX, maxX, minZ, maxZ] per box, so sightBlocked allocates nothing per call. */
+const SIGHT_WALLS: Float64Array = (() => {
+  const boxes = wallColliders();
+  const flat = new Float64Array(boxes.length * 4);
+  boxes.forEach((box, i) => flat.set([box.minX, box.maxX, box.minZ, box.maxZ], i * 4));
+  return flat;
+})();
 /**
- * True when a wall (or a locked door) stands between two floor points, ignoring doorway gaps. First-person
- * views use it to hide screen-space labels for things behind walls; it is a 2D test, so headers and window
- * openings count as solid.
+ * True when a wall (or a locked door) stands between two floor points (ax, az) and (bx, bz), ignoring doorway
+ * gaps. First-person views use it every frame to hide screen-space labels for things behind walls, so it takes
+ * plain numbers and allocates nothing; it is a 2D test, so headers and window openings count as solid.
  */
-export function sightBlocked(from: Vec2, to: Vec2): boolean {
-  SIGHT_WALLS ??= wallColliders();
-  const dx = to[0] - from[0], dz = to[1] - from[1];
-  return SIGHT_WALLS.some(box => {
+export function sightBlocked(ax: number, az: number, bx: number, bz: number): boolean {
+  const dx = bx - ax, dz = bz - az;
+  const flatX = Math.abs(dx) < 1e-12, flatZ = Math.abs(dz) < 1e-12;
+  for (let i = 0; i < SIGHT_WALLS.length; i += 4) {
+    const minX = SIGHT_WALLS[i]!, maxX = SIGHT_WALLS[i + 1]!, minZ = SIGHT_WALLS[i + 2]!, maxZ = SIGHT_WALLS[i + 3]!;
     let t0 = 0, t1 = 1;
-    for (const [start, delta, min, max] of [[from[0], dx, box.minX, box.maxX], [from[1], dz, box.minZ, box.maxZ]] as const) {
-      if (Math.abs(delta) < 1e-12) {
-        if (start < min || start > max) return false;
-        continue;
-      }
-      let a = (min - start) / delta, b = (max - start) / delta;
-      if (a > b) [a, b] = [b, a];
-      t0 = Math.max(t0, a);
-      t1 = Math.min(t1, b);
-      if (t0 > t1) return false;
+    if (flatX) {
+      if (ax < minX || ax > maxX) continue;
+    } else {
+      const a = (minX - ax) / dx, b = (maxX - ax) / dx;
+      t0 = Math.max(t0, Math.min(a, b));
+      t1 = Math.min(t1, Math.max(a, b));
+      if (t0 > t1) continue;
+    }
+    if (flatZ) {
+      if (az < minZ || az > maxZ) continue;
+    } else {
+      const a = (minZ - az) / dz, b = (maxZ - az) / dz;
+      t0 = Math.max(t0, Math.min(a, b));
+      t1 = Math.min(t1, Math.max(a, b));
+      if (t0 > t1) continue;
     }
     return true;
-  });
+  }
+  return false;
 }
 
 /** Floor pad inset from a room's walls (the cream pad scene.tsx draws, tinted when the room is focused). */

@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ANCHOR_IDS, ANCHOR_LAYOUT, ATRIUM_HEIGHT, BUILDING, MAIN_BUILDING, CORRIDOR, DOORWAYS, LEAF_OPENING, ROOM_SPAWNS, SPACES, SPACE_IDS, WALLS, WALL_HEIGHT, WINDOWS,
-  WINDOW_HEAD, WINDOW_SILL, sightBlocked, spaceAt, wallColliders, wallPieces, windowPieces, type Rect, type Vec2,
+  ANCHOR_IDS, ANCHOR_LAYOUT, ATRIUM_HEIGHT, BUILDING, MAIN_BUILDING, CORRIDOR, DOORWAYS, LEAF_OPENING, LOBBY_BOARD, ROOM_SPAWNS, SPACES, SPACE_IDS, WALLS, WALL_HEIGHT, WINDOWS,
+  WINDOW_FRAME, WINDOW_HEAD, WINDOW_SILL, sightBlocked, spaceAt, wallColliders, wallPieces, windowPieces, type Rect, type Vec2,
 } from './layout';
 import { BUSHES, HILLS, PATH, PLAZA, SUN_DIRECTION, TREES, groundClear } from './outdoors';
 import { OFFICE_LIGHTING } from './lighting';
 import { OUTDOOR, PALETTE, ROLES } from './palette';
 import { FLOOR, PAYLINK_KIOSK, PLAYER_RADIUS, SERVER_ROOM_BOX, insideAny, officeColliders } from './play';
 import { AUDIT_WALL } from './props/auditWall';
+import { CLOCK_INTERACTION, CLOCK_MOUNT } from './props/clock';
+import { ROOM_DETAILS } from './props/roomDetail';
+import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { SHARED_ROOM_COLLIDERS, SHARED_ROOM_PIECES } from './shared-rooms';
 import { dressingColliders } from './props/dressing';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
@@ -214,12 +217,51 @@ describe('outdoors', () => {
 describe('sight lines', () => {
   it('is blocked by walls and locked doors but not through open doorways or along the corridor', () => {
     const [cx, cz] = OFFICE_ANCHORS.collections.center, [px, pz] = OFFICE_ANCHORS.payables.center;
-    expect(sightBlocked([cx, cz], [px, pz])).toBe(true);
-    expect(sightBlocked([-11, 0], [9, 0])).toBe(false);
-    expect(sightBlocked([cx, 0.5], [cx, cz])).toBe(false);
-    expect(sightBlocked([cx + 2, 0.5], [cx + 2, cz])).toBe(true);
+    expect(sightBlocked(cx, cz, px, pz)).toBe(true);
+    expect(sightBlocked(-11, 0, 9, 0)).toBe(false);
+    expect(sightBlocked(cx, 0.5, cx, cz)).toBe(false);
+    expect(sightBlocked(cx + 2, 0.5, cx + 2, cz)).toBe(true);
     const [tx, tz] = DOORWAYS.find(door => door.id === 'treasury')!.at;
-    expect(sightBlocked([tx, tz - 1], [tx, tz + 1])).toBe(true);
+    expect(sightBlocked(tx, tz - 1, tx, tz + 1)).toBe(true);
+  });
+
+  it('matches the original array-based slab test on sample points', () => {
+    // The pre-optimisation implementation, kept verbatim as the reference.
+    const walls = wallColliders();
+    const reference = (from: Vec2, to: Vec2) => {
+      const dx = to[0] - from[0], dz = to[1] - from[1];
+      return walls.some(box => {
+        let t0 = 0, t1 = 1;
+        for (const [start, delta, min, max] of [[from[0], dx, box.minX, box.maxX], [from[1], dz, box.minZ, box.maxZ]] as const) {
+          if (Math.abs(delta) < 1e-12) {
+            if (start < min || start > max) return false;
+            continue;
+          }
+          let a = (min - start) / delta, b = (max - start) / delta;
+          if (a > b) [a, b] = [b, a];
+          t0 = Math.max(t0, a);
+          t1 = Math.min(t1, b);
+          if (t0 > t1) return false;
+        }
+        return true;
+      });
+    };
+    const points: Vec2[] = [
+      ...SPACE_IDS.map(id => ROOM_SPAWNS[id].position), ...ANCHOR_IDS.map(id => ANCHOR_LAYOUT[id].center),
+      ...DOORWAYS.map(door => door.at), [-12, 0], [12, 0], [0, -7.5], [-6, 0], [9.5, 1.5], [-13, 8], [13, -8],
+    ];
+    // Deterministic pseudo-random points across and just outside the building.
+    let seed = 7;
+    const next = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 120; i++) points.push([-13 + 26 * next(), -8.5 + 17 * next()]);
+    let blocked = 0, pairs = 0;
+    for (const a of points) for (const b of points) {
+      const expected = reference(a, b);
+      expect(sightBlocked(a[0], a[1], b[0], b[1]), `${a} -> ${b}`).toBe(expected);
+      pairs++; if (expected) blocked++;
+    }
+    expect(blocked).toBeGreaterThan(0);
+    expect(blocked).toBeLessThan(pairs);
   });
 });
 
@@ -235,5 +277,72 @@ describe('lobby windows', () => {
     const kiosk = { minX: PAYLINK_KIOSK[0] - 0.4, maxX: PAYLINK_KIOSK[0] + 0.4, minZ: PAYLINK_KIOSK[1] - 0.5, maxZ: PAYLINK_KIOSK[1] + 0.5 };
     expect(kiosk.minX).toBeGreaterThan(SPACES.lobby.rect.minX + (SPACES.lobby.rect.maxX - SPACES.lobby.rect.minX) / 2);
     expect(AUDIT_WALL.x).toBeGreaterThan(kiosk.minX);
+  });
+});
+
+describe('wall-mounted props', () => {
+  interface Mounted { id: string; rect: Rect; bottom: number; top: number }
+  const span = (id: string, minX: number, maxX: number, minZ: number, maxZ: number, bottom: number, top: number): Mounted =>
+    ({ id, rect: { minX, maxX, minZ, maxZ }, bottom, top });
+  const art: Mounted[] = ROOM_DETAILS.filter(detail => detail.kind === 'art').flatMap(detail => detail.pieces.map(piece => {
+    const turned = Math.abs(Math.sin(piece.rotation?.[1] ?? 0)) > 0.5;
+    const [sx, sy, sz] = piece.size, hx = (turned ? sz : sx) / 2, hz = (turned ? sx : sz) / 2;
+    return span(detail.id, piece.at[0] - hx, piece.at[0] + hx, piece.at[2] - hz, piece.at[2] + hz, piece.at[1] - sy / 2, piece.at[1] + sy / 2);
+  }));
+  const [wx] = WHITEBOARD_INTERACTION.position;
+  const props: Mounted[] = [
+    span('whiteboard', wx - WHITEBOARD.width / 2, wx + WHITEBOARD.width / 2, BUILDING.minZ, BUILDING.minZ + 0.33, WHITEBOARD.bottom, WHITEBOARD.bottom + WHITEBOARD.height),
+    span('audit wall', AUDIT_WALL.x - 0.1, AUDIT_WALL.x + 0.1, AUDIT_WALL.z - AUDIT_WALL.width / 2, AUDIT_WALL.z + AUDIT_WALL.width / 2, AUDIT_WALL.bottom, AUDIT_WALL.bottom + AUDIT_WALL.height),
+    // Conservative bounds for the tilted clock face and its bracket off the corridor's north wall.
+    span('clock', CLOCK_MOUNT.position[0] - CLOCK_MOUNT.radius, CLOCK_MOUNT.position[0] + CLOCK_MOUNT.radius,
+      CORRIDOR.minZ, CLOCK_MOUNT.position[2] + CLOCK_MOUNT.bracketLength + CLOCK_MOUNT.radius,
+      CLOCK_MOUNT.position[1] - CLOCK_MOUNT.radius, CLOCK_MOUNT.position[1] + CLOCK_MOUNT.radius),
+    // LobbyCounter.tsx / Ambient.tsx: 2 x 1.45 board centred 1.25 m up.
+    span('decision board', LOBBY_BOARD[0] - 1, LOBBY_BOARD[0] + 1, LOBBY_BOARD[1] - 0.2, LOBBY_BOARD[1] + 0.2, 1.25 - 0.725, 1.25 + 0.725),
+    ...art,
+  ];
+  /** Each window's opening plus its frame, 0.4 m either side of the wall line, sill frame to head frame. */
+  const windows = WINDOWS.map(win => {
+    const wall = WALLS.find(candidate => candidate.id === win.wall)!;
+    const from = win.at - win.width / 2 - WINDOW_FRAME, to = win.at + win.width / 2 + WINDOW_FRAME;
+    const rect: Rect = wall.axis === 'x'
+      ? { minX: from, maxX: to, minZ: wall.fixed - 0.4, maxZ: wall.fixed + 0.4 }
+      : { minX: wall.fixed - 0.4, maxX: wall.fixed + 0.4, minZ: from, maxZ: to };
+    return { id: `${win.wall}@${win.at}`, rect, bottom: WINDOW_SILL - WINDOW_FRAME, top: WINDOW_HEAD + WINDOW_FRAME };
+  });
+  const hits = (a: Rect, b: Rect) => a.minX < b.maxX && b.minX < a.maxX && a.minZ < b.maxZ && b.minZ < a.maxZ;
+
+  it('mounts the clock on solid corridor wall within a metre of its reachable interaction point', () => {
+    const { position: [x, y, z], radius, bracketLength } = CLOCK_MOUNT;
+    const [ix, iz] = CLOCK_INTERACTION.position;
+    expect(Math.hypot(x - ix, z + bracketLength - iz)).toBeLessThan(1);
+    expect(Math.hypot(x - ix, z - iz)).toBeLessThan(1);
+    expect(spaceAt([ix, iz])).toBe('corridor');
+    expect(insideAny([ix, iz], colliders, PLAYER_RADIUS)).toBe(false);
+    expect(Math.abs(z - CORRIDOR.minZ)).toBeLessThan(0.11);
+    // A single drawn wall segment must support the entire face, rather than a doorway/header.
+    expect(wallPieces('full').some(piece =>
+      Math.abs(piece.at[2] - CORRIDOR.minZ) < 1e-9
+      && piece.at[0] - piece.size[0] / 2 <= x - radius
+      && piece.at[0] + piece.size[0] / 2 >= x + radius
+      && piece.at[1] - piece.size[1] / 2 <= y - radius
+      && piece.at[1] + piece.size[1] / 2 >= y + radius)).toBe(true);
+    for (const door of DOORWAYS.filter(door => door.axis === 'x' && door.at[1] === CORRIDOR.minZ)) {
+      expect(x + radius < door.at[0] - door.width / 2 || x - radius > door.at[0] + door.width / 2, door.id).toBe(true);
+    }
+  });
+
+  it('keeps the whiteboard, audit wall, clock, decision board and wall art clear of every window opening and frame', () => {
+    expect(art.length).toBeGreaterThan(0);
+    for (const prop of props) for (const win of windows) {
+      const clash = hits(prop.rect, win.rect) && prop.bottom < win.top && win.bottom < prop.top;
+      expect(clash, `${prop.id} overlaps window ${win.id}`).toBe(false);
+    }
+  });
+
+  it('keeps the Payables whiteboard inside Payables', () => {
+    const { minX, maxX } = SPACES.payables.rect;
+    expect(wx - WHITEBOARD.width / 2).toBeGreaterThan(minX);
+    expect(wx + WHITEBOARD.width / 2).toBeLessThan(maxX);
   });
 });

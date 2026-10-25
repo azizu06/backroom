@@ -56,8 +56,8 @@ export const OFFICE_LIGHTING: OfficeLighting = {
     // A late-afternoon sun low in the south-east (about 27 degrees up), so its disc shows through the windows.
     position: [15, 10, 13],
     castShadow: true,
-    // near/far bound the light's throw across the 24 x 15 building, so the bias stays ~0.01 world units.
-    shadow: { mapSize: 1024, bias: -0.0004, near: 1, far: 50, left: -17, right: 17, top: 14, bottom: -14 },
+    // Cover the expanded 36 x 15 building and 7 m atrium, keeping depth bias below 0.02 world units.
+    shadow: { mapSize: 1024, bias: -0.0003, near: 1, far: 55, left: -26, right: 26, top: 24, bottom: -24 },
   },
   fill: { color: ROLES.fillLight, intensity: 0.45, position: [-8, 7, 8], castShadow: false },
   hemisphere: { skyColor: ROLES.ceiling, groundColor: ROLES.shadow, intensity: 1.5 },

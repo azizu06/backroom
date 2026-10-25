@@ -39,9 +39,17 @@ export const WORK_ROOM_PIECES: readonly WingPiece[] = [
 
 const hall = SPACES.atrium.rect;
 export const ATRIUM_TREES = [
-  [hall.minX + 1.5, hall.minZ + 1.5], [hall.maxX - 1.5, hall.minZ + 1.5],
+  // Crown north edges stop south of the mezzanine slab and rail.
+  [hall.minX + 1.5, hall.minZ + 3.1], [hall.maxX - 1.5, hall.minZ + 3.1],
   [hall.minX + 1.5, hall.maxZ - 1.5],
 ] as const;
+/** A visual-only mezzanine, 3.5 m up, along the north side. No stair or walkable floor. */
+export const ATRIUM_MEZZANINE: readonly WingPiece[] = [
+  box([-18, 3.5, -6.6], [11.7, 0.22, 1.5], ROLES.desk),
+  box([-18, 4.6, -5.85], [11.7, 0.09, 0.09], ROLES.frame),
+  ...Array.from({ length: 13 }, (_, i) => box([-23.6 + i * 0.93, 4.1, -5.85], [0.05, 1, 0.05], ROLES.frame)),
+  ...[-23.5, -12.5].map(x => box([x, 1.7, -6.6], [0.2, 3.4, 0.2], ROLES.frame)),
+];
 export const ATRIUM_PIECES: readonly WingPiece[] = [
   ...ATRIUM_TREES.flatMap(([x, z]): WingPiece[] => [
     cylinder([x, 0.45, z], [1.4, 0.9, 1.4], PALETTE.peach, true),
@@ -57,11 +65,7 @@ export const ATRIUM_PIECES: readonly WingPiece[] = [
     box([x + (x < -18 ? -0.35 : 0.35), 0.85, -3.2], [0.18, 0.75, 2.5], PALETTE.lavender),
   ]),
   cylinder([-18, 0.4, -3.2], [1.3, 0.7, 1.3], ROLES.desk, true),
-  // A visual-only mezzanine, 3.5 m up, along the north side. No stair or walkable floor.
-  box([-18, 3.5, -6.6], [11.7, 0.22, 1.5], ROLES.desk),
-  box([-18, 4.6, -5.85], [11.7, 0.09, 0.09], ROLES.frame),
-  ...Array.from({ length: 13 }, (_, i) => box([-23.6 + i * 0.93, 4.1, -5.85], [0.05, 1, 0.05], ROLES.frame)),
-  ...[-23.5, -12.5].map(x => box([x, 1.7, -6.6], [0.2, 3.4, 0.2], ROLES.frame)),
+  ...ATRIUM_MEZZANINE,
 ];
 
 /** Two genuine roof openings, each 3 x 6 m, filled by tinted skylight panes. */

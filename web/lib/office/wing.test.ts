@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ATRIUM_HEIGHT, DOORWAYS, ROOM_SPAWNS, SPACES, spaceAt, type Vec2 } from './layout';
 import { insideAny, movePlayer, officeColliders, PLAYER_RADIUS, type Box } from './play';
 import { OUTDOOR, PALETTE, ROLES } from './palette';
-import { WORK_DESKS, WORK_ROOM_PIECES, ATRIUM_PIECES, ATRIUM_ROOF, ATRIUM_SKYLIGHTS, WING_COLLIDERS } from './wing';
+import { WORK_DESKS, WORK_ROOM_PIECES, ATRIUM_PIECES, ATRIUM_ROOF, ATRIUM_SKYLIGHTS, ATRIUM_MEZZANINE, ATRIUM_TREES, WING_COLLIDERS } from './wing';
 
 const colliders = officeColliders([]);
 function walk(from: Vec2, to: Vec2, boxes: readonly Box[] = colliders): Vec2 {
@@ -37,6 +37,18 @@ describe('west wing', () => {
         expect(p.at[2] + p.size[2] / 2).toBeLessThan(r.maxZ);
         expect(tokens.has(p.color)).toBe(true);
       }
+    }
+  });
+
+  it('keeps every planter tree crown clear of the mezzanine slab, rails and supports', () => {
+    const crowns = ATRIUM_PIECES.filter(piece => piece.shape === 'sphere');
+    expect(crowns).toHaveLength(ATRIUM_TREES.length * 2);
+    expect(ATRIUM_MEZZANINE.length).toBeGreaterThan(2);
+    for (const crown of crowns) for (const piece of ATRIUM_MEZZANINE) {
+      // Sphere sizes are full diameters, as rendered by StaticInstances.
+      const overlaps = ([0, 1, 2] as const).every(axis =>
+        Math.abs(crown.at[axis] - piece.at[axis]) < (crown.size[axis] + piece.size[axis]) / 2);
+      expect(overlaps, `crown ${crown.at} vs mezzanine ${piece.at}`).toBe(false);
     }
   });
 

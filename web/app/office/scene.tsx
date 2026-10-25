@@ -41,7 +41,7 @@ function RoomPad({ id, color }: { id: SpaceId; color: string }) {
 }
 /** First person only: a wall between the eye and a label's floor point hides the label (the overview sees over the cut-away walls). */
 function behindWall(camera: Camera, x: number, z: number): boolean {
-  return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked([camera.position.x, camera.position.z], [x, z]);
+  return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked(camera.position.x, camera.position.z, x, z);
 }
 function ScreenLabel({ at, element }: { at: [number, number, number]; element: LabelRef }) {
   const point = useRef(new Vector3());
