@@ -4,11 +4,11 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "541b33bfd2c7e9a55211541da825d2768f502c4f",
+    "baseCommit": "4cd53d7bc44a307960fa514d4712edf628579d1b",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "299fc6fb3b300b4793c2ac785cd4a292b9efcefc8be185631f9303cb5392d065",
-      "orchestrator/src/agents/eval/conversation.ts": "da0c786d8253ad0e35af4b3203689d6069ed8b8ae29b4a794510fcb009f14088",
+      "orchestrator/src/agents/eval/conversation.ts": "f31ba3a947a00c78b588696ae0a1a7adefe66c56a3c006398224860a1a4fae8d",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -28,7 +28,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "f83e9635a318a5be99a8b154d069f0cefef91c4c0cf46982179cb9889028286c",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "d147a86b75f2c2c61d5aaf5cbd69d82ddc14fdddb440c6c8883035bd682d4d0b"
+      "orchestrator/src/agents/eval/scoreboard.ts": "b5641e32a4bf763c4d476fdf258b6519742c656bd256774e7af84b05f83f9fb9"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "b3595cb164c903a47d125117032e5fd3739b40ed4439964e2c126f7d65e67d00",
@@ -36,7 +36,7 @@
       "orchestrator/src/agents/dispatcher.ts": "64690fe5c34675e5202d715ffad9cf4fc439b29e1407892b9aca2f328c88984e"
     },
     "voicemailRuntimeSources": {
-      "orchestrator/src/voice/tools.ts": "1e41ca0f4f7010213aa6814a1b181929e68429130bd8769cad27b1c8cf5eb87f"
+      "orchestrator/src/voice/tools.ts": "a0568692f6b2e8b4b954bdb449e950555535ff69eb7a93a8ce773d3c91b25278"
     },
     "wrongPersonRuntimeSources": {
       "orchestrator/src/voice/index.ts": "f5c3e1b655a62f6e1bc1f285fbed4a633ba21eabacd820873c612dc512cbfd2a",
@@ -14860,6 +14860,7 @@
         "humanFollowupQueued": true,
         "humanEscalationMirrored": true,
         "danaCallbackAssigned": true,
+        "hostileRuleRecorded": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -14878,7 +14879,8 @@
           {
             "decision": "ESCALATE",
             "ruleIds": [
-              "REQUEST_HUMAN"
+              "REQUEST_HUMAN",
+              "HOSTILE_ESCALATE"
             ]
           }
         ],
@@ -14886,7 +14888,8 @@
           {
             "decision": "ESCALATE",
             "ruleIds": [
-              "REQUEST_HUMAN"
+              "REQUEST_HUMAN",
+              "HOSTILE_ESCALATE"
             ]
           }
         ],
@@ -14913,7 +14916,7 @@
       },
       "hostileEvidence": {
         "requiredRule": "HOSTILE_ESCALATE",
-        "dedicatedRuleRecorded": false,
+        "dedicatedRuleRecorded": true,
         "speechMeasured": false,
         "providerEndCallExecuted": false
       },
@@ -14949,6 +14952,7 @@
         "humanFollowupQueued": true,
         "humanEscalationMirrored": true,
         "danaCallbackAssigned": true,
+        "noHostileRule": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -16286,10 +16290,6 @@
       "detail": "No keyed AP invoice step to replay for P10; their GX10 failover is not measured here."
     },
     {
-      "id": "C05",
-      "detail": "Frozen integrationOutcome: one_deescalation_then_end_escalate_stop_further_calls_HOSTILE_ESCALATE. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: false. One spoken de-escalation and provider end-call are not executed; keep the integration gap open."
-    },
-    {
       "id": "C15",
       "detail": "Frozen integrationOutcome: use_actual_CRS_OFAC_test_identity_if_available_label_sandbox_no_dial. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: 0, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open."
     },
@@ -16300,6 +16300,10 @@
     {
       "id": "C09:scope",
       "detail": "The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway's code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed."
+    },
+    {
+      "id": "C05:scope",
+      "detail": "The gateway records the dedicated HOSTILE_ESCALATE when the voice agent sends request_human with reason hostile; that reason is a scripted tool choice here. The one calm de-escalation reply is prompt-driven agent speech, and it and the provider end-call are not executed on a real call."
     },
     {
       "id": "C08:scope",
