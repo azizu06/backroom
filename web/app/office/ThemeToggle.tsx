@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { OfficeTheme } from '../../lib/office/palette';
-import { nextTheme, themePreference, writeThemePreference } from '../../lib/office/theme';
+import { applyTheme, nextTheme, themePreference, writeThemePreference } from '../../lib/office/theme';
 
-/** Light/dark office chrome theme, persisted per viewer and applied as [data-theme] on every office shell. */
+/** Light/dark theme, persisted per viewer under the shared 'backroom-theme' key and applied as [data-theme] on <html> and every office shell. */
 export function useOfficeTheme(): [OfficeTheme, (theme: OfficeTheme) => void, () => void] {
   const [theme, setThemeState] = useState<OfficeTheme>('light');
-  useEffect(() => { setThemeState(themePreference()); }, []);
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setThemeState(themePreference()); setReady(true); }, []);
   useEffect(() => {
-    for (const shell of document.querySelectorAll<HTMLElement>('.office-shell')) shell.dataset.theme = theme;
-  }, [theme]);
+    if (!ready) return; // never overwrite the root layout's pre-paint theme with the SSR default
+    applyTheme(theme, document.documentElement, document.querySelectorAll<HTMLElement>('.office-shell'));
+  }, [theme, ready]);
   const setTheme = useCallback((value: OfficeTheme) => { setThemeState(value); writeThemePreference(value); }, []);
   const toggle = useCallback(() => {
     setThemeState(current => { const value = nextTheme(current); writeThemePreference(value); return value; });

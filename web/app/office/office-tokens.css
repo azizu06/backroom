@@ -1,4 +1,5 @@
-/* Office chrome tokens (corner menu, overview panel, prompts, demo pill, drawer, overlays), AJ's names from branch 271-cozy-office-ui.
+/* Office-scoped chrome tokens; the shared :root tokens live in web/app/theme.css. Dark follows :root[data-theme='dark'] (root layout) or the shell's own data-theme.
+   Office chrome tokens (corner menu, overview panel, prompts, demo pill, drawer, overlays), AJ's names from branch 271-cozy-office-ui.
    Mirrors CHROME in web/lib/office/palette.ts; lib/office/overlay-contrast.test.ts checks the values and AA pairs.
    Only the chrome reads these: the 3D world (materials, sky, outdoors) stays on PALETTE/ROLES. */
 .office-shell {
@@ -19,6 +20,7 @@
 }
 .office-shell :focus-visible { outline-color: var(--focus); }
 
+:root[data-theme='dark'] .office-shell,
 .office-shell[data-theme=dark] {
   --ink: #FFF8DC;
   --ink-soft: #C7CEE6;
@@ -34,6 +36,6 @@
   background-color: #19213B;
 }
 /* Pastel plates (yellow, aqua, blush) keep dark navy ink in both themes; dark panels use --paper with cream --ink. */
-.office-shell[data-theme=dark] :is(.play-chat-off button, .coworker-bubble, .office-disconnected, .room-inspector button, .play-panel button:not([aria-pressed='true']),
+:is(:root[data-theme='dark'] .office-shell, .office-shell[data-theme=dark]) :is(.play-chat-off button, .coworker-bubble, .office-disconnected, .room-inspector button, .play-panel button:not([aria-pressed='true']),
   .tour-stop:hover, .story-mode button, .office-sound-toggle[aria-pressed='true'], .agent-talk-line, .agent-talk-recent li[data-tone='fail'],
   .agent-talk-reply[data-tone='fail'], .agent-talk-recent li[data-tone='correction']) { color: #19213B; }
