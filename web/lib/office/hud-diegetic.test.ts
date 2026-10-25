@@ -18,7 +18,7 @@ describe('diegetic desk plates', () => {
 
   it('prefers held over denied, denied over away, and marks a dropped connection stale', () => {
     expect(deskPlate(at({ escalationId: 'e', targetAnchor: 'dana' }), { ...alex, escalationId: 'e', targetAnchor: 'dana' }))
-      .toMatchObject({ tone: 'held', status: 'Held for a human · folder to Dana’s desk' });
+      .toMatchObject({ tone: 'held', status: 'Held for a human · folder to Dana’s Desk' });
     const denied = at({ targetAnchor: 'payables' }, { audit: [row('1', 'DENY'), row('2', 'ALLOW', 'other')] });
     expect(deskPlate(denied, denied.agents[0]!)).toMatchObject({ tone: 'denied', status: 'Denied · RULE_1' });
     expect(PLATE_TONES.denied.color).toBe(ROLES.deny);

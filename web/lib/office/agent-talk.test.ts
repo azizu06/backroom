@@ -64,12 +64,12 @@ describe('agent talk', () => {
     const mock = createMockOfficeState();
     mock.setTargetAnchor('dana');
     const talk = agentTalk(mock.source.getSnapshot(), alex.id)!;
-    expect(talk.greeting.text).toBe("I'm Alex, collections. Right now: Four installments requested · awaiting Dana (Dana’s desk).");
+    expect(talk.greeting.text).toBe("I'm Alex, collections. Right now: Four installments requested · awaiting Dana (Dana’s Desk).");
     expect(talk.greeting.tone).toBe('passkey');
     expect(talkReply(talk, 'stopped').receiptIds).toHaveLength(1);
     expect(talkReply(talk, 'stopped')).toMatchObject({ id: 'stopped', tone: 'passkey', ruleIds: ['MAX_INSTALLMENTS'],
-      text: "I stopped to escalate: Invoice 1042 · four installments → Dana. It's waiting at Dana’s desk (preview-escalation-1042)." });
-    expect(talkReply(talk, 'next').text).toBe("Dana’s desk is next: my folder is waiting there (preview-escalation-1042).");
+      text: "I stopped to escalate: Invoice 1042 · four installments → Dana. It's waiting at Dana’s Desk (preview-escalation-1042)." });
+    expect(talkReply(talk, 'next').text).toBe("Dana’s Desk is next: my folder is waiting there (preview-escalation-1042).");
     expect(talk.lines[0]).toMatchObject({ text: 'I escalated: Invoice 1042 · four installments → Dana.', ruleIds: ['MAX_INSTALLMENTS'], tone: 'passkey' });
   });
 

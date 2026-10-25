@@ -1,8 +1,8 @@
 export const navLinks = [
   { label: 'Office', href: '/office' },
   { label: 'Inbox', href: '/inbox' },
-  { label: 'Audit wall', href: '/audit' },
-  { label: 'Attack demo', href: '/attack' },
+  { label: 'Audit Wall', href: '/audit' },
+  { label: 'Attack Demo', href: '/attack' },
   { label: 'Operator', href: '/operator' },
   { label: 'Controller', href: '/controller' },
 ] as const;
@@ -18,7 +18,7 @@ export function isActive(pathname: string, href: string) {
 
 /**
  * Embeds and customer /pay/* pages stay free of internal chrome.
- * The office header draws this same bar, so the layout copy stays off `/` and `/office`.
+ * The office owns navigation in its sidebar, so the layout copy stays off `/` and `/office`.
  */
 export function siteNavHidden(pathname: string, embed: string | null, placement: SiteNavPlacement = 'layout') {
   if (embed === '1') return true;

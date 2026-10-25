@@ -3,7 +3,7 @@ import { isActive, navLinks, siteNavHidden, whatsRealLink } from './site-nav';
 
 describe('site nav', () => {
   it('lists only the demo pages, with What’s real as the small trailing link', () => {
-    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Inbox', 'Audit wall', 'Attack demo', 'Operator', 'Controller']);
+    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Inbox', 'Audit Wall', 'Attack Demo', 'Operator', 'Controller']);
     expect(navLinks.map(link => link.href as string)).not.toContain('/real-vs-sim');
     expect(whatsRealLink).toEqual({ label: 'What’s real', href: '/real-vs-sim' });
   });
@@ -25,7 +25,7 @@ describe('site nav', () => {
     expect(siteNavHidden('/payment-link', null)).toBe(false);
   });
 
-  it('draws one bar on the office: in its header, not the layout', () => {
+  it('lets the office own navigation without adding a layout bar', () => {
     for (const path of ['/', '/office', '/office/x']) {
       expect(siteNavHidden(path, null, 'layout')).toBe(true);
       expect(siteNavHidden(path, null, 'office')).toBe(false);

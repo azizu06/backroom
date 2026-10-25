@@ -35,3 +35,15 @@ export function readStartView(storage?: StorageLike): StartView | null {
 export function saveStartView(view: StartView, storage?: StorageLike) {
   try { (storage ?? defaultStorage())?.setItem(START_VIEW_KEY, view); } catch { /* Storage may be unavailable. */ }
 }
+
+/** The Enter splash shows once per browser session; coming back to /office from another page skips it. */
+export const SPLASH_SEEN_KEY = 'office.splashSeen';
+function sessionStore(): StorageLike | undefined {
+  return typeof sessionStorage === 'undefined' ? undefined : sessionStorage;
+}
+export function splashSeen(storage?: StorageLike): boolean {
+  try { return (storage ?? sessionStore())?.getItem(SPLASH_SEEN_KEY) === '1'; } catch { return false; }
+}
+export function markSplashSeen(storage?: StorageLike) {
+  try { (storage ?? sessionStore())?.setItem(SPLASH_SEEN_KEY, '1'); } catch { /* Storage may be unavailable. */ }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { START_VIEW_KEY, readStartView, saveStartView, startView } from './start-mode';
+import { SPLASH_SEEN_KEY, START_VIEW_KEY, markSplashSeen, readStartView, saveStartView, splashSeen, startView } from './start-mode';
 
 function memory(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial));
@@ -52,5 +52,20 @@ describe('office start view storage', () => {
       expect(readStartView()).toBeNull();
       expect(() => saveStartView('play')).not.toThrow();
     } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+describe('office splash once per session', () => {
+  it('is unseen until marked, then stays seen', () => {
+    const storage = memory();
+    expect(splashSeen(storage)).toBe(false);
+    markSplashSeen(storage);
+    expect(storage.getItem(SPLASH_SEEN_KEY)).toBe('1');
+    expect(splashSeen(storage)).toBe(true);
+  });
+  it('treats unavailable storage as unseen without throwing', () => {
+    const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+    expect(splashSeen(broken)).toBe(false);
+    expect(() => markSplashSeen(broken)).not.toThrow();
   });
 });
