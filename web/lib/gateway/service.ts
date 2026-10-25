@@ -195,7 +195,10 @@ export function executeTool(
     else if (call.status !== "opted_out" && call.status !== "human_requested") call.status = status;
     call.outbox.push({ type: input.tool });
     // Asking for a human is how the voice agent handles anything it does not recognize: escalate.
-    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED", [input.tool.toUpperCase()]);
+    // C05: a hostile caller is a dedicated escalation reason; the stop and spoken line are the same.
+    const hostile = input.tool === "request_human" && input.reason === "hostile";
+    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED",
+      [input.tool.toUpperCase(), ...(hostile ? ["HOSTILE_ESCALATE"] : [])]);
     return { kind: "RECORDED", can_confirm: false, speak };
   }
   if (!call.identityConfirmed)
