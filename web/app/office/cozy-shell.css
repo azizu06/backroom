@@ -68,3 +68,30 @@ html body .office-shell .aj-detail-close:active { transform: translateY(1px); }
   .office-shell[data-hud='diegetic'] .play-overview { right: auto; left: 8px; top: 46px; }
   .office-shell[data-hud='diegetic'] .office-sound-toggle { right: auto !important; left: 8px; }
 }
+
+/* One job per drawer. The header and tabs stay above each body's own scrollport. */
+html body .office-shell .office-drawer {
+  display: flex; flex-direction: column; overflow: hidden; padding: 0; z-index: 20;
+  color: var(--ink); background: var(--office-cream);
+}
+html body .office-shell .office-drawer[hidden] { display: none; }
+.office-shell .office-drawer .office-drawer-head { flex: none; top: 0; margin: 0; }
+.office-shell .office-panel-tabs { display: flex; flex: none; gap: 6px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--office-lavender); }
+.office-shell .office-panel-tabs button {
+  flex: 1 0 auto; white-space: nowrap; padding: 7px 12px; border: 1px solid var(--office-lavender); border-radius: 999px;
+  color: var(--ink); background: var(--office-cream); font: inherit; font-weight: 700; cursor: pointer;
+}
+.office-shell .office-panel-tabs button[aria-selected=true] { color: var(--office-cream); background: var(--office-navy); }
+.office-shell .office-panel-tabs span { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.office-shell .office-panel-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 14px 16px 20px; animation: office-panel-fade 0.16s ease-out; }
+.office-shell .office-panel-body[hidden] { display: none; }
+.office-shell .office-panel-today h2 { margin: 0 0 8px; font-size: 18px; }
+.office-shell .office-panel-today p { margin: 0 0 14px; }
+.office-shell .office-drawer .seat-statuses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.office-shell .office-drawer .seat-statuses > div { padding: 10px 12px; border-radius: 14px; overflow-wrap: anywhere; }
+@keyframes office-panel-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .office-shell .office-panel-body { animation: none; } }
+@media (max-width: 760px) { .office-shell .office-panel-tabs button { flex: 0 0 auto; } }
+.office-shell .office-drawer-trigger { padding: 0; }
+.office-shell .office-drawer-trigger button { border: 0; background: transparent; color: inherit; font: inherit; padding: 6px 10px; cursor: pointer; border-radius: inherit; }
+.office-shell .office-drawer-trigger button[aria-expanded=true] { color: var(--office-cream); background: var(--office-navy); }
