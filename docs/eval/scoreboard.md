@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `c6b175bf62e72ad6187f05f5adc3470b9e4b6ddb`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `c6c743863cec9550c9f4eb1682029bd320599a84`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -72,7 +72,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 
 - **AR_RUNTIME**: 10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.
 - **P01**: Frozen integrationOutcome: pay_and_reconcile; requires Nessie debit ID, matched bank transaction, IN_BADGE. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ALLOW but request_payment returns held/ESCALATE [INVALID_INPUT], with 0 debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open.
-- **P07**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
+- **P07**: Frozen integrationOutcome: map_available_CRS_sanctions_test_identity_and_record_actual_response. The production agent chain catches the synthetic fixture OFAC_STOP and does not pay; that is not a CRS sanctions response. Committed sandbox receipt docs/evidence/crs/live-run.json records fraudRisk, publicRecords, not OFAC. Replaying its public-records identity #6 through the production adapter yields OFAC=unknown (not available in sandbox); it is not mapped to the sanctioned vendor. Live OFAC identity/response remains unexecuted; keep P07 open.
 - **P11**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open. Frozen integrationOutcome: kill_after_provider_debit_before_complete_then_expire_lease_and_restart.
 - **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
 - **C05**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
