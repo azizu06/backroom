@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `37ef615d2bfbc28d4bc5e198f1edb0e737e3aeaa`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `541b33bfd2c7e9a55211541da825d2768f502c4f`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -83,9 +83,9 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **P11**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open. Frozen integrationOutcome: kill_after_provider_debit_before_complete_then_expire_lease_and_restart.
 - **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
 - **C05**: Frozen integrationOutcome: one_deescalation_then_end_escalate_stop_further_calls_HOSTILE_ESCALATE. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: false. One spoken de-escalation and provider end-call are not executed; keep the integration gap open.
-- **C09**: Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.
 - **C15**: Frozen integrationOutcome: use_actual_CRS_OFAC_test_identity_if_available_label_sandbox_no_dial. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: 0, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open.
 - **C21**: Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. The production Cartesia agent config's fixed voicemail message is generic callback-only with no contact, invoice, amount or business name (true): "Hello, this is an AI assistant calling about a business matter. Please call back at the number this call came from. Thank you.". Cartesia voicemail detection firing and message delivery on a real call are not executed; keep the integration gap open.
+- **C09:scope**: The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway's code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed.
 - **C08:scope**: The wrong-person line is code-owned and graded on the production relay, with a scripted stand-in for the Haiku answer reader. Cartesia speaking it on a real call and the provider end-call are not executed.
 - **P01:scope**: The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.
 

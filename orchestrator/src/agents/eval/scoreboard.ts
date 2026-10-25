@@ -215,7 +215,9 @@ for (const row of legacy.reports) {
   }
   if (row.id === 'C09' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C09');
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher run queues ${run?.humanFollowup?.queuedRequests ?? 0} request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has ${run?.humanFollowup?.gatewayReviewRecipients.length ?? 0} review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.` });
+    // Code-owned parts: code acknowledgment line, callback persisted to Dana's inbox, no offer after, next call refused.
+    if (run?.match && (run.checks as Record<string, boolean>).danaCallbackAssigned) continue;
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Gateway -> approval bridge -> Dispatcher run: callback row ${JSON.stringify(run?.humanFollowup?.danaCallback ?? null)}, code acknowledgment ${run?.humanFollowup?.acknowledged ?? false}. Keep the integration gap open.` });
     continue;
   }
   if (row.id === 'P01' && row.seams.includes('integration:not_executed')) {
@@ -255,6 +257,7 @@ const metrics = score(observations);
 const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
 const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
+gaps.push({ id: 'C09:scope', detail: 'The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway\'s code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed.' });
 gaps.push({ id: 'C08:scope', detail: 'The wrong-person line is code-owned and graded on the production relay, with a scripted stand-in for the Haiku answer reader. Cartesia speaking it on a real call and the provider end-call are not executed.' });
 gaps.push({ id: 'P01:scope', detail: 'The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.' });
 const rates = {
