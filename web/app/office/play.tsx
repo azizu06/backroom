@@ -211,7 +211,8 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
     const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current, handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
-    if (hud.current && (moved || turned || !written.current)) {
+    // A remounted HUD surface starts without the pose, so write it again even when standing still.
+    if (hud.current && (moved || turned || !written.current || hud.current.dataset.playerZ === undefined)) {
       written.current = true;
       hud.current.dataset.playerX = next[0].toFixed(3);
       hud.current.dataset.playerZ = next[1].toFixed(3);

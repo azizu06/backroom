@@ -32,7 +32,8 @@ test.describe('at 1440x1000', () => {
     await expect(gate).toBeVisible();
     expect(await gate.evaluate(element => element.tagName)).not.toBe('DIALOG');
     // The corner menu (and the site nav inside it) is inert behind the splash.
-    await expect(page.locator('.office-corner-row')).toHaveAttribute('inert', '');
+    // With nothing kept live, the inert boundary may sit on the corner row itself or an ancestor.
+    expect(await page.locator('.office-corner-row').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
     expect(await page.locator('.site-nav > ul').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
   });
 });
@@ -65,7 +66,7 @@ test('Tab three times stays in the splash, Escape closes it, and focus returns t
   await expect(overview).toBeFocused();
   await expect(gate.locator(':focus')).toHaveCount(1);
   const menu = page.locator('.office-corner-toggle');
-  await expect(page.locator('.office-corner-row')).toHaveAttribute('inert', '');
+  expect(await page.locator('.office-corner-row').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
   const blocked = await menu.evaluate(el => {
     const rect = el.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);

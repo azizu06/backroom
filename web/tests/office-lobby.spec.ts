@@ -55,7 +55,7 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await openMenu(page);
   await page.getByRole('button', { name: 'Show Treasury denial' }).click();
-  const previewReceipts = page.getByRole('region', { name: 'Preview audit receipts' });
+  const previewReceipts = page.getByRole('region', { name: 'Walkthrough audit receipts' });
   await expect(previewReceipts).toContainText('DENY');
   // Fixture rows stay out of the server-record lobby wall (its own rows may carry data-audit-id).
   const denialId = await previewReceipts.locator('[data-audit-id]').first().getAttribute('data-audit-id');

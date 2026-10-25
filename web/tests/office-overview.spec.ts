@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { OFFICE_ANCHORS } from '../lib/office/state';
 
 // HUD variant (c) Overview: O toggles the overhead 3D camera and first person; agents and desks open quick actions.
 function surface(page: Page) {
@@ -18,7 +19,7 @@ async function openOverview(page: Page, errors: string[]) {
   await expect(page.getByRole('button', { name: /first person/i })).toBeVisible();
 }
 /** Alex's seat (OFFICE_ANCHORS.collections.position), where the preview keeps him. */
-const ALEX = { x: -5, z: -1.8 };
+const ALEX = { x: OFFICE_ANCHORS.collections.position[0], z: OFFICE_ANCHORS.collections.position[1] };
 
 test('O toggles Overview and first person, and the buttons do the same', async ({ page }) => {
   const errors: string[] = [];
