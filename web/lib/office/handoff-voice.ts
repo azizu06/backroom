@@ -6,6 +6,7 @@
 import type { HandoffLine } from '@backroom/orchestrator/handoff-client';
 
 import type { HandoffPlan } from './handoff-plan';
+import type { Handoff } from './handoffs';
 
 export type HandoffRole = HandoffLine['role'];
 /** Mirrors orchestrator/src/voice/voices.ts (server-only); the type check keeps the names in step. */
@@ -34,6 +35,18 @@ export function voiceCues(plan: HandoffPlan): VoiceCue[] {
   }).sort((a, b) => a.at - b.at);
 }
 
+/** New live rows speak on publication, even when subscription updates coalesce their statuses.
+ * Desk choreography can queue trips indefinitely; it must not gate live audio. The mount time
+ * excludes history on reload, and HandoffVoice deduplicates later updates by handoff id.
+ */
+export function liveVoiceCues(rows: readonly Handoff[], since: number): VoiceCue[] {
+  return rows.flatMap(row => {
+    const line = handoffVoiceLine(row.fromVoiceRole, row.line);
+    return line && Number.isFinite(row.createdAt) && row.createdAt >= since
+      ? [{ key: row.handoffId, at: row.createdAt, line }] : [];
+  }).sort((a, b) => a.at - b.at);
+}
+
 export type FetchAudio = (line: HandoffLine) => Promise<Blob>;
 /** Plays a clip; must settle when `signal` aborts (sound turned off or the office unmounted). */
 export type PlayAudio = (audio: Blob, signal: AbortSignal) => Promise<void>;
@@ -44,8 +57,8 @@ export type PlayAudio = (audio: Blob, signal: AbortSignal) => Promise<void>;
 const FATAL = /HANDOFF_AUDIO_HTTP_(400|401|403|404|405|413|415|500|503)$/;
 
 /**
- * Plays cues one at a time while enabled. Errors never surface: a fatal status or a blocked playback
- * silences voices for the visit; a transient one just drops the line.
+ * Plays cues one at a time while enabled. Errors never surface: a fatal status
+ * silences voices for the visit; autoplay refusal or a transient one just drops the line.
  */
 export class HandoffVoice {
   private readonly spoken = new Set<string>();
@@ -89,7 +102,8 @@ export class HandoffVoice {
           if (controller.signal.aborted) continue;
           const message = error instanceof Error ? error.message : String(error);
           const transient = /HANDOFF_AUDIO_HTTP_\d+$/.test(message) && !FATAL.test(message);
-          if (!transient) { this.failed = true; this.queue = []; this.onChange(); }
+          const autoplayBlocked = error instanceof Error && error.name === 'NotAllowedError';
+          if (!transient && !autoplayBlocked) { this.failed = true; this.queue = []; this.onChange(); }
         } finally {
           if (this.current === controller) this.current = null;
         }
