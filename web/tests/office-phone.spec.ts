@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 import { mkdir } from 'node:fs/promises';
 import { PHONE_INTERACTION } from '../lib/office/props/phone';
 
@@ -54,8 +55,9 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await page.goto('/office?calls=mock&callsSpeed=fast&view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   // Pass the collections doorway between its posts, then move to the phone's aisle-side x.
   await page.keyboard.down('w');
   await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.0);
@@ -76,19 +78,21 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await expect(dialog.getByTestId('phone-transcript').locator('li').first()).toContainText('Collections');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-live.png' });
   await expect(dialog).toContainText('AI-disclosed');
-  await expect(dialog.getByTestId('phone-precall')).toContainText('Mock preview: no pre-call evidence');
+  await expect(dialog.getByTestId('phone-precall')).toContainText('Scripted call: no pre-call evidence');
   await expect.poll(() => dialog.getByTestId('phone-status').innerText(), { timeout: 15_000, intervals: [100] }).toContain('Ended');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-ended.png' });
   await expect(dialog.getByTestId('phone-request')).toHaveAttribute('aria-disabled', 'false');
   await dialog.getByTestId('phone-request').click();
-  await expect(dialog.getByTestId('phone-request-result')).toHaveText('Mock preview: no call placed');
+  await expect(dialog.getByTestId('phone-request-result')).toHaveText('Scripted call: no call placed');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-request.png' });
-  expect(calls.filter(({ url, type }) => /call/i.test(url) && !['document', 'script', 'stylesheet', 'font', 'image'].includes(type))).toEqual([]);
+  // Next's RSC prefetch of the nav's /calls page (`?_rsc=`) is navigation, not a call request.
+  expect(calls.filter(({ url, type }) => /call/i.test(url) && !new URL(url).searchParams.has('_rsc') && !['document', 'script', 'stylesheet', 'font', 'image'].includes(type))).toEqual([]);
 });
 
 test('phone stays idle without the mock query', async ({ page }) => {
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeVisible();
   // Target is already within reach at spawn only after approaching the Collections desk.

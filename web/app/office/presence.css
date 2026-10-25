@@ -1,4 +1,4 @@
-.office-tools .presence-toggle { color: #d0d6c6; font-size: 12px; white-space: nowrap; }
+.office-tools .presence-toggle { color: var(--office-navy); font-size: 12px; white-space: nowrap; }
 .presence-chip { font-size: 12px; white-space: nowrap; }
 .office-tools .presence-toggle { gap: 5px; }
 .presence-chip { padding: 4px 8px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-lavender); border-radius: 12px; }
