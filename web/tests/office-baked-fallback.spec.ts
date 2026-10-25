@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 import { deflateSync } from 'node:zlib';
 import { PROPKIT_NODES, PROPKIT_SPECS, currentPropKitLayout, propkitPlacements } from '../lib/office/propkit';
 
