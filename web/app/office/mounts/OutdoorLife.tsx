@@ -5,8 +5,9 @@ import { useThree } from '@react-three/fiber';
 import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, MeshBasicMaterial, Object3D, SphereGeometry,
   type InstancedMesh, type Material } from 'three';
 import type { FurniturePiece } from '../../../lib/office/furniture';
-import { BIRD_COUNT, CLOUD_COUNT, OUTDOOR_FPS, birdHeading, birdPosition, cloudPosition, daylightBlend,
+import { BIRD_COUNT, CLOUD_COUNT, birdHeading, birdPosition, cloudPosition, daylightBlend,
   outdoorMotionVisible, outdoorSway } from '../../../lib/office/outdoor-motion';
+import { subscribeOutdoorTicker } from '../../../lib/office/outdoor-ticker';
 import { OUTDOOR } from '../../../lib/office/palette';
 import { useReducedMotion } from './shared';
 
@@ -21,17 +22,19 @@ const BIRD_MATERIAL = new MeshBasicMaterial({ color: OUTDOOR.bird, side: DoubleS
 
 export interface WindBatch { pieces: readonly FurniturePiece[]; geometry: BufferGeometry; material: Material }
 
-/** One low-rate ticker for every outdoor instance; no frame subscription or vertex uploads. */
-export function OutdoorLife({ plants, overview, skyMaterial, sunMaterial }: {
+/** Shared low-rate ticker for every outdoor instance; no frame subscription or vertex uploads. */
+export function OutdoorLife({ plants, overview, skyMaterial, sunMaterial, haloMaterial, rain }: {
   plants: readonly WindBatch[]; overview: boolean; skyMaterial: MeshBasicMaterial; sunMaterial: MeshBasicMaterial;
+  haloMaterial: MeshBasicMaterial; rain: boolean;
 }) {
+  const seconds = useRef(0);
   const meshes = useRef<(InstancedMesh | null)[]>([]);
   const clouds = useRef<InstancedMesh>(null), birds = useRef<InstancedMesh>(null);
   const camera = useThree(state => state.camera), invalidate = useThree(state => state.invalidate);
   const reduced = useReducedMotion();
   const [scratch] = useState(() => ({ transform: new Object3D(), color: new Color(),
     skyStart: new Color(OUTDOOR.skyTint), skyEnd: new Color(OUTDOOR.skyTintWarm),
-    sunStart: new Color(OUTDOOR.sun), sunEnd: new Color(OUTDOOR.sunWarm) }));
+    sunStart: new Color(OUTDOOR.sun), sunEnd: new Color(OUTDOOR.sunWarm), rainSun: new Color(OUTDOOR.rainSun) }));
 
   useLayoutEffect(() => {
     const { transform, color } = scratch;
@@ -43,9 +46,9 @@ export function OutdoorLife({ plants, overview, skyMaterial, sunMaterial }: {
         for (let i = 0; i < pieces.length; i++) {
           const piece = pieces[i]!;
           const sway = reduced ? 0 : outdoorSway(seconds, piece.at[0] * 0.7 + piece.at[2] * 0.3);
-          transform.position.set(...piece.at);
+          transform.position.set(piece.at[0], piece.at[1], piece.at[2]);
           transform.rotation.set((piece.rotation?.[0] ?? 0) + sway * 0.6, piece.rotation?.[1] ?? 0, (piece.rotation?.[2] ?? 0) + sway);
-          transform.scale.set(...piece.size);
+          transform.scale.set(piece.size[0], piece.size[1], piece.size[2]);
           transform.updateMatrix();
           mesh.setMatrixAt(i, transform.matrix);
         }
@@ -78,6 +81,8 @@ export function OutdoorLife({ plants, overview, skyMaterial, sunMaterial }: {
       const daylight = daylightBlend(seconds);
       skyMaterial.color.copy(scratch.skyStart).lerp(scratch.skyEnd, daylight);
       sunMaterial.color.copy(scratch.sunStart).lerp(scratch.sunEnd, daylight);
+      if (rain) sunMaterial.color.copy(scratch.rainSun);
+      haloMaterial.color.set(rain ? OUTDOOR.rainSunHalo : OUTDOOR.sunHalo);
     }
     for (let batch = 0; batch < plants.length; batch++) {
       const mesh = meshes.current[batch];
@@ -86,32 +91,22 @@ export function OutdoorLife({ plants, overview, skyMaterial, sunMaterial }: {
       for (let i = 0; i < pieces.length; i++) mesh.setColorAt(i, color.set(pieces[i]!.color));
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-    update(0);
+    update(seconds.current);
     invalidate();
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const start = performance.now();
-    function tick() {
-      if (!outdoorMotionVisible(overview, camera.position.x, camera.position.z)) return;
-      update((performance.now() - start) / 1000);
-      invalidate();
-    }
-    function syncVisibility() {
-      if (timer !== undefined) clearInterval(timer);
-      timer = undefined;
-      if (!reduced && !document.hidden) timer = setInterval(tick, 1000 / OUTDOOR_FPS);
-    }
-    syncVisibility();
-    document.addEventListener('visibilitychange', syncVisibility);
-    // Each batch owns its instance buffers; shared geometries/materials live with the lazy bundle.
+    const unsubscribe = reduced ? undefined : subscribeOutdoorTicker(elapsed => {
+      if (!outdoorMotionVisible(overview, camera.position.x, camera.position.z)) return false;
+      seconds.current += elapsed;
+      update(seconds.current);
+      return true;
+    }, invalidate);
     const owned = [...meshes.current, clouds.current, birds.current];
     return () => {
-      if (timer !== undefined) clearInterval(timer);
-      document.removeEventListener('visibilitychange', syncVisibility);
+      unsubscribe?.();
       for (const mesh of owned) mesh?.dispose();
       skyMaterial.color.copy(scratch.skyStart);
       sunMaterial.color.copy(scratch.sunStart);
     };
-  }, [camera, invalidate, overview, plants, reduced, scratch, skyMaterial, sunMaterial]);
+  }, [camera, invalidate, overview, plants, reduced, scratch, skyMaterial, sunMaterial, haloMaterial, rain]);
 
   return <group name='outdoors:life'>
     {plants.map((batch, index) => <instancedMesh key={index} ref={mesh => { meshes.current[index] = mesh; }}

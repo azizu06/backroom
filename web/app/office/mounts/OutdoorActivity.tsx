@@ -4,7 +4,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { BoxGeometry, Color, MeshBasicMaterial, MeshLambertMaterial, Object3D, type InstancedMesh } from 'three';
 import { CAR_COUNT, PEOPLE_COUNT, RAIN_COUNT, carPosition, personHeading, personPosition, rainPosition } from '../../../lib/office/outdoor-activity-motion';
-import { OUTDOOR_FPS, outdoorMotionVisible } from '../../../lib/office/outdoor-motion';
+import { outdoorMotionVisible } from '../../../lib/office/outdoor-motion';
+import { subscribeOutdoorTicker } from '../../../lib/office/outdoor-ticker';
 import { OUTDOOR } from '../../../lib/office/palette';
 import { mergeBoxes } from './StaticGeometry';
 import { useReducedMotion } from './shared';
@@ -33,6 +34,7 @@ const BATCHES = [
 const TINTS = [OUTDOOR.skyTint, OUTDOOR.sunWarm, OUTDOOR.glass, OUTDOOR.skyTintWarm];
 
 export function OutdoorActivity({ overview, rain }: { overview: boolean; rain: boolean }) {
+  const seconds = useRef(0);
   const meshes = useRef<(InstancedMesh | null)[]>([]);
   const camera = useThree(state => state.camera), invalidate = useThree(state => state.invalidate);
   const reduced = useReducedMotion();
@@ -68,30 +70,17 @@ export function OutdoorActivity({ overview, rain }: { overview: boolean; rain: b
       for (let i = 0; i < BATCHES[batch]!.count; i++) mesh.setColorAt(i, color.set(TINTS[i % TINTS.length]!));
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-    update(0);
+    update(seconds.current);
     invalidate();
-    let seconds = 0, last = performance.now();
-    let timer: ReturnType<typeof setInterval> | undefined;
-    function tick() {
-      const now = performance.now(), elapsed = (now - last) / 1000;
-      last = now;
-      if (!outdoorMotionVisible(overview, camera.position.x, camera.position.z)) return;
-      seconds += elapsed;
-      update(seconds);
-      invalidate();
-    }
-    function syncVisibility() {
-      if (timer !== undefined) clearInterval(timer);
-      timer = undefined;
-      last = performance.now();
-      if (!reduced && !document.hidden) timer = setInterval(tick, 1000 / OUTDOOR_FPS);
-    }
-    syncVisibility();
-    document.addEventListener('visibilitychange', syncVisibility);
+    const unsubscribe = reduced ? undefined : subscribeOutdoorTicker(elapsed => {
+      if (!outdoorMotionVisible(overview, camera.position.x, camera.position.z)) return false;
+      seconds.current += elapsed;
+      update(seconds.current);
+      return true;
+    }, invalidate);
     const owned = [...meshes.current];
     return () => {
-      if (timer !== undefined) clearInterval(timer);
-      document.removeEventListener('visibilitychange', syncVisibility);
+      unsubscribe?.();
       owned.forEach(mesh => mesh?.dispose());
     };
   }, [camera, invalidate, overview, rain, reduced, scratch]);

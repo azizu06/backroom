@@ -50,6 +50,8 @@ export const OUTDOOR = {
   rainSkyHorizon: "#D0DEE5",
   rain: "#C5D9E8",
   sun: "#FFE9A8",
+  rainSun: "#B5BEC4",
+  rainSunHalo: "#788C9C",
   sunHalo: "#FFF4CF",
   sunWarm: "#FFE0A0",
   skyTint: "#FFFDF8",

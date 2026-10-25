@@ -108,7 +108,7 @@ export function Outdoors() {
     <mesh geometry={GRASS} material={GRASS_MATERIAL} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} dispose={null} />
     <StaticBoxes pieces={GROUND} material={GROUND_MATERIAL} castShadow={false} receiveShadow={false} />
     <StaticInstances pieces={TRUNKS} geometry={TRUNK} material={PLANT_MATERIAL} castShadow={false} receiveShadow={false} />
-    <OutdoorLife plants={WIND_BATCHES} overview={overview} skyMaterial={SKY_MATERIAL} sunMaterial={SUN_MATERIAL} />
+    <OutdoorLife plants={WIND_BATCHES} overview={overview} skyMaterial={SKY_MATERIAL} sunMaterial={SUN_MATERIAL} haloMaterial={HALO_MATERIAL} rain={rain} />
     <OutdoorActivity overview={overview} rain={rain} />
     <group ref={sky} visible={!overview} name='outdoors:sky'>
       <mesh geometry={rain ? RAIN_SKY : SKY} material={SKY_MATERIAL} renderOrder={-10} frustumCulled={false} dispose={null} />

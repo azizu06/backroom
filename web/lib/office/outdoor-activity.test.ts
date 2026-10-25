@@ -2,17 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { BoxGeometry, InstancedMesh, MeshBasicMaterial } from 'three';
 import { OutdoorActivity } from '../../app/office/mounts/OutdoorActivity';
-import { CAR_COUNT, PEOPLE_COUNT, RAIN_COUNT } from './outdoor-activity-motion';
+import { CAR_COUNT, PEOPLE_COUNT, RAIN_COUNT, carPosition, personPosition } from './outdoor-activity-motion';
 
 const state = vi.hoisted(() => ({
   camera: { position: { x: 0, z: 0 } }, invalidate: vi.fn(), reduced: false,
+  refs: [] as { current: unknown }[], refIndex: 0,
   meshes: [] as InstancedMesh[], cleanup: undefined as undefined | (() => void),
 }));
 vi.mock('@react-three/fiber', () => ({ useThree: (select: (value: typeof state) => unknown) => select(state) }));
 vi.mock('../../app/office/mounts/shared', () => ({ useReducedMotion: () => state.reduced }));
 vi.mock('react', async importOriginal => ({
   ...await importOriginal<typeof import('react')>(),
-  useRef: () => ({ current: state.meshes }),
+  useRef: (current: unknown) => {
+    const index = state.refIndex++;
+    return state.refs[index] ??= { current: Array.isArray(current) ? state.meshes : current };
+  },
   useState: (create: () => unknown) => [create()],
   useLayoutEffect: (effect: () => (() => void)) => { state.cleanup = effect(); },
 }));
@@ -21,6 +25,8 @@ describe('outdoor activity demand ticker', () => {
   let documentState: EventTarget & { hidden: boolean };
   beforeEach(() => {
     vi.useFakeTimers();
+    state.refs = [];
+    state.refIndex = 0;
     state.camera.position.x = 0;
     state.camera.position.z = 0;
     state.reduced = false;
@@ -55,6 +61,21 @@ describe('outdoor activity demand ticker', () => {
     state.invalidate.mockClear();
     vi.advanceTimersByTime(1000);
     expect(state.invalidate).not.toHaveBeenCalled();
+  });
+  it('keeps walkers and cars on their paths across a rain toggle', () => {
+    OutdoorActivity({ overview: true, rain: false });
+    vi.advanceTimersByTime(2000);
+    const before = state.meshes.slice(0, 2).map(mesh => Array.from(mesh.instanceMatrix.array));
+    const elapsed = state.refs[0]!.current as number;
+    state.cleanup?.();
+    state.refIndex = 0;
+    OutdoorActivity({ overview: true, rain: true });
+    state.meshes.slice(0, 2).forEach((mesh, i) => expect(Array.from(mesh.instanceMatrix.array)).toEqual(before[i]));
+    vi.advanceTimersByTime(1000);
+    const continued = state.refs[0]!.current as number;
+    expect(continued).toBeGreaterThan(elapsed);
+    expect(state.meshes[0]!.instanceMatrix.array[12]).toBeCloseTo(personPosition(continued, 0, 'x'), 4);
+    expect(state.meshes[1]!.instanceMatrix.array[12]).toBeCloseTo(carPosition(continued, 0, 'x'), 4);
   });
   it('freezes people, cars and enabled rain with reduced motion and allocates no timer', () => {
     state.reduced = true;
