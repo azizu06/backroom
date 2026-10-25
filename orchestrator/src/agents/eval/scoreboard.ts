@@ -18,6 +18,7 @@ import { runRecovery } from './recovery';
 import { runDurableRecoveryPreflight } from './durable-recovery';
 import { CRS_RECEIPT_PATH, replayRecordedCrsCoverage } from './crs-availability';
 import { runEmailDispatcher } from './email-dispatcher';
+import { runEmailHost } from './email-host';
 import { runBadgeAttack } from './badge-attack';
 import { canonicalTextSha256, evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
@@ -172,6 +173,8 @@ for (const id of PRECALL_STOPS) {
 }
 const callButton = await runCallButton();
 const emailDispatcher = await runEmailDispatcher();
+const emailHost = await runEmailHost();
+if (!emailHost.match) gaps.push({ id: 'C14:host', detail: `Demo host call-refusal email path missed: ${Object.entries(emailHost.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 if (!emailDispatcher.match) gaps.push({ id: 'C14:dispatcher', detail: `Email fallback missed: ${Object.entries(emailDispatcher.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 if (!callButton.match) gaps.push({ id: 'call-button', detail: `In-app call button missed: ${Object.entries(callButton.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const conversations = [];
@@ -256,6 +259,7 @@ const rates = {
   reconciliation: fraction(receivables.filter(row => row.match === true).length, receivables.filter(row => row.match !== null).length),
   dispatcherMemoryRecovery: fraction(recoveryRuns.filter(row => row.outcome === 'RECOVERED_ONE_MOCK_DEBIT').length, recoveryRuns.length),
   dispatcherEmailFollowup: fraction(Number(emailDispatcher.match), 1),
+  hostEmailFollowup: fraction(Number(emailHost.match), 1),
   runtimeBadgeIsolation: fraction(Number(badgeIsolationMatch), 1),
   dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
   gx10Failover: fraction(failoverRuns.filter(row => row.match).length, failoverRuns.length),
@@ -273,7 +277,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'ap-debit.ts', 'email-dispatcher.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'ap-debit.ts', 'email-dispatcher.ts', 'email-host.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -285,6 +289,8 @@ const report = {
       'orchestrator/src/payables/index.ts', 'orchestrator/src/agents/tools/payables.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     emailRuntimeSources: Object.fromEntries(['orchestrator/src/agents/roles/collections.ts', 'orchestrator/src/agents/tools/collections.ts',
       'orchestrator/src/agents/roles/index.ts', 'orchestrator/src/collections/email.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
+    emailHostRuntimeSources: Object.fromEntries(['web/lib/calls/request.ts', 'web/lib/calls/runtime.ts', 'web/lib/demo/agents.ts',
+      'web/lib/demo/services.ts', 'web/lib/demo/runtime.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json', CRS_RECEIPT_PATH,
       ...(pdfRun ? [PDF_RESULT_PATH] : [])].map(path => [path, sha(path)])),
@@ -300,6 +306,7 @@ const report = {
     recovery: recoveryRuns[0]!.scope,
     durableRecovery: durableRecovery.scope,
     emailDispatcher: emailDispatcher.scope,
+    emailHost: emailHost.scope,
     arConversations: conversations[0]?.scope ?? 'not run',
     judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
@@ -323,6 +330,7 @@ const report = {
   apDebit,
   crsRecordedCoverage,
   emailDispatcher,
+  emailHost,
   durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
@@ -373,6 +381,7 @@ const lines = [
   `| P01 AP withdrawal + reconciliation through the Dispatcher (synthetic bank HTTP, once per invoice) | ${display(rates.dispatcherApDebit)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| C14 simulated email fallback through the Dispatcher (trusted contact, daily dedupe, no amount or dial) | ${display(rates.dispatcherEmailFollowup)} |`,
+  `| C14 demo host call route: signed-in consumer click -> CALL_DENIED -> host planner email preview (queued, duplicate, next day; no dial) | ${display(rates.hostEmailFollowup)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider, email-only clients get a simulated follow-up with no amount (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
   `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: button withheld, 409, no provider attempt) | ${display(rates.callButton)} |`,
@@ -401,4 +410,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (!apDebit.match || !emailDispatcher.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (!apDebit.match || !emailDispatcher.match || !emailHost.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
