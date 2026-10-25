@@ -5,7 +5,7 @@
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
     "baseCommit": "042013fef06b3b9a9d35b612558b09a4ac0562e5",
-    "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
+    "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
       "orchestrator/src/agents/eval/conversation.ts": "2923b6c6d14e00bdb5035405d1024534b44e381e6f6db7f1bd7b9f706bfbc889",
@@ -20,12 +20,12 @@
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/durable-recovery.ts": "b7ecc566b2d562ec87e4f59ca6c67b7f2c3351b9160c024a6ba7670b2823da35",
-      "orchestrator/src/agents/eval/crs-availability.ts": "dfa793bea72fcd7c7dfed0883df179f6b46c112a6c2214a1f854b4e04b965676",
-      "orchestrator/src/agents/eval/email-dispatcher.ts": "0becdf31065ececeff46f8b821347a3b1ecbc4ca6936e816d4f82221047e734d",
+      "orchestrator/src/agents/eval/crs-availability.ts": "976ec0b27819e5d0816af752d08e020528e84af8d8caa198c6240a5d74e738f0",
+      "orchestrator/src/agents/eval/email-dispatcher.ts": "23c65d4c5595816587633a76dcc33180240eb40de93c7b8c89aef0235392bc45",
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
-      "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
+      "orchestrator/src/agents/eval/provenance.ts": "f83e9635a318a5be99a8b154d069f0cefef91c4c0cf46982179cb9889028286c",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "57dfeede90b89796671694af3920e7bc375fe53f2a43f5dbb3ca1917395f78f7"
+      "orchestrator/src/agents/eval/scoreboard.ts": "2565a734d3b566b43f7e23b8f14e8b2144bff7c17a40a1a918d71da58d3344e3"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -39,7 +39,7 @@
       "orchestrator/src/collections/crs.ts": "210a1a7e30b6efea4f1e538293eaac8ca189b88955c700962b78f1ccc51fb6e4"
     },
     "emailRuntimeSources": {
-      "orchestrator/src/agents/roles/collections.ts": "4a81c7f48171bd024a86a38fd31ebef0a94c2fcc13e31461d086467c04b4cb73",
+      "orchestrator/src/agents/roles/collections.ts": "da20dae59c67c2a416495721808ed1a545f629a065d158f7589a1008dc042485",
       "orchestrator/src/agents/tools/collections.ts": "16e409e016232b6fe912cd48019c31c50950f1b349a463ab934837d7ac06921e",
       "orchestrator/src/agents/roles/index.ts": "fb7cf1078027a0736eae39f646c86c6dcda999aa98c920512b1271aea3030ad9",
       "orchestrator/src/collections/email.ts": "b73ddcb394b902dd85aa05951bc0c9646208fbe71882ffd6d7cc0e4210842243"
@@ -50,7 +50,7 @@
       "fixtures/answer-key/frozen-manifest.json": "6ff7132e7792784b833774f1bf02fa79b5b15d59a02d3c18062ca377f65da1e5",
       "fixtures/scenarios/payables.json": "5dfb840adc3286e91df15148b9c698e7e7908294f0ba16bcacd93f36fa9a37d8",
       "fixtures/scenarios/collections.json": "e8411c084e3da3f8a6812ceaeb96d1e565bf3ddb5149933c0923ed567642735a",
-      "docs/evidence/crs/live-run.json": "c7bbded781f7630922f2cae83f9544e73cd47b85c887e31d075742dbd66b761c",
+      "docs/evidence/crs/live-run.json": "d75e85c27a1d66c8ad9c6d16a14f0a63fa6035f584c809d5271b1657fe23d488",
       "docs/eval/pdf-extraction.json": "762e09694c6605dcb77c36fb5c84364ffc6248e04c05d8a17e54e709d7ff4e90"
     },
     "keyVersion": "northfield-v1",
@@ -13186,8 +13186,9 @@
   ],
   "crsRecordedCoverage": {
     "receiptPath": "docs/evidence/crs/live-run.json",
-    "receiptSha256": "c7bbded781f7630922f2cae83f9544e73cd47b85c887e31d075742dbd66b761c",
+    "receiptSha256": "d75e85c27a1d66c8ad9c6d16a14f0a63fa6035f584c809d5271b1657fe23d488",
     "recordedAt": "2026-10-24T10:43:51.144Z",
+    "receiptHashEncoding": "UTF-8 text with LF line endings",
     "recordedProducts": [
       "fraudRisk",
       "publicRecords"

@@ -56,3 +56,26 @@ it('does not send email after a permitted call was started', async () => {
   expect(run.queuedPreviews).toBe(0);
   expect(run.emailAudits).toEqual([]);
 });
+
+
+it.each([
+  'person@domain.example/private-fragment', 'person@domain.example?private-fragment',
+  'person@domain.example#private-fragment', 'person@domain.example:443',
+  'person@domain..example', 'person@-domain.example', 'person@domain.example\r\nBcc: private@other.example',
+])('rejects malformed trusted email contact %s before it can enter the queue or audit domain', async address => {
+  vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
+  const run = await runEmailDispatcher('consumer', address);
+  expect(run.first.status).toBe('held');
+  expect(run.queuedPreviews).toBe(0);
+  expect(run.providerRequests).toBe(0);
+  expect(run.emailAudits[0]).toMatchObject({ action: 'email_followup_blocked', ruleIds: ['NO_EMAIL_ON_FILE'] });
+  expect(run.emailAudits[0]!.inputs).not.toHaveProperty('toDomain');
+  expect(JSON.stringify(run.emailAudits)).not.toContain('private');
+});
+
+it('normalizes only the trusted recipient hostname before queuing and auditing', async () => {
+  const run = await runEmailDispatcher('consumer', ' Billing@Client.Example ');
+  expect(run.first.status).toBe('done');
+  expect(run.queuedPreviews).toBe(1);
+  expect(run.emailAudits[0]!.inputs).toMatchObject({ toDomain: 'client.example' });
+});

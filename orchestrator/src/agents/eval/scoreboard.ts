@@ -18,7 +18,7 @@ import { runDurableRecoveryPreflight } from './durable-recovery';
 import { CRS_RECEIPT_PATH, replayRecordedCrsCoverage } from './crs-availability';
 import { runEmailDispatcher } from './email-dispatcher';
 import { runBadgeAttack } from './badge-attack';
-import { evaluatorSourceHash, inputFileSha256 } from './provenance';
+import { canonicalTextSha256, evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
 
 // All outbound network attempts fail closed, including accidental provider calls in future adapters.
@@ -26,7 +26,11 @@ globalThis.fetch = async () => { throw new Error('EVAL_NETWORK_FORBIDDEN'); };
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const read = (path: string) => JSON.parse(readFileSync(join(root, path), 'utf8'));
-const sha = (path: string) => inputFileSha256(readFileSync(join(root, path)));
+const sha = (path: string) => {
+  const bytes = readFileSync(join(root, path));
+  // This recorded JSON receipt is Git text (CRLF on Windows); fixtures keep byte-exact hashes.
+  return path === CRS_RECEIPT_PATH ? canonicalTextSha256(bytes) : inputFileSha256(bytes);
+};
 const command = 'pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts';
 const key = read('fixtures/answer-key/expected.json');
 const manifest = read('fixtures/answer-key/frozen-manifest.json');
@@ -264,7 +268,7 @@ const rates = {
 const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
-    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
+    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.',
     evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'email-dispatcher.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),

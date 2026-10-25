@@ -94,6 +94,21 @@ export type PlannerRun =
   | { kind: 'started'; callId: string; sessionId: string; result: ActivationResult }
   | { kind: 'not_started'; result: ActivationResult; email?: EmailFollowUpResult };
 
+/** Restrict the preview port to a mailbox with a DNS hostname. Invalid host data must
+ * never reach the helper, which projects the recipient hostname into its audit. */
+function emailAddressOnFile(address?: string): string | undefined {
+  const mailbox = address?.trim();
+  if (!mailbox || mailbox.length > 254) return undefined;
+  const parts = mailbox.split('@');
+  if (parts.length !== 2) return undefined;
+  const [local, hostname] = parts as [string, string];
+  if (!local || local.length > 64 || !/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/.test(local)
+    || local.startsWith('.') || local.endsWith('.') || local.includes('..')) return undefined;
+  const labels = hostname.split('.');
+  if (labels.length < 2 || labels.some(label => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) return undefined;
+  return `${local}@${hostname.toLowerCase()}`;
+}
+
 /** Runs the planner activation; the dial is confirmed from tool state, never from the model's text. */
 export async function runCollectionsPlanner(runtime: AgentRuntime, ctx: ToolContext, deps: CollectionsToolDeps, input: Json = {}): Promise<PlannerRun> {
   const { spec, started, release } = createCollectionsPlannerSpecialist(deps);
@@ -112,7 +127,7 @@ export async function runCollectionsPlanner(runtime: AgentRuntime, ctx: ToolCont
     const outbox = deps.emailFollowUp.outbox;
     const inputOf = (row: CollectionsCase): EmailFollowUpInput => ({ clientId: row.precall.clientId, invoiceId: row.precall.invoiceId,
       businessName: row.dial.businessName, contactName: row.dial.contactName, callbackNumber: row.dial.callbackNumber,
-      context: row.precall.context, email: row.emailContact?.address,
+      context: row.precall.context, email: emailAddressOnFile(row.emailContact?.address),
       identityVerified: row.emailContact?.identityVerified, payLink: row.emailContact?.payLink });
     const snapshot = structuredClone(inputOf(c));
     const fingerprint = JSON.stringify(snapshot);

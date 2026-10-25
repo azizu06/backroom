@@ -19,7 +19,7 @@ export type EmailDispatcherMode = 'consumer' | 'no_consent' | 'opt_out' | 'after
 
 /** The frozen C14 case through the production planner registry, Dispatcher and SDK runtime.
  * Caller/model turns and provider dependencies are scripted; the preview is queued by product code. */
-export async function runEmailDispatcher(mode: EmailDispatcherMode = 'consumer') {
+export async function runEmailDispatcher(mode: EmailDispatcherMode = 'consumer', address = 'billing@client.example') {
   const scenarios = JSON.parse(readFileSync(fileURLToPath(new URL('../../../../fixtures/scenarios/collections.json', import.meta.url)), 'utf8'));
   const scenario = scenarios.find((row: any) => row.id === 'C14');
   const invoice = northfield.arInvoices.find(row => row.id === scenario.invoiceId)!;
@@ -46,7 +46,7 @@ export async function runEmailDispatcher(mode: EmailDispatcherMode = 'consumer')
     dial: { sessionId: 'offline:C14:session', agentId: 'offline-agent', fromNumberId: 'offline-number', clientId: client.id,
       businessName: 'Northfield Studio', contactName: client.name, invoiceId: invoice.id, callbackNumber: '+12025550100',
       client: { type: 'business', number: client.phoneNumber, timeZone: client.timezone, dnc: client.dnc } },
-    ...(mode !== 'no_address' && { emailContact: { address: 'billing@client.example' } }),
+    ...(mode !== 'no_address' && { emailContact: { address } }),
   };
   let providerRequests = 0;
   const deps: CollectionsToolDeps = {
