@@ -20,6 +20,7 @@ import { interactionStore } from '../../lib/office/interactions';
 import { bakedArtRequested } from '../../lib/office/baked-art';
 import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
+import { pingPongSession } from '../../lib/office/pingpong/session';
 
 function playEye([x, z]: readonly [number, number]): IntroPose {
   return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)] };
@@ -75,6 +76,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     return () => query.removeEventListener('change', update);
   }, [invalidate]);
   useEffect(() => () => { latest.current.onTarget(null); }, []);
+  useEffect(() => () => { pingPongSession.stop(); }, []);
   // The canvas only resizes the active camera; refit the restored orthographic one in case it resized during Play.
   useEffect(() => () => {
     if (!(previous instanceof OrthographicCamera)) return;
@@ -86,6 +88,13 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
 
   useFrame((state, delta) => {
     if (!camera.current) return;
+    // Keep the walking pose intact while the table owns the camera. The next frame restores it.
+    if (pingPongSession.getSnapshot()) {
+      input.clear();
+      velocity.current = [0, 0];
+      wasActive.current = false;
+      return;
+    }
     if (!intro.done) {
       const now = performance.now();
       intro.startedAt ??= now;

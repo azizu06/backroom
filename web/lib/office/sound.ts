@@ -7,6 +7,8 @@ export const SOUND_CUES = {
   passkey: { oscillator: 'sine', frequencies: [523.25, 783.99], attackMs: 12, releaseMs: 210, gain: 0.08 },
   interact: { oscillator: 'sine', frequencies: [392, 587.33], attackMs: 8, releaseMs: 110, gain: 0.06 },
   step: { oscillator: 'sine', frequencies: [95, 82], attackMs: 4, releaseMs: 70, gain: 0.025 },
+  pingHit: { oscillator: 'triangle', frequencies: [720, 480], attackMs: 2, releaseMs: 45, gain: 0.04 },
+  pingBounce: { oscillator: 'sine', frequencies: [420, 280], attackMs: 2, releaseMs: 35, gain: 0.03 },
 } as const;
 
 export type SoundCue = keyof typeof SOUND_CUES;
@@ -14,8 +16,8 @@ export type OneShotCue = Exclude<SoundCue, 'roomTone'>;
 export type CueTimes = Partial<Record<OneShotCue, number>>;
 export const SOUND_PREFERENCE_KEY = 'office.sound';
 export const SOUND_COOLDOWN_MS = 800;
-/** Footsteps are already spaced by distance (>= 150 ms apart at 2x speed); this only stops overlapping cues. Every other cue keeps the default. */
-export const CUE_COOLDOWN_MS: Partial<Record<OneShotCue, number>> = { step: 60 };
+/** Short physical cues may repeat within a second; notifications keep the default cooldown. */
+export const CUE_COOLDOWN_MS: Partial<Record<OneShotCue, number>> = { step: 60, pingHit: 40, pingBounce: 40 };
 export function cooldownFor(kind: OneShotCue): number { return CUE_COOLDOWN_MS[kind] ?? SOUND_COOLDOWN_MS; }
 
 export function soundPreference(storage?: Pick<Storage, 'getItem'>): 'on' | 'off' {
