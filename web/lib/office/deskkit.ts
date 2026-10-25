@@ -1,6 +1,5 @@
 import { BAKED_REPLACES } from './baked-art';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
-import { roomPoint } from './layout';
 import { DESKS } from './targets/desk';
 import { MONITOR_FACE } from './props/monitors';
 import { DRESSING, type DressingPlant, type DressingShelf } from './props/dressing';
