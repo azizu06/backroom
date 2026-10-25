@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AGENT_RADIUS, INTERACT_RANGE, PLAYER_RADIUS, forwardOf, insideAny, interactCandidates, officeColliders, pickTarget, type Vec2 } from './play';
-import { AGENT_CLEARANCE, agentEntry, isOverviewKey, playOwnsMoveKeys, roomAtPoint, roomEntry, roomRect, seatedAgent, standable, yawToward } from './overview';
+import { AGENT_CLEARANCE, agentEntry, clearEntry, isOverviewKey, playOwnsMoveKeys, roomAtPoint, roomEntry, roomRect, seatedAgent, standable, yawToward } from './overview';
 import { createMockOfficeState } from './preview';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
 
@@ -92,4 +92,40 @@ describe('jumping into a room', () => {
       if (Math.hypot(center[0] - entry.position[0], center[1] - entry.position[1]) > 0.3) expect(facing(entry.position, entry.yaw, center)).toBeLessThan(1e-6);
     });
   }
+});
+
+describe('validating a live entry against rendered colliders', () => {
+  it('keeps a clear requested pose unchanged', () => {
+    const entry = { position: [0, 0] as const, yaw: 0.8 };
+    expect(clearEntry(entry, [])).toBe(entry);
+  });
+  it('nudges to the nearest expanded edge and keeps facing the destination', () => {
+    const boxes = [{ minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5 }];
+    const lookAt = [0, -1] as const;
+    const entry = clearEntry({ position: [0.4, 0], yaw: 0, lookAt }, boxes)!;
+    expect(entry.position).toEqual([0.5 + PLAYER_RADIUS, 0]);
+    expect(insideAny(entry.position, boxes, PLAYER_RADIUS)).toBe(false);
+    expect(facing(entry.position, entry.yaw, lookAt)).toBeCloseTo(0);
+  });
+  it('checks every collider when the nearest edge is blocked by another box', () => {
+    const boxes = [
+      { minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5 },
+      { minX: 0.5, maxX: 2, minZ: -1, maxZ: 1 },
+    ];
+    const entry = clearEntry({ position: [0.4, 0], yaw: 0.8 }, boxes)!;
+    expect(standable(entry.position, boxes)).toBe(true);
+    expect(entry.position[0]).toBeCloseTo(0.5 - PLAYER_RADIUS);
+    expect(Math.abs(entry.position[1])).toBeCloseTo(0.5 + PLAYER_RADIUS);
+    expect(entry.yaw).toBe(0.8);
+  });
+  it('uses the nearest clear floor beyond 1.5 m when the nearby floor is blocked', () => {
+    const boxes = [
+      { minX: -3, maxX: 3, minZ: -3, maxZ: 3 },
+    ];
+    const lookAt = [0, 0] as const;
+    const entry = clearEntry({ position: [0, 0], yaw: 0, lookAt }, boxes)!;
+    expect(standable(entry.position, boxes)).toBe(true);
+    expect(Math.hypot(...entry.position)).toBeCloseTo(3 + PLAYER_RADIUS);
+    expect(facing(entry.position, entry.yaw, lookAt)).toBeCloseTo(0);
+  });
 });
