@@ -1,12 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
 import { MeshBasicMaterial, type Group, type Material, type Texture } from 'three';
 import type { SceneMountProps } from './types';
-import { bakedArtRequested } from '../../../lib/office/baked-art';
+import { bakedArtRequested, bakedPieceActive, setBakedPieceReady, subscribeBakedReady } from '../../../lib/office/baked-art';
 
 export { bakedArtRequested };
+
+/**
+ * True only while `?art=baked` is on AND the baked lobby GLB is in the scene. Every procedural replacement, hide and
+ * collider change keys off this, so a failed load (404, bad file) leaves the procedural lobby whole.
+ */
+export function useBakedLobbyReady(): boolean {
+  return useSyncExternalStore(subscribeBakedReady, () => bakedPieceActive(window.location.search, 'lobby'), () => false);
+}
 
 /**
  * Opt-in Blender layer (`/office?art=baked`): baked, bevelled room shells from tools/bake, drawn over the
@@ -16,7 +24,7 @@ const ROOMS = [{ id: 'lobby', url: '/office-art/lobby.glb' }] as const;
 /** Pieces that block the overview camera; kept for first-person Play, hidden when the camera is orthographic. */
 const HIDDEN_IN_OVERVIEW = new Set(['ceiling', 'wall_near']);
 
-function BakedRoom({ url, overview }: { url: string; overview: boolean }) {
+function BakedRoom({ id, url, overview }: { id: string; url: string; overview: boolean }) {
   const invalidate = useThree(state => state.invalidate);
   const [scene, setScene] = useState<Group | null>(null);
   useEffect(() => {
@@ -47,11 +55,18 @@ function BakedRoom({ url, overview }: { url: string; overview: boolean }) {
         setScene(gltf.scene);
         invalidate();
       } catch (error) {
+        setBakedPieceReady(id, false);
         console.warn(`Baked art ${url} failed to load; using the procedural scene.`, error);
       }
     })();
     return () => { cancelled = true; setScene(null); disposables.forEach(item => item.dispose()); };
   }, [url, invalidate]);
+  // Ready only once the primitive is committed into the scene graph (passive effects run after R3F attaches it).
+  useEffect(() => {
+    if (!scene) return;
+    setBakedPieceReady(id, true);
+    return () => setBakedPieceReady(id, false);
+  }, [id, scene]);
   useEffect(() => {
     scene?.traverse(node => { if (HIDDEN_IN_OVERVIEW.has(node.name)) node.visible = !overview; });
     invalidate();
@@ -64,5 +79,5 @@ export function BakedArt(_props: SceneMountProps) {
   useEffect(() => { setRequested(bakedArtRequested(window.location.search)); }, []);
   const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
   if (!requested) return null;
-  return <>{ROOMS.map(room => <BakedRoom key={room.id} url={room.url} overview={overview} />)}</>;
+  return <>{ROOMS.map(room => <BakedRoom key={room.id} id={room.id} url={room.url} overview={overview} />)}</>;
 }
