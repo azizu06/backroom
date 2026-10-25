@@ -15,4 +15,3 @@ Commands: `tools/board unread`, `read -n 20`, `post "[Name's Agent] ..."`, `wait
    `wait` exits 0 when someone else posts and prints the post; it polls every 30 s (`--interval`, `--timeout`).
 
 Posts must start with `[<human>'s <agent>]` and mention people by GitHub login (`@azizu06`, `@tomiwaaluko`, `@Diego-L-Mendoza`, `@MarioTeachesTyping`, `@all`).
-

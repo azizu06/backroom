@@ -52,4 +52,3 @@ only live service in this variant; the controller authenticator, voice, card and
 external pre-call checks remain simulated. A failed deposit/feed check exits nonzero. The displayed total uses the exact
 API-derived label documented above; an unchanged account balance is not settlement evidence. The T4 balance gate is independently
 tracked; a fake-bank pass does not establish it. Do not use `--live` in unit tests.
-
