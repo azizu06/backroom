@@ -9,6 +9,7 @@ test('private audit wall updates, replays and cites decisions on laptop and phon
   await page.getByLabel('Operator code').fill('local-audit-test-only');
   await page.getByRole('button', { name: 'Open audit wall' }).click();
   await expect(page.getByText('Chain verified · 0 entries', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^No decisions in this run yet/)).toBeVisible();
   const tool = async (id: string, terms: Record<string, unknown>) => {
     const result = await request.post('/api/tools/propose_plan', { headers: { authorization: 'Bearer local-tool-test-only' },
       data: { call_id: 'approval-demo', webhook_request_id: id, installments: 4, first_payment_pct: 50,
@@ -18,10 +19,24 @@ test('private audit wall updates, replays and cites decisions on laptop and phon
   };
   expect((await tool('audit-escalate', {})).kind).toBe('ESCALATE');
   await expect(page.getByText('Chain verified · 2 entries', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: /create escalation/ })).toContainText('via');
+  // Default view: one story per call, readable lines, the raw list closed.
+  const story = page.locator('.audit-story[data-kind=call]');
+  await expect(story.getByRole('heading', { name: /^Call (with|about)/ })).toBeVisible();
+  await expect(story.locator('.audit-line').filter({ hasText: '4-payment plan proposed, over the badge limit' })).toContainText('MAX_INSTALLMENTS');
+  await expect(page.getByRole('heading', { name: 'Recorded actions' })).toBeHidden();
   expect((await tool('audit-deny', { installments: 2, waive_fee: true })).kind).toBe('DENY');
   await expect(page.getByText('Chain verified · 3 entries', { exact: true })).toBeVisible();
-  const denied = page.getByRole('button', { name: /DENY/ });
+  await expect(story.locator('.audit-line[data-proof=deny]')).toContainText('FEES_NON_WAIVABLE');
+  await story.getByRole('button', { name: /^Ask why: 4-payment plan/ }).click();
+  await expect(page.getByLabel('Question about a decision')).toHaveValue('Why was invoice 1042 escalated to Dana under MAX_INSTALLMENTS?');
+  await expect(page.getByText('Recorded facts · code fallback', { exact: true })).toBeVisible();
+  await page.screenshot({ path: '../docs/evidence/audit-wall/stories.png', fullPage: true });
+
+  // Show all entries keeps the full chain, raw inputs and hashes.
+  await page.getByText(/^Show all entries/).click();
+  const all = page.locator('.audit-advanced');
+  await expect(all.getByRole('button', { name: /create escalation/ })).toContainText('via');
+  const denied = all.getByRole('button', { name: /DENY/ });
   await expect(denied).toContainText('FEES_NON_WAIVABLE');
   await expect(denied.locator('.audit-quote')).not.toContainText('not recorded');
   await denied.click();
@@ -67,7 +82,8 @@ test('private audit wall updates, replays and cites decisions on laptop and phon
   });
   await expect(page.getByText('Chain broken · first broken seq 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Explain decision' })).toBeDisabled();
-  await expect(page.locator('.audit-chain')).toHaveCSS('color', 'rgb(255, 176, 176)');
+  await expect(page.locator('.audit-chain')).toHaveCSS('background-color', 'rgb(255, 201, 217)');
+  await expect(story.getByRole('button', { name: /^Ask why:/ }).first()).toBeDisabled();
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: '../docs/evidence/audit-wall/tampered.png', fullPage: true });
