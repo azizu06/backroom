@@ -8,7 +8,7 @@ import { ROLES } from '../../lib/office/palette';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 import type { FurniturePiece } from '../../lib/office/furniture';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './mounts/StaticGeometry';
-import { useBakedArtRequested } from './mounts/BakedArt';
+import { useBakedLobbyReady } from './mounts/BakedArt';
 import { bakedReplacesProps } from '../../lib/office/baked-art';
 
 export const OFFICE_RENDERER = { antialias: true, powerPreference: 'high-performance' as const,
@@ -39,7 +39,7 @@ const SHADE_MATERIAL = new MeshStandardMaterial({ color: ROLES.lampLight, emissi
 
 /** Two static geometry batches, no shadow-casting lamp geometry and no animation subscriptions. */
 function Lamps({ rooms }: { rooms: string }) {
-  const baked = useBakedArtRequested();
+  const baked = useBakedLobbyReady();
   const { bodies, shades } = useMemo(() => {
     const bodies: FurniturePiece[] = [], shades: FurniturePiece[] = [];
     // Under ?art=baked the baked room brings its own lamp, so the procedural one would stand inside it.

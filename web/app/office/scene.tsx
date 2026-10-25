@@ -18,7 +18,7 @@ import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } 
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
-import { useBakedArtRequested } from './mounts/BakedArt';
+import { useBakedLobbyReady } from './mounts/BakedArt';
 import { bakedReplacesPartition } from '../../lib/office/baked-art';
 import { PresenceGhosts } from './PresenceGhosts';
 import { Bear, createBearRig, poseBear } from './avatars/Bear';
@@ -144,7 +144,7 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
 }
 /** Lavender partitions; under ?art=baked the baked lobby's east wall replaces the lobby-side segment in first person. */
 function Partitions() {
-  const baked = useBakedArtRequested();
+  const baked = useBakedLobbyReady();
   const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
   return <>{[-2.5, 2.5].map(x => <group key={x}>
     <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
