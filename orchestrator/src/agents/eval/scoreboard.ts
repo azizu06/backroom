@@ -15,6 +15,7 @@ import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
 import { runDurableRecoveryPreflight } from './durable-recovery';
+import { CRS_RECEIPT_PATH, replayRecordedCrsCoverage } from './crs-availability';
 import { runBadgeAttack } from './badge-attack';
 import { evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
@@ -121,6 +122,7 @@ const p01DebitProbeHeld = p01DebitProbe.actual === 'HOLD' && p01DebitProbe.resul
   p01DebitProbe.result.verdict === 'ESCALATE' && !p01DebitProbe.result.receiptId && p01DebitProbe.mockDebits === 0;
 if (!p01DebitProbeHeld) gaps.push({ id: 'P01:missing-adapter', detail: 'The missing AP debit adapter probe did not retain the expected hold; see p01DebitProbe.' });
 const durableRecovery = await runDurableRecoveryPreflight();
+const crsRecordedCoverage = await replayRecordedCrsCoverage();
 const recoveryRuns = [];
 for (const variant of [{ lateCancel: false }, { lateCancel: true }, { checkpoint: 'before_provider' as const }]) {
   const run = await runRecovery(variant);
@@ -202,6 +204,10 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });
     continue;
   }
+  if (row.id === 'P07' && row.seams.includes('integration:not_executed')) {
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.payables.P07.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The production agent chain catches the synthetic fixture OFAC_STOP and does not pay; that is not a CRS sanctions response. Committed sandbox receipt ${CRS_RECEIPT_PATH} records ${crsRecordedCoverage.recordedProducts.join(', ')}, not OFAC. Replaying its public-records identity #${crsRecordedCoverage.recordedTestIdentityId} through the production adapter yields OFAC=${crsRecordedCoverage.replay.ofacStatus} (${crsRecordedCoverage.replay.ofacAvailability}); it is not mapped to the sanctioned vendor. Live OFAC identity/response remains unexecuted; keep P07 open.` });
+    continue;
+  }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 const inboxTeam = await runInboxTeam();
@@ -244,15 +250,16 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
       const path = `orchestrator/src/agents/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     voicemailRuntimeSources: { 'orchestrator/src/voice/tools.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/voice/tools.ts'))) },
+    crsRuntimeSources: { 'orchestrator/src/collections/crs.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/collections/crs.ts'))) },
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
-      'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json',
+      'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json', CRS_RECEIPT_PATH,
       ...(pdfRun ? [PDF_RESULT_PATH] : [])].map(path => [path, sha(path)])),
     keyVersion: key.version, signoff: key.signoff, authorship: key.authorship },
   scope: { apItems: invoiceRuns.length, arItems: receivables.length, scenarios: legacy.reports.length,
@@ -284,6 +291,7 @@ const report = {
     tools: p01DebitProbe.trace.map(row => `${row.role}.${row.tool}`),
     scope: 'Production Dispatcher + ClaudeAgentRuntime and all five AP roles, with the AP debit port explicitly absent. Fixture extraction and vendor checks, no network. This measures the unavailable-adapter hold, not a Nessie payment or debit reconciliation.' },
   recovery: recoveryRuns,
+  crsRecordedCoverage,
   durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
