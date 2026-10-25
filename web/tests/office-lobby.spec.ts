@@ -44,6 +44,47 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(errors).toEqual([]);
 });
 
+test('office demo guide and keyboard shortcuts help open and restore focus', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office?view=overview');
+  const guideButton = page.getByRole('button', { name: 'Demo guide' });
+  await guideButton.click();
+  const guide = page.getByRole('dialog', { name: 'Try this' });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('Treasury');
+  await page.keyboard.press('Escape');
+  await expect(guide).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+  await guideButton.focus();
+  await page.keyboard.press('?');
+  const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(shortcuts).toBeVisible();
+  await expect(shortcuts).toContainText('Interact');
+  // Native modal dialogs keep sequential focus inside while the background is inert.
+  const close = shortcuts.getByRole('button', { name: 'Close' });
+  for (let index = 0; index < 3; index++) {
+    await page.keyboard.press('Tab');
+    await expect(shortcuts).toContainText('Keyboard shortcuts');
+    await expect(shortcuts).toContainText('Interact');
+    expect(await page.evaluate(() => document.activeElement?.closest('dialog')?.classList.contains('office-shortcuts'))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+  await page.getByLabel('Office view').selectOption('play');
+  await page.locator('.play-surface').press('?');
+  await expect(shortcuts).toBeVisible();
+  for (let index = 0; index < 3; index++) {
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement?.closest('dialog')?.classList.contains('office-shortcuts'))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toHaveCount(0);
+  await expect(page.locator('.play-surface')).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test('office shows the lobby summary and agent roster without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

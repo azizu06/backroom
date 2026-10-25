@@ -62,13 +62,17 @@ export async function runPrecallStop(id: PrecallStop) {
     await call('start_call');
   }, (role, tool, output) => trace.push({ role, tool, output })), context(`precall:${id}`, 'collections', [`ar_invoice:${invoice.id}`]), deps);
   const permit = trace.find(row => row.tool === 'can_call')?.output as Record<string, Json> | undefined;
+  // The scripted runtime must reach every step: a crash after can_call would otherwise look like a refusal.
+  const reached = (tool: string) => trace.find(row => row.tool === tool)?.output as Record<string, Json> | undefined;
+  const precallRefused = reached('run_precall'), startRefused = reached('start_call');
   const plannerProviderRequests = providerRequests.length;
   // 2. A direct dial that skips the planner.
   let directError: string | undefined;
   try { await voice.start(dialInput as never); } catch (error) { directError = error instanceof Error ? error.message : 'ERROR'; }
   const checks = {
     plannerRule: permit?.decision === expected.kind && JSON.stringify(permit?.ruleIds) === JSON.stringify(expected.ruleIds),
-    plannerNoDial: planned.kind === 'not_started' && plannerProviderRequests === 0,
+    plannerNoDial: planned.kind === 'not_started' && plannerProviderRequests === 0 && planned.result.kind === 'done',
+    laterStepsRefused: !!precallRefused && precallRefused.status !== 'ready' && startRefused?.status === 'DENY',
     directDialRejected: directError === expected.ruleIds.join(','),
     noProviderRequest: providerRequests.length === 0 && prepared.length === 0 && !dialAudits.includes('CALL_PERMIT'),
     auditChain: (await state.verifyAuditChain()).valid,

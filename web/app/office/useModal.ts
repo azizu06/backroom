@@ -3,6 +3,8 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { isCloseKey } from '../../lib/office/a11y';
 
+/** The demo disclosure must stay readable and hit-testable over any office modal (it holds no controls). */
+const KEEP_LIVE = '.demo-pill';
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** A DOM node, or a stand-in with the same parent/child shape, so the inert set can be tested without a browser. */
@@ -16,10 +18,17 @@ export interface ModalTreeNode {
  * Elements that should be `inert` while `modal` is open.
  * Siblings of the modal (up through the office shell), not the shell itself: an inert ancestor
  * would freeze the dialog too. A modal that lives outside the shell inerts the shell element.
+ * Nodes in `keep` (and their ancestors) are never inerted, only their sibling branches.
  */
-export function backgroundHosts<T extends { parentElement: T | null; readonly children: ArrayLike<T>; contains(node: T): boolean }>(shell: T | null, modal: T): T[] {
+export function backgroundHosts<T extends { parentElement: T | null; readonly children: ArrayLike<T>; contains(node: T): boolean }>(shell: T | null, modal: T, keep: readonly T[] = []): T[] {
   if (!shell || shell === modal) return [];
-  if (!shell.contains(modal)) return [shell];
+  // A kept node (the demo disclosure) stays live: its host is split so only the host's other branches go inert.
+  const split = (hosts: T[]): T[] => hosts.flatMap(host => {
+    if (keep.includes(host)) return [];
+    const kept = keep.find(node => host.contains(node));
+    return kept ? backgroundHosts(host, kept, keep.filter(node => node !== kept)) : [host];
+  });
+  if (!shell.contains(modal)) return split([shell]);
   const hosts: T[] = [];
   for (let parent: T | null = modal.parentElement; parent; parent = parent.parentElement) {
     for (let i = 0; i < parent.children.length; i++) {
@@ -29,7 +38,7 @@ export function backgroundHosts<T extends { parentElement: T | null; readonly ch
     }
     if (parent === shell) break;
   }
-  return hosts;
+  return split(hosts);
 }
 
 /** Next element in a Tab cycle. An active node outside the list is pulled in at the matching end. */
@@ -55,7 +64,8 @@ export function tabbableElements(root: ParentNode): HTMLElement[] {
  * Moves focus in, cycles Tab and Shift+Tab, sets `inert` on the rest of `.office-shell`,
  * closes on Escape from anywhere inside (or outside, if focus escaped), and restores the opener.
  * A `<dialog>` is shown with `showModal` so the rest of the document, including overlays outside
- * the shell, is inert and above other z-index layers.
+ * the shell, is inert and above other z-index layers. A positioned root (the Enter splash) stays
+ * below the demo disclosure instead, and the disclosure is kept out of the inert set.
  */
 export function useModal<T extends HTMLElement>(onClose: () => void): RefObject<T | null> {
   const ref = useRef<T>(null);
@@ -70,7 +80,8 @@ export function useModal<T extends HTMLElement>(onClose: () => void): RefObject<
     }
     const shell = modal.closest('.office-shell');
     const inerted: HTMLElement[] = [];
-    for (const node of backgroundHosts<Element>(shell, modal)) {
+    const keep = shell ? [...shell.querySelectorAll(KEEP_LIVE)].filter(node => !modal.contains(node) && !node.contains(modal)) : [];
+    for (const node of backgroundHosts<Element>(shell, modal, keep)) {
       if (!(node instanceof HTMLElement) || node.hasAttribute('inert')) continue;
       node.setAttribute('inert', '');
       inerted.push(node);

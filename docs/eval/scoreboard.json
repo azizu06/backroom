@@ -4,17 +4,17 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "86b05525817299e4af27cb4be35af210f0c66c0f",
+    "baseCommit": "6ede37a2ae7190b58175fea6757f5809590d96fa",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "405f533151f8fab92f53be87b882d80415e3700a4ea9fb52aeccaad0f4d43dfc",
+      "orchestrator/src/agents/eval/conversation.ts": "c4cd8e828a12e5dc782ad6ffc7162ef9661d19fd98c0591132236c1b88ca7b60",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
-      "orchestrator/src/agents/eval/precall.ts": "9a86909a16d577e6f7f8d3be2dc65d3fbdf3d04132782e3cea54fc0e9f9de333",
-      "orchestrator/src/agents/eval/call-button.ts": "b4c4b7df803fac52fb740d105c680e6fb012d5512c932d3556385c1a886cac58",
-      "orchestrator/src/agents/eval/failover.ts": "4561574399679b3665244ec88fe4ec439009eff4fe97039a2c2192b51330c537",
+      "orchestrator/src/agents/eval/precall.ts": "6d113616ff096e94961dc63be0b691e97bbdaca6dc5cd2d6e37165a6febf1671",
+      "orchestrator/src/agents/eval/call-button.ts": "e5743c6322744bed184de2d9029f35c1d7bc1a3967a6d4b5ced6fed1c9d1ffb2",
+      "orchestrator/src/agents/eval/failover.ts": "9506d421ed7f91396eeed59c0752743a93c7ea887352a3159382d15dc607f36c",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
@@ -22,7 +22,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "68c631cf2b74e271c21fa6bdcac426f79952fee197f51e3449ab261ed89d19ec"
+      "orchestrator/src/agents/eval/scoreboard.ts": "607c1f4b125a73db948e4cecb3e160de2640f991d8ddf87ab0e81f90a55bb01c"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -160,8 +160,8 @@
       "percent": 100
     },
     "arConversations": {
-      "numerator": 9,
-      "denominator": 9,
+      "numerator": 10,
+      "denominator": 10,
       "percent": 100
     },
     "judgeCalls": {
@@ -241,7 +241,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -347,7 +350,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -480,7 +484,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -586,7 +593,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -729,7 +737,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -872,7 +881,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1015,7 +1025,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1158,7 +1169,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1301,7 +1313,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1444,7 +1457,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1587,7 +1601,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1730,7 +1745,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1873,7 +1889,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2016,7 +2033,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2159,7 +2177,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2302,7 +2321,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2445,7 +2465,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2588,7 +2609,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2731,7 +2753,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2874,7 +2897,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3017,7 +3041,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3160,7 +3185,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3303,7 +3329,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3435,6 +3462,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -3535,6 +3565,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -3631,7 +3664,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -3737,7 +3773,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3870,7 +3907,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -3976,7 +4016,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4119,7 +4160,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4262,7 +4304,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4405,7 +4448,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4548,7 +4592,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4691,7 +4736,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4834,7 +4880,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4977,7 +5024,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5120,7 +5168,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5263,7 +5312,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5406,7 +5456,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5549,7 +5600,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5692,7 +5744,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5835,7 +5888,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5978,7 +6032,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6121,7 +6176,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6264,7 +6320,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6407,7 +6464,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6550,7 +6608,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6693,7 +6752,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6825,6 +6885,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -6925,6 +6988,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -7021,7 +7087,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -7127,7 +7196,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7264,7 +7334,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -7370,7 +7443,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7517,7 +7591,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7664,7 +7739,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7811,7 +7887,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7958,7 +8035,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8105,7 +8183,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8252,7 +8331,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8399,7 +8479,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8546,7 +8627,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8693,7 +8775,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8840,7 +8923,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8987,7 +9071,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9134,7 +9219,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9281,7 +9367,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9428,7 +9515,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9575,7 +9663,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9722,7 +9811,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9869,7 +9959,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10016,7 +10107,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10163,7 +10255,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10299,6 +10392,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -10399,6 +10495,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -10495,7 +10594,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -10595,6 +10697,9 @@
         ],
         "ruleIds": [
           "LOOKALIKE_DOMAIN"
+        ],
+        "evidenceRuleIds": [
+          "LOOKALIKE_DOMAIN"
         ]
       },
       "result": {},
@@ -10692,7 +10797,10 @@
           "ACCOUNT_DIFFERS_FROM_MASTER",
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -10798,7 +10906,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -10943,7 +11052,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -11077,6 +11187,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -11176,6 +11289,9 @@
           "SITE_UNREACHABLE"
         ],
         "ruleIds": [
+          "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER"
         ]
       },
@@ -11283,7 +11399,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -11613,7 +11730,9 @@
       "actualRules": [
         "BANK_CHANGE_HOLD"
       ],
-      "reportedSignalRules": [],
+      "reportedSignalRules": [
+        "BANK_CHANGE_HOLD"
+      ],
       "exactRuleMatch": true,
       "runtime": {
         "status": "held",
@@ -11670,7 +11789,9 @@
       "actualRules": [
         "BANK_CHANGE_HOLD"
       ],
-      "reportedSignalRules": [],
+      "reportedSignalRules": [
+        "BANK_CHANGE_HOLD"
+      ],
       "exactRuleMatch": true,
       "runtime": {
         "status": "held",
@@ -11884,7 +12005,6 @@
         "OFAC_STOP"
       ],
       "reportedSignalRules": [
-        "PAYEE_NOT_IN_MASTER",
         "OFAC_STOP"
       ],
       "exactRuleMatch": true,
@@ -13037,7 +13157,10 @@
           "ACCOUNT_DIFFERS_FROM_MASTER",
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -13143,7 +13266,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -13388,7 +13512,7 @@
   },
   "failover": [
     {
-      "id": "P01:4401",
+      "id": "P01:0",
       "scenarioId": "P01",
       "invoiceId": "4401",
       "match": true,
@@ -13425,7 +13549,7 @@
       ]
     },
     {
-      "id": "P02:4419",
+      "id": "P02:0",
       "scenarioId": "P02",
       "invoiceId": "4419",
       "match": true,
@@ -13462,7 +13586,7 @@
       ]
     },
     {
-      "id": "P03:4471",
+      "id": "P03:0",
       "scenarioId": "P03",
       "invoiceId": "4471",
       "match": true,
@@ -13497,7 +13621,7 @@
       ]
     },
     {
-      "id": "P03:4471",
+      "id": "P03:1",
       "scenarioId": "P03",
       "invoiceId": "4471",
       "match": true,
@@ -13532,7 +13656,7 @@
       ]
     },
     {
-      "id": "P04:4480",
+      "id": "P04:0",
       "scenarioId": "P04",
       "invoiceId": "4480",
       "match": true,
@@ -13567,7 +13691,7 @@
       ]
     },
     {
-      "id": "P05:4481",
+      "id": "P05:0",
       "scenarioId": "P05",
       "invoiceId": "4481",
       "match": true,
@@ -13604,7 +13728,7 @@
       ]
     },
     {
-      "id": "P06:4482",
+      "id": "P06:0",
       "scenarioId": "P06",
       "invoiceId": "4482",
       "match": true,
@@ -13641,7 +13765,7 @@
       ]
     },
     {
-      "id": "P07:4483",
+      "id": "P07:0",
       "scenarioId": "P07",
       "invoiceId": "4483",
       "match": true,
@@ -13676,7 +13800,7 @@
       ]
     },
     {
-      "id": "P08:4484",
+      "id": "P08:0",
       "scenarioId": "P08",
       "invoiceId": "4484",
       "match": true,
@@ -13711,7 +13835,7 @@
       ]
     },
     {
-      "id": "P09:4485",
+      "id": "P09:0",
       "scenarioId": "P09",
       "invoiceId": "4485",
       "match": true,
@@ -13976,7 +14100,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
-        "identityDenied": true
+        "identityDenied": true,
+        "numberFlagged": true
       },
       "callStatus": "human_requested",
       "caseStatus": "held",
@@ -13994,7 +14119,9 @@
         "collections.planner.get_invoice_context",
         "collections.planner.can_call",
         "collections.planner.run_precall",
-        "collections.planner.start_call"
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     },
@@ -14066,7 +14193,8 @@
       "gatewayTools": [
         "verify_identity_result:RECORDED",
         "get_invoice_context:CONTEXT",
-        "request_human:RECORDED"
+        "request_human:RECORDED",
+        "propose_plan:DENY"
       ],
       "tools": [
         "collections.planner.get_invoice_context",
@@ -14106,7 +14234,8 @@
       "gatewayTools": [
         "verify_identity_result:RECORDED",
         "get_invoice_context:CONTEXT",
-        "request_human:RECORDED"
+        "request_human:RECORDED",
+        "propose_plan:DENY"
       ],
       "tools": [
         "collections.planner.get_invoice_context",
@@ -14154,6 +14283,45 @@
         "collections.next-call.can_call",
         "collections.next-call.run_precall",
         "collections.next-call.start_call"
+      ],
+      "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    },
+    {
+      "id": "phone_mismatch",
+      "scenarioId": "C17",
+      "invoiceId": "1042",
+      "match": true,
+      "checks": {
+        "dialedOnce": true,
+        "callStatus": true,
+        "caseStatus": true,
+        "roles": true,
+        "cleared": true,
+        "noLeakBeforeIdentity": true,
+        "auditChain": true,
+        "warningRecorded": true,
+        "noAmountBeforeIdentity": true,
+        "contextAfterIdentity": true
+      },
+      "callStatus": "active",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "roles": [
+        "collections"
+      ],
+      "cleared": false,
+      "reconRules": [],
+      "gatewayTools": [
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:DENY",
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:CONTEXT"
+      ],
+      "tools": [
+        "collections.planner.get_invoice_context",
+        "collections.planner.can_call",
+        "collections.planner.run_precall",
+        "collections.planner.start_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     }
@@ -14408,6 +14576,7 @@
       "checks": {
         "plannerRule": true,
         "plannerNoDial": true,
+        "laterStepsRefused": true,
         "directDialRejected": true,
         "noProviderRequest": true,
         "auditChain": true
@@ -14435,6 +14604,7 @@
       "checks": {
         "plannerRule": true,
         "plannerNoDial": true,
+        "laterStepsRefused": true,
         "directDialRejected": true,
         "noProviderRequest": true,
         "auditChain": true
@@ -14462,6 +14632,7 @@
       "checks": {
         "plannerRule": true,
         "plannerNoDial": true,
+        "laterStepsRefused": true,
         "directDialRejected": true,
         "noProviderRequest": true,
         "auditChain": true
@@ -14489,6 +14660,7 @@
       "checks": {
         "plannerRule": true,
         "plannerNoDial": true,
+        "laterStepsRefused": true,
         "directDialRejected": true,
         "noProviderRequest": true,
         "auditChain": true
@@ -14516,6 +14688,7 @@
       "checks": {
         "plannerRule": true,
         "plannerNoDial": true,
+        "laterStepsRefused": true,
         "directDialRejected": true,
         "noProviderRequest": true,
         "auditChain": true
@@ -14543,6 +14716,7 @@
       "checks": {
         "plannerRule": true,
         "plannerNoDial": true,
+        "laterStepsRefused": true,
         "directDialRejected": true,
         "noProviderRequest": true,
         "auditChain": true
@@ -15266,16 +15440,8 @@
   },
   "gaps": [
     {
-      "id": "P03/1:signals",
-      "detail": "Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct."
-    },
-    {
-      "id": "P04/0:signals",
-      "detail": "Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct."
-    },
-    {
-      "id": "P07/0:signals",
-      "detail": "Tool signal list [PAYEE_NOT_IN_MASTER,OFAC_STOP] differs from key [OFAC_STOP]; authoritative sealed decision is [OFAC_STOP]. Signal lists and decision rules are distinct."
+      "id": "AR_RUNTIME",
+      "detail": "10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     },
     {
       "id": "P01",
@@ -15318,16 +15484,8 @@
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
     },
     {
-      "id": "C17",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
       "id": "C21",
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
-      "id": "AR_RUNTIME",
-      "detail": "9 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     }
   ]
 }

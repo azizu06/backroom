@@ -10,12 +10,13 @@ Failed refreshes mark the previous chain status stale and disable asking.
 ## Access and data boundary
 
 Configure the existing `WEBAUTHN_ORIGIN` and `CONTROLLER_ENROLLMENT_SECRET` variables
-on the Next server. The private operator code opens an eight-hour signed,
-HttpOnly, SameSite=Strict read session (Secure on HTTPS). It never reaches client
-props, local storage, a URL, or a model. The browser submits its code only to
-`POST /api/audit/session`. The session cookie is scoped to `/api/audit` and cannot
-authorize gateway tools or passkey approval decisions. POST origins are checked
-against deployment configuration. Audit reads and explanations require that
+on the Next server. The private operator code opens the demo's one eight-hour signed,
+HttpOnly, SameSite=Strict operator session (Secure only when that origin is HTTPS, so
+the loopback office works over HTTP), shared with the operator console, desk phone and
+policy editor. It never reaches client props, local storage, a URL, or a model. The
+browser submits its code only to the rate-limited `POST /api/session`
+(`web/lib/operator/sign-in.ts`). The cookie cannot authorize gateway tools or passkey
+approval decisions. POST origins must be `WEBAUTHN_ORIGIN` or the declared loopback office, `http://127.0.0.1:$DEMO_PORT`. Audit reads and explanations require that
 session and use `Cache-Control: no-store`.
 
 This is a single-company demo access gate, reusing the existing controller

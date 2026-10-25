@@ -54,6 +54,17 @@ describe('backgroundHosts', () => {
     const shell = tree([header, wrap]);
     expect(backgroundHosts(shell, modal)).toEqual([aside, header]);
   });
+  it('keeps the demo disclosure live and inerts only its host\'s other branches', () => {
+    const modal = tree();
+    const pill = tree();
+    const links = tree();
+    const note = tree([pill]);
+    const nav = tree([links, note]);
+    const header = tree();
+    const shell = tree([nav, header, modal]);
+    expect(backgroundHosts(shell, modal, [pill])).toEqual([links, header]);
+    expect(backgroundHosts(shell, modal, [nav])).toEqual([header]);
+  });
   it('inerts the whole shell when the modal is portaled outside it', () => {
     const shell = tree([tree()]);
     const modal = tree();
@@ -65,10 +76,13 @@ describe('backgroundHosts', () => {
 
 describe('office modal wiring', () => {
   const read = (name: string) => readFileSync(new URL(`../../app/office/${name}`, import.meta.url), 'utf8');
-  it('PlaySplash is a dialog that delegates focus to useModal', () => {
+  it('PlaySplash is a positioned role=dialog (not the top layer) that delegates focus to useModal', () => {
     const splash = read('PlaySplash.tsx');
     expect(splash).toContain('useModal');
-    expect(splash).toContain('<dialog');
+    expect(splash).toContain("role='dialog'");
+    expect(splash).toContain("aria-modal='true'");
+    expect(splash).not.toContain('<dialog');
+    expect(splash).not.toContain('showModal()');
     expect(splash).not.toContain("event.key === 'Tab'");
   });
   it('the hook sets inert, traps Tab, closes on Escape, and restores focus', () => {
@@ -86,6 +100,8 @@ describe('office modal wiring', () => {
     expect(office).toContain("from './PlaySplash'");
     expect(office).toContain('useOfficeHandoffs');
     expect(office).toContain('Enter first person');
-    expect(office).toContain("href='/operator'");
+    expect(office).toContain('<OfficeHelp />');
+    expect(office).toContain("<SiteNav placement='office' />");
+    expect(office).toContain('lookOnStart={lookOnEnter}');
   });
 });
