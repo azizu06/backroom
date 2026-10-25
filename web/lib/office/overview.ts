@@ -5,6 +5,7 @@
 import { FLOOR, INTERACT_RANGE, PLAYER_RADIUS, SPAWN, insideAny, interactCandidates, pickTarget, type Box, type PlayEntry, type Vec2 } from './play';
 import { AGENT_RADIUS } from './targets/agent';
 import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type OfficeSnapshot } from './state';
+import { SPACES } from './layout';
 
 export type { PlayEntry };
 
@@ -12,18 +13,9 @@ export type { PlayEntry };
 export type OverviewPick = { readonly kind: 'agent'; readonly id: string } | { readonly kind: 'room'; readonly room: AnchorId };
 
 export interface FloorRect { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
-/** Room cells from the partitions in officeColliders: walls at x = ±2.5, back doors at z = -0.65, front rooms from z ≈ 1.15. */
-const COLUMNS = [[FLOOR.minX, -2.5], [-2.5, 2.5], [2.5, FLOOR.maxX]] as const;
-const ROWS = { back: [FLOOR.minZ, -0.65], front: [1.15, FLOOR.maxZ] } as const;
-const CELLS: Record<AnchorId, readonly [column: 0 | 1 | 2, row: keyof typeof ROWS]> = {
-  collections: [0, 'back'], payables: [1, 'back'], vendor_onboarding: [2, 'back'],
-  lobby: [0, 'front'], dana: [1, 'front'], treasury: [2, 'front'],
-};
+/** A desk room's walls, from the floor plan (./layout). */
 export function roomRect(room: AnchorId): FloorRect {
-  const [column, row] = CELLS[room];
-  const [minX, maxX] = COLUMNS[column];
-  const [minZ, maxZ] = ROWS[row];
-  return { minX, maxX, minZ, maxZ };
+  return SPACES[room].rect;
 }
 export function roomAtPoint([x, z]: Vec2, rooms: readonly AnchorId[] = Object.keys(OFFICE_ANCHORS) as AnchorId[]): AnchorId | null {
   return rooms.find(room => { const r = roomRect(room); return x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ; }) ?? null;

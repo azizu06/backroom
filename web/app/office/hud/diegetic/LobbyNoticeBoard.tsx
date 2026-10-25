@@ -7,12 +7,13 @@ import { NOTICE_DECISION_COLORS, NOTICE_DECISION_LABELS, noticeBoard, noticeBoar
 import { canvasTextLines } from '../../../../lib/office/props/readability';
 import { PALETTE, ROLES } from '../../../../lib/office/palette';
 import { visibleRooms } from '../../../../lib/office/state';
+import { LOBBY_BOARD } from '../../../../lib/office/layout';
 import { PROP_FONT, useCanvasTexture } from '../../props/useCanvasTexture';
 import type { SceneMountProps } from '../../mounts/types';
 import { usePlayCamera } from './usePlayCamera';
 
-// Painted onto the face of the lobby counter board (LobbyCounter: 2 x 1.45 at [-5.9, 1.25, 3.9], facing the spawn).
-const BOARD = { x: -5.9, y: 1.25, z: 3.9 - 0.075 - 0.045, width: 1.9, height: 1.36 } as const;
+// Painted onto the face of the lobby decision board (LobbyCounter: 2 x 1.45 at LOBBY_BOARD, y 1.25, facing into the lobby).
+const BOARD = { x: LOBBY_BOARD[0], y: 1.25, z: LOBBY_BOARD[1] + 0.075 + 0.045, width: 1.9, height: 1.36 } as const;
 const TEX_W = 760, TEX_H = Math.round(TEX_W * BOARD.height / BOARD.width);
 const FACE = new PlaneGeometry(BOARD.width, BOARD.height);
 
@@ -86,7 +87,7 @@ function Board({ snapshot }: SceneMountProps) {
     canvas.dataset.noticeBoard = `${board.stats.map(stat => `${stat.label} ${stat.value}`).join(' · ')} | ${board.happened.map(entry => `${entry.decision} ${entry.text}`).join(' · ') || board.empty}`;
     return () => { delete canvas.dataset.noticeBoard; };
   }, [canvas, board]);
-  return <mesh name='hud-notice-board' geometry={FACE} position={[BOARD.x, BOARD.y, BOARD.z]} rotation={[0, Math.PI, 0]}>
+  return <mesh name='hud-notice-board' geometry={FACE} position={[BOARD.x, BOARD.y, BOARD.z]} rotation={[0, 0, 0]}>
     <meshBasicMaterial map={texture} toneMapped={false} />
   </mesh>;
 }

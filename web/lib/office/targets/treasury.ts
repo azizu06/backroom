@@ -1,7 +1,8 @@
 import { OFFICE_ANCHORS, matchingDenial, type FloorPosition } from "../state";
 import { defineTarget } from "./types";
+import { doorway } from "../layout";
 
-export const TREASURY_DOOR: FloorPosition = [5, 1.15];
+export const TREASURY_DOOR: FloorPosition = doorway("treasury").at;
 export const DOOR_RADIUS = 0.65;
 
 export const treasuryTarget = defineTarget<{ kind: "treasury" }>({

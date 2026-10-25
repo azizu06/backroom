@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { PALETTE } from '../palette';
 import { OFFICE_ANCHORS, type AnchorId } from '../state';
-import { officeColliders, PLAYER_RADIUS, SPAWN, type Box } from '../play';
+import { officeColliders, PAYLINK_KIOSK, PLAYER_RADIUS, SERVER_ROOM, SPAWN, TREASURY_DOOR, type Box } from '../play';
+import { BUILDING, CORRIDOR, CORRIDOR_Z, SPACES, WALL_HEIGHT, WALL_THICKNESS, roomPoint } from '../layout';
 import { PHONE_INTERACTION } from './phone';
 import { DRESSING, dressingColliders } from './dressing';
 import { monitorStandPosition, MONITOR_DESKS } from './monitors';
@@ -20,27 +21,24 @@ function footprint(piece: DetailPiece): Box {
   return rect(piece.at[0], piece.at[2], piece.size[0] * cos + piece.size[2] * sin, piece.size[0] * sin + piece.size[2] * cos);
 }
 
-/** Architectural interiors: shell inner faces, partition faces and the ends of the partitions. */
+/** Architectural interiors: each room's wall inner faces (../layout). */
 function roomBounds(room: AnchorId): Box {
-  const [x] = OFFICE_ANCHORS[room].center;
-  const top = ['collections', 'payables', 'vendor_onboarding'].includes(room);
-  return {
-    minX: x === -5 ? -7.92 : x - 2.44, maxX: x === 5 ? 8 : x + 2.44,
-    minZ: top ? -5.42 : 1.6, maxZ: top ? -0.85 : 5.4,
-  };
+  const r = SPACES[room].rect, half = WALL_THICKNESS / 2;
+  return { minX: r.minX + half, maxX: r.maxX - half, minZ: r.minZ + half, maxZ: r.maxZ - half };
 }
+const at = (room: AnchorId, dx: number, dz: number) => roomPoint(room, dx, dz);
 
 // Deliberately independent of the detail layout: keep the aisle, desk approaches, targets and
 // player-sized corridors along all existing wayfinding routes free, including flat decorations.
 const paths: Box[] = [
-  rect(0, 0.6, 15.8, 1.3),
+  rect((CORRIDOR.minX + CORRIDOR.maxX) / 2, CORRIDOR_Z, CORRIDOR.maxX - CORRIDOR.minX, 1.3),
   ...(['collections', 'payables', 'vendor_onboarding'] as const).map(room =>
-    ({ minX: OFFICE_ANCHORS[room].center[0] - 0.65, maxX: OFFICE_ANCHORS[room].center[0] + 0.65, minZ: -2.45, maxZ: -0.05 })),
-  { minX: -0.65, maxX: 0.65, minZ: 1.25, maxZ: 2.875 },
-  { minX: 3.5, maxX: 6.5, minZ: 0.5, maxZ: 1.8 },
-  { minX: 6.4, maxX: 7.8, minZ: -1.5, maxZ: 0.45 },
-  { minX: -4.9, maxX: -3.9, minZ: 1.25, maxZ: 2.6 },
-  { minX: PHONE_INTERACTION.position[0] - PLAYER_RADIUS, maxX: PHONE_INTERACTION.position[0] + PLAYER_RADIUS, minZ: -2.47, maxZ: -1.3 },
+    ({ minX: OFFICE_ANCHORS[room].center[0] - 0.65, maxX: OFFICE_ANCHORS[room].center[0] + 0.65, minZ: CORRIDOR.minZ - 1.8, maxZ: CORRIDOR_Z })),
+  { minX: OFFICE_ANCHORS.dana.center[0] - 0.65, maxX: OFFICE_ANCHORS.dana.center[0] + 0.65, minZ: CORRIDOR.maxZ - 0.35, maxZ: OFFICE_ANCHORS.dana.center[1] - 0.525 },
+  { minX: TREASURY_DOOR[0] - 1.5, maxX: TREASURY_DOOR[0] + 1.5, minZ: TREASURY_DOOR[1] - 0.65, maxZ: TREASURY_DOOR[1] + 0.65 },
+  { minX: SERVER_ROOM.position[0] - 0.7, maxX: SERVER_ROOM.position[0] + 0.7, minZ: SERVER_ROOM.position[1] - 0.7, maxZ: SERVER_ROOM.position[1] + 1.25 },
+  { minX: PAYLINK_KIOSK[0] - 0.5, maxX: PAYLINK_KIOSK[0] + 0.5, minZ: PAYLINK_KIOSK[1] - 1.85, maxZ: PAYLINK_KIOSK[1] - 0.5 },
+  { minX: PHONE_INTERACTION.position[0] - PLAYER_RADIUS, maxX: PHONE_INTERACTION.position[0] + PLAYER_RADIUS, minZ: at('collections', 0, 0.53)[1], maxZ: at('collections', 0, 1.7)[1] },
   rect(...SPAWN.position, PLAYER_RADIUS * 2, PLAYER_RADIUS * 2),
   ...MONITOR_DESKS.map(room => rect(...monitorStandPosition(room), PLAYER_RADIUS * 2, PLAYER_RADIUS * 2)),
   ...DRESSING.routes.flatMap(route => route.points.slice(1).map((end, index) => {
@@ -78,10 +76,11 @@ describe('pastel room details', () => {
         expect(piece.at[1] + piece.size[1] / 2).toBeLessThanOrEqual(0.062);
       } else if (detail.kind === 'art') {
         const [x, y, z] = piece.at;
-        const onShell = Math.abs(x + 7.92) < 0.1 || Math.abs(z + 5.42) < 0.1;
-        const onPartition = Math.abs(Math.abs(x) - 2.5) < 0.15;
+        const face = WALL_THICKNESS / 2;
+        const onShell = Math.abs(x - (BUILDING.minX + face)) < 0.1 || Math.abs(z - (BUILDING.minZ + face)) < 0.1;
+        const onPartition = [-6, 0, 6].some(wall => Math.abs(Math.abs(x - wall) - face) < 0.1);
         expect(onShell || onPartition, detail.id).toBe(true);
-        expect(y + piece.size[1] / 2, detail.id).toBeLessThanOrEqual(onShell ? 1.1 : 0.76);
+        expect(y + piece.size[1] / 2, detail.id).toBeLessThanOrEqual(WALL_HEIGHT);
       } else {
         expect(supports.some(support => contains(support, footprint(piece))), detail.id).toBe(true);
         expect(piece.at[1] - piece.size[1] / 2, detail.id).toBeGreaterThanOrEqual(0.9 - 1e-9);

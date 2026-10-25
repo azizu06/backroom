@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INITIAL_OFFICE, type OfficeAgent, type OfficeSnapshot } from './state';
+import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeAgent, type OfficeSnapshot } from './state';
 import { PALETTE, ROLES } from './palette';
 import { PLATE_TONES, deskPlate, deskPlateKey, deskPlates, noticeBoard } from './hud-diegetic';
 
@@ -12,7 +12,7 @@ const at = (agent: Partial<OfficeAgent>, extra: Partial<OfficeSnapshot> = {}): O
 describe('diegetic desk plates', () => {
   it('hangs a working plate over the seat desk with the agent task', () => {
     const plate = deskPlate(at({}), alex);
-    expect(plate).toMatchObject({ name: 'Alex', desk: 'Collections', task: 'Reviewing invoice 1042', tone: 'working', status: 'Working', at: [-5, -3] });
+    expect(plate).toMatchObject({ name: 'Alex', desk: 'Collections', task: 'Reviewing invoice 1042', tone: 'working', status: 'Working', at: [...OFFICE_ANCHORS.collections.center] });
     expect(PLATE_TONES[plate.tone].color).toBe(PALETTE.mint);
   });
 

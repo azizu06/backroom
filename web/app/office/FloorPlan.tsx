@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { roomLabel, seatLabel } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
+import { BUILDING } from '../../lib/office/layout';
 import { OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 
 function planLeft(position: readonly number[]) { return `${50 + position[0]! / 16 * 100}%`; }
@@ -37,7 +38,7 @@ export function FloorPlan({ snapshot, motions, select }: { snapshot: OfficeSnaps
   return <div className='floor-plan' aria-label='2D office floor plan'>
     <div className='plan-aisle' aria-hidden='true' />
     {visibleRooms(snapshot).map(room => <button key={room} className='plan-room' aria-label={roomLabel(room, snapshot)} onClick={event => select(room, event.currentTarget)}
-      style={{ left: `${50 + OFFICE_ANCHORS[room].center[0] / 16 * 100}%`, top: `${50 + OFFICE_ANCHORS[room].center[1] / 11 * 100}%` }}>
+      style={{ left: `${(OFFICE_ANCHORS[room].center[0] - BUILDING.minX) / (BUILDING.maxX - BUILDING.minX) * 100}%`, top: `${(OFFICE_ANCHORS[room].center[1] - BUILDING.minZ) / (BUILDING.maxZ - BUILDING.minZ) * 100}%` }}>
       {OFFICE_ANCHORS[room].name}{room === 'treasury' && ' · Locked'}
       {matchingDenial(snapshot, room) && <span className='denial-text' data-denial-audit={matchingDenial(snapshot, room)!.auditId}>Entry denied</span>}
     </button>)}

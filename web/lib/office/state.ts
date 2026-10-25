@@ -1,12 +1,14 @@
+import { ANCHOR_LAYOUT } from "./layout";
 import type { Handoff } from './handoffs';
 
+/** Positions come from the floor-plan data in ./layout; names and accent colours live here. */
 export const OFFICE_ANCHORS = {
-  lobby: { name: "Lobby", position: [-5, 3] as const, center: [-5, 2.9] as const, color: "#8c9c87" },
-  collections: { name: "Collections", position: [-5, -1.8] as const, center: [-5, -3] as const, color: "#a9bc8f" },
-  payables: { name: "Payables", position: [0, -1.8] as const, center: [0, -3] as const, color: "#bdac89" },
-  vendor_onboarding: { name: "Vendor Desk", position: [5, -1.8] as const, center: [5, -3] as const, color: "#b2a3bb" },
-  dana: { name: "Dana’s desk", position: [0, 2.2] as const, center: [0, 3.4] as const, color: "#cc9c7d" },
-  treasury: { name: "Treasury", position: [5, 0.6] as const, center: [5, 3.4] as const, color: "#788b85" },
+  lobby: { name: "Lobby", ...ANCHOR_LAYOUT.lobby, color: "#8c9c87" },
+  collections: { name: "Collections", ...ANCHOR_LAYOUT.collections, color: "#a9bc8f" },
+  payables: { name: "Payables", ...ANCHOR_LAYOUT.payables, color: "#bdac89" },
+  vendor_onboarding: { name: "Vendor Desk", ...ANCHOR_LAYOUT.vendor_onboarding, color: "#b2a3bb" },
+  dana: { name: "Dana’s desk", ...ANCHOR_LAYOUT.dana, color: "#cc9c7d" },
+  treasury: { name: "Treasury", ...ANCHOR_LAYOUT.treasury, color: "#788b85" },
 } as const;
 export type AnchorId = keyof typeof OFFICE_ANCHORS;
 /** Live rows carry free-form anchor strings; never index OFFICE_ANCHORS without this guard. */

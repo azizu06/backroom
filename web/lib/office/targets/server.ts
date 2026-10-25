@@ -1,7 +1,7 @@
 import { defineTarget } from "./types";
 
-/** GX10 server room footprint: scene.tsx mounts ServerRoom here and Play makes it solid and interactable. */
-export const SERVER_ROOM = { position: [7.1, -0.8] as const, size: { width: 1.2, depth: 1.05 } } as const;
+/** GX10 rack in the server room at the corridor's east end (layout SPACES.server_room); Play makes it solid and interactable. */
+export const SERVER_ROOM = { position: [10.9, -0.8] as const, size: { width: 1.2, depth: 1.05 } } as const;
 
 export const serverTarget = defineTarget<{ kind: "server" }>({
   id: "server",

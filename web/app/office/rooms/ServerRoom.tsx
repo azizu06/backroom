@@ -5,7 +5,7 @@ import { serverRoomReadout, type Gx10Status } from '../../../lib/gx10/server-roo
 import { ROLES } from '../../../lib/office/palette';
 
 /** One scene anchor; no camera, Play controls, policy, or state mutations. */
-export function ServerRoom({ position = [7.1, 0, -0.8], replay = false }: { position?: [number, number, number]; replay?: boolean }) {
+export function ServerRoom({ position = [10.9, 0, -0.8], replay = false }: { position?: [number, number, number]; replay?: boolean }) {
   const [status, setStatus] = useState<Gx10Status | null>(null);
   useEffect(() => {
     // Replay is a recorded projection: never read live telemetry or arm its timer.

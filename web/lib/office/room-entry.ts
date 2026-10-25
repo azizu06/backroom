@@ -1,8 +1,8 @@
 /** Room labels are view-only; these radii never grant access or affect Play's colliders. */
 import { OFFICE_ANCHORS, type AnchorId, type FloorPosition } from './state';
 
-export const ROOM_ENTER_RADIUS = 2.2;
-export const ROOM_LEAVE_RADIUS = 2.8;
+export const ROOM_ENTER_RADIUS = 2.8;
+export const ROOM_LEAVE_RADIUS = 3.4;
 export const ROOM_ENTRY_MS = 1600;
 
 /** Furniture colliders are not room footprints, so use the shared anchor centres. */

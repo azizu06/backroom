@@ -16,6 +16,7 @@ import {
   type DeskSeat,
 } from '../../../lib/office/baked-seat';
 import { visibleRooms, type OfficeAgent } from '../../../lib/office/state';
+import { CONTACT_DYNAMIC_LAYER } from '../../../lib/office/lighting';
 import { useReducedMotion } from './shared';
 import { StaticBoxes } from './StaticGeometry';
 import type { SceneMountProps } from './types';
@@ -297,6 +298,8 @@ function syncClone(template: CharacterTemplate, agent: OfficeAgent, map: Map<str
   object.visible = false;
   (object.userData as { seatId?: string }).seatId = agent.seatId;
   object.traverse(node => {
+    // Walks with its agent: drawn by the per-frame contact-shadow pass, never baked.
+    node.layers.enable(CONTACT_DYNAMIC_LAYER);
     const mesh = node as Mesh;
     if (!mesh.isMesh) return;
     mesh.castShadow = true;

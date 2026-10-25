@@ -249,7 +249,7 @@ html body .office-shell .office-drawer {
 }
 .office-shell .overview-map-actions .overview-map-fp { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
 .office-shell .overview-map-actions kbd { margin-left: 4px; padding: 0 4px; font: inherit; font-size: 11px; border: 1px solid var(--office-lavender); border-radius: 4px; color: var(--office-navy); background: var(--office-cream); }
-.office-shell .overview-map-board { position: relative; align-self: center; justify-self: center; width: min(100%, calc((100dvh - 230px) * 16 / 11)); aspect-ratio: 16 / 11; border-radius: 14px; background: var(--office-peach); border: 2px solid var(--office-navy); }
+.office-shell .overview-map-board { position: relative; align-self: center; justify-self: center; border-radius: 14px; background: var(--office-peach); border: 2px solid var(--office-navy); }
 .office-shell .overview-map-hall { position: absolute; display: grid; place-items: center; background: var(--office-blush); opacity: .7; }
 .office-shell .overview-map-hall span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--office-navy); }
 .office-shell .overview-map-room {
