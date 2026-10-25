@@ -40,6 +40,10 @@
 .play-setting input[type='range'] { width: 100%; accent-color: var(--office-navy); }
 .play-setting-check { display: flex; align-items: center; gap: 8px; }
 .play-settings-note { margin: 4px 0 10px; }
+.play-setting-group { margin: 12px 0; padding: 8px 12px; border: 1px solid var(--office-lavender); border-radius: 10px; }
+.play-setting-group summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+.play-setting-group summary .play-settings-note { display: block; margin: 4px 0 0; font-size: 13px; font-weight: 400; }
+.play-setting-group summary:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 .play-settings input:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 @media (max-width: 760px) {
   .play-panel.play-settings { top: 88px; right: 8px; width: min(280px, calc(100% - 16px)); }
