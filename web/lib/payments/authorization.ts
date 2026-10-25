@@ -1,12 +1,17 @@
 import type { AuthorizedPaymentLink } from '@backroom/orchestrator';
-import type { GatewayCall } from '../gateway/store';
+import { DANA_APPROVED } from '../gateway/policy-adapter';
+import type { AuditEntry, GatewayCall } from '../gateway/store';
+
+/** A plan is authorized by propose_plan's ALLOW, or by check_approval's ALLOW on Dana's passkey approval. */
+const isPlanAuthority = (row: AuditEntry) =>
+  row.action === 'propose_plan' || (row.action === 'check_approval' && row.ruleIds.includes(DANA_APPROVED));
 
 /** Only stored gateway rows and their original ALLOW audit can authorize a payment. */
 export function authorizedPaymentLink(call: GatewayCall, id: string, now = Date.now()): AuthorizedPaymentLink | undefined {
   const link = call.links.find(row => row.id === id);
   const plan = link && call.plans.find(row => row.id === link.planId && row.auditId === link.auditId);
   const audit = plan && call.audits.find(row => row.id === plan.auditId && row.kind === 'ALLOW'
-    && row.action === 'propose_plan' && row.policyVersion === call.policyVersion);
+    && isPlanAuthority(row) && row.policyVersion === call.policyVersion);
   if (!link || !plan || !audit?.plan || call.currency !== 'USD' || call.status !== 'active'
     || (link.expiresAt !== undefined && now >= link.expiresAt)) return;
   for (const field of ['installments', 'firstPaymentPct', 'durationDays', 'waiveFee', 'discountPct'] as const) {
