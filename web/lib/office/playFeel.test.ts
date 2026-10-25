@@ -118,7 +118,7 @@ describe("per-frame feel", () => {
   });
 
   it("keeps the kick subtle and never scales past walking speed", () => {
-    expect(FOV_KICK).toBeLessThanOrEqual(5);
+    expect(FOV_KICK).toBe(3.5);
     const fast = run(DEFAULT_FEEL, WALK_SPEED * 2, 2);
     expect(fast.last.fov).toBeLessThanOrEqual(BASE_FOV + FOV_KICK + 1e-9);
   });
@@ -164,7 +164,39 @@ describe("per-frame feel", () => {
 });
 
 describe("reduced motion and settings", () => {
-  it("forces every effect off under reduced motion, whatever the settings say", () => {
+  it("honours the office override while preserving individual switches", () => {
+    const flags = { ...DEFAULT_FEEL, bob: false, useMotionAnyway: true };
+    expect(effectiveFeel(flags, true)).toEqual(flags);
+    expect(effectiveFeel(flags, false)).toEqual(flags);
+    expect(effectiveFeel({ ...flags, useMotionAnyway: false }, true)).toEqual(NO_FEEL);
+    const walking = run(effectiveFeel(flags, true), WALK_SPEED, 2);
+    expect(walking.last.bobY).toBe(0);
+    expect(walking.last.fov - BASE_FOV).toBeCloseTo(FOV_KICK, 3);
+  });
+
+  it("uses the original release rate, stops requesting settle frames, and disables immediately", () => {
+    const walking = { distance: STEP_DISTANCE, bob: 1, fov: FOV_KICK };
+    const settling = run(DEFAULT_FEEL, 0, 0.1, walking);
+    expect(Math.abs(settling.last.bobY)).toBeCloseTo(0.03 * Math.exp(-9 * 0.1), 9);
+    expect(settling.state.fov).toBeCloseTo(3.5 * Math.exp(-9 * 0.1), 9);
+    expect(settling.last.settling).toBe(true);
+    const rested = run(DEFAULT_FEEL, 0, 1, walking);
+    expect(rested.last.bobY).toBe(0);
+    expect(rested.last.settling).toBe(false);
+    const off = advanceFeel(walking, { speed: WALK_SPEED, travelled: 0.05, dt: 1 / 60, flags: NO_FEEL });
+    expect(off.bobY).toBe(0);
+    expect(off.fov).toBe(BASE_FOV);
+  });
+
+  it("makes starts and releases stepped without smoothing", () => {
+    const smooth = integrateVelocity([0, 0], [WALK_SPEED, 0], 1 / 60, true);
+    const stepped = integrateVelocity([0, 0], [WALK_SPEED, 0], 1 / 60, false);
+    expect(stepped[0] - smooth[0]).toBeGreaterThan(2);
+    expect(integrateVelocity(stepped, [0, 0], 1 / 60, false)).toEqual([0, 0]);
+    expect(integrateVelocity(stepped, [0, 0], 1 / 60, true)[0]).toBeGreaterThan(2);
+  });
+
+  it("forces every effect off under reduced motion unless explicitly overridden", () => {
     expect(effectiveFeel(DEFAULT_FEEL, true)).toEqual(NO_FEEL);
     expect(effectiveFeel({ smoothing: true, bob: true, fovKick: true }, true)).toEqual({ smoothing: false, bob: false, fovKick: false });
     expect(effectiveFeel(DEFAULT_FEEL, false)).toEqual(DEFAULT_FEEL);
@@ -183,7 +215,7 @@ describe("reduced motion and settings", () => {
   it("defaults all three effects on and maps settings to flags", () => {
     expect(DEFAULT_PLAY_SETTINGS).toMatchObject({ smoothMove: true, headBob: true, fovKick: true });
     expect(feelFlags(DEFAULT_PLAY_SETTINGS)).toEqual(DEFAULT_FEEL);
-    expect(feelFlags({ ...DEFAULT_PLAY_SETTINGS, headBob: false })).toEqual({ smoothing: true, bob: false, fovKick: true });
+    expect(feelFlags({ ...DEFAULT_PLAY_SETTINGS, headBob: false })).toEqual({ ...DEFAULT_FEEL, bob: false });
   });
 
   it("PlayInput carries the feel flags with the defaults", () => {

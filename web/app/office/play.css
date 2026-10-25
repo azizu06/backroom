@@ -33,6 +33,11 @@
   .play-panel { top: 8px; left: 8px; width: min(300px, calc(100% - 16px)); }
 }
 .office-shell .play-settings-toggle { position: absolute; top: 52px; right: 18px; padding: 5px 10px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-peach); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-size: 13px; }
+/* Keep Settings on its own row, clear of the Overview pill in every HUD variant. */
+.office-shell[data-hud] .play-hud > .play-settings-toggle { top: 52px !important; right: 18px !important; }
+.office-shell[data-hud] .play-hud > .play-panel.play-settings { top: 92px; max-height: calc(100% - 104px); }
+.play-hud > .play-settings-toast { position: absolute; z-index: 7; bottom: 24px; left: 50%; transform: translateX(-50%); pointer-events: none; padding: 8px 14px; border-radius: 10px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-lavender); box-shadow: var(--office-plate-shadow); }
+.play-settings-toast:empty { display: none; }
 .play-panel.play-settings { left: auto; right: 18px; top: 92px; width: 280px; }
 .play-setting { display: grid; gap: 4px; margin: 12px 0; font-size: 13px; color: var(--office-navy); }
 .play-setting span { display: flex; justify-content: space-between; }

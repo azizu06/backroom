@@ -16,6 +16,25 @@ function memory() {
 }
 
 describe("play settings", () => {
+  it("persists the office override and resets it to the original defaults", () => {
+    const storage = memory();
+    const settings = { ...DEFAULT_PLAY_SETTINGS, useMotionAnyway: true };
+    expect(savePlaySettings(storage, settings)).toBe(true);
+    expect(storage.data.has(PLAY_SETTINGS_KEY)).toBe(true);
+    expect(loadPlaySettings(storage)).toEqual(settings);
+    savePlaySettings(storage, DEFAULT_PLAY_SETTINGS);
+    expect(storage.data.has(PLAY_SETTINGS_KEY)).toBe(false);
+    expect(loadPlaySettings(storage)).toEqual({
+      sensitivity: 1, invertY: false, speed: 1, smoothMove: true, headBob: true, fovKick: true,
+      useMotionAnyway: false,
+    });
+  });
+
+  it("migrates old settings and validates the override", () => {
+    expect(parsePlaySettings('{"headBob":false}')).toMatchObject({ headBob: false, useMotionAnyway: false });
+    expect(parsePlaySettings('{"useMotionAnyway":"yes"}')).toEqual(DEFAULT_PLAY_SETTINGS);
+  });
+
   it("stores the movement-feel switches and falls back per field", () => {
     const off = { smoothMove: false, headBob: false, fovKick: false };
     expect(parsePlaySettings(JSON.stringify(off))).toEqual({ ...DEFAULT_PLAY_SETTINGS, ...off });
