@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { isReplayPage } from '../lib/replay/mode';
 
 /** Both placements share the operator-only endpoint and its per-reset batch claim. */
 export function StartWorkdayButton() {
@@ -7,6 +8,7 @@ export function StartWorkdayButton() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
+    if (isReplayPage()) return;
     let active = true;
     const refresh = async () => {
       try {
