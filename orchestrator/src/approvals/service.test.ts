@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { ControllerApprovals } from './service';
@@ -182,6 +185,92 @@ describe('M6 server-verified controller authority', () => {
     expect(await service.pending(['e1', 'e2'])).toEqual([]);
     advance(12 * 60 * 60_000);
     expect(service.hasSession(token)).toBe(false);
+  });
+
+  describe('controller credential file', () => {
+    const config = { origin: 'http://localhost:3020', rpID: 'localhost', enrollmentSecret: 'test-enrollment' };
+    async function enrolled() {
+      const dir = mkdtempSync(join(tmpdir(), 'backroom-controller-'));
+      const credentialFile = join(dir, 'nested', 'controller-credential.json');
+      const store = new MemoryStateStore();
+      const auth = new TestAuthenticator();
+      const first = new ControllerApprovals(store, { ...config, credentialFile });
+      const { options, challengeId } = await first.registrationOptions('test-enrollment');
+      await first.register('test-enrollment', challengeId, auth.registration(options.challenge));
+      const signIn = async (service: ControllerApprovals) => {
+        const session = await service.sessionOptions();
+        return (await service.signIn(session.challengeId, auth.assertion(session.options.challenge))).token;
+      };
+      const restart = (overrides: Partial<typeof config> = {}) =>
+        new ControllerApprovals(store, { ...config, ...overrides, credentialFile });
+      return { store, auth, first, credentialFile, signIn, restart };
+    }
+
+    it('lets a restarted service accept the registered passkey without re-enrollment', async () => {
+      const { store, auth, first, credentialFile, signIn, restart } = await enrolled();
+      const token = await signIn(first);
+      const text = readFileSync(credentialFile, 'utf8');
+      expect(statSync(credentialFile).mode & 0o777).toBe(0o600);
+      expect(text).not.toContain('test-enrollment');
+      expect(text).not.toContain(token);
+
+      const second = restart();
+      expect(second.isRegistered()).toBe(true);
+      expect(second.hasSession(token)).toBe(true);
+      await expect(second.registrationOptions('test-enrollment')).rejects.toThrow('CONTROLLER_ALREADY_REGISTERED');
+      expect(second.hasSession(await signIn(second))).toBe(true);
+      await store.insertInvoice({ id: '1042', kind: 'ar', state: 'in_collection' });
+      await store.createCallEscalation({ id: 'e1', taskId: 't1', callId: 'c1', fromAgent: 'collections-1', toHuman: 'Dana',
+        seat: 'collections', evidenceRefs: ['audit:1', '1042'], ruleIds: ['MAX_INSTALLMENTS'], invoiceId: '1042', policyVersion: 1,
+        quote: { sentenceId: 'NF-005', text: 'At most two installments.' }, amountCents: 495000, principalCents: 480000,
+        lateFeeCents: 15000, currency: 'USD', requestedTerms: terms }, Date.now());
+      const { options, challengeId } = await second.decisionOptions('e1', { kind: 'Approve' });
+      expect(await second.decide('e1', challengeId, auth.assertion(options.challenge)))
+        .toMatchObject({ status: 'approved', credentialId: auth.id });
+
+      // Three assertions advanced the sign counter to 3; the next restart still refuses a cloned counter.
+      const third = restart();
+      const cloned = await third.sessionOptions();
+      await expect(third.signIn(cloned.challengeId, auth.assertion(cloned.options.challenge, { counter: 3 }))).rejects.toThrow();
+      expect(third.hasSession(await signIn(third))).toBe(true);
+    });
+
+    it.each([
+      ['a swapped public key', (file: { payload: string }) => {
+        const payload = JSON.parse(file.payload);
+        payload.credential.publicKey = Buffer.alloc(77, 1).toString('base64url');
+        file.payload = JSON.stringify(payload);
+      }],
+      ['a forged session', (file: { payload: string }) => {
+        const payload = JSON.parse(file.payload);
+        payload.sessions.push({ hash: 'a'.repeat(43), expiresAt: Number.MAX_SAFE_INTEGER });
+        file.payload = JSON.stringify(payload);
+      }],
+      ['a replaced MAC', (file: { mac: string }) => { file.mac = Buffer.alloc(32).toString('base64url'); }],
+      ['unparseable JSON', null],
+    ] as const)('rejects a tampered file with %s and requires enrollment again', async (_name, tamper) => {
+      const { credentialFile, restart, signIn } = await enrolled();
+      if (tamper) {
+        const file = JSON.parse(readFileSync(credentialFile, 'utf8'));
+        tamper(file);
+        writeFileSync(credentialFile, JSON.stringify(file));
+      } else writeFileSync(credentialFile, '{ not json');
+      const second = restart();
+      expect(second.isRegistered()).toBe(false);
+      await expect(second.sessionOptions()).rejects.toThrow('CONTROLLER_NOT_REGISTERED');
+      await expect(signIn(second)).rejects.toThrow('CONTROLLER_NOT_REGISTERED');
+      const next = new TestAuthenticator();
+      const { options, challengeId } = await second.registrationOptions('test-enrollment');
+      await second.register('test-enrollment', challengeId, next.registration(options.challenge));
+      expect(restart().isRegistered()).toBe(true);
+    });
+
+    it('does not trust a file written under another enrollment secret or relying party', async () => {
+      const { restart } = await enrolled();
+      expect(restart({ enrollmentSecret: 'rotated-enrollment' }).isRegistered()).toBe(false);
+      expect(restart({ origin: 'http://localhost:3021' }).isRegistered()).toBe(false);
+      expect(restart().isRegistered()).toBe(true);
+    });
   });
 
   it('rejects a sign-in assertion without user verification', async () => {
