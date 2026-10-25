@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { auditStories, currentRun, isPlumbing, whyQuestion } from './stories';
 import { MemoryStateStore } from '@backroom/orchestrator';
+import { auditStories, currentRun, isPlumbing, whyQuestion } from './stories';
 import { demoRunSnapshot } from './testing/demoRun';
 
 describe('audit stories', () => {
@@ -36,6 +36,18 @@ describe('audit stories', () => {
     // The bank-change escalation joins its inbox item, not the call.
     expect(inbox.lines.map(line => line.entry.action)).toEqual(['create_escalation', 'judge_inbox_decision']);
     expect(inbox.lines[1]).toMatchObject({ text: 'Inbox bank change refused', outcome: 'DENY', rule: 'LOOKALIKE_DOMAIN +1', proof: 'deny' });
+  });
+
+  it('labels a reconciled AP withdrawal as a debit, including the invoice and exact-match proof', async () => {
+    const store = new MemoryStateStore();
+    await store.appendAudit({ ts: 1, actor: 'code', seat: 'payables', action: 'reconcile', decision: 'ALLOW',
+      ruleIds: ['EXACT_PAYMENT_MATCH'], policyVersion: 1, refs: ['judge:p01', '4401', 'nessie-debit-4401'],
+      route: 'code', latencyMs: 0, costUsd: 0, inputs: { transactionKind: 'withdrawal', match: 'EXACT',
+        debitId: 'nessie-debit-4401', transactionId: 'nessie-debit-4401', invoiceId: '4401', amountCents: 64000 } });
+    const payment = auditStories(await store.listAudit())[0]!;
+    expect(payment.title).toBe('Payment $640.00 reconciled');
+    expect(payment.lines[0]).toMatchObject({ text: 'Debit matched invoice 4401 exactly', proof: 'match',
+      rule: 'EXACT_PAYMENT_MATCH', amount: '$640.00' });
   });
 
   it('falls back to the whole chain and an implicit call when nothing marks the run or the dial', async () => {

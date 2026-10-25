@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { FileClaims, NessieClient } from './index.js';
+import { FileClaims, NessieClient, withdrawalMemo } from './index.js';
 
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
@@ -27,6 +27,44 @@ it('R13: concurrent clients sharing durable claims issue only one POST', async (
   expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
   expect((await other.deposit(payment))._id).toBe('d1');
   await expect(other.deposit({ ...payment, amountCents: 100 })).rejects.toThrow('conflict');
+});
+it('creates one sandbox withdrawal per invoice and reconciles the exact debit from the bank feed', async () => {
+  const withdrawals: unknown[] = [];
+  const fetcher = vi.fn<typeof fetch>(async (url, init) => {
+    expect(new URL(String(url)).pathname).toBe('/accounts/a1/withdrawals');
+    if (init?.method === 'POST') {
+      const withdrawal = { _id: 'w1', ...JSON.parse(String(init.body)) };
+      withdrawals.push(withdrawal);
+      return Response.json({ objectCreated: withdrawal }, { status: 201 });
+    }
+    return Response.json(withdrawals);
+  });
+  const { client, dir } = await setup(fetcher);
+  const debit = { accountId: 'a1', vendorId: 'papertrail', invoiceId: '4401', amountCents: 64000 };
+  expect((await client.withdraw(debit))._id).toBe('w1');
+  const restarted = new NessieClient({ apiKey: 'secret', claims: new FileClaims(dir), fetch: fetcher });
+  expect((await restarted.withdraw(debit))._id).toBe('w1');
+  expect(await restarted.reconcileWithdrawal(debit, 'w1')).toEqual({
+    match: 'EXACT', debitId: 'w1', transactionId: 'w1', amountCents: 64000,
+  });
+  expect(withdrawalMemo(debit)).toBe('backroom:ap_vendor=papertrail:invoice=4401');
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+});
+it('recovers a withdrawal after a lost POST response and never debits the invoice twice after restart', async () => {
+  const withdrawals: unknown[] = [];
+  const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
+    if (init?.method === 'POST') {
+      withdrawals.push({ _id: 'w-lost', ...JSON.parse(String(init.body)) });
+      throw new Error('network failure with secret URL');
+    }
+    return Response.json(withdrawals);
+  });
+  const { client, dir } = await setup(fetcher);
+  const debit = { accountId: 'a1', vendorId: 'papertrail', invoiceId: '4401', amountCents: 64000 };
+  expect((await client.withdraw(debit))._id).toBe('w-lost');
+  const restarted = new NessieClient({ apiKey: 'secret', claims: new FileClaims(dir), fetch: fetcher });
+  expect((await restarted.withdraw(debit))._id).toBe('w-lost');
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 });
 it('rejects fractional-dollar amounts before touching the integer-only sandbox', async () => {
   const fetcher = vi.fn<typeof fetch>(); const { client } = await setup(fetcher);

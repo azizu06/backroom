@@ -21,7 +21,7 @@ const feed = await bank.listTransactions(account._id);
 ```
 
 Exports: `NessieClient`, `FileClaims`, `Claims`, `NessieError`, `seedNorthfield`,
-`paymentMemo`, `SANDBOX_LABEL`, `POSTED_DEPOSITS_LABEL`, `PostedDepositsDisplay`, and typed customer/account/payment/transaction
+`paymentMemo`, `withdrawalMemo`, `SANDBOX_LABEL`, `POSTED_DEPOSITS_LABEL`, `PostedDepositsDisplay`, and typed customer/account/payment/transaction
 inputs and results. Customer/account create/get/list methods are available.
 `readBalance` returns the provider's balance in dollars; `amountCents` is integer
 cents and converts at the boundary. **The current API truncates fractional dollar
@@ -54,6 +54,23 @@ claim reserved until an operator reconciles it. Claims never expire automaticall
 Raw `createCustomer`/`createAccount` methods do not promise idempotency; use
 `seedNorthfield` for the seed workflow.
 
+## AP sandbox withdrawals
+
+`withdraw({ accountId, vendorId, invoiceId, amountCents })` posts a completed balance withdrawal
+to the configured Nessie sandbox account. The memo is the code-owned
+`backroom:ap_vendor=<vendorId>:invoice=<invoiceId>`; callers cannot replace it. It scans the withdrawal
+feed before POST, reserves `withdrawal:<account>:<memo>` in the same durable Claims
+domain, never blindly retries a POST, and recovers the exact feed row after an
+ambiguous response. A conflicting amount, cancelled row, duplicate memo, or reserved
+but absent row fails closed. The integer-only sandbox still requires whole dollars.
+
+`reconcileWithdrawal(request, debitId)` performs a fresh withdrawal-feed read and
+returns `EXACT` only when one row has the same debit ID, memo, amount, `balance`
+medium and `completed` status. `MISMATCH` is evidence for controller review, not a
+successful payment. `@backroom/orchestrator` exports `nessieDebitPayables` to bind
+this client to `PayablesSeat`; the configured source account is `NESSIE_ACCOUNT_ID`.
+This is simulated sandbox money only, never a production bank rail.
+
 `readBalanceWithPostedDeposits(accountId)` is an explicitly selected sandbox display:
 “Nessie account balance + Nessie-reported posted deposits”. It returns `accountBalance`,
 `postedDepositsTotal`, `displayTotal`, and `postedDepositIds`, all from API reads.
@@ -75,6 +92,8 @@ pnpm --filter @backroom/nessie typecheck
 # Only opt-in live script; loads root .env.local without printing it.
 # Seeds Northfield, reuses a fixed invoice/installment reference, writes redacted evidence under ignored .nessie-state/.
 pnpm --filter @backroom/nessie live -- --confirm-sandbox
+# One fixed, idempotent $1 AP debit; prints only redacted IDs.
+pnpm --filter @backroom/nessie debit:live -- --confirm-sandbox-debit
 # Optional diagnostic variants: one-time mutation claims; reads on replay.
 pnpm --filter @backroom/nessie live -- --confirm-sandbox --probe-variants
 ```
