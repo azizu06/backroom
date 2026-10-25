@@ -11,6 +11,7 @@
     "test:approvals:browser": "playwright test --config playwright.approvals.config.ts",
     "test:controller:browser": "playwright test --config playwright.controller.config.ts",
     "test:office:browser": "playwright test --config playwright.office.config.ts",
+    "test:office:walk": "OFFICE_WALK=1 playwright test --config playwright.office.config.ts office-walk.spec.ts --global-timeout=240000",
     "test:audit:browser": "playwright test --config playwright.audit.config.ts",
     "test:inbox:browser": "playwright test --config playwright.inbox.config.ts",
     "test:payments:browser": "playwright test --config playwright.payments.config.ts",

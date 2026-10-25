@@ -78,6 +78,15 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
 
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_OFFICE_TEST !== '1') return;
+    Object.defineProperty(window, '__officeWalk', { configurable: true, get: () => ({
+      position: [...position.current], yaw: yaw.current, eye: camera.current?.position.toArray(),
+      colliders: latest.current.colliders.map(box => ({ ...box })), radius: PLAYER_RADIUS,
+    }) });
+    return () => { Reflect.deleteProperty(window, '__officeWalk'); };
+  }, []);
+
   // Clear held keys only when a tour starts, changes stop or ends: on a plain Play mount the rig can
   // mount after a key is already held, and clearing then would swallow that first press.
   const lastStory = useRef(story);
