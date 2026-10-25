@@ -9,13 +9,13 @@ test('policy unlock explains an HTML 502 and a dropped connection instead of a J
   let mode: 'html' | 'network' = 'html';
   await page.route('**/api/policy', route => mode === 'html' ? route.fulfill(badGateway) : route.abort('internetdisconnected'));
   await page.goto('/policy');
-  await page.getByLabel('Owner demo PIN').fill('any-pin');
+  await page.getByLabel('Owner PIN').fill('any-pin');
   await page.getByRole('button', { name: 'Unlock policy' }).click();
   await expect(alert(page)).toHaveText(outage);
   mode = 'network';
   await page.getByRole('button', { name: 'Unlock policy' }).click();
   await expect(alert(page)).toHaveText('Backroom could not be reached. Check the connection and try again.');
-  await expect(page.getByLabel('Owner demo PIN')).toBeVisible();
+  await expect(page.getByLabel('Owner PIN')).toBeVisible();
 });
 
 test('audit wall explains an HTML 502 on unlock and recovers its poll after an outage', async ({ page }) => {

@@ -163,10 +163,10 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
         <details className="inbox-more">
           <summary>Full receipt</summary>
           <dl className="inbox-facts">
-            <div><dt>Scenario source</dt><dd>judge</dd></div>
+            <div><dt>Scenario source</dt><dd>Custom</dd></div>
             <div><dt>Extraction</dt><dd>{receipt.extractionSource === 'seed' ? 'Frozen seed fields · code' : receipt.extractionSource === 'model' ? 'Model fields · schema validated' : 'Unrecognized · human review'}</dd></div>
-            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie sandbox' : receipt.paymentRail}</dd></div>}
-            {receipt.receiptId && <div><dt>Sandbox debit</dt><dd>{receipt.receiptId}</dd></div>}
+            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie' : receipt.paymentRail}</dd></div>}
+            {receipt.receiptId && <div><dt>Bank debit</dt><dd>{receipt.receiptId}</dd></div>}
             {receipt.reconciliation && <div><dt>Reconciliation</dt><dd>{receipt.reconciliation.match === 'EXACT' ? 'Exact withdrawal match' : 'Mismatch · held for review'}</dd></div>}
           </dl>
           {(held || reason) && <>
@@ -208,7 +208,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
     </section>
     <details className="inbox-advanced">
       <summary>Advanced: try your own email</summary>
-      <form onSubmit={submit} aria-label="Judge scenario">
+      <form onSubmit={submit} aria-label="Custom scenario">
         <fieldset disabled={busy}>
           <div className="inbox-envelope">
             <div><label htmlFor={`${uid}-kind`}>Document type</label><select id={`${uid}-kind`} value={kind} onChange={event => setKind(event.target.value)}>

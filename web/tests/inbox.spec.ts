@@ -71,7 +71,7 @@ test('judge submits traps, original scenarios and uploads on laptop and phone', 
   await expect(receipt).toBeFocused();
   await receipt.getByText('Full receipt').click();
   await expect(receipt.getByText('Unrecognized · human review', { exact: true })).toBeVisible();
-  await expect(receipt.getByText('judge', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('Custom', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const submit = page.getByRole('button', { name: 'Route scenario' });
   await submit.scrollIntoViewIfNeeded();
@@ -122,7 +122,7 @@ test('attachment flow with the vision API mocked', async ({ page }) => {
   await page.getByText('Advanced: try your own email').click();
   const fileInput = page.getByLabel('Attach a PDF or image');
   const submit = page.getByRole('button', { name: 'Route scenario' });
-  const alert = page.getByRole('form', { name: 'Judge scenario' }).getByRole('alert');
+  const alert = page.getByRole('form', { name: 'Custom scenario' }).getByRole('alert');
 
   await fileInput.setInputFiles({ name: 'judge.txt', mimeType: 'text/plain', buffer: Buffer.from('not a document') });
   await expect(alert).toHaveText('judge.txt is not a PDF, PNG, JPEG or WebP.');

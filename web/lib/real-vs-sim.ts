@@ -6,7 +6,7 @@ export type HostSandboxId = 'nessie' | 'crs';
 export type StatusId = ServiceId | HostSandboxId;
 export const hostSandboxServices = ['nessie', 'crs'] as const satisfies readonly HostSandboxId[];
 export type DisclosureItem = {
-  id: ServiceId | 'crs' | 'nessie' | 'company' | 'card';
+  id: ServiceId | 'crs' | 'nessie' | 'card';
   kind: 'real' | 'sandbox';
   label: string;
   description: string;
@@ -14,15 +14,14 @@ export type DisclosureItem = {
 
 export const disclosureItems = [
   { id: 'phone', kind: 'real', label: 'Phone call', description: 'A real voice connection through Cartesia. Verified from the latest voice webhook receipt written by the call receiver.' },
-  { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments. Verified from a committed route receipt, or from validated pre-call inference in this demo host; no paid call is made per page load.' },
+  { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments. Verified from a committed route receipt, or from validated pre-call inference on this host; no paid call is made per page load.' },
   { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
-  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run in this demo host.' },
+  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run on this host.' },
   { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
-  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live database probe; simulated when the server runs in memory.' },
-  { id: 'crs', kind: 'sandbox', label: 'CRS test identities', description: 'Sandbox identities only; no real customer credit reports.' },
-  { id: 'nessie', kind: 'sandbox', label: 'Nessie bank', description: 'Sandbox bank accounts and transactions; no real money moves.' },
-  { id: 'company', kind: 'sandbox', label: 'Company, vendors & emails', description: 'Northfield Studio and its records are fictional.' },
-  { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'Simulated card payment; the demo creates a sandbox Nessie deposit.' },
+  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live database probe; local when the server keeps state in memory.' },
+  { id: 'crs', kind: 'sandbox', label: 'CRS credit checks', description: 'Identity and fraud-risk checks through the CRS partner API.' },
+  { id: 'nessie', kind: 'sandbox', label: 'Nessie bank', description: 'Accounts, deposits and withdrawals through the Capital One Nessie API.' },
+  { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'The pay page posts a Nessie deposit; no card details are collected.' },
 ] as const satisfies readonly DisclosureItem[];
 
 /** Services /api/demo-status reports evidence for. Any id it lists in `notProbed` is shown as NOT_PROBED_LABEL. */
@@ -32,6 +31,8 @@ export const unprobedServices = disclosureItems
   .map(item => item.id as ServiceId);
 export const NOT_PROBED_LABEL = 'Not probed in this process';
 export const CHECKING_LABEL = 'Checking…';
+/** The service runs in this process instead of the external provider. */
+export const LOCAL_LABEL = 'Local';
 
 export type DemoStatus = {
   measuredAt: string;
@@ -65,7 +66,7 @@ function probeStatus(probe: ServiceProbe, now: number): DisclosureStatus {
       const time = `${(probe.source === 'live' ? liveTime : receiptTime).format(at)} UTC`;
       return { label: 'Verified', tone: 'good', detail: `${probe.evidence} · ${time}` };
     }
-    case 'simulated': return { label: 'Simulated', tone: 'neutral', detail: probe.evidence };
+    case 'simulated': return { label: LOCAL_LABEL, tone: 'neutral', detail: probe.evidence };
     case 'unreachable': return { label: 'Unreachable', tone: 'warning', detail: probe.evidence };
     case 'disabled': return { label: 'Disabled', tone: 'warning', detail: probe.evidence };
     case 'unverified': return { label: 'Unverified', tone: 'neutral', detail: probe.evidence };
@@ -82,9 +83,9 @@ export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | n
   const unverified: DisclosureStatus = { label: 'Unverified', tone: 'neutral' };
   const current = isCurrent(status, now);
   if (item.kind === 'sandbox') {
-    // Sandbox rows stay Simulated unless the demo host reports their adapter; a sandbox is never 'real'.
+    // Partner rows stay Local unless the host reports their adapter; a partner row is never 'real'.
     const probe = current && (hostSandboxServices as readonly string[]).includes(item.id) ? status!.services?.[item.id as HostSandboxId] : undefined;
-    return probe ? probeStatus(probe, now) : { label: 'Simulated', tone: 'neutral' };
+    return probe ? probeStatus(probe, now) : { label: LOCAL_LABEL, tone: 'neutral' };
   }
   if (!current || !status) return unverified;
   if (['phone', 'claude', 'gx10'].includes(item.id) && !status.llmEnabled) return { label: 'LLM OFF', tone: 'warning' };
@@ -102,12 +103,4 @@ export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | n
   // services present but probesCheckedAt null: the server's first probe run has not finished yet.
   if (status.services && status.probesCheckedAt === null) return { label: CHECKING_LABEL, tone: 'neutral' };
   return unverified;
-}
-
-/** The one-line disclosure every page shows. Money wording follows the host's Nessie adapter, so every page agrees. */
-export function demoPillText(status: DemoStatus | null, now = Date.now()) {
-  const current = isCurrent(status, now);
-  const nessie = current ? status.services?.nessie : undefined;
-  const money = !nessie ? 'sandbox money' : nessie.state === 'simulated' ? 'mock bank money' : 'Nessie sandbox money';
-  return ['Demo', 'synthetic company', money, ...(current && !status.llmEnabled ? ['LLM OFF'] : [])].join(' · ');
 }

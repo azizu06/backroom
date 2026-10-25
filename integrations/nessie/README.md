@@ -34,7 +34,7 @@ status/purchase/transfer probes in the evidence. Returning a deposit
 is a receipt, not evidence of settlement. M7 must keep the invoice unresolved and
 surface an exception if the bank balance does not reflect the amount. This package
 does not fabricate a balance or implement a mock bank. Display `SANDBOX_LABEL`
-wherever this data is shown; the pay page also needs “simulated card.”
+wherever this data is shown; the pay page also says no card is charged.
 
 ## R13 retries
 

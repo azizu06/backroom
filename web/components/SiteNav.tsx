@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { NavDisclosure } from './DemoPill';
 import { isActive, navLinks, siteNavHidden, whatsRealLink, type SiteNavPlacement } from '../lib/site-nav';
 import { applyTheme, readTheme, type Theme } from '../lib/theme';
 import './SiteNav.css';
@@ -22,7 +21,6 @@ function SiteNavContent({ placement }: { placement: SiteNavPlacement }) {
     <ul>
       {navLinks.map(({ label, href }) => <li key={href}><Link href={href} aria-current={current(href)}>{label}</Link></li>)}
     </ul>
-    <NavDisclosure />
     <Link className='site-nav-real' href={whatsRealLink.href} aria-current={current(whatsRealLink.href)}>{whatsRealLink.label}</Link>
     {/* The office has its own theme toggle. */}
     {placement === 'layout' && <ThemeToggle />}

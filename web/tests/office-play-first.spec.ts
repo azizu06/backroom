@@ -26,23 +26,12 @@ test('/office opens on the Enter the office splash and Enter starts first person
 test.describe('at 1440x1000', () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
 
-  test('the demo disclosure stays visible and on top of the splash', async ({ page }) => {
+  test('the site nav stays inert behind the splash', async ({ page }) => {
     await page.goto('/office');
     const gate = splash(page);
     await expect(gate).toBeVisible();
     expect(await gate.evaluate(element => element.tagName)).not.toBe('DIALOG');
-    const disclosure = page.getByRole('note', { name: 'Demo disclosure' });
-    await expect(disclosure).toBeVisible();
-    await expect(disclosure).toContainText(/Demo/);
-    const hit = await disclosure.evaluate(el => {
-      const rect = el.getBoundingClientRect();
-      const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-      return { onTop: top === el || el.contains(top), inSplash: !!top?.closest('.play-splash'), opacity: getComputedStyle(el).opacity, visibility: getComputedStyle(el).visibility };
-    });
-    expect(hit).toEqual({ onTop: true, inSplash: false, opacity: '1', visibility: 'visible' });
-    // The rest of the nav is still inert behind the splash; the disclosure itself holds no controls.
     await expect(page.locator('.site-nav > ul')).toHaveAttribute('inert', '');
-    await expect(page.locator('.site-nav .site-nav-note')).not.toHaveAttribute('inert', '');
   });
 });
 
