@@ -38,7 +38,7 @@ function expectLobby(html: string) {
   expect(section).toContain('aria-label="Ask why by voice"');
   expect(section).toContain('Hold to ask why');
   // The snapshot.audit receipt list is gone.
-  expect(section).not.toContain('Preview receipts');
+  expect(section).not.toContain('Walkthrough receipts');
   expect(section).not.toContain('Subscribed receipts');
   expect(section).not.toContain('data-audit-id=');
 }

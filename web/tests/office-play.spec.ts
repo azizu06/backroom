@@ -143,7 +143,7 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
       // Preview controls sit in the corner menu (closed by default); a pick closes it again.
       const menu = page.getByRole('button', { name: 'Backroom menu' });
       if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
-      await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+      await page.getByRole('button', { name: 'Show Treasury denial' }).click();
       await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
     }).toPass();
   });

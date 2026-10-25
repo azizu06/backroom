@@ -34,7 +34,7 @@ describe('audit wall rows', () => {
     expect(auditWallText(auditWallView(snap([])))).toBe('');
   });
   it('paints no rows for preview or replay feeds, which are not the audit log', () => {
-    expect(auditWallNotice('preview')).toBe('Preview feed: no audit entries. Live receipts appear here; see /audit.');
+    expect(auditWallNotice('preview')).toBe('Walkthrough feed: no audit entries. Live receipts appear here; see /audit.');
     expect(auditWallNotice('replay')).toBe('Replay feed: no audit entries. Live receipts appear here; see /audit.');
     for (const connection of ['preview', 'replay'] as const) {
       const view = auditWallView(snap([row('preview-denial-1', { decision: 'DENY' })], { connection }));

@@ -1,10 +1,10 @@
 export const DEMO_GUIDE_STEPS: readonly { id: string; title: string; detail: string }[] = [
-  { id: 'play', title: 'Switch to Play', detail: 'Choose “Play (first person)” from View, then walk with WASD or the arrow keys.' },
+  { id: 'play', title: 'Walk the floor', detail: 'Press Enter on the splash (or O in Overview) for first person, then walk with WASD or the arrow keys.' },
   { id: 'collections', title: 'Check Alex’s task', detail: 'Walk up to Alex at the Collections desk and press E to see the current task and audit receipts.' },
   { id: 'treasury', title: 'Test the Treasury lock', detail: 'Walk to the locked Treasury door on the right and press E. Entry is denied with the real rule id.' },
   { id: 'gx10', title: 'Visit the server room', detail: 'Go to the GX10 server room at the far right and press E for live tokens per second.' },
   { id: 'payment', title: 'Find the pay kiosk', detail: 'In the lobby, open a payment link from the pay kiosk.' },
-  { id: 'previews', title: 'Replay key moments', detail: 'Use “Preview escalation” or “Preview Treasury denial” below the office.' },
+  { id: 'previews', title: 'Replay key moments', detail: 'Open the Backroom menu and use “Show escalation” or “Show Treasury denial”.' },
   { id: 'why', title: 'Ask why', detail: 'On the lobby audit wall, ask why to get an explanation grounded in receipts.' },
 ];
 

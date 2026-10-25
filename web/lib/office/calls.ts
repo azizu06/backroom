@@ -63,7 +63,7 @@ export function callFromProjection(row: unknown): CallState | null {
   } as CallState;
 }
 
-export const CALL_DISCLOSURE = 'Calls are AI-disclosed and only go to the allowlisted demo number.';
+export const CALL_DISCLOSURE = 'Calls are AI-disclosed and only go to the allowlisted number.';
 // Aziz's host routes (web/lib/calls): the operator-session request and the read-only live feed.
 const CALL_REQUEST_ENDPOINT: string | null = '/api/calls/request';
 const CALL_FEED_ENDPOINT = '/api/calls/active';
@@ -72,7 +72,7 @@ export type CallRequestResult = { ok: boolean; reason?: 'unavailable' | 'failed'
 export async function requestCall(_input?: unknown): Promise<CallRequestResult> {
   if (!CALL_REQUEST_ENDPOINT) return { ok: false, reason: 'unavailable', message: 'Call requests not available yet' };
   // The scripted preview never reaches the real dial route.
-  if (typeof window !== 'undefined' && isMockCalls(window.location.search)) return { ok: false, reason: 'unavailable', message: 'Mock preview: no call placed' };
+  if (typeof window !== 'undefined' && isMockCalls(window.location.search)) return { ok: false, reason: 'unavailable', message: 'Scripted call: no call placed' };
   try {
     const response = await fetch(CALL_REQUEST_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ line: 'collections' }) });
     const body = await response.json() as { message?: unknown };

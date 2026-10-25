@@ -37,7 +37,7 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   const lobby = page.locator('#office-audit-wall');
   await expect(lobby).toHaveAttribute('data-office-mount', 'audit-wall');
   await expect(lobby.locator('[data-audit-id]')).toHaveCount(0);
-  await expect(lobby).not.toContainText('Preview receipts');
+  await expect(lobby).not.toContainText('Walkthrough receipts');
   await lobby.getByLabel('Operator code').fill(code);
   await lobby.getByRole('button', { name: 'Open audit wall' }).click();
   await expect(lobby.getByText(/^Chain verified · \d+ entries$/)).toBeVisible();
@@ -54,13 +54,13 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(wall!.x + wall!.width).toBeLessThanOrEqual(drawer!.x + drawer!.width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await openMenu(page);
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   const previewReceipts = page.getByRole('region', { name: 'Preview audit receipts' });
   await expect(previewReceipts).toContainText('DENY');
   // Fixture rows stay out of the server-record lobby wall (its own rows may carry data-audit-id).
   const denialId = await previewReceipts.locator('[data-audit-id]').first().getAttribute('data-audit-id');
   await expect(lobby.locator(`[data-audit-id="${denialId}"]`)).toHaveCount(0);
-  await expect(lobby).not.toContainText('Preview receipts');
+  await expect(lobby).not.toContainText('Walkthrough receipts');
   expect(errors).toEqual([]);
 });
 
@@ -68,7 +68,7 @@ test('office demo guide and keyboard shortcuts help open and restore focus', asy
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
-  const guideButton = page.getByRole('button', { name: 'Demo guide' });
+  const guideButton = page.getByRole('button', { name: 'Guide' });
   await guideButton.click();
   const guide = page.getByRole('dialog', { name: 'Try this' });
   await expect(guide).toBeVisible();
@@ -281,7 +281,7 @@ test('office desk monitors survive the Collections escalation preview', async ({
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await openMenu(page);
-  await page.getByRole('button', { name: 'Preview escalation' }).click();
+  await page.getByRole('button', { name: 'Show escalation' }).click();
   // The pick closes the menu; the control now offers the way back.
   await expect(page.locator('.mock-controls button', { hasText: 'Return to Collections' })).toBeAttached();
   await (await preset(page, 'Collections')).click();
@@ -419,7 +419,7 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const before = await signRedness(page, canvas);
   expect(Math.max(...before), `redness before the preview: ${before.join(', ')}`).toBeLessThan(40);
   await openMenu(page);
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   // The preview button sits below the scene, so clicking it can scroll the canvas out of view.
   await canvas.scrollIntoViewIfNeeded();
   // Poll rather than sample at a fixed time: under load the first frame of the moment can land late.

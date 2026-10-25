@@ -22,6 +22,7 @@ import { useStoryMode } from './useStoryMode';
 import type { StoryChapter } from '../../lib/office/story';
 import { SoundToggle } from './SoundToggle';
 import { ThemeToggle } from './ThemeToggle';
+import { RainToggle } from './RainToggle';
 import { PresenceChip } from './PresenceChip';
 import { usePresence } from './usePresence';
 import { useProximityChat } from './useProximityChat';
@@ -54,7 +55,7 @@ import './office-tokens.css';
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
   if (error) throw error;
-  return <div role='status' style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#202620', color: '#d8d8e0' }}>
+  return <div role='status' style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--page-bg)', color: 'var(--ink)' }}>
     Loading 3D office…
   </div>;
 }
@@ -297,9 +298,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>{storyActive ? 'Skip tour' : 'Take the tour'}</button>
             <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Camera tour</button>
             <ThemeToggle className='theme-toggle office-theme-toggle' />
+            <RainToggle />
             <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
             <OfficeAdvanced replay={snapshot.connection === 'replay'}
-              connection={snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}
+              connection={snapshot.connection === 'preview' ? 'Walkthrough · local state, not live' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}
               llm={<fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
                 <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
               </fieldset>} />
@@ -373,8 +375,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         {typeof auditWall === 'function' ? auditWall(snapshot, setFocus) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
         </ViewBoundary>
       </section>
-      {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Preview audit receipts'>
-        <ViewBoundary name='Preview receipts' resetKey={snapshot} fallback={<p role='status'>Preview receipts unavailable · a received row could not be displayed.</p>}>
+      {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Walkthrough audit receipts'>
+        <ViewBoundary name='Walkthrough receipts' resetKey={snapshot} fallback={<p role='status'>Walkthrough receipts unavailable · a received row could not be displayed.</p>}>
           <ReceiptList snapshot={snapshot} title='Office receipts' />
         </ViewBoundary>
       </section>}
@@ -391,10 +393,10 @@ export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
   return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
-    <span>Preview only</span>
+    <span>Walkthrough controls</span>
     <a href='/inbox'>Judge inbox</a>
     <span>Receipts there are not synced into this static scene.</span>
-    <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Preview escalation'}</button>
-    <button onClick={() => mock.denyTreasury()}>Preview Treasury denial</button>
+    <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Show escalation'}</button>
+    <button onClick={() => mock.denyTreasury()}>Show Treasury denial</button>
   </div>} />;
 }

@@ -4,9 +4,9 @@ import type { OfficeSnapshot } from './state';
 
 /** Reading time stays constant even when the demo walk is sped up. */
 export const AGENT_CHAT_MS = 3500;
-export type AgentChatSource = 'Simulated' | 'Live handoff' | 'Replay' | 'Offline record';
+export type AgentChatSource = 'Scripted' | 'Live handoff' | 'Replay' | 'Offline record';
 export function agentChatSource(connection: OfficeSnapshot['connection'], scripted: boolean): AgentChatSource {
-  return scripted || connection === 'preview' ? 'Simulated' : connection === 'live' ? 'Live handoff'
+  return scripted || connection === 'preview' ? 'Scripted' : connection === 'live' ? 'Live handoff'
     : connection === 'replay' ? 'Replay' : 'Offline record';
 }
 

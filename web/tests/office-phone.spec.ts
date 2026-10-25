@@ -76,12 +76,12 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await expect(dialog.getByTestId('phone-transcript').locator('li').first()).toContainText('Collections');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-live.png' });
   await expect(dialog).toContainText('AI-disclosed');
-  await expect(dialog.getByTestId('phone-precall')).toContainText('Mock preview: no pre-call evidence');
+  await expect(dialog.getByTestId('phone-precall')).toContainText('Scripted call: no pre-call evidence');
   await expect.poll(() => dialog.getByTestId('phone-status').innerText(), { timeout: 15_000, intervals: [100] }).toContain('Ended');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-ended.png' });
   await expect(dialog.getByTestId('phone-request')).toHaveAttribute('aria-disabled', 'false');
   await dialog.getByTestId('phone-request').click();
-  await expect(dialog.getByTestId('phone-request-result')).toHaveText('Mock preview: no call placed');
+  await expect(dialog.getByTestId('phone-request-result')).toHaveText('Scripted call: no call placed');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-request.png' });
   expect(calls.filter(({ url, type }) => /call/i.test(url) && !['document', 'script', 'stylesheet', 'font', 'image'].includes(type))).toEqual([]);
 });

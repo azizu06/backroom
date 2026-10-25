@@ -17,7 +17,7 @@ describe('story caption disclosure', () => {
     STORY_CHAPTERS.forEach((chapter, index) => {
       const html = render(index, { ...INITIAL_OFFICE, connection: 'live' });
       expect(html).toContain(`<header class="story-disclaimer">${disclosure} · live state below is real</header>`);
-      expect(chapter.caption.startsWith('In the demo, ')).toBe(true);
+      expect(chapter.caption.startsWith('In this walkthrough, ')).toBe(true);
       expect(html).toContain('<p class="story-evidence">Not recorded in this session</p>');
       expect(html).toContain('aria-live="polite" aria-atomic="true">Scripted walkthrough:');
       expect(html).not.toContain('href=');

@@ -31,7 +31,7 @@ describe('lobby v2 projections', () => {
 
   it('never returns non-finite count values and labels preview modes', () => {
     expect(lobbyStats({ ...INITIAL_OFFICE, inboxCount: Number.NaN }).inbox).toBe(0);
-    expect(lobbyModeLabel('preview')).toBe('Preview');
+    expect(lobbyModeLabel('preview')).toBe('Walkthrough');
     expect(lobbyModeLabel('replay')).toBe('REPLAY');
     expect(lobbyModeLabel('live')).toBeUndefined();
   });

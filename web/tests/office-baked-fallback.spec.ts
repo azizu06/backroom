@@ -23,7 +23,7 @@ async function openBaked(page: Page) {
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   // Preview controls sit in the corner menu (closed by default); a pick closes it again.
   await page.getByRole('button', { name: 'Backroom menu' }).click();
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
   return { warnings, errors };
 }

@@ -8,10 +8,10 @@ test('scripted handoff shows a sender bubble followed by the receiver reply', as
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   const sender = page.getByTestId('agent-chat-intake-sender');
   const receiver = page.getByTestId('agent-chat-extractor-reply');
-  await expect(sender).toContainText('Simulated · Intake: Passing INV-1042 to Extractor.', { timeout: 20_000 });
+  await expect(sender).toContainText('Scripted · Intake: Passing INV-1042 to Extractor.', { timeout: 20_000 });
   await expect(sender).toContainText('Status: Passing documents');
   await expect(receiver).toHaveCount(0);
-  await expect(receiver).toContainText('Simulated · Extractor: Got it.', { timeout: 20_000 });
+  await expect(receiver).toContainText('Scripted · Extractor: Got it.', { timeout: 20_000 });
   await expect(receiver).toContainText(/Status: (Reviewing documents|Turn finished)/);
   expect(errors).toEqual([]);
 });
