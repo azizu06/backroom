@@ -6,6 +6,7 @@ import { createAdminDial, type AdminDialResponse } from '../../voice/admin-dial'
 import { parsePreCallGate } from '../../voice/demo-bridge';
 import { createCallRequestHTTP, type CallRequestAudit } from '../../../../web/lib/calls/request';
 import { createOperatorSignIn } from '../../../../web/lib/operator/sign-in';
+import { precallCard, precallGate } from '../../../../web/lib/calls/precall';
 
 const ORIGIN = 'https://demo.example';
 const LOOPBACK = 'http://127.0.0.1:3000';
@@ -136,6 +137,9 @@ export async function runCallButton() {
     const consentOffice = await office(publishPreCall(consentPre), network);
     const consentResponse = await consentOffice.click({ line: 'collections' });
     const consentBody = await consentResponse.json() as { ok?: boolean; error?: string };
+    // The desk phone's own gate on the same published evidence: the button must not be offered.
+    const consentGate = precallGate(precallCard({ preCall: publishPreCall(consentPre), signals: [] } as never), false);
+    const readyGate = precallGate(precallCard({ preCall: readyPublished, signals: [] } as never), false);
     const quiet = network.calls === 0;
     const checks = {
       blocked: quiet && blockedPre.status === 'blocked' && blockedPre.reason === BLOCKED_REASON
@@ -160,7 +164,8 @@ export async function runCallButton() {
         && readyOffice.counts.providerAttempts === 1 && readyOffice.counts.relayCalls === 1,
       noConsent: quiet && consentPre.status === 'blocked' && 'decision' in consentPre && JSON.stringify(consentPre.decision?.ruleIds) === JSON.stringify(['CONSENT_REQUIRED'])
         && consentResponse.status === 409 && consentBody.ok === false && consentBody.error === 'PRECALL_BLOCKED'
-        && consentOffice.counts.providerAttempts === 0,
+        && consentOffice.counts.providerAttempts === 0
+        && consentGate.ready === false && (consentGate.note ?? '').startsWith('Blocked:') && readyGate.ready === true,
       loopback: quiet && loopbackResponse.status === 200 && loopbackBody.ok === true
         && loopbackBody.message === 'Ringing the allowlisted demo phone. Answer on speaker.'
         && loopbackOffice.counts.providerAttempts === 1 && loopbackOffice.counts.relayCalls === 1,
@@ -171,11 +176,11 @@ export async function runCallButton() {
       blocked: { status: blockedResponse.status, error: blockedBody.error ?? null, providerAttempts: blockedOffice.counts.providerAttempts,
         admin: blockedAdmin ?? null, audit: blockedAudit ?? null, adminAudit: blockedAdminAudit ?? null },
       invalid: { status: invalidResponse.status, error: invalidBody.error ?? null, providerAttempts: invalidAttempts, relayCalls: invalidRelayCalls },
-      noConsent: { status: consentResponse.status, error: consentBody.error ?? null, providerAttempts: consentOffice.counts.providerAttempts,
+      noConsent: { gate: consentGate, status: consentResponse.status, error: consentBody.error ?? null, providerAttempts: consentOffice.counts.providerAttempts,
         ruleIds: consentPre.status === 'blocked' ? consentPre.decision?.ruleIds ?? null : null },
       ready: { status: readyResponse.status, ok: readyBody.ok === true, error: readyBody.error ?? null, audit: readyAudit ?? null,
         providerAttempts: readyOffice.counts.providerAttempts },
-      scope: 'Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. C13: a client without consent is blocked at pre-call (CONSENT_REQUIRED) and the button request is 409 PRECALL_BLOCKED with no provider attempt; the desk-phone button itself is not disabled in the UI (not measured as passing). No network and no Cartesia.',
+      scope: 'Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. C13: a client without consent is blocked at pre-call (CONSENT_REQUIRED) and the button request is 409 PRECALL_BLOCKED with no provider attempt; the desk-phone precallGate on the same published evidence withholds Request call with a Blocked reason (a ready pre-call offers it). No network and no Cartesia.',
     };
   } finally { globalThis.fetch = prior; }
 }
