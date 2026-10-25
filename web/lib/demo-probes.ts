@@ -160,7 +160,7 @@ async function probePhone(deps: ProbeDeps): Promise<ServiceProbe> {
 }
 
 async function probeSpacetime(deps: ProbeDeps): Promise<ServiceProbe> {
-  if ((deps.env.STATE_STORE ?? 'memory') !== 'spacetime') return { state: 'simulated', source: 'config', evidence: 'In-memory state fixture', at: null };
+  if ((deps.env.STATE_STORE ?? 'memory') !== 'spacetime') return { state: 'simulated', source: 'config', evidence: 'In-memory state', at: null };
   const uri = deps.env.SPACETIMEDB_URI?.trim(), db = deps.env.SPACETIMEDB_DATABASE?.trim();
   if (!uri || !db) return unverified('Not configured', 'config');
   const http = uri.replace(/^ws:\/\//i, 'http://').replace(/^wss:\/\//i, 'https://').replace(/\/+$/, '');

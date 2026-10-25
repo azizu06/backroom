@@ -26,23 +26,13 @@ test('/office opens on the Enter the office splash and Enter starts first person
 test.describe('at 1440x1000', () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
 
-  test('the demo disclosure stays visible and on top of the splash', async ({ page }) => {
+  test('the site nav stays inert behind the splash', async ({ page }) => {
     await page.goto('/office');
     const gate = splash(page);
     await expect(gate).toBeVisible();
     expect(await gate.evaluate(element => element.tagName)).not.toBe('DIALOG');
-    const disclosure = page.getByRole('note', { name: 'Demo disclosure' });
-    await expect(disclosure).toBeVisible();
-    await expect(disclosure).toContainText(/Demo/);
-    const hit = await disclosure.evaluate(el => {
-      const rect = el.getBoundingClientRect();
-      const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-      return { onTop: top === el || el.contains(top), inSplash: !!top?.closest('.play-splash'), opacity: getComputedStyle(el).opacity, visibility: getComputedStyle(el).visibility };
-    });
-    expect(hit).toEqual({ onTop: true, inSplash: false, opacity: '1', visibility: 'visible' });
-    // The corner menu is inert behind the splash; the disclosure itself holds no controls and stays live.
-    await expect(page.locator('.office-corner-row')).toHaveAttribute('inert', '');
-    expect(await disclosure.evaluate(el => !!el.closest('[inert]'))).toBe(false);
+    // With nothing in the nav kept live, the inert boundary may sit on the nav itself or an ancestor.
+    expect(await page.locator('.site-nav > ul').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
   });
 });
 
@@ -74,7 +64,7 @@ test('Tab three times stays in the splash, Escape closes it, and focus returns t
   await expect(overview).toBeFocused();
   await expect(gate.locator(':focus')).toHaveCount(1);
   const menu = page.locator('.office-corner-toggle');
-  await expect(page.locator('.office-corner-row')).toHaveAttribute('inert', '');
+  expect(await page.locator('.office-corner-toggle').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
   const blocked = await menu.evaluate(el => {
     const rect = el.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);

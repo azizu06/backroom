@@ -18,10 +18,10 @@ test('OFF cannot clear a pending proof action and failed proof output stays visi
   await page.getByRole('button', { name: 'Turn models OFF', exact: true }).click();
   // Wait for OFF to settle before checking that the original action still owns busy state.
   await expect(page.getByRole('region', { name: 'Latest action receipt' })).toContainText('false');
-  await expect(page.getByRole('button', { name: 'Refresh demo links', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Refresh host links', exact: true })).toBeDisabled();
   await expect(page.getByRole('status').first()).toHaveText('Run scripted eval…');
   release();
-  await expect(page.getByRole('button', { name: 'Refresh demo links', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Refresh host links', exact: true })).toBeEnabled();
   const receipt = page.getByRole('region', { name: 'Latest action receipt' });
   await expect(receipt).toContainText('Answer-key mismatch: C03');
   await expect(receipt).toContainText('Exit status: 1 · failed');
@@ -43,14 +43,14 @@ test('x402 buttons label each rail, explain an unavailable testnet and show the 
   await page.goto('/operator');
   await expect(page.getByRole('button', { name: 'Pay vendor with x402 · TESTNET', exact: true })).toBeDisabled();
   await expect(page.getByText('Unavailable: Testnet is off.')).toBeVisible();
-  await page.getByRole('button', { name: 'Pay vendor with x402 · SIMULATED', exact: true }).click();
-  const result = page.getByRole('definition').filter({ hasText: 'X402 SIMULATED' });
+  await page.getByRole('button', { name: 'Pay vendor with x402 · OFFLINE', exact: true }).click();
+  const result = page.getByRole('definition').filter({ hasText: 'X402 OFFLINE' });
   await expect(result).toBeVisible();
   const facts = page.getByLabel('x402 payment result');
   await expect(facts).toContainText('$1,250.00');
-  await expect(facts).toContainText('simulated hash, not on any chain');
+  await expect(facts).toContainText('local hash, not broadcast to any chain');
   await expect(facts.getByRole('link', { name: 'Open payment audit' })).toHaveAttribute('href', '/audit?entry=pay-1');
-  await page.getByRole('button', { name: 'Try blocked x402 invoice · SIMULATED', exact: true }).click();
+  await page.getByRole('button', { name: 'Try blocked x402 invoice · OFFLINE', exact: true }).click();
   await expect(facts).toContainText('ESCALATE · OVER_LIMIT');
   await expect(facts).toContainText('0 signatures · 0 vendor requests');
 });

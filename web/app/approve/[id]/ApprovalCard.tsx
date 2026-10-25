@@ -66,8 +66,8 @@ export default function ApprovalCard({ id, embedded = false }: { id: string; emb
     : row.status === 'pending' ? `Client waiting · ${seconds}s` : `Dana ${row.status === 'counter' ? 'countered' : row.status}`;
   const body = <>
       <p className={styles.status} role="status">{busy ? 'Confirm with your passkey…' : status}</p>
-      {embedded ? <h2 className={styles.cardTitle}>Approval needed</h2> : <h1>A decision<br />beyond the badge.</h1>}
-      <p className={styles.intro}>The collections clerk needs your review before agreeing to these terms.</p>
+      {embedded ? <h2 className={styles.cardTitle}>Approval needed</h2> : <h1>{missing ? 'Nothing to review.' : <>A decision<br />beyond the badge.</>}</h1>}
+      {!missing && <p className={styles.intro}>The collections clerk needs your review before agreeing to these terms.</p>}
       {missing ? <section className={styles.result}>
         <h2>This approval link does not match a request.</h2>
         <p>Nothing was approved or denied. Open the latest link from the clerk, or check the audit wall for the escalation.</p>

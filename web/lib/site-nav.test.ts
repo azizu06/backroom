@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { isActive, navLinks, siteNavHidden, whatsRealLink } from './site-nav';
 
 describe('site nav', () => {
-  it('lists only the demo pages, with What’s real as the small trailing link', () => {
-    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Inbox', 'Audit wall', 'Attack demo', 'Operator', 'Controller']);
+  it('lists only the product pages, with System status as the small trailing link', () => {
+    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Inbox', 'Audit wall', 'Attack lab', 'Operator', 'Controller']);
     expect(navLinks.map(link => link.href as string)).not.toContain('/real-vs-sim');
-    expect(whatsRealLink).toEqual({ label: 'What’s real', href: '/real-vs-sim' });
+    expect(whatsRealLink).toEqual({ label: 'System status', href: '/real-vs-sim' });
   });
 
   it('marks the active page, treating / as the office', () => {

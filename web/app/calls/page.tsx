@@ -36,7 +36,7 @@ export default function CallUnlock() {
   return <main className={styles.page}><div className={styles.sheet}>
     <p className={styles.status}>Operator setup</p>
     <h1>Unlock the<br />desk phone.</h1>
-    <p className={styles.intro}>Request call on the office desk phone then rings the approved demo phone. The agent says it is an AI before anything else.</p>
+    <p className={styles.intro}>Press Request call on the office desk phone to ring the approved number. The agent says it is an AI before anything else.</p>
     {result && <p className={result.ok ? styles.status : styles.error} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
     {result?.ok ? <p className={styles.section}><a href="/office">Back to the office</a></p>
       : <form className={styles.section} onSubmit={e => { e.preventDefault(); void unlock(); }}>

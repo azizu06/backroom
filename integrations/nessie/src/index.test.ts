@@ -147,9 +147,9 @@ it('labels a mock adapter as an offline bank, not the Nessie sandbox', async () 
     .mockResolvedValueOnce(Response.json([{ _id: 'mock-deposit-1', amount: 2, status: 'completed', medium: 'balance' }]));
   const { client } = await setup(fetcher, { surface: 'mock' });
   const display = await client.readBalanceWithPostedDeposits('a1');
-  expect(display.sandboxLabel).toBe('Mock bank (offline)');
-  expect(display.cardNotice).toBe('Mock bank (offline); simulated card.');
-  expect(display.panelLine).toBe('Mock bank (offline) · simulated card');
+  expect(display.sandboxLabel).toBe('Offline bank');
+  expect(display.cardNotice).toBe('Offline bank; no card is charged.');
+  expect(display.panelLine).toBe('Offline bank · no card charged');
   expect(display.sandboxLabel).not.toContain('Nessie');
   expect(client.surfaceCopy().surface).toBe('mock');
 });

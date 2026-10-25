@@ -42,7 +42,7 @@ it('publishes the loopback pay link and redirects the short code only while the 
     url: `http://127.0.0.1:3300/p/${sent.short_code}`,
     localOnly: true,
     amountCents: 247500,
-    bankLine: 'Mock bank (offline) · simulated card',
+    bankLine: 'Offline bank · no card charged',
   });
   expect(body.active.qr).toMatch(/^data:image\/png;base64,/);
   const redirect = await paymentCode(new Request(`http://127.0.0.1:3300/p/${sent.short_code}`), { params: Promise.resolve({ code: sent.short_code.toLowerCase() }) });
@@ -57,7 +57,7 @@ it('uses the live Nessie line only when DEMO_LIVE selects that adapter and no mo
   process.env.DEMO_LIVE = '1';
   try {
     const body = await (await activePayment()).json();
-    expect(body.active.bankLine).toBe('Nessie sandbox · simulated card');
+    expect(body.active.bankLine).toBe('Nessie bank · no card charged');
     expect(body.active.code).toBe(sent.short_code);
   } finally { delete process.env.DEMO_LIVE; }
 });

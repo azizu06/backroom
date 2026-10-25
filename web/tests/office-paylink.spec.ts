@@ -13,7 +13,7 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: {
     code: 'ABCDEF1234', url: 'https://demo.example/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr: PIXEL,
-    bankLine: 'Mock bank (offline) · simulated card',
+    bankLine: 'Offline bank · no card charged',
   } } }));
   await page.goto('/office?view=overview');
   await openPanels(page);
@@ -24,7 +24,7 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
   await expect(kiosk.getByRole('link', { name: 'https://demo.example/p/ABCDEF1234' })).toHaveAttribute('href', 'https://demo.example/p/ABCDEF1234');
   await expect(kiosk.getByRole('img', { name: 'Scan to open your authorized payment page' })).toBeVisible();
   await expect(kiosk).toContainText('$2,475.00');
-  await expect(kiosk.getByText('Mock bank (offline) · simulated card', { exact: true })).toBeVisible();
+  await expect(kiosk.getByText('Offline bank · no card charged', { exact: true })).toBeVisible();
   // Phone width: the kiosk and its QR fit the viewport instead of forcing horizontal scroll.
   await page.setViewportSize({ width: 360, height: 800 });
   const card = await kiosk.boundingBox();
@@ -42,7 +42,7 @@ test('office lobby kiosk labels a loopback rehearsal link', async ({ page }) => 
   await page.goto('/office?view=overview');
   await openPanels(page);
   const kiosk = page.locator("[data-office-mount='payment-link']");
-  await expect(kiosk.getByText('local rehearsal only, not scannable by a phone')).toBeVisible();
+  await expect(kiosk.getByText('Local link only; a phone cannot open it.')).toBeVisible();
   await expect(kiosk.getByRole('link', { name: 'http://127.0.0.1:3300/p/ABCDEF1234' })).toBeVisible();
 });
 
