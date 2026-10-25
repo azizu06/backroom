@@ -16,6 +16,8 @@ import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights
 import { ROLES } from '../../lib/office/palette';
 import { BUILDING, CORRIDOR, CORRIDOR_Z, sightBlocked } from '../../lib/office/layout';
 import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
+import { bakedReplacesHall } from '../../lib/office/baked-art';
+import { useBakedHallReady } from './mounts/BakedArt';
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
@@ -67,6 +69,15 @@ const { base } = OFFICE_LIGHTING;
 registerSceneFrameRequester(invalidate);
 
 const FLOOR_SIZE = [BUILDING.maxX - BUILDING.minX + 0.2, BUILDING.maxZ - BUILDING.minZ + 0.2] as const;
+
+function ProceduralFloor() {
+  const hall = useBakedHallReady();
+  if (bakedReplacesHall(hall, 'floor')) return null;
+  return <>
+    <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
+    <Block at={[(CORRIDOR.minX + CORRIDOR.maxX) / 2, 0.01, CORRIDOR_Z]} size={[CORRIDOR.maxX - CORRIDOR.minX - 0.5, 0.02, 1.3]} color={ROLES.aisle} />
+  </>;
+}
 /** First person only: a wall between the eye and a label's floor point hides the label (the overview sees over the cut-away walls). */
 function behindWall(camera: Camera, x: number, z: number): boolean {
   return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked(camera.position.x, camera.position.z, x, z);
@@ -235,8 +246,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     <Instances limit={240} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
     {/* Floor slab, a cream pad per room (tinted while focused) and a blush corridor runner; walls, windows and the ceiling are the WorldShell mount. */}
-    <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
-    <Block at={[(CORRIDOR.minX + CORRIDOR.maxX) / 2, 0.01, CORRIDOR_Z]} size={[CORRIDOR.maxX - CORRIDOR.minX - 0.5, 0.02, 1.3]} color={ROLES.aisle} />
+    <ProceduralFloor />
 
     {visibleRooms(snapshot).map(room => {
       const { center } = OFFICE_ANCHORS[room];

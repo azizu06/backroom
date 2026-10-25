@@ -1,4 +1,29 @@
-import { LOBBY_BOARD_MOUNT } from './layout';
+import { LOBBY_BOARD_MOUNT, wallColliders, type Rect } from './layout';
+
+/** The old enclosed lobby is incompatible with the shared hall; keep its helpers for legacy consumers only. */
+export const BAKED_ROOMS = [
+  { id: 'hall', url: '/office-art/hall.glb', playOnly: false, collidersUrl: '/office-art/hall.colliders.json' },
+  { id: 'exterior', url: '/office-art/exterior.glb', playOnly: true, collidersUrl: null },
+] as const;
+
+export const HALL_NODES = ['floor', 'walls', 'wall_north', 'wall_south', 'wall_east', 'wall_west', 'ceiling', 'beams', 'windows', 'lamps'] as const;
+export const HIDDEN_IN_OVERVIEW = new Set(['ceiling', 'beams', 'lamps', 'wall_south', 'wall_east', 'windows', 'wall_near']);
+
+/** A stale or malformed bake must never hide the current procedural shell. */
+export function validateHallColliders(data: unknown): readonly Rect[] {
+  const record = data as { room?: unknown; boxes?: unknown } | null;
+  const expected = wallColliders();
+  if (!record || record.room !== 'hall' || !Array.isArray(record.boxes) || record.boxes.length !== expected.length) {
+    throw new Error('hall colliders do not match the layout');
+  }
+  for (let i = 0; i < expected.length; i++) {
+    const box = record.boxes[i] as Rect | null;
+    if (!box || (['minX', 'maxX', 'minZ', 'maxZ'] as const).some(key => box[key] !== expected[i]![key])) {
+      throw new Error('hall colliders do not match the layout');
+    }
+  }
+  return record.boxes as Rect[];
+}
 
 /** True for `?art=baked`. Pure so it is testable without the scene. */
 export function bakedArtRequested(search: string): boolean {
@@ -11,11 +36,16 @@ export function bakedArtRequested(search: string): boolean {
  * (first person); the overview hides the baked near walls, so it keeps the procedural partition as the divider.
  */
 export const BAKED_REPLACES = {
+  hall: ['floor', 'walls', 'ceiling', 'windowFrames'] as const,
   /** Rooms whose floor lamp and dressing plant the bake replaces with its own lamp and plants. */
   props: ['lobby'] as readonly string[],
   /** x of the partition segment (z > 0) that sits inside the baked lobby's east wall. */
   shellPartitionX: [-2.5] as readonly number[],
 };
+
+export function bakedReplacesHall(ready: boolean, piece: typeof BAKED_REPLACES.hall[number]): boolean {
+  return ready && BAKED_REPLACES.hall.includes(piece);
+}
 
 /** True when the baked room replaces this room's procedural floor lamp and dressing plant. */
 export function bakedReplacesProps(baked: boolean, room: string): boolean {

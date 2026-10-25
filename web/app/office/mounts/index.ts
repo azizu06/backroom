@@ -4,6 +4,7 @@
  */
 import { OfficeProps } from '../props/OfficeProps';
 import { BakedCharacters } from './BakedCharacters';
+import { BakedArt } from './BakedArt';
 import { LobbyInbox } from '../props/LobbyInbox';
 import { ReceiptPrinter } from '../props/ReceiptPrinter';
 import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
@@ -29,6 +30,7 @@ export type { SceneMount, SceneMountProps } from './types';
 export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'outdoors', instanced: false, Component: Outdoors },
   { id: 'world-shell', instanced: false, Component: WorldShell },
+  { id: 'baked-art', instanced: false, Component: BakedArt },
   { id: 'carry-folder', instanced: false, moving: true, Component: CarryFolder },
   { id: 'desks', instanced: true, Component: Desks },
   { id: 'lobby-counter', instanced: true, Component: LobbyCounter },

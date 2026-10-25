@@ -10,6 +10,8 @@ import { BUILDING, WALL_HEIGHT, wallPieces, windowPieces } from '../../../lib/of
 import { OFFICE_LIGHTING } from '../../../lib/office/lighting';
 import { OUTDOOR, ROLES } from '../../../lib/office/palette';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './StaticGeometry';
+import { useBakedHallReady } from './BakedArt';
+import { bakedReplacesHall } from '../../../lib/office/baked-art';
 
 // Shared for the lazy scene's lifetime, like the other static batches. Instance colours (palette tokens) tint white materials.
 const WALL_MATERIAL = new MeshStandardMaterial({ vertexColors: true, roughness: OFFICE_LIGHTING.base.roughness });
@@ -41,17 +43,18 @@ const PANELS: FurniturePiece[] = [-8, 0, 8].flatMap(x => [-4, 3].map(z => ({
  * the wall pixels that fill a first-person frame skip the shadow-map lookups.
  */
 export function WorldShell() {
+  const hall = useBakedHallReady();
   const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
   const full = useRef<Group>(null);
   usePrecompile(full);
   return <group name='world-shell'>
-    <group ref={full} visible={!overview} name='world-shell:full'>
+    <group ref={full} visible={!overview && !bakedReplacesHall(hall, 'walls')} name='world-shell:full'>
       <StaticBoxes pieces={FULL_SHELL} material={FULL_WALL_MATERIAL} castShadow={false} receiveShadow={false} />
       <StaticInstances pieces={GLASS} geometry={UNIT_BOX} material={GLASS_MATERIAL} castShadow={false} receiveShadow={false} />
       <StaticInstances pieces={CEILING} geometry={UNIT_BOX} material={CEILING_MATERIAL} castShadow={false} receiveShadow={false} />
       <StaticInstances pieces={PANELS} geometry={UNIT_BOX} material={PANEL_MATERIAL} castShadow={false} receiveShadow={false} />
     </group>
-    <group visible={overview} name='world-shell:overview'>
+    <group visible={overview && !bakedReplacesHall(hall, 'walls')} name='world-shell:overview'>
       <StaticBoxes pieces={OVERVIEW_WALLS} material={WALL_MATERIAL} />
     </group>
   </group>;
