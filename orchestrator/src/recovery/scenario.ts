@@ -1,6 +1,7 @@
 import { MemoryFinanceRepository } from '../payables/repository';
 import { fork, type ChildProcess } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { FakeEffects, MemoryStateStore, type AuditEntry, type NewTask, type Task } from '../index';
 
@@ -61,7 +62,7 @@ export async function runRecovery(options: RecoveryOptions = {}): Promise<Recove
   const spawnWorker = (generation: number) => {
     const process = fork(new URL('./worker-process.ts', import.meta.url),
       [`payables:${generation}`, String(leaseMs), String(heartbeatMs)],
-      { execArgv: ['--import', createRequire(import.meta.url).resolve('tsx')], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+      { execArgv: ['--import', pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     child = process; alive = true;
     let stderr = '';
     process.stderr!.on('data', data => { stderr += String(data); });
