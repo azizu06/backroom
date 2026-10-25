@@ -9,6 +9,6 @@ export default defineConfig({
     command: `pnpm exec next start --port ${port}`, url: `${origin}/office`, reuseExistingServer: false,
     env: { WEBAUTHN_ORIGIN: origin, WEBAUTHN_RP_ID: 'localhost',
       CONTROLLER_ENROLLMENT_SECRET: 'local-audit-test-only', TOOL_GATEWAY_SECRET: 'local-tool-test-only',
-      STATE_STORE: 'memory', BACKROOM_APPROVAL_DEMO: '1', OPENROUTER_API_KEY: '' },
+      STATE_STORE: 'memory', BACKROOM_APPROVAL_DEMO: '1', OPENROUTER_API_KEY: '', ANTHROPIC_API_KEY: '' },
   },
 });
