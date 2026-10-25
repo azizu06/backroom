@@ -1,9 +1,28 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { openMenu, openSheet } from './office-menu';
 
 // /office uses AJ’s sidebar + topbar shell; the 3D scene fills the main pane, not the whole window.
 const BANNED = /\b(demo|synthetic|fake|sandbox|simulated|simulation|preview|hackathon)\b/i;
 const visibleText = (page: Page) => page.locator('.office-shell').evaluate(element => (element as HTMLElement).innerText);
+
+async function expectCenteredAction(dialog: Locator, column: Locator, action: Locator) {
+  await expect(dialog).toHaveCSS('scrollbar-gutter', 'stable both-edges');
+  await expect(action).toBeVisible();
+  await action.scrollIntoViewIfNeeded();
+  const contentCenter = await dialog.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+    const right = box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+    // Symmetric scrollbar reservations leave the content centre at this midpoint.
+    return (left + right) / 2;
+  });
+  for (const target of [column, action]) {
+    const box = await target.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.abs(box!.x + box!.width / 2 - contentCenter)).toBeLessThanOrEqual(4);
+  }
+}
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test.describe(`at ${viewport.width}x${viewport.height}`, () => {
@@ -53,6 +72,32 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     test.describe(`quiet sheets at ${viewport.width}x${viewport.height}, motion ${reducedMotion}`, () => {
       test.use({ viewport, reducedMotion });
+
+      test('Inbox and Play Settings centre their content and primary actions', async ({ page }) => {
+        await page.goto('/office?view=overview');
+        const inbox = await openSheet(page, 'inbox');
+        await inbox.getByText('Advanced: Try Your Own Email', { exact: true }).click();
+        await expectCenteredAction(inbox, inbox.locator('.detail-sheet-body'),
+          inbox.getByRole('button', { name: 'Route scenario', exact: true }));
+        await page.keyboard.press('Escape');
+        await expect(inbox).toHaveCount(0);
+
+        await expect(page.getByLabel('Office view')).toBeEnabled();
+        await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+        await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+        await expect(page.getByRole('application', { name: /First-person office/ }))
+          .toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+        await page.evaluate(() => document.exitPointerLock?.());
+        await expect(page.getByTestId('office-viewport')).not.toHaveAttribute('data-pointer-locked');
+        await page.getByRole('button', { name: 'Settings', exact: true }).focus();
+        await page.keyboard.press('Enter');
+        const settings = page.getByRole('dialog', { name: 'Play Settings', exact: true });
+        const reset = settings.getByRole('button', { name: 'Reset to defaults', exact: true });
+        await expectCenteredAction(settings, settings.locator('details').first(), reset);
+        // Expanded controls exercise the same alignment when the panel needs to scroll.
+        await settings.locator('summary').filter({ hasText: 'Movement Feel' }).click();
+        await expectCenteredAction(settings, settings.locator('details').first(), reset);
+      });
 
       test('Help anchors focus uncovered headings within the sheet and preserve search and Escape', async ({ page }) => {
         await page.goto('/office?view=overview');

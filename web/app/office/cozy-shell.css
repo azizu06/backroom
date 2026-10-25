@@ -27,6 +27,15 @@ html body .office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-togg
 html body .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { opacity: 1 !important; }
 .office-shell[data-hud='diegetic'] .office-drawer-toggle { display: block; }
 .office-shell .office-viewport .overview-map { inset: 12px 12px 58px; overflow: auto; }
+/* Keep sheet content centred when a vertical scrollbar appears. */
+.office-shell :is(.detail-sheet, .aj-detail-sheet, .room-inspector, .play-panel) {
+  scrollbar-gutter: stable both-edges;
+}
+/* Standalone panel actions keep their intrinsic size, centred in the content column. */
+.office-shell :is(.play-panel, .room-inspector, .detail-sheet-body, .aj-detail-body) > button {
+  display: block;
+  margin-inline: auto;
+}
 /* Match the shared sheet entrance in the overview sheet variant. */
 html body .office-shell .aj-detail-backdrop { animation: sheet-fade 0.18s ease-out; }
 html body .office-shell .aj-detail-sheet { animation: sheet-pop 0.16s ease-out both; }
