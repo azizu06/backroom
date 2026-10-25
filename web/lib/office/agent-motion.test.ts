@@ -5,6 +5,12 @@ import {
   damp, deskHeading, facesPlayer, handoffCueKey, lookYaw, poseAgent, transientMode, type AgentCue, type AgentMode,
 } from './agent-motion';
 import { OFFICE_ANCHORS } from './state';
+import { Group, PerspectiveCamera } from 'three';
+import { AgentAnimator } from '../../app/office/avatars/agentAnimator';
+import { createBearRig, poseBear } from '../../app/office/avatars/Bear';
+import { agentCues } from './agent-motion';
+import { BEAR_SEAT_LIFT, SIT_HIP_RAD, deskSeat, seatAtApproach } from './baked-seat';
+import { WORKSTATIONS, workstationApproach } from './layout';
 
 const cue = (over: Partial<AgentCue> = {}): AgentCue => ({ greetAt: -Infinity, thinkAt: -Infinity, talking: false, ...over });
 
@@ -66,6 +72,9 @@ describe('agent cues', () => {
 });
 
 describe('agent motion geometry', () => {
+  it.each(['collections', 'payables', 'vendor_onboarding', 'dana'] as const)('faces the monitor at %s', room => {
+    expect(deskHeading(room, ...OFFICE_ANCHORS[room].position)).toBe(deskSeat(room)!.heading);
+  });
   it('faces the desk only when seated at a desk seat', () => {
     const [x, z] = OFFICE_ANCHORS.payables.position;
     expect(Math.abs(angleDelta(deskHeading('payables', x, z), Math.PI))).toBeLessThan(1e-9);
@@ -89,6 +98,84 @@ describe('agent motion geometry', () => {
     const twice = damp(damp(0, 1, 6, 0.05), 1, 6, 0.05);
     expect(once).toBeCloseTo(twice);
     expect(damp(0, 1, 6, 5)).toBe(damp(0, 1, 6, 0.1));
+  });
+});
+
+describe('rendered seat transitions', () => {
+  function fixture(index: number) {
+    const rig = createBearRig();
+    rig.root = new Group(); rig.legs = new Group(); rig.head = new Group();
+    for (let i = 0; i < 2; i++) {
+      const leg = new Group(), shin = new Group(); shin.name = 'shin'; leg.add(shin); rig.legs.add(leg);
+    }
+    const body = new Group(); body.add(rig.root);
+    const animator = new AgentAnimator('handoff:seated-test', 'seated-test', rig);
+    const [x, z] = workstationApproach(index);
+    Object.assign(animator.input, { x, z }); // HandoffLayer deliberately passes desk: NaN.
+    const state = { camera: new PerspectiveCamera(), invalidate: vi.fn(), clock: { elapsedTime: 1 } };
+    state.camera.position.set(x, 1.7, z + 2);
+    const frame = () => {
+      body.position.set(animator.input.x, 0, animator.input.z);
+      poseBear(rig, 0, animator.input.moving, animator.input.reduced);
+      animator.animate(state, 1 / 60, body);
+    };
+    const settle = () => { for (let i = 0; i < 180; i++) frame(); };
+    return { rig, body, animator, state, frame, settle };
+  }
+
+  it.each(WORKSTATIONS.map((_, i) => i))('sits on workstation %i with bent knees and eyes on the monitor', index => {
+    const { rig, body, animator, settle } = fixture(index);
+    settle();
+    const seat = seatAtApproach(animator.input.x, animator.input.z)!;
+    expect(body.position.x).toBeCloseTo(seat.x);
+    expect(body.position.z).toBeCloseTo(seat.z);
+    expect(Math.abs(angleDelta(body.rotation.y, seat.heading))).toBeLessThan(0.001);
+    expect(rig.root!.position.y).toBeCloseTo(BEAR_SEAT_LIFT);
+    expect(rig.head!.rotation.y).toBe(0);
+    for (const leg of rig.legs!.children) {
+      expect(leg.rotation.x).toBeCloseTo(-SIT_HIP_RAD);
+      expect(leg.getObjectByName('shin')!.rotation.x).toBeCloseTo(SIT_HIP_RAD);
+    }
+  });
+
+  it('tweens out for conversation or a carried handoff, then sits again without a positional pop', () => {
+    const { rig, body, animator, frame, settle, state } = fixture(9);
+    try {
+      settle();
+      const seatedZ = body.position.z;
+      agentCues.setTalking('handoff:seated-test');
+      frame();
+      expect(body.position.z).toBeGreaterThan(seatedZ);
+      expect(body.position.z).toBeLessThan(animator.input.z);
+      expect(state.invalidate).toHaveBeenCalled();
+      settle();
+      expect(body.userData.agentMotion.seated).toBe(0);
+      expect(body.position.z).toBeCloseTo(animator.input.z);
+      expect(body.rotation.y).toBeCloseTo(0, 3);
+      agentCues.setTalking(null);
+      frame();
+      expect(body.position.z).toBeGreaterThan(seatedZ);
+      expect(body.position.z).toBeLessThan(animator.input.z);
+      settle();
+      expect(body.userData.agentMotion.seated).toBe(1);
+      rig.carry = 'front'; settle();
+      expect(body.userData.agentMotion.seated).toBe(0);
+      rig.carry = 'none'; settle();
+      expect(body.userData.agentMotion.seated).toBe(1);
+      animator.input.moving = true; frame();
+      expect(body.userData.agentMotion.seated).toBeGreaterThan(0);
+      settle();
+      expect(body.userData.agentMotion.seated).toBe(0);
+    } finally { agentCues.clear(); }
+  });
+
+  it('holds the seated and standing poses immediately with reduced motion', () => {
+    const { body, animator, rig, frame } = fixture(0);
+    animator.input.reduced = true;
+    frame();
+    expect(body.userData.agentMotion.seated).toBe(1);
+    rig.carry = 'front'; frame();
+    expect(body.userData.agentMotion.seated).toBe(0);
   });
 });
 

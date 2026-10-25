@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   AnimationMixer, Euler, LoopRepeat, Quaternion, Vector3, type AnimationAction, type AnimationClip, type Group, type Mesh, type Object3D,
 } from 'three';
+import { facesPlayer, type AgentMode } from '../../../lib/office/agent-motion';
 import { bakedArtRequested } from '../../../lib/office/baked-art';
 import {
   CHARACTER_CLIPS, CHARACTER_GLB_URL, CLIP_FADE_SECONDS, WALK_CLIP_SPEED, agentBodyColor, applyCharacterVariant, atOwnDesk, bakedTalkingAgent,
@@ -18,6 +19,7 @@ import {
 import { visibleRooms, type OfficeAgent } from '../../../lib/office/state';
 import { CONTACT_DYNAMIC_LAYER } from '../../../lib/office/lighting';
 import { useReducedMotion } from './shared';
+import { AvatarAnchors } from '../avatars/AvatarAnchors';
 import { StaticBoxes } from './StaticGeometry';
 import type { SceneMountProps } from './types';
 
@@ -52,7 +54,7 @@ interface Puppet {
   last: [number, number] | null;
   /** Thigh and shin bones with their seated local rotations; null when the rig lacks them (never sits). */
   readonly legs: SeatedLegs | null;
-  /** 0 standing at the anchor, 1 seated on the stool. */
+  /** 0 standing at the anchor, 1 seated on the chair. */
   seat: number;
   /** Drawn heading (avatar convention), smoothed toward the desk, the player or the avatar's own heading. */
   heading: number | null;
@@ -154,8 +156,8 @@ function seatOf(object: Group): string | undefined {
  * Opt-in stylized agents (`/office?art=baked`). Loads `character.glb` once, clones it per agent, shows the
  * accessories of the agent's role variant and tints the shirt. Clips follow the drawn avatar (view only):
  * walk while it moves, talk while the Play talk panel is open on it, type at its desk, idle otherwise. At its desk the
- * clone slides onto a stool at the keyboard (baked-seat.ts) and sits; while talking it turns to face the player. The
- * avatar group and its anchor never move.
+ * clone slides onto a chair at the keyboard (baked-seat.ts) and sits; while talking it turns to face the player. The
+ * logical route anchor stays fixed; the avatar and clone share the visual seat tween.
  * The blocky figure stays until each clone is ready, and stays if the GLB fails; a GLB without clips stands still.
  */
 export function BakedCharacters({ snapshot }: SceneMountProps) {
@@ -227,21 +229,22 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
       const body = puppet.body;
       if (!body) { clone.visible = false; continue; }
       clone.visible = true;
-      // The avatar group (anchor and Bear) is read, never moved; only the clone slides onto the stool.
+      // Read the logical route from the animator: its visual slide must not trigger the walk clip.
       body.updateWorldMatrix(true, false);
       scratchPosition.setFromMatrixPosition(body.matrixWorld);
       scratchEuler.setFromRotationMatrix(body.matrixWorld, 'YXZ');
-      const bx = scratchPosition.x, bz = scratchPosition.z, bodyHeading = scratchEuler.y;
-      const moving = !!puppet.last && Math.hypot(bx - puppet.last[0], bz - puppet.last[1]) > STILL_EPSILON;
+      const motion = body.userData.agentMotion as { x: number; z: number; moving: boolean; seated: number; mode: AgentMode } | undefined;
+      const bx = motion?.x ?? scratchPosition.x, bz = motion?.z ?? scratchPosition.z, bodyHeading = scratchEuler.y;
+      const moving = motion?.moving ?? (!!puppet.last && Math.hypot(bx - puppet.last[0], bz - puppet.last[1]) > STILL_EPSILON);
+      const isTalking = talking === id || (motion ? facesPlayer(motion.mode) : false);
       if (puppet.last) { puppet.last[0] = bx; puppet.last[1] = bz; } else puppet.last = [bx, bz];
       const seatId = seatOf(clone) ?? '';
       const atDesk = atOwnDesk(seatId, bx, bz);
       const seat = puppet.legs && puppet.mixer ? puppet.deskSeat : null;
       const settle = puppet.seat;
-      puppet.seat = seat ? stepSeatBlend(puppet.seat, atDesk && !moving, dt, reduced) : 0;
-      const sit = easeSeat(puppet.seat);
+      puppet.seat = seat ? stepSeatBlend(puppet.seat, atDesk && !moving && !isTalking, dt, reduced) : 0;
+      const sit = seat ? motion?.seated ?? easeSeat(puppet.seat) : 0;
       clone.position.set(seat ? bx + (seat.x - bx) * sit : bx, SIT_LIFT_M * sit, seat ? bz + (seat.z - bz) * sit : bz);
-      const isTalking = talking === id;
       const target = isTalking ? headingToward(clone.position.x, clone.position.z, camera.position.x, camera.position.z)
         : seat && atDesk && !moving ? seat.heading : bodyHeading;
       puppet.heading = puppet.heading === null ? target : turnToward(puppet.heading, target, dt, reduced);
@@ -253,7 +256,7 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
       scratchActivity.atDesk = atDesk;
       play(puppet, characterClip(scratchActivity, puppet.available), reduced);
       puppet.mixer.update(step);
-      // The clip leaves the legs at rest (type, talk, idle); fold them onto the stool on top of it.
+      // The clip leaves the legs at rest (type, talk, idle); fold them onto the chair on top of it.
       if (puppet.legs && sit > 0) {
         for (let index = 0; index < puppet.legs.bones.length; index++) {
           puppet.legs.bones[index]!.quaternion.slerp(puppet.legs.seated[index]!, sit);
@@ -266,15 +269,15 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
     if (again) invalidate();
   });
 
-  // A stool and keyboard at each occupied, visible desk, once the GLB clones exist (the Bear never sits).
+  // A keyboard at each occupied desk; furniture already supplies the chair.
   const visible = visibleRooms(snapshot);
   const seatRooms = models.length === 0 ? '' : [...new Set(snapshot.agents.map(agent => agent.seatId))]
     .filter(room => isSeatDesk(room) && visible.includes(room)).sort().join(',');
-  const stools = useMemo(() => seatRooms ? seatRooms.split(',').filter(isSeatDesk).flatMap(seatPieces) : [], [seatRooms]);
+  const keyboards = useMemo(() => seatRooms ? seatRooms.split(',').filter(isSeatDesk).flatMap(seatPieces) : [], [seatRooms]);
 
   return <>
-    {models.map(model => <primitive key={model.id} object={model.object} dispose={null} />)}
-    {stools.length > 0 && <StaticBoxes pieces={stools} />}
+    {models.map(model => <Fragment key={model.id}><primitive object={model.object} dispose={null} /><AvatarAnchors object={model.object} /></Fragment>)}
+    {keyboards.length > 0 && <StaticBoxes pieces={keyboards} />}
   </>;
 }
 
