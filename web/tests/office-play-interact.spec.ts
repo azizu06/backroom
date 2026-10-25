@@ -4,7 +4,7 @@ const surface = (page: Page) => page.getByRole('application', { name: /First-per
 const prompt = (page: Page) => page.locator('.play-prompt');
 
 async function start(page: Page, spawn: string) {
-  await page.goto(`/office?playSpawn=${spawn}`);
+  await page.goto(`/office?view=overview&playSpawn=${spawn}`);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();

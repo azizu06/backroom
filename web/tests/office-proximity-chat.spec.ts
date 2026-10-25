@@ -39,8 +39,8 @@ test('proximity chat reaches a coworker in range and is dropped out of range', a
   const errors: string[] = [];
   for (const page of [a, b]) page.on('pageerror', error => errors.push(error.message));
 
-  await enterPlay(a, '/office?presence=1');
-  await enterPlay(b, '/office?presence=1');
+  await enterPlay(a, '/office?presence=1&view=overview');
+  await enterPlay(b, '/office?presence=1&view=overview');
   await expect(a.getByText('2 viewing')).toBeVisible({ timeout: 8000 });
 
   // Both at the lobby spawn: within PROXIMITY_RADIUS.
@@ -48,7 +48,7 @@ test('proximity chat reaches a coworker in range and is dropped out of range', a
   await expect(chatLog(b)).toContainText('hello from A', { timeout: 5000 });
 
   // A re-enters Play 10 m away (test-only spawn), then speaks again.
-  await enterPlay(a, `/office?presence=1&playSpawn=${FAR.x},${FAR.z}`);
+  await enterPlay(a, `/office?presence=1&view=overview&playSpawn=${FAR.x},${FAR.z}`);
   await expect.poll(async () => Number(await surface(a).getAttribute('data-player-x'))).toBeCloseTo(FAR.x, 1);
   await say(a, 'too far to hear');
   await b.waitForTimeout(1500);
@@ -62,7 +62,7 @@ test('proximity chat reaches a coworker in range and is dropped out of range', a
 test('play chat offers Show coworkers when presence is off', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await enterPlay(page, '/office');
+  await enterPlay(page, '/office?view=overview');
   const chat = page.getByRole('region', { name: 'Proximity chat' });
   await chat.getByRole('button', { name: 'Show coworkers' }).click();
   await expect(page.getByLabel('Show viewers')).toBeChecked();

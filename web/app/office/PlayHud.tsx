@@ -27,7 +27,7 @@ import './play.css';
 import './playfeel.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
-export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
+export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Overview to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
   w: 'forward', arrowup: 'forward', keyw: 'forward', s: 'back', arrowdown: 'back', keys: 'back',
@@ -140,8 +140,10 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: {
+export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lookOnStart = false }: {
   snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; onHelp?: () => void; chat?: PlayChat;
+  /** Entered from an explicit Enter click: ask for pointer lock right away (that click is the user gesture). */
+  lookOnStart?: boolean;
 }) {
   const touch = useTouch();
   const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
@@ -156,10 +158,12 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: 
   const knob = useRef<HTMLSpanElement>(null);
   const targetRef = useRef(target);
   targetRef.current = target;
+  const lookOnMount = useRef(lookOnStart);
 
   useEffect(() => {
     const surface = hud.current;
     surface?.focus();
+    if (surface && lookOnMount.current) requestLook(surface);
     requestSceneFrame();
     return () => {
       input.clear();
@@ -327,7 +331,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: 
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    <button className='play-exit' onClick={onExit}>Exit Play</button>
+    <button className='play-exit' onClick={onExit}>Overview</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>
