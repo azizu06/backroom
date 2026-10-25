@@ -19,7 +19,6 @@ import { visibleRooms, type OfficeAgent } from '../../../lib/office/state';
 import { CONTACT_DYNAMIC_LAYER } from '../../../lib/office/lighting';
 import { useReducedMotion } from './shared';
 import { StaticBoxes } from './StaticGeometry';
-import { CONTACT_DYNAMIC_LAYER } from '../../../lib/office/lighting';
 import type { SceneMountProps } from './types';
 
 const scratchPosition = new Vector3();
