@@ -27,6 +27,12 @@ describe('collection dial boundary', () => {
     await expect(dialCollectionCall({ ...input, ...override }, { apiKey: 'key', http, prepare: vi.fn(), audit: vi.fn(), now })).rejects.toThrow(rule);
     expect(http).not.toHaveBeenCalled();
   });
+  it('records the business name and callback number on the session for the code-owned wrong-person line', async () => {
+    const http = vi.fn<typeof fetch>(async () => Response.json({ calls: [{ agent_call_id: 'ac-test' }] }));
+    const prepare = vi.fn<DialOptions['prepare']>(async () => undefined);
+    await dialCollectionCall(input, { apiKey: 'key', http, prepare, audit: vi.fn(async () => undefined), now });
+    expect(prepare.mock.calls[0]?.[0]).toMatchObject({ businessName: 'Northfield Studio', callbackNumber: '+12025550101' });
+  });
   it('requires both visible and explicitly enabled DEMO_OVERRIDE for a Saturday call', async () => {
     const http = vi.fn<typeof fetch>(async () => Response.json({ calls: [{ agent_call_id: 'ac-test' }] }));
     const audit = vi.fn<DialOptions['audit']>(async () => undefined), prepare = vi.fn(async () => undefined);
