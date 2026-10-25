@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { NessieClient, type Transaction } from '@backroom/nessie';
-import { PaymentService, type AuthorizedPaymentLink } from './index';
+import { NessieClient, paymentMemo, type Transaction } from '@backroom/nessie';
+import { PaymentService, paymentLinkMemo, type AuthorizedPaymentLink } from './index';
 const link: AuthorizedPaymentLink = { id: 'link-1042', invoiceId: '1042', planId: 'plan-1042', auditId: 'allow-1042',
   policyVersion: 1, installment: 1, amountCents: 247500, totalCents: 495000, currency: 'USD' };
 function setup() {
@@ -11,7 +11,7 @@ function setup() {
       if (init?.method === 'POST') { posts++; const row = { _id: `deposit-${posts}`, ...JSON.parse(String(init.body)) }; deposits.push(row); return Response.json({ objectCreated: row }); }
       return Response.json(String(_url).includes('/deposits') ? deposits : { balance: 0 });
     } });
-  return { service: new PaymentService({ bank: client, accountId: 'mock-account', lookup: async id => id === link.id ? link : undefined }), deposits, posts: () => posts };
+  return { service: new PaymentService({ bank: client, accountId: 'mock-account', lookup: async id => id === link.id ? link : undefined }), client, deposits, posts: () => posts };
 }
 it('posts only the authorized link amount and replays simultaneous clicks without a second deposit', async () => {
   const { service, posts } = setup();
@@ -56,6 +56,23 @@ it.each(['short', 'duplicate', 'pending', 'wrong memo'] as const)('queues %s dep
   expect(await store.getPayment('ar:1042:1')).toBeUndefined();
   // A successful CAS from promised proves that reconciliation did not change state.
   await expect(store.transitionInvoice(lease, '1042', 'promised', 'disputed', Date.now())).resolves.toBeUndefined();
+});
+it('ignores a deposit an earlier reset left under the invoice memo; the new link pays and matches exactly', async () => {
+  const { service, deposits, posts } = setup(); const { store, lease } = await job();
+  deposits.push({ _id: 'prior-reset-deposit', amount: 990, description: paymentMemo({ invoiceId: '1042', installment: 1 }),
+    status: 'completed', medium: 'balance', transaction_date: '2026-10-24' });
+  expect(await service.pay(link.id)).toMatchObject({ status: 'pending_reconciliation', depositId: 'deposit-1' });
+  expect(posts()).toBe(1); expect(deposits[1]!.description).toBe(paymentLinkMemo(link));
+  expect(await service.reconcile(link.id, store, lease, 'promised')).toMatchObject({ status: 'partially_paid', depositId: 'deposit-1' });
+  expect(service.exceptions()).toEqual([]);
+  expect((await store.listAudit()).filter(row => row.ruleIds.includes('EXACT_PAYMENT_MATCH'))).toHaveLength(1);
+});
+it('still refuses a second deposit for the same link after a restart', async () => {
+  const { service, client, deposits, posts } = setup();
+  const first = await service.pay(link.id);
+  const restarted = new PaymentService({ bank: client, accountId: 'mock-account', lookup: async id => id === link.id ? link : undefined });
+  expect(await restarted.pay(link.id)).toEqual(first);
+  expect(posts()).toBe(1); expect(deposits).toHaveLength(1);
 });
 it('marks a full authorized payment paid, using the feed even when Nessie account balance stays zero', async () => {
   const deposits: Transaction[] = [];

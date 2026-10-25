@@ -15,6 +15,7 @@ export function createAuditHTTP(options: {
   const now = options.now ?? Date.now;
   return async (action: string, request: Request): Promise<Response> => {
     const secret = options.secret(), origin = options.origin();
+    if (action === 'session' && request.method === 'GET') return json({ signedIn: !!secret && !!origin && operatorSignedIn(request, secret, now()) });
     if (!secret || !origin) return json({ error: 'Audit access is not configured.' }, 503);
     const requestOrigin = request.headers.get('origin');
     const loopback = options.loopbackOrigin?.();

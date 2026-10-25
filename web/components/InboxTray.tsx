@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import type { InboxPreset, InboxReceipt } from '../lib/inbox/types';
 import '../app/office/lobby.css';
 import { crsFraudText } from '../lib/provenance';
@@ -34,7 +34,7 @@ function attachmentProblem(file: File) {
 
 /** DOM panel for /inbox and the office lobby; presets are serializable server-owned fixture text. */
 /** headingLevel 3 when embedded under another page heading (the office lobby); 1 on /inbox. */
-export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxPreset[]; headingLevel?: 1 | 3 }) {
+export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets?: InboxPreset[]; headingLevel?: 1 | 3; actions?: ReactNode }) {
   const Title = headingLevel === 3 ? 'h3' : 'h1';
   const Sub = headingLevel === 3 ? 'h4' : 'h2';
   const uid = useId();
@@ -128,6 +128,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
   return <section className="inbox-tray" aria-labelledby={`${uid}-title`}>
     <header className="inbox-heading">
       <Title id={`${uid}-title`} className="inbox-title">Inbox</Title>
+      {actions}
       <p>Vendor bills and emails land here. Code checks every one before anything gets paid.</p>
     </header>
     <div className="inbox-presets" role="group" aria-label="Planted scenarios">

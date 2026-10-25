@@ -43,6 +43,25 @@ It uses the merged role modules on synthetic Northfield fixtures, with a fake GX
 
 ## Judge inbox host
 
+Signed-in operators can press **Start the workday** in the Inbox or office corner
+menu. `/api/operator/workday` feeds three frozen Northfield invoice presets
+(4401, 4481, 4482), then a lookalike bank-change email, 2.5 seconds apart through
+the existing inbox handler and narration host. The attack also runs the existing
+Attack assessment in `mock` mode (code checks, no paid analyst). Invoice intake
+uses a server-only hold adapter: it calls `PayablesSeat.assess`, never payment
+execution, even when the host has a live bank configured. Narration already has
+no payment port. Vendor/CRS guards still apply to the email.
+
+The producer runs once per company reset, shares the host's ledger and demo case
+caps, and requires headroom for all remaining $0.50 case budgets below the $40
+hard stop. OFF refuses new work; reset aborts the producer and existing agents.
+A repeat returns the current running/done/stopped receipt without resubmitting.
+The local `$0` rehearsal is `pnpm --filter @backroom/web build` followed by
+`pnpm --filter @backroom/web exec playwright test --config tests/workday.config.ts`.
+It starts its own ports 3057/3058 and uses a scripted QueryFn with real tools,
+guards and public rows; it also verifies overlap through the office walk planner.
+
+
 `web/lib/demo/agents.ts` wires the production `Dispatcher`, `ClaudeAgentRuntime` and
 `createRoleRegistry` into `/api/inbox` after its deterministic decision is recorded.
 It defaults ON under `BACKROOM_DEMO=1`; `DEMO_AGENTS=0` disables narration for an
