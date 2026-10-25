@@ -64,11 +64,11 @@ client with fixture-owned identity mappings; unmapped/unavailable identities hol
 Paid Apify checks have zero narration allowance and report `skipped_budget`.
 
 SpacetimeDB mode shares the demo runtime's exact transport and publishes rows to
-`agent_handoff_public`. The office's current `OFFICE_QUERIES` subscription in
-`web/lib/office/spacetime.ts` excludes that table: publication is tested, but live
-handoff display still needs an office consumer. Memory mode exposes the same row
-shape through `MemoryHandoffStore.subscribe`; the office uses static preview data
-and is not connected to that host feed.
+`agent_handoff_public`. The office subscribes to that table (`OFFICE_QUERIES` in
+`web/lib/office/spacetime.ts`) and its handoff stage walks the sender to the receiver's
+desk from those rows (`web/lib/office/live-handoff.test.ts`). Memory mode exposes the same row
+shape through `MemoryHandoffStore.subscribe`; without SpacetimeDB the office shows its
+walkthrough state and is not connected to that host feed.
 The Mac host reads its own `ANTHROPIC_API_KEY` at activation time. No key is copied
 to GX10 or a team env file. The repo-root `FileUsageLedger` persists across reset:
 $0.50 per demo case, $0.02 Haiku/$0.08 Sonnet activation reservations, $40 hard stop

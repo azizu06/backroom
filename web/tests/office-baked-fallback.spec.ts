@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL for the first-person Play view.
 const WARNING = 'Baked art /office-art/lobby.glb failed to load; using the procedural scene.';
@@ -21,15 +22,18 @@ async function openBaked(page: Page) {
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('canvas')).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  // Preview controls sit in the corner menu (closed by default); a pick closes it again.
+  await page.getByRole('button', { name: 'Backroom menu' }).click();
+  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
   return { warnings, errors };
 }
 
 async function enterPlay(page: Page) {
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
 }
 
 test('a missing baked lobby keeps the procedural audit board, stamp and colliders in Play', async ({ page }) => {

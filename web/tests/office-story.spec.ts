@@ -6,7 +6,8 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
-    await page.goto('/office');
+    await page.goto('/office?view=overview');
+    await page.getByRole('button', { name: 'Backroom menu' }).click();
     await page.getByRole('button', { name: 'Take the tour', exact: true }).click();
     const story = page.getByRole('complementary', { name: 'Judge story mode' });
     const camera = page.getByTestId('story-camera');

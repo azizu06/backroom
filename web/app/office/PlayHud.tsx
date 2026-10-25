@@ -149,7 +149,7 @@ export function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot:
  */
 export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOverview, chat, lookOnStart = false, keyOwners = { story: false, menu: false } }: {
   snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; onHelp?: () => void;
-  /** Toggle to the Overview camera (O or the Overview button); absent hides the button. */
+  /** Toggle to the Overview camera and map (O or the Overview button); absent, the button just exits Play. */
   onOverview?: () => void; chat?: PlayChat;
   /** Story mode or an Overview menu owning the arrow keys: Play then records no movement or turn input. */
   keyOwners?: { story: boolean; menu: boolean };
@@ -166,6 +166,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, changeSettings] = usePlaySettings();
   usePointerLockChrome(hud);
+  // One frame once the surface exists, so the rig reports its pose even before the first key.
+  useEffect(() => { requestSceneFrame(); }, []);
   useImmersiveAudio(hud, snapshot);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(settings);
@@ -356,7 +358,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    {onOverview && <button className='play-overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
+    {onOverview && <button className='play-overview' aria-label='Overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>

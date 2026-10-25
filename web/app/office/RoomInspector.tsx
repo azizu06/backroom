@@ -28,7 +28,7 @@ export function RoomInspector({ room, snapshot, close, inboxTray, openSheet }: {
     </> : room === 'treasury' ? <p>Locked · Dana only. Entry and money movement require server authorization.</p>
       : room === 'dana' ? <p>Human review. Approvals require Dana’s passkey on the approval card.</p>
       : <><h3>Audit Wall</h3><p>{openSheet ? <button type='button' onClick={() => openSheet('audit')}>Open the Audit Wall</button> : <a href='#office-audit-wall'>Open the Audit Wall below</a>}</p>
-        <div data-office-mount='inbox-inspector'><h3>Inbox tray · {snapshot.inboxCount}</h3>{openSheet ? <button type='button' onClick={() => openSheet('inbox')}>Open the inbox tray</button> : inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <><p>Preview contains three fixture items.</p><p>Receipts on the judge inbox are not synced into this static scene.</p><a href='/inbox'>Open the judge inbox</a></>}</div></>}
+        <div data-office-mount='inbox-inspector'><h3>Inbox tray · {snapshot.inboxCount}</h3>{openSheet ? <button type='button' onClick={() => openSheet('inbox')}>Open the inbox tray</button> : inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <><p>Receipts on the inbox page are not synced into this scene.</p><a href='/inbox'>Open the inbox</a></>}</div></>}
     {denial && <p className='denial-text' role='status'>Entry denied · audit {denial.auditId}</p>}
     </div>
   </section></div>;

@@ -46,8 +46,8 @@ describe('agent handoff dialogue', () => {
   });
 
   it('labels explicit scripts, preview, live, replay and disconnected records honestly', () => {
-    expect(agentChatSource('live', true)).toBe('Simulated');
-    expect(agentChatSource('preview', false)).toBe('Simulated');
+    expect(agentChatSource('live', true)).toBe('Scripted');
+    expect(agentChatSource('preview', false)).toBe('Scripted');
     expect(agentChatSource('live', false)).toBe('Live handoff');
     expect(agentChatSource('replay', false)).toBe('Replay');
     expect(agentChatSource('disconnected', false)).toBe('Offline record');
@@ -75,11 +75,11 @@ describe('dialogue follows the handoff choreography', () => {
 
   it('acknowledges an offer without claiming it was accepted and updates on acceptance', () => {
     const stage = new HandoffStage(), offered = row(); stage.update([offered], 1000);
-    const initial = agentChatTimeline(stage.plan, 'Simulated');
+    const initial = agentChatTimeline(stage.plan, 'Scripted');
     expect(initial[1]!.text).toContain('Waiting for acceptance');
     expect(Number.isFinite(initial[1]!.start)).toBe(true);
     stage.update([{ ...offered, status: 'accepted', acceptedAt: 2500 }], 2500);
-    const accepted = agentChatTimeline(stage.plan, 'Simulated');
+    const accepted = agentChatTimeline(stage.plan, 'Scripted');
     expect(accepted[0]!.start).toBe(initial[0]!.start);
     expect(accepted[1]!.text).toBe('Got it. I’ll check the invoice fields.');
   });
@@ -97,23 +97,23 @@ describe('dialogue follows the handoff choreography', () => {
 
   it('preserves reading time at demo speed, works with static reduced-motion positions, and skips unsupported trips', () => {
     const plan = planHandoffs([row({ status: 'completed' })], { speed: 8 });
-    const cues = agentChatTimeline(plan, 'Simulated');
+    const cues = agentChatTimeline(plan, 'Scripted');
     expect(cues.every(cue => cue.end - cue.start === AGENT_CHAT_MS)).toBe(true);
     const stage = new HandoffStage(8); stage.update([row({ status: 'completed' })]);
     expect(stage.sample(cues[1]!.start, true).actors.every(actor => !actor.moving)).toBe(true);
     expect(sampleAgentChat(cues, cues[1]!.start)[0]!.phase).toBe('reply');
-    expect(agentChatTimeline(planHandoffs([row({ toRole: 'intake' })]), 'Simulated')).toEqual([]);
+    expect(agentChatTimeline(planHandoffs([row({ toRole: 'intake' })]), 'Scripted')).toEqual([]);
   });
 
   it('selects the latest overlapping cue per actor, including ties', () => {
-    const cue = agentChatTimeline(planHandoffs([row()]), 'Simulated')[0]!;
+    const cue = agentChatTimeline(planHandoffs([row()]), 'Scripted')[0]!;
     const newer = { ...cue, start: cue.start + 1, text: 'Newer' };
     const tied = { ...newer, text: 'Latest' };
     expect(sampleAgentChat([cue, newer, tied], newer.start)).toEqual([tied]);
   });
 
   it('reuses the caller buffer and clears expired cues without retaining stale entries', () => {
-    const cues = agentChatTimeline(planHandoffs([row()]), 'Simulated');
+    const cues = agentChatTimeline(planHandoffs([row()]), 'Scripted');
     const out = [cues[1]!];
     expect(sampleAgentChat(cues, cues[0]!.start, out)).toBe(out);
     expect(out).toEqual([cues[0]]);

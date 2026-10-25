@@ -6,7 +6,7 @@ import type { ActorFrame } from './handoff-plan';
 import { HANDOFF_ROLES, type HandoffAgentId } from './handoffs';
 
 const cue = (actor: HandoffAgentId): AgentChatCue => ({ actor, phase: 'sender', start: 0, end: 3500,
-  text: 'Passing documents.', status: 'Passing documents', source: 'Simulated' });
+  text: 'Passing documents.', status: 'Passing documents', source: 'Scripted' });
 const actor = (id: HandoffAgentId, x = 0, z = 0): ActorFrame => ({ id, position: [x, z],
   heading: 0, moving: false, stride: 0, returning: false });
 

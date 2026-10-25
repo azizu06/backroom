@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TICKET_BOARD, TICKET_BOARD_POSITION } from '../lib/office/props/ticketBoard';
 import { BUILDING } from '../lib/office/layout';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 function surface(page: Page) {
@@ -78,15 +79,16 @@ async function startPlay(page: Page) {
     // Preview controls sit in the corner menu (closed by default); a pick closes it again.
     const menu = page.getByRole('button', { name: 'Backroom menu' });
     if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
-    await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+    await page.getByRole('button', { name: 'Show Treasury denial' }).click();
     await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
   }).toPass();
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return errors;
 }
 
@@ -102,10 +104,10 @@ test('the audit wall hangs in the lobby and, on a preview feed, paints no receip
   const at = await player(page);
   expect(at.x).toBeGreaterThan(-7.6);
 
-  // Preview rows are not the audit log, so the wall paints none of them and says so (live ids are covered by the unit tests).
+  // Local rows are not the audit log, so the wall paints none of them and says so (live ids are covered by the unit tests).
   expect(await canvas.getAttribute('data-audit-wall')).toBe('');
   const description = await canvas.getAttribute('aria-description');
-  expect(description).toContain('Preview feed: no audit entries');
+  expect(description).toContain('No audit entries in this view');
   const denialId = await page.locator('[data-audit-id]').first().getAttribute('data-audit-id');
   expect(denialId).not.toBeNull();
   expect(description).not.toContain(denialId!);
