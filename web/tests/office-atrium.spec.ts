@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 /** Start in the west corridor and cross the real layout opening with keyboard movement. */
 test('walks from the corridor into the atrium without a wall or furniture blocking the opening', async ({ page }) => {
@@ -7,6 +8,7 @@ test('walks from the corridor into the atrium without a wall or furniture blocki
   await page.goto('/office?playSpawn=-10.8,0&perf=1&view=overview');
   const view = page.getByLabel('Office view');
   await expect(view).toBeEnabled();
+  await openMenu(page);
   await view.selectOption({ label: 'Play (first person)' });
   const surface = page.getByRole('application', { name: /First-person office/ });
   await expect(surface).toBeFocused();

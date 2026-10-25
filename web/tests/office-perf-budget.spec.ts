@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Reads the opt-in ?perf=1 overlay (all passes, shadows included).
 const MOVING_PLAY_DRAW_BUDGET = 300;
@@ -17,6 +18,7 @@ test('moving first-person Play stays within the draw-call budget', async ({ page
   const select = page.getByLabel('Office view');
   await expect(select).toBeEnabled();
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-x', /\d/, { timeout: 20_000 });

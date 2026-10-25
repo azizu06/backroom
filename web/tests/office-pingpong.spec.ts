@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 for (const reducedMotion of ['reduce', 'no-preference'] as const) {
   test(`E starts ping pong, mouse and A/D move the paddle, Escape restores first person (${reducedMotion})`, async ({ page }) => {
@@ -8,6 +9,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     await page.emulateMedia({ reducedMotion });
     await page.goto('/office?playSpawn=9.5,4&view=overview');
     await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+    await openMenu(page);
     await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
     const surface = page.getByRole('application', { name: /First-person office/ });
     await expect(surface).toBeFocused();
@@ -59,9 +61,11 @@ test('score card hides behind a wall in first person and returns in overview', a
   const view = page.getByLabel('Office view');
   const score = page.getByTestId('pingpong-score');
   await expect(score).toHaveCSS('visibility', 'visible');
+  await openMenu(page);
   await view.selectOption({ label: 'Play (first person)' });
   await expect(page.getByRole('application', { name: /First-person office/ })).toHaveAttribute('data-player-x', '9.000');
   await expect(score).toHaveCSS('visibility', 'hidden');
+  await openMenu(page);
   await view.selectOption({ label: 'Orbit camera' });
   await expect(score).toHaveCSS('visibility', 'visible');
 });
