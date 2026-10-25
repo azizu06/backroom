@@ -6,6 +6,7 @@ import { auditUnlockMessage, CODE_REJECTED, ORIGIN_REJECTED } from '../lib/audit
 import { jsonObject, NETWORK_MESSAGE, outageMessage, serverError } from '../lib/http/response';
 import { signInOperator } from '../lib/operator/sign-in-client';
 import { auditStories, whyQuestion, type StoryLine } from '../lib/audit/stories';
+import PlanBalance from './PlanBalance';
 import './AuditWall.css';
 
 export type AuditSnapshot = { entries: AuditEntry[]; chain: ChainStatus; measuredAt: string };
@@ -186,6 +187,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
             <div className="audit-section-heading"><PanelHeading>{story.title}</PanelHeading>
               <span>{story.total} {story.total === 1 ? 'entry' : 'entries'}</span></div>
             <ul className="audit-lines">{(quoted => story.lines.map(line => storyLine(line, quoted)))(new Set<string>())}</ul>
+            {story.balance && <PlanBalance balance={story.balance} label={`Invoice ${story.balance.invoiceId} payment plan`} />}
             {story.total > story.lines.length && <button type="button" className="audit-more" onClick={() => { setAdvanced(true); requestAnimationFrame(() => replay.current?.scrollIntoView({ block: 'start' })); }}>
               {story.total - story.lines.length} more in all entries</button>}
           </li>)}</ol>

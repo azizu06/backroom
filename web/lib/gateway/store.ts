@@ -3,6 +3,7 @@ import type {
   GatewayPolicyState,
 } from "./policy-adapter";
 import { getStateStore, type StateStore } from "@backroom/orchestrator";
+import type { PaymentPlanRecord } from "@backroom/orchestrator/payment-schedule";
 
 export interface GatewayCall {
   callId: string;
@@ -58,6 +59,8 @@ export interface AuditEntry {
   webhookRequestId: string;
   plan?: PlanTerms;
   decision?: GatewayPolicyDecision;
+  /** Set only on the ALLOW that authorizes a plan; persisted with that audit row. */
+  paymentPlan?: PaymentPlanRecord;
 }
 export interface AllowedPlan extends PlanTerms {
   id: string;
@@ -197,6 +200,7 @@ export class MemoryGatewayStore implements GatewayStore {
         decision: entry.kind === 'RECORDED' ? undefined : entry.kind,
         inputs: { kind: entry.kind, webhookRequestId: entry.webhookRequestId,
           invoiceId: saved.invoiceId, plan: entry.plan, decision: entry.decision,
+          ...(entry.paymentPlan && { paymentPlan: entry.paymentPlan }),
           scenario_source: saved.scenarioSource ?? 'seed' },
         latencyMs: 0, costUsd: 0,
       }));

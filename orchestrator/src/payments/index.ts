@@ -1,10 +1,13 @@
 import { paymentMemo, type NessieClient, type PostedDepositsDisplay, type Transaction } from '@backroom/nessie';
 import type { InvoiceState, Lease, StateStore } from '../store';
+import { planBalance, type PlanInstallment } from './schedule';
 
 /** Trusted projection of a payment_link and its matching ALLOW audit/plan. Never accept this from HTTP or a model. */
 export interface AuthorizedPaymentLink {
   id: string; invoiceId: string; planId: string; auditId: string; policyVersion: number;
   installment: number; amountCents: number; totalCents: number; currency: 'USD';
+  /** The authorized plan's code-computed schedule, for display only. */
+  schedule?: readonly PlanInstallment[];
 }
 export type PaymentBank = Pick<NessieClient, 'deposit' | 'listDeposits' | 'readBalanceWithPostedDeposits' | 'surfaceCopy'>
   & Partial<Pick<NessieClient, 'readBalanceDisplay'>>;
@@ -58,8 +61,13 @@ export class PaymentService {
   hasRecordedPayment(id: string): boolean { return this.records.has(id); }
   async view(id: string) {
     const link = await this.link(id);
+    const payment = this.records.get(id);
+    // Only this link's exact reconciled match counts as paid here; nothing is inferred from the bank balance.
+    const matched = payment?.status === 'paid' || payment?.status === 'partially_paid';
     return { linkId: link.id, invoiceId: link.invoiceId, installment: link.installment, amountCents: link.amountCents,
-      currency: link.currency, payment: structuredClone(this.records.get(id)),
+      currency: link.currency, payment: structuredClone(payment),
+      plan: link.schedule ? planBalance(link.totalCents, link.schedule,
+        matched ? [{ installment: link.installment, amountCents: link.amountCents }] : []) : undefined,
       balance: await (this.options.bank.readBalanceDisplay
         ? this.options.bank.readBalanceDisplay(this.options.accountId)
         : this.options.bank.readBalanceWithPostedDeposits(this.options.accountId)) };
@@ -185,7 +193,8 @@ export class PaymentService {
       await store.reservePayment(lease, key, fingerprint, this.now());
       await store.transitionInvoice(lease, link.invoiceId, from, invoiceState, this.now());
       await store.recordPayment(lease, { key, fingerprint, result: { amountCents: link.amountCents, invoiceState, depositId: record.depositId } }, this.now());
-      await this.audit(store, link, 'EXACT_PAYMENT_MATCH', { depositId: record.depositId, invoiceState, amountCents: link.amountCents });
+      await this.audit(store, link, 'EXACT_PAYMENT_MATCH', { depositId: record.depositId, invoiceState, amountCents: link.amountCents,
+        installment: link.installment });
       record.status = invoiceState; return structuredClone(record);
     });
   }
@@ -207,6 +216,7 @@ export function matchRemittance(expected: { amountCents: number; memo: string },
 export type PaymentView = Awaited<ReturnType<PaymentService['view']>>;
 export type { PostedDepositsDisplay };
 export { mirrorBankFeed } from './bank-feed';
+export * from './schedule';
 
 export type BankEvidence = Transaction & { paymentLinkRef?: string };
 /** A trusted imported link reference can identify exceptions; it can never substitute

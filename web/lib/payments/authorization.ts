@@ -1,4 +1,5 @@
 import type { AuthorizedPaymentLink } from '@backroom/orchestrator';
+import { parsePaymentPlan } from '@backroom/orchestrator/payment-schedule';
 import { firstPaymentCents } from '../../../policy/src/index';
 import { DANA_APPROVED } from '../gateway/policy-adapter';
 import type { AuditEntry, GatewayCall } from '../gateway/store';
@@ -22,6 +23,9 @@ export function authorizedPaymentLink(call: GatewayCall, id: string, now = Date.
     + (plan.waiveFee ? 0 : call.receivable.lateFeeCents);
   const first = firstPaymentCents(total, plan.firstPaymentPct, plan.installments);
   if (plan.totalCents !== total || plan.firstPaymentCents !== first || link.amountCents !== first) return;
+  // Display-only: the schedule shows only when it is exactly the one code computes from the authorized terms.
+  const persisted = audit.paymentPlan?.planId === plan.id ? parsePaymentPlan(audit.paymentPlan) : undefined;
+  const schedule = persisted?.totalCents === total && persisted.schedule[0]?.amountCents === first ? persisted.schedule : undefined;
   return { id: link.id, invoiceId: call.invoiceId, planId: plan.id, auditId: audit.id, policyVersion: call.policyVersion,
-    installment: 1, amountCents: link.amountCents, totalCents: plan.totalCents, currency: 'USD' };
+    installment: 1, amountCents: link.amountCents, totalCents: plan.totalCents, currency: 'USD', ...(schedule && { schedule }) };
 }

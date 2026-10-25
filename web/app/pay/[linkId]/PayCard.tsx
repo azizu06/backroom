@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import type { PaymentView } from '@backroom/orchestrator';
+import PlanBalance from '../../../components/PlanBalance';
 import styles from './pay.module.css';
 const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 export default function PayCard({ linkId }: { linkId: string }) {
@@ -44,6 +45,7 @@ export default function PayCard({ linkId }: { linkId: string }) {
         : payment.status === 'exception' ? 'Deposit needs review. Your invoice has not been cleared.'
         : payment.status === 'paid' ? 'Payment matched. Invoice paid.' : 'Payment matched. Invoice partially paid.'}</p>}
       {payment && <p className={styles.reference}>Deposit reference: {payment.depositId}</p>}
+      {view.plan && <PlanBalance balance={view.plan} label={`Invoice #${view.invoiceId} payment plan`} />}
       <section className={styles.balance} aria-label={view.balance.readbackLabel}><h2>{view.balance.label}</h2>
         <p className={styles.amount}>{money(view.balance.displayTotal)}</p>
         <p>Account balance: {money(view.balance.accountBalance)}<br />Posted deposits: {money(view.balance.postedDepositsTotal)}</p>

@@ -82,7 +82,20 @@ test('judge invoice, attack, passkey exception and exact payment finish the agen
     expect(nessieReceipt).toMatchObject({ invoiceId: '1042', installment: 1, amountCents: 74300, status: 'partially_paid' });
     expect(nessieReceipt.depositId).toMatch(/^mock-deposit-/);
     await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
+    const balance = 'Paid $743.00 of $4,950.00 · Remaining $4,207.00';
+    const plan = page.getByRole('region', { name: 'Invoice #1042 payment plan' });
+    await expect(plan.getByText(balance, { exact: true })).toBeVisible();
+    await expect(plan.getByRole('row')).toHaveCount(8);
+    await expect(plan.getByRole('row').nth(1)).toContainText('Paid');
+    await expect(plan.getByRole('row').nth(2)).toContainText('Upcoming');
     await page.screenshot({ path: info.outputPath('payment.png'), fullPage: true });
+    // The operator sees the same balance on the Calls page case summary and the audit wall's stories.
+    await page.goto(`${origin}/calls`);
+    await expect(page.getByRole('region', { name: 'Invoice 1042 payment plan' }).getByText(balance, { exact: true })).toBeVisible();
+    await page.goto(`${origin}/audit`);
+    for (const kind of ['payment', 'call']) {
+      await expect(page.locator(`.audit-story[data-kind=${kind}]`).getByText(balance, { exact: true }).first()).toBeVisible();
+    }
   });
   await test.step('Call completion emits collections, reconciler and auditor evidence', async () => {
     const before = await (await page.request.get(`${origin}/api/audit/entries`)).json();

@@ -52,6 +52,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./reducer": "./src/reducer-engine.ts",
+    "./payment-schedule": "./src/payments/schedule.ts",
     "./spacetime-client": "./src/spacetime-client/index.ts",
     "./spacetime-client/types": "./src/spacetime-client/types.ts",
     "./replay": "./src/replay/index.ts",
