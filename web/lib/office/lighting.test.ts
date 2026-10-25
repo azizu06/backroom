@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { OrthographicCamera, Vector3 } from 'three';
 import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, MAX_OFFICE_LIGHTS, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LAMPS, OFFICE_LIGHTING, officeLightRig, officeLowPower } from './lighting';
 import { ROLES } from './palette';
+import { ATRIUM_HEIGHT, BUILDING } from './layout';
 
 function rgb(hex: string) {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -105,7 +107,10 @@ describe('office lighting', () => {
     const { position, near, scale } = OFFICE_LIGHTING.contactShadows;
     expect(position[1]).toBeGreaterThan(FLOOR_PAD_TOP);
     expect(position[1] + near).toBeGreaterThan(FLOOR_PAD_BOTTOM);
-    expect(scale).toEqual([16, 11]);
+    // Covers the expanded building floor, centred on its footprint, with a small margin.
+    expect(position[0]).toBe((BUILDING.minX + BUILDING.maxX) / 2);
+    expect(scale[0]).toBeGreaterThanOrEqual(BUILDING.maxX - BUILDING.minX);
+    expect(scale[1]).toBeGreaterThanOrEqual(BUILDING.maxZ - BUILDING.minZ);
   });
 
   it('bounds the key shadow camera so the depth bias stays small in world units', () => {
@@ -114,6 +119,20 @@ describe('office lighting', () => {
     expect(near).toBeLessThan(throwDistance - 8);
     expect(far).toBeGreaterThan(throwDistance + 8);
     expect(Math.abs(bias) * (far - near)).toBeLessThan(0.02);
+  });
+
+  it('covers the expanded building and full atrium height with the key shadow camera', () => {
+    const { position, shadow: { left, right, top, bottom, near, far } } = OFFICE_LIGHTING.key;
+    const camera = new OrthographicCamera(left, right, top, bottom, near, far);
+    camera.position.set(...position);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    for (const x of [BUILDING.minX - 0.1, BUILDING.maxX + 0.1])
+      for (const z of [BUILDING.minZ - 0.1, BUILDING.maxZ + 0.1])
+        for (const y of [0, ATRIUM_HEIGHT + 0.12]) {
+          const projected = new Vector3(x, y, z).project(camera);
+          for (const value of projected.toArray()) expect(Math.abs(value), `${x},${y},${z}`).toBeLessThan(1);
+        }
   });
 
   it('makes screens glossier than the rough base material', () => {

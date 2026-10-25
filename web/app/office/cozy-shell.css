@@ -1,0 +1,33 @@
+/* Composition only. AJ 1f5ea2be9ce6 iisu.css owns the presentation.
+   The integrated Play stylesheet used to cover the shell with a fixed viewport. */
+html body .office-shell .office-main .office-viewport.office-viewport {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+}
+.office-shell .office-main > .office-toolbar {
+  position: relative;
+  inset: auto;
+  z-index: 12;
+  visibility: visible;
+  justify-content: flex-start;
+}
+.office-shell .office-toolbar > .office-tools { min-width: max-content; justify-content: flex-start; }
+/* The legacy mobile full-row status width does not apply to AJ's scrolling toolbar. */
+.office-shell .office-toolbar .connection-status { width: auto; }
+.office-shell .office-toolbar .overview-toggle { position: static; inset: auto; z-index: auto; }
+/* Keep the disclosure link together so its visible bounds form one click target. */
+.office-shell .real-sim-tile-foot a { display: inline-block; }
+/* The source Info tile owns the bottom-right corner; keep the integrated tour exit clear of it. */
+.office-shell .office-viewport > .tour-stop { top: 14px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); z-index: 7; }
+/* The source toolbar is shared by all views; obsolete corner visibility cannot hide it. */
+.office-shell[data-hud='diegetic'] .office-main > .office-toolbar { visibility: visible; }
+/* Keep integrated gameplay controls readable and reachable inside the framed scene. */
+html body .office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle, .play-overview),
+html body .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { opacity: 1 !important; }
+.office-shell[data-hud='diegetic'] .office-drawer-toggle { display: block; }
+.office-shell .office-viewport .overview-map { inset: 12px 12px 58px; overflow: auto; }
+@media (max-width: 760px) {
+  .office-shell[data-hud='diegetic'] .play-overview { right: auto; left: 8px; top: 46px; }
+  .office-shell[data-hud='diegetic'] .office-sound-toggle { right: auto !important; left: 8px; }
+}

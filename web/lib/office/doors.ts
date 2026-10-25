@@ -1,4 +1,4 @@
-import { OFFICE_ANCHORS } from './state';
+import { doorway } from './layout';
 
 /** Cosmetic interior doors only. Treasury is deliberately outside this contract. */
 export const INTERIOR_DOORS = ['collections', 'payables', 'vendor_onboarding'] as const;
@@ -7,8 +7,10 @@ export type DoorState = Readonly<Record<DoorId, boolean>>;
 export const OPEN_DOORS: DoorState = { collections: true, payables: true, vendor_onboarding: true };
 export const DOOR_WIDTH = 1.3;
 export const DOOR_DEPTH = 0.12;
+/** Full-height leaves under the DOOR_OPENING_HEIGHT header (layout). */
+export const DOOR_LEAF_HEIGHT = 2.1;
 export function doorPosition(room: DoorId): readonly [number, number] {
-  return [OFFICE_ANCHORS[room].center[0], -0.65];
+  return doorway(room).at;
 }
 export function toggleDoor(state: DoorState, room: DoorId): DoorState {
   return { ...state, [room]: !state[room] };

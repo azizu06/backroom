@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StoryChapter } from '../../lib/office/story';
-import type { OfficeSnapshot } from '../../lib/office/state';
+import { OFFICE_ANCHORS, type OfficeSnapshot } from '../../lib/office/state';
 import { StoryCaption } from './StoryCaption';
 import './story.css';
 
@@ -15,6 +15,8 @@ export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced, sna
   const [elapsed, setElapsed] = useState(0);
   const [finished, setFinished] = useState(false);
   const started = useRef(Date.now());
+  const card = useRef<HTMLElement>(null);
+  useEffect(() => { card.current?.focus(); }, []);
   const togglePause = useCallback(() => setPaused(value => {
     if (value) started.current = Date.now() - elapsed;
     return !value;
@@ -55,16 +57,19 @@ export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced, sna
   }, []);
   if (!chapter || !chapters.length) return null;
   const progress = reduced ? (index + 1) / chapters.length : (index + Math.min(1, elapsed / chapter.dwellMs)) / chapters.length;
-  return <aside className='story-mode' aria-label='Judge story mode' onPointerDown={event => event.stopPropagation()}>
+  return <aside ref={card} tabIndex={-1} className='story-mode' aria-label='Judge story mode' onPointerDown={event => event.stopPropagation()}>
     <div className='story-progress' role='progressbar' aria-label='Story progress' aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}><span style={{ width: `${progress * 100}%` }} /></div>
     <StoryCaption chapter={chapter} index={index} total={chapters.length} snapshot={snapshot} />
+    {chapter.handoff && <div className='story-handoff' role='img' aria-label={`Scripted evidence folder handoff from ${OFFICE_ANCHORS[chapter.handoff[0]].name} to ${OFFICE_ANCHORS[chapter.handoff[1]].name}`}>
+      <span>{OFFICE_ANCHORS[chapter.handoff[0]].name}</span><span aria-hidden='true'>▱ →</span><span>{OFFICE_ANCHORS[chapter.handoff[1]].name}</span>
+    </div>}
     {chapter.preview && !onPreview && <p className='story-preview-note'>(preview only in demo mode)</p>}
     <div className='story-actions'>
       {!finished && <button onClick={togglePause}>{paused ? 'Resume' : 'Pause'}</button>}
       {finished && <button onClick={() => { select(0); setPaused(false); }}>Replay</button>}
-      <button onClick={() => select(index - 1)} disabled={index === 0}>Previous</button>
+      <button onClick={() => select(index - 1)} disabled={index === 0}>Back</button>
       {!finished && <button onClick={() => select(index + 1)} disabled={index === chapters.length - 1}>Next</button>}
-      <button onClick={onExit}>Exit</button>
+      <button onClick={onExit}>Skip</button>
     </div>
   </aside>;
 }

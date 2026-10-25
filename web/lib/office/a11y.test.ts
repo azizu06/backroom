@@ -19,7 +19,7 @@ describe('a11y names', () => {
   it('includes the agent name and state, and the folder target only when escalating', () => {
     expect(seatLabel(agent)).toBe('Alex · collections_1, working');
     expect(seatLabel({ ...agent, escalationId: 'escalation-1' }))
-      .toBe('Alex · collections_1, working, escalation folder to Dana’s desk');
+      .toBe('Alex · collections_1, working, escalation folder to Dana’s Desk');
     expect(seatLabel({ ...agent, escalationId: 'escalation-1', targetAnchor: 'payables' }))
       .toContain('escalation folder to Payables');
   });
@@ -27,7 +27,7 @@ describe('a11y names', () => {
   it('names badge versions and room functions', () => {
     expect(roomLabel('payables', snapshot)).toBe('Payables · badge v3 · open limits');
     expect(roomLabel('lobby', snapshot)).toBe('Lobby · audit wall and inbox');
-    expect(roomLabel('dana', snapshot)).toBe('Dana’s desk · human approval');
+    expect(roomLabel('dana', snapshot)).toBe('Dana’s Desk · human approval');
     expect(roomLabel('treasury', INITIAL_OFFICE)).toBe('Treasury · locked, Dana only');
     expect(roomLabel('collections', INITIAL_OFFICE)).toBe('Collections · open details');
   });

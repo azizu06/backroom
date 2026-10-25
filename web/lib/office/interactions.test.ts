@@ -5,6 +5,11 @@ import { createInteractionStore, interactionStore } from './interactions';
 import { interactCandidates, movePlayer, officeColliders, pickTarget, PLAYER_RADIUS } from './play';
 import { createMockOfficeState } from './preview';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
+import { doorPosition } from './doors';
+import { BUILDING, WALL_THICKNESS } from './layout';
+import { PAYLINK_KIOSK as K, TREASURY_DOOR } from './play';
+
+const [X, D] = doorPosition('payables');
 
 const rooms = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 
@@ -22,33 +27,34 @@ describe('local interior doors', () => {
 
   it('blocks a closed doorway, releases it when open and blocks again when closed', () => {
     for (const room of INTERIOR_DOORS) {
-      const x = OFFICE_ANCHORS[room].center[0];
+      const [x, door] = doorPosition(room);
       const closedState = toggleDoor(OPEN_DOORS, room);
       const closed = officeColliders(rooms, [], closedState);
       const open = officeColliders(rooms, [], toggleDoor(closedState, room));
       expect(officeColliders(rooms)).toEqual(open);
-      expect(movePlayer([x, 0.4], [0, -1.7], closed)[1]).toBeCloseTo(-0.65 + 0.06 + PLAYER_RADIUS, 3);
-      expect(movePlayer([x, 0.4], [0, -1.7], open)[1]).toBeCloseTo(-1.3);
-      expect(movePlayer([x, -1.3], [0, 1.7], closed)[1]).toBeCloseTo(-0.65 - 0.06 - PLAYER_RADIUS, 3);
+      expect(movePlayer([x, door + 1.05], [0, -1.7], closed)[1]).toBeCloseTo(door + 0.06 + PLAYER_RADIUS, 3);
+      expect(movePlayer([x, door + 1.05], [0, -1.7], open)[1]).toBeCloseTo(door - 0.65);
+      expect(movePlayer([x, door - 0.65], [0, 1.7], closed)[1]).toBeCloseTo(door - 0.06 - PLAYER_RADIUS, 3);
     }
   });
 
   it('never opens the Treasury barrier when every interior door is open', () => {
     const colliders = officeColliders(rooms, [], OPEN_DOORS);
-    expect(movePlayer([5, 0.4], [0, 3], colliders)[1]).toBeCloseTo(1.05 - PLAYER_RADIUS, 3);
+    const [x, z] = TREASURY_DOOR;
+    expect(movePlayer([x, z - 1.1], [0, 3], colliders)[1]).toBeCloseTo(z - WALL_THICKNESS / 2 - PLAYER_RADIUS, 3);
   });
 
   it('lets a player stopped on either side reopen a closed door with an agent behind it', () => {
     interactionStore.toggleDoor('payables');
     try {
-      const candidates = interactCandidates([{ id: 'sam', position: [0, -1.8] }], rooms);
-      for (const z of [-0.31, -0.99]) {
-        const yaw = Math.atan2(-0.15, -(-0.65 - z));
-        expect(pickTarget([-0.15, z], yaw, candidates)).toEqual({ kind: 'door', room: 'payables' });
+      const candidates = interactCandidates([{ id: 'sam', position: [X, D - 1.15] }], rooms);
+      for (const z of [D + 0.34, D - 0.34]) {
+        const yaw = Math.atan2(-0.15, -(D - z));
+        expect(pickTarget([X - 0.15, z], yaw, candidates)).toEqual({ kind: 'door', room: 'payables' });
       }
       // Targets on the player's side still win when they are nearer than the closed leaf.
-      const nearer = interactCandidates([{ id: 'near', position: [0, 0.1] }], rooms);
-      expect(pickTarget([0, 0.4], 0, nearer)).toEqual({ kind: 'agent', id: 'near' });
+      const nearer = interactCandidates([{ id: 'near', position: [X, D + 0.75] }], rooms);
+      expect(pickTarget([X, D + 1.05], 0, nearer)).toEqual({ kind: 'agent', id: 'near' });
     } finally {
       interactionStore.toggleDoor('payables');
     }
@@ -57,17 +63,18 @@ describe('local interior doors', () => {
   it('targets the closed leaf away from its centre on both sides instead of an agent behind it', () => {
     interactionStore.toggleDoor('payables');
     try {
-      const candidates = interactCandidates([{ id: 'sam', position: [0, -1.8] }], rooms);
-      // The crosshair is on the leaf at x=-0.35, outside the old centre-only aim cone.
-      expect(pickTarget([-0.35, -0.31], 0, candidates)).toEqual({ kind: 'door', room: 'payables' });
-      expect(pickTarget([-0.35, -0.99], Math.PI, candidates)).toEqual({ kind: 'door', room: 'payables' });
+      const candidates = interactCandidates([{ id: 'sam', position: [X, D - 1.15] }], rooms);
+      // The crosshair is on the leaf 0.35 left of its centre, outside the old centre-only aim cone.
+      expect(pickTarget([X - 0.35, D + 0.34], 0, candidates)).toEqual({ kind: 'door', room: 'payables' });
+      expect(pickTarget([X - 0.35, D - 0.34], Math.PI, candidates)).toEqual({ kind: 'door', room: 'payables' });
     } finally {
       interactionStore.toggleDoor('payables');
     }
-    const open = interactCandidates([{ id: 'sam', position: [0, -1.8] }], rooms);
-    for (const z of [0, -1.05, -0.31, -0.99]) {
-      const yaw = Math.atan2(0.5, z);
-      expect(pickTarget([-0.15, z], yaw, open)).toEqual({ kind: 'door', room: 'payables' });
+    const open = interactCandidates([{ id: 'sam', position: [X, D - 1.15] }], rooms);
+    // The open leaf lies beside the frame at (X - 0.65, D + 0.65).
+    for (const dz of [0, -1.05, -0.31, -0.99]) {
+      const yaw = Math.atan2(0.5, dz);
+      expect(pickTarget([X - 0.15, D + 0.65 + dz], yaw, open)).toEqual({ kind: 'door', room: 'payables' });
     }
   });
 
@@ -94,7 +101,7 @@ describe('cosmetic folder', () => {
     expect(first.getSnapshot().folder).toBeNull();
     first.pickUp(); // Already held: no second item or notification.
     expect(changes).toBe(1);
-    first.putDown([-4.4, 2], Math.PI, rooms);
+    first.putDown([K[0], K[1] - 1.1], Math.PI, rooms);
     expect(first.getSnapshot().folder?.position[1]).toBe(0.8);
     expect(other.getSnapshot().folder).toEqual(INITIAL_FOLDER);
     expect(JSON.stringify(snapshot)).toBe(before);
@@ -105,14 +112,20 @@ describe('cosmetic folder', () => {
 
   it('chooses the nearest surface ahead, keeps the folder on it, and otherwise uses the floor', () => {
     expect(pickUpFolder()).toBeNull();
-    const counter = putDownFolder([-4.4, 2], Math.PI, rooms);
+    const eye = [K[0], K[1] - 1.1] as const;
+    const counter = putDownFolder(eye, Math.PI, rooms);
     expect(counter.room).toBe('lobby');
     expect(counter.position[1]).toBe(0.8);
-    expect(counter.position[2]).toBeGreaterThanOrEqual(2.79);
-    expect(putDownFolder([0, -1.8], 0, rooms)).toMatchObject({ room: 'payables', position: [0, 0.93, expect.any(Number)] });
-    expect(putDownFolder([-4.4, 2], 0, rooms)).toEqual({ room: null, position: [-4.4, 0.025, 1.2] });
-    expect(putDownFolder([-4.4, 2], Math.PI, [])).toMatchObject({ room: null });
-    expect(putDownFolder([7.7, 0], -Math.PI / 2, rooms).position[0]).toBe(7.8);
+    expect(counter.position[2]).toBeGreaterThanOrEqual(K[1] - 0.31);
+    const [px, pz] = OFFICE_ANCHORS.payables.center;
+    expect(putDownFolder([px, pz + 1.2], 0, rooms)).toMatchObject({ room: 'payables', position: [px, 0.93, expect.any(Number)] });
+    const floor = putDownFolder(eye, 0, rooms);
+    expect(floor.room).toBeNull();
+    expect(floor.position[0]).toBe(eye[0]);
+    expect(floor.position[1]).toBe(0.025);
+    expect(floor.position[2]).toBeCloseTo(eye[1] - 0.8, 9);
+    expect(putDownFolder(eye, Math.PI, [])).toMatchObject({ room: null });
+    expect(putDownFolder([BUILDING.maxX - 0.3, 0], -Math.PI / 2, rooms).position[0]).toBe(BUILDING.maxX - 0.2);
   });
 
   it('offers putting down only when held and no world target takes priority', () => {

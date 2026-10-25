@@ -13,7 +13,7 @@ export const navLinks = [
 export const PAYMENT_LINK_HREF = '/payment-link';
 
 /** Small trailing link to the integration status page. */
-export const whatsRealLink = { label: 'System status', href: '/real-vs-sim' } as const;
+export const whatsRealLink = { label: 'System Status', href: '/real-vs-sim' } as const;
 
 export type SiteNavPlacement = 'layout' | 'office';
 
@@ -23,7 +23,7 @@ export function isActive(pathname: string, href: string) {
 
 /**
  * Embeds and customer /pay/* pages stay free of internal chrome.
- * The office header draws this same bar, so the layout copy stays off `/` and `/office`.
+ * The office owns navigation in its sidebar, so the layout copy stays off `/` and `/office`.
  */
 export function siteNavHidden(pathname: string, embed: string | null, placement: SiteNavPlacement = 'layout') {
   if (embed === '1') return true;

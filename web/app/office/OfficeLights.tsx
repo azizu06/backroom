@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import { ContactShadows } from '@react-three/drei';
 import { ACESFilmicToneMapping, MeshStandardMaterial } from 'three';
 import { LOW_POWER_QUERY, OFFICE_LAMPS, OFFICE_EXPOSURE, officeLightRig, officeLowPower } from '../../lib/office/lighting';
 import { ROLES } from '../../lib/office/palette';
@@ -10,6 +9,7 @@ import type { FurniturePiece } from '../../lib/office/furniture';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './mounts/StaticGeometry';
 import { useBakedLobbyReady } from './mounts/BakedArt';
 import { bakedReplacesProps } from '../../lib/office/baked-art';
+import { OfficeContactShadows } from './ContactShadows';
 
 export const OFFICE_RENDERER = { antialias: true, powerPreference: 'high-performance' as const,
   toneMapping: ACESFilmicToneMapping, toneMappingExposure: OFFICE_EXPOSURE };
@@ -62,6 +62,7 @@ function Lamps({ rooms }: { rooms: string }) {
 export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot; lowPower: boolean }) {
   const { key, fill, hemisphere, pointLights, contactShadows } = officeLightRig(lowPower);
   const rooms = visibleRooms(snapshot);
+  const baked = useBakedLobbyReady();
   return <>
     <hemisphereLight args={[hemisphere.skyColor, hemisphere.groundColor, hemisphere.intensity]} />
     <directionalLight position={key.position} color={key.color} intensity={key.intensity} castShadow={key.castShadow}
@@ -70,8 +71,8 @@ export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot;
       shadow-camera-left={key.shadow.left} shadow-camera-right={key.shadow.right} shadow-camera-top={key.shadow.top} shadow-camera-bottom={key.shadow.bottom} />
     <directionalLight position={fill.position} color={fill.color} intensity={fill.intensity} castShadow={fill.castShadow} />
     {pointLights.filter(light => rooms.includes(light.room)).map(({ room, ...light }) => <pointLight key={room} {...light} />)}
-    {/* Demand frames only; dropping this pass entirely is essential in low-power mode. */}
-    {contactShadows && <ContactShadows {...contactShadows} />}
+    {/* Demand frames only; dropping this pass entirely is essential in low-power mode. Static casters bake once per room set. */}
+    {contactShadows && <OfficeContactShadows config={contactShadows} version={`${rooms.join(',')}|${baked}`} />}
     <Lamps rooms={rooms.join(',')} />
   </>;
 }

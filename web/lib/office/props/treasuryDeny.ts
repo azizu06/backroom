@@ -1,14 +1,15 @@
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type OfficeSnapshot } from '../state';
 import type { OfficePropInteraction } from './interact';
 import { ROLES } from '../palette';
+import { doorway } from '../layout';
 
 /** How long the Treasury door "DENY moment" plays before the door settles. */
 export const DENY_MOMENT_MS = 4000;
 export const DENY_FALLBACK_COLOR: string = ROLES.shadow;
 /** Floor (x, z) of the Treasury doorway; the aisle is on its -z side, the vault room on its +z side. */
-export const TREASURY_DOOR: readonly [x: number, z: number] = [5, 1.15];
+export const TREASURY_DOOR: readonly [x: number, z: number] = doorway('treasury').at;
 /** Where the denied agent's echo stands on the aisle side of the door. */
-export const ECHO_START: readonly [x: number, z: number] = [5, 0.55];
+export const ECHO_START: readonly [x: number, z: number] = [TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.6];
 /** How far the echo walks back toward the aisle (decreasing z). */
 export const ECHO_WALK = 1.2;
 export const ECHO_OPACITY = 0.55;
@@ -99,6 +100,23 @@ export function denyPose(ageMs: number, reduced: boolean, out: DenyPose = create
   return out;
 }
 
+/** Longest stretch of the moment one rendered frame may cover (20 fps). */
+export const DENY_MAX_STEP_MS = 50;
+
+/**
+ * Frame-paced age of the scene's moment. Each rendered frame advances it by its wall-clock step, capped at
+ * DENY_MAX_STEP_MS, so a slow or contended GPU plays the sign and echo in slow motion instead of skipping
+ * most of the beat between a few frames. It never runs ahead of the wall clock and never lags it by more
+ * than DENY_MOMENT_MS, so the moment always ends within 2 x DENY_MOMENT_MS of the row's `at`.
+ * `previous` is null on the first frame, which starts at the wall-clock age (a late mount does not replay).
+ */
+export function pacedDenyAge(previous: number | null, stepMs: number, realAgeMs: number): number {
+  const real = Math.max(0, realAgeMs);
+  if (previous === null) return real;
+  const paced = previous + Math.min(DENY_MAX_STEP_MS, Math.max(0, stepMs));
+  return Math.min(real, Math.max(real - DENY_MOMENT_MS, paced));
+}
+
 /** Null without a matching server denial for Treasury or once the moment is over. */
 export function denyMoment(snapshot: OfficeSnapshot, now: number, reduced: boolean): DenyMoment | null {
   const denial = matchingDenial(snapshot, 'treasury');
@@ -114,7 +132,7 @@ export function denyMoment(snapshot: OfficeSnapshot, now: number, reduced: boole
 export const TREASURY_DOOR_INTERACTION: OfficePropInteraction = {
   id: 'treasury-door',
   prompt: 'Inspect Treasury door',
-  position: [5, 0.6],
+  position: [TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.55],
   radius: 1.2,
   visible: snapshot => visibleRooms(snapshot).includes('treasury'),
   panel(snapshot) {

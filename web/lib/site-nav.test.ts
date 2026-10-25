@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { isActive, navLinks, siteNavHidden, whatsRealLink } from './site-nav';
 
 describe('site nav', () => {
-  it('reaches every product page, with System status as the small trailing link', () => {
+  it('reaches every product page, with System Status as the small trailing link', () => {
     expect(navLinks.map(link => link.label)).toEqual(['Office', 'Calls', 'Inbox', 'Audit wall', 'Attack lab', 'Policy', 'Controller', 'Payment link', 'Operator']);
     expect(navLinks.map(link => link.href as string)).not.toContain('/real-vs-sim');
-    expect(whatsRealLink).toEqual({ label: 'System status', href: '/real-vs-sim' });
+    expect(whatsRealLink).toEqual({ label: 'System Status', href: '/real-vs-sim' });
   });
 
   it('marks the active page, treating / as the office', () => {
@@ -25,7 +25,7 @@ describe('site nav', () => {
     expect(siteNavHidden('/payment-link', null)).toBe(false);
   });
 
-  it('draws one bar on the office: in its header, not the layout', () => {
+  it('lets the office own navigation without adding a layout bar', () => {
     for (const path of ['/', '/office', '/office/x']) {
       expect(siteNavHidden(path, null, 'layout')).toBe(true);
       expect(siteNavHidden(path, null, 'office')).toBe(false);

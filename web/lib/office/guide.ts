@@ -14,6 +14,7 @@ export const OFFICE_SHORTCUTS: readonly { keys: string[]; action: string; mode: 
   { keys: ['E'], action: 'Interact: talk to an agent, inspect a desk, door or server', mode: 'play' },
   { keys: ['Click'], action: 'Look around with the mouse (Esc releases it)', mode: 'play' },
   { keys: ['Esc'], action: 'Exit Play, or close a panel', mode: 'play' },
+  { keys: ['O'], action: 'Overview: toggle the overview map and first person', mode: 'any' },
   { keys: ['?'], action: 'Open keyboard shortcuts', mode: 'any' },
   { keys: ['Any key', 'Click'], action: 'Stop the tour', mode: 'tour' },
 ];

@@ -6,6 +6,11 @@ import {
 } from "./play";
 import { createMockOfficeState } from "./preview";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
+import { BUILDING, DOORWAYS, WALL_THICKNESS, spaceAt } from "./layout";
+import { doorPosition } from "./doors";
+import { roomPropColliders } from './room-props';
+import { PINGPONG_COLLIDER } from './pingpong/table';
+import { WING_COLLIDERS } from './wing';
 
 const ALL = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const colliders = officeColliders(ALL);
@@ -22,7 +27,7 @@ function walk(from: Vec2, direction: Vec2, distance: number, boxes = colliders):
 }
 
 describe("play constants", () => {
-  it("spawns in the lobby aisle facing the Collections desk, outside every collider", () => {
+  it("spawns in the corridor by the lobby facing the Collections desk, outside every collider", () => {
     expect(EYE_HEIGHT).toBeGreaterThan(1.4);
     expect(SPAWN.yaw).toBe(0);
     expect(insideAny(SPAWN.position, colliders, PLAYER_RADIUS)).toBe(false);
@@ -30,46 +35,72 @@ describe("play constants", () => {
 });
 
 describe("collisions", () => {
-  it("cannot walk through a desk", () => {
-    // From the Collections aisle straight into the desk top at z -2.475.
-    const end = walk([-5, -1.5], [0, -1], 3);
-    expect(end[1]).toBeGreaterThan(-2.475 + PLAYER_RADIUS - 0.01);
+  const [cx, cz] = OFFICE_ANCHORS.collections.center;
+  const wallFace = WALL_THICKNESS / 2;
+  it("keeps wing furniture, room dressing and ping-pong solid after merging their mounts", () => {
+    for (const rooms of [ALL, []] as const) {
+      const merged = officeColliders(rooms);
+      expect(merged).toEqual(expect.arrayContaining([...WING_COLLIDERS]));
+      for (const footprint of [...roomPropColliders(rooms), PINGPONG_COLLIDER]) {
+        expect(merged).toContainEqual(footprint);
+        const x = (footprint.minX + footprint.maxX) / 2;
+        const start: Vec2 = [x, footprint.maxZ + PLAYER_RADIUS + 0.15];
+        const end = movePlayer(start, [0, -0.3], merged);
+        expect(end[1]).toBeGreaterThanOrEqual(footprint.maxZ + PLAYER_RADIUS);
+      }
+    }
   });
 
-  it("cannot walk through a partition and slides along it", () => {
-    const end = walk([-3.5, -3], [1, 0], 3);
-    expect(end[0]).toBeLessThan(-2.44 - PLAYER_RADIUS + 0.01);
-    const slid = walk([-3.5, -3], [Math.SQRT1_2, Math.SQRT1_2], 2);
-    expect(slid[0]).toBeLessThan(-2.44 - PLAYER_RADIUS + 0.01);
+  it("cannot walk through a desk", () => {
+    // From inside Collections straight into the desk front.
+    const end = walk([cx, cz + 2.5], [0, -1], 3);
+    expect(end[1]).toBeGreaterThan(cz + DESK_SIZE.depth / 2 + PLAYER_RADIUS - 0.01);
+  });
+
+  it("cannot walk through a wall between rooms and slides along it", () => {
+    // Collections and Payables share the x = -6 wall.
+    const end = walk([-7, -3], [1, 0], 3);
+    expect(end[0]).toBeLessThan(-6 - wallFace - PLAYER_RADIUS + 0.01);
+    const slid = walk([-7, -3], [Math.SQRT1_2, Math.SQRT1_2], 2);
+    expect(slid[0]).toBeLessThan(-6 - wallFace - PLAYER_RADIUS + 0.01);
     expect(slid[1]).toBeGreaterThan(-3 + 1);
   });
 
-  it("clamps to the floor bounds", () => {
-    expect(walk([-6, 0.5], [-1, 0], 5)[0]).toBeCloseTo(-8 + PLAYER_RADIUS, 5);
-    expect(movePlayer([0, 0.5], [0, 20], [], PLAYER_RADIUS)).toEqual([0, 5.5 - PLAYER_RADIUS]);
+  it("stops at the outer walls and clamps to the floor bounds", () => {
+    expect(walk([-21, -0.5], [-1, 0], 5)[0]).toBeCloseTo(BUILDING.minX + wallFace + PLAYER_RADIUS, 3);
+    expect(walk([-0.8, 6], [0, 1], 5)[1]).toBeCloseTo(BUILDING.maxZ - wallFace - PLAYER_RADIUS, 3);
+    expect(movePlayer([0, 0.5], [0, 20], [], PLAYER_RADIUS)).toEqual([0, BUILDING.maxZ - wallFace - PLAYER_RADIUS]);
+  });
+
+  it("walks through every doorway in the plan and never through the locked or street doors", () => {
+    for (const door of DOORWAYS) {
+      const [x, z] = door.at;
+      const step: Vec2 = door.axis === "x" ? [0, 1] : [1, 0];
+      const start: Vec2 = door.axis === "x" ? [x, z - 0.9] : [x - 0.9, z];
+      const end = walk(start, step, 1.8);
+      const passed = door.axis === "x" ? end[1] > z + 0.5 : end[0] > x + 0.5;
+      expect(passed, door.id).toBe(door.kind !== "locked" && door.kind !== "entrance");
+    }
   });
 
   it("never ends inside a collider even for a large step", () => {
-    const end = movePlayer([-5, -1.5], [0, -10], colliders, PLAYER_RADIUS);
+    const end = movePlayer([cx, cz + 2.5], [0, -10], colliders, PLAYER_RADIUS);
     expect(insideAny(end, colliders, PLAYER_RADIUS)).toBe(false);
-    expect(end[1]).toBeGreaterThan(-2.5);
+    expect(end[1]).toBeGreaterThan(cz + DESK_SIZE.depth / 2);
   });
 
   it("cannot reach the vault through or around the locked Treasury door", () => {
-    const inTreasury = (p: Vec2) => p[0] > 2.5 && p[1] > 1.6;
-    const starts: Vec2[] = [[5, 0.6], [2.3, 0.6], [7.6, 0.6], [3, 0.4], [1.5, 0.6]];
+    const inTreasury = (p: Vec2) => spaceAt(p) === "treasury";
+    const [tx, tz] = TREASURY_DOOR;
+    const starts: Vec2[] = [[tx, tz - 0.9], [tx - 2.2, tz - 0.9], [tx + 3.1, tz - 0.9], [tx + 0.5, tz - 1.1], [tx - 3.5, tz - 0.9], [-1, 5], [7.4, 4]];
     for (const start of starts) {
       for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
         const end = walk(start, [Math.sin(angle), Math.cos(angle)], 8);
         expect(inTreasury(end)).toBe(false);
       }
     }
-    // Sliding along the barrier toward the partition finds no gap.
-    expect(inTreasury(walk([3, 0.6], [-0.3, 1], 10))).toBe(false);
-    // No gap past the partition's end at the back wall either (plant removed to test the partition alone).
-    const noPlant = colliders.filter(c => !(c.minX === 1.2 && c.minZ === 4));
-    expect(noPlant).toHaveLength(colliders.length - 1);
-    expect(inTreasury(walk([1.9, 5.2], [1, 0], 10, noPlant))).toBe(false);
+    // Sliding along the corridor wall finds no gap.
+    expect(inTreasury(walk([tx - 2, tz - 0.9], [0.3, 1], 10))).toBe(false);
   });
 
   it("lets the player walk out of a collider that appeared on top of them", () => {
@@ -86,22 +117,26 @@ describe("collisions", () => {
     expect(stopped[0]).toBeLessThanOrEqual(extra.minX - PLAYER_RADIUS + 1e-6);
   });
   it("makes the GX10 server room solid at its footprint", () => {
-    for (const [key, value] of Object.entries({ minX: 6.5, maxX: 7.7, minZ: -1.325, maxZ: -0.275 })) {
+    for (const [key, value] of Object.entries({ minX: 10.3, maxX: 11.5, minZ: -1.325, maxZ: -0.275 })) {
       expect(SERVER_ROOM_BOX[key as keyof typeof SERVER_ROOM_BOX]).toBeCloseTo(value, 9);
     }
+    expect(spaceAt(SERVER_ROOM.position)).toBe("server_room");
     const withServer = officeColliders(ALL, [SERVER_ROOM_BOX]);
     expect(insideAny(SPAWN.position, withServer, PLAYER_RADIUS)).toBe(false);
-    const fromFront = walk([7.1, 0.4], [0, -1], 2, withServer);
+    const fromFront = walk([SERVER_ROOM.position[0], 0.4], [0, -1], 2, withServer);
     expect(fromFront[1]).toBeCloseTo(SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS, 3);
-    const fromWest = walk([6.1, -0.8], [1, 0], 2, withServer);
+    const fromWest = walk([9.9, -0.6], [1, 0], 2, withServer);
     expect(fromWest[0]).toBeCloseTo(SERVER_ROOM_BOX.minX - PLAYER_RADIUS, 3);
     // Without the extra footprint the same walk passes through.
-    expect(walk([6.1, -0.8], [1, 0], 2)[0]).toBeGreaterThan(SERVER_ROOM_BOX.maxX);
+    expect(walk([9.9, -0.6], [1, 0], 2)[0]).toBeGreaterThan(SERVER_ROOM_BOX.maxX);
   });
-  it("drops colliders for rooms that are not visible", () => {
+  it("drops furniture colliders for rooms that are not visible, but keeps the walls", () => {
+    const withoutCollections = officeColliders(ALL.filter(room => room !== "collections"));
+    expect(withoutCollections.length).toBeLessThan(colliders.length);
+    expect(walk([cx, cz + 2.5], [0, -1], 4, withoutCollections)[1]).toBeLessThan(cz - 0.6);
+    // The building does not depend on live rows: the locked Treasury stays shut.
     const withoutTreasury = officeColliders(ALL.filter(room => room !== "treasury"));
-    expect(withoutTreasury.length).toBeLessThan(colliders.length);
-    expect(walk([5, 0.6], [0, 1], 3, withoutTreasury)[1]).toBeGreaterThan(1.6);
+    expect(spaceAt(walk([TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.9], [0, 1], 3, withoutTreasury))).toBe("corridor");
   });
 });
 
@@ -210,14 +245,15 @@ describe("targets", () => {
   it("offers open doors only when deliberately facing the leaf by the frame", () => {
     const candidates = interactCandidates([], ALL);
     for (const room of ["collections", "payables", "vendor_onboarding"] as const) {
-      const [x] = OFFICE_ANCHORS[room].center;
+      // Eye points measured from the doorway: 0.65 into the corridor, 0.4 inside the room, 2.65 across the corridor.
+      const [x, door] = doorPosition(room);
       const target = { kind: "door", room };
-      expect(pickTarget([x - 0.3, 0], Math.PI / 2, candidates)).toEqual(target);
-      expect(pickTarget([x - 0.3, -1.05], Math.atan2(0.35, -1.05), candidates)).toEqual(target);
-      expect(pickTarget([x - 0.3, 0], 0, candidates)).not.toEqual(target);
-      expect(pickTarget([x - 0.3, 2], Math.atan2(0.35, 2), candidates)).not.toEqual(target);
-      // The short gamepad walk from spawn must still face empty aisle.
-      for (const z of [0.9, 0.8, 0.7, 0.6, 0.5]) {
+      expect(pickTarget([x - 0.3, door + 0.65], Math.PI / 2, candidates)).toEqual(target);
+      expect(pickTarget([x - 0.3, door - 0.4], Math.atan2(0.35, -1.05), candidates)).toEqual(target);
+      expect(pickTarget([x - 0.3, door + 0.65], 0, candidates)).not.toEqual(target);
+      expect(pickTarget([x - 0.3, door + 2.65], Math.atan2(0.35, 2), candidates)).not.toEqual(target);
+      // The short gamepad walk from spawn must still face empty corridor.
+      for (const z of [0.6, 0.5, 0.4, 0.3, 0.2]) {
         expect(pickTarget([x, z], 0, candidates)).toBeNull();
       }
     }
@@ -280,14 +316,14 @@ describe("targets", () => {
   it("offers the Treasury door only when the room is visible", () => {
     const visible = interactCandidates([], ALL);
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
-    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "door:collections", "folder"]);
-    expect(pickTarget([5, 0.6], Math.PI, visible)).toEqual({ kind: "treasury" });
+    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "door:collections", "folder", "pingpong"]);
+    expect(pickTarget([TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.55], Math.PI, visible)).toEqual({ kind: "treasury" });
   });
 
   it("picks the GX10 server when standing in front of it facing it", () => {
     const candidates = interactCandidates([], ALL);
     expect(candidates).toContainEqual({ target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 });
-    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server"]);
+    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server", "pingpong"]);
     const front: Vec2 = [SERVER_ROOM.position[0], SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS + 0.1];
     expect(pickTarget(front, 0, candidates)).toEqual({ kind: "server" });
     expect(pickTarget(front, Math.PI, candidates)).not.toEqual({ kind: "server" });
@@ -296,12 +332,13 @@ describe("targets", () => {
 
   it("offers the Treasury door where the browser test stands and where the barrier stops you, not from afar", () => {
     const visible = interactCandidates([], ALL);
-    expect(pickTarget([5, 0.45], Math.PI, visible)).toEqual({ kind: "treasury" });
-    const stop = walk([5, 0.45], [0, 1], 2);
-    expect(stop[1]).toBeCloseTo(1.05 - PLAYER_RADIUS, 2);
+    const [tx, tz] = TREASURY_DOOR;
+    expect(pickTarget([tx, tz - 0.7], Math.PI, visible)).toEqual({ kind: "treasury" });
+    const stop = walk([tx, tz - 0.7], [0, 1], 2);
+    expect(stop[1]).toBeCloseTo(tz - WALL_THICKNESS / 2 - PLAYER_RADIUS, 2);
     expect(pickTarget(stop, Math.PI, visible)).toEqual({ kind: "treasury" });
-    expect(pickTarget([5, 3.0], 0, visible)).toBeNull();
-    expect(pickTarget([5, -1], Math.PI, visible)).toBeNull();
+    expect(pickTarget([tx, tz + 1.85], 0, visible)).toBeNull();
+    expect(pickTarget([tx, tz - 2.15], Math.PI, visible)).toBeNull();
   });
 
   it("offers the payment link kiosk only when the lobby is visible", () => {
@@ -313,11 +350,11 @@ describe("targets", () => {
 
   it("picks the kiosk when facing it within range, from outside its counter", () => {
     const candidates = interactCandidates([], ["lobby"]);
-    const eye: Vec2 = [-4.4, 1.9];
+    const eye: Vec2 = [PAYLINK_KIOSK[0], PAYLINK_KIOSK[1] - 1.2];
     expect(insideAny(eye, colliders, PLAYER_RADIUS)).toBe(false);
     expect(pickTarget(eye, Math.PI, candidates)).toEqual({ kind: "paylink" });
     expect(pickTarget(eye, 0, candidates)).toBeNull();
-    expect(pickTarget([-4.4, -1], Math.PI, candidates)).toBeNull();
+    expect(pickTarget([PAYLINK_KIOSK[0], PAYLINK_KIOSK[1] - 4.1], Math.PI, candidates)).toBeNull();
   });
 });
 

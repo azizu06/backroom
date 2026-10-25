@@ -8,29 +8,32 @@ import { PerspectiveCamera } from '@react-three/drei';
 import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { interpolateIntroPose, playIntroProgress, type IntroPose } from '../../lib/office/play-intro';
+import { storyCameraPose } from '../../lib/office/story';
 import type { MotionRegistry } from '../../lib/office/motion';
 import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, type FeelState } from '../../lib/office/playFeel';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, interactCandidates, moveIntent, movePlayer, officeColliders,
-  frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
+  frameLookYaw, insideAny, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
+import { useImmersiveRig } from './immersive/rig';
 import { interactionStore } from '../../lib/office/interactions';
 import { withoutHiddenAuditBoard } from '../../lib/office/baked-art';
 import { useBakedLobbyReady } from './mounts/BakedArt';
 import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
+import { pingPongSession } from '../../lib/office/pingpong/session';
 
-function playEye([x, z]: readonly [number, number]): IntroPose {
-  return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)] };
+function playEye([x, z]: readonly [number, number], yaw: number): IntroPose {
+  return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)] };
 }
 
 /**
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, entry, last, story }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
@@ -42,11 +45,14 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     from: { position: previous.position.toArray(), quaternion: previous.quaternion.toArray() } satisfies IntroPose,
     startedAt: null as number | null, done: false,
   }));
-  const yaw = useRef<number>(SPAWN.yaw);
+  // Overview "Go here" / room jump / resume: a requested entry, read once and cleared. Only a standable one is used.
+  const [requested] = useState(() => { const next = entry?.current ?? null; if (entry) entry.current = null; return next; });
+  const yaw = useRef<number>(requested?.yaw ?? SPAWN.yaw);
   const pitch = useRef(0);
   const feel = useRef<FeelState>(INITIAL_FEEL);
   const velocity = useRef<[number, number]>([0, 0]);
   const fov = useRef(BASE_FOV);
+  const immersive = useImmersiveRig();
   const wasActive = useRef(false);
   const feelSettling = useRef(false);
   const written = useRef(false);
@@ -62,11 +68,26 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     () => withoutHiddenAuditBoard(officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX]), local.doors), baked),
     [roomsKey, baked, local.doors],
   );
-  const [spawn] = useState(() => playSpawn(location.search, colliders));
-  const [eye] = useState(() => playEye(spawn));
+  const [spawn] = useState((): [number, number] => {
+    if (requested && !insideAny(requested.position, colliders, PLAYER_RADIUS)) return [requested.position[0], requested.position[1]];
+    return playSpawn(location.search, colliders);
+  });
+  const [eye] = useState(() => playEye(spawn, yaw.current));
   const position = useRef<[number, number]>(spawn);
+  const storyMove = useRef<{ id: string; from: IntroPose; startedAt: number } | null>(null);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
+
+  // Clear held keys only when a tour starts, changes stop or ends: on a plain Play mount the rig can
+  // mount after a key is already held, and clearing then would swallow that first press.
+  const lastStory = useRef(story);
+  useEffect(() => {
+    if (lastStory.current === story) return;
+    lastStory.current = story;
+    input.clear(); written.current = false;
+    if (!story) storyMove.current = null;
+    invalidate();
+  }, [story, input, invalidate]);
 
   useEffect(() => {
     const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -75,7 +96,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, [invalidate]);
-  useEffect(() => () => { latest.current.onTarget(null); }, []);
+  useEffect(() => () => {
+    latest.current.onTarget(null);
+    if (last) last.current = { position: [position.current[0], position.current[1]], yaw: yaw.current };
+  }, [last]);
+  useEffect(() => () => { pingPongSession.stop(); }, []);
   // The canvas only resizes the active camera; refit the restored orthographic one in case it resized during Play.
   useEffect(() => () => {
     if (!(previous instanceof OrthographicCamera)) return;
@@ -87,6 +112,46 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
 
   useFrame((state, delta) => {
     if (!camera.current) return;
+    // Keep the walking pose intact while the table owns the camera. The next frame restores it.
+    if (pingPongSession.getSnapshot()) {
+      input.clear();
+      velocity.current = [0, 0];
+      wasActive.current = false;
+      return;
+    }
+    if (story) {
+      const now = performance.now();
+      // First-person from the first tour frame, even when entered from the overview.
+      if (!intro.done) {
+        camera.current.position.fromArray(eye.position);
+        camera.current.quaternion.fromArray(eye.quaternion);
+        intro.done = true;
+      }
+      if (storyMove.current?.id !== story.id) storyMove.current = {
+        id: story.id, startedAt: now,
+        from: { position: camera.current.position.toArray(), quaternion: camera.current.quaternion.toArray() },
+      };
+      const progress = playIntroProgress(now - storyMove.current.startedAt, reduced.current);
+      const pose = interpolateIntroPose(storyMove.current.from, storyCameraPose(story.anchor), progress);
+      camera.current.position.fromArray(pose.position);
+      camera.current.quaternion.fromArray(pose.quaternion);
+      camera.current.rotation.reorder('YXZ');
+      camera.current.updateMatrixWorld();
+      // Retain the sampled pose on Skip, including halfway through a move.
+      position.current = [pose.position[0], pose.position[2]];
+      yaw.current = camera.current.rotation.y; pitch.current = camera.current.rotation.x;
+      velocity.current = [0, 0]; feel.current = INITIAL_FEEL; feelSettling.current = false;
+      input.clear();
+      if (hud.current) {
+        hud.current.dataset.playerX = position.current[0].toFixed(3);
+        hud.current.dataset.playerZ = position.current[1].toFixed(3);
+        hud.current.dataset.playerYaw = yaw.current.toFixed(3);
+        hud.current.dataset.storyAnchor = story.anchor;
+        hud.current.dataset.storyMoving = String(progress < 1);
+      }
+      if (progress < 1) state.invalidate();
+      return;
+    }
     if (!intro.done) {
       const now = performance.now();
       intro.startedAt ??= now;
@@ -104,13 +169,14 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
       intro.done = true;
     }
     const flags = effectiveFeel(input.feel, reduced.current);
-    const coasting = velocity.current[0] !== 0 || velocity.current[1] !== 0 || feelSettling.current;
+    const coasting = velocity.current[0] !== 0 || velocity.current[1] !== 0 || feelSettling.current || immersive.settling;
     const active = input.active() || coasting;
     // The first frame after idle has a stale clock delta; treat it as one display frame.
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;
     wasActive.current = active;
     const [lookYaw, lookPitch] = input.consumeLook();
-    const look = applyLook(yaw.current, pitch.current, frameLookYaw(lookYaw, turnIntent(input, dt), input.consumeTurnTap()), lookPitch);
+    immersive.damp(lookYaw, lookPitch, dt, flags.smoothing);
+    const look = applyLook(yaw.current, pitch.current, frameLookYaw(immersive.yaw, turnIntent(input, dt), input.consumeTurnTap()), immersive.pitch);
     const turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
     yaw.current = look.yaw;
     pitch.current = look.pitch;
@@ -127,16 +193,14 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     const frame = advanceFeel(feel.current, { speed: travelled / dt, travelled, dt, flags });
     feel.current = frame.state;
     feelSettling.current = frame.settling;
-    if (frame.steps > 0) playOfficeCue('step');
+    if (frame.steps > 0) { immersive.step(travelled / dt); playOfficeCue('step'); }
     if (camera.current) {
       if (Math.abs(camera.current.fov - frame.fov) > 1e-3) {
         camera.current.fov = frame.fov;
         camera.current.updateProjectionMatrix();
       }
       fov.current = frame.fov;
-      camera.current.position.set(next[0], EYE_HEIGHT + frame.bobY, next[1]);
-      camera.current.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
-      camera.current.updateMatrixWorld();
+      immersive.pose(camera.current, next[0], EYE_HEIGHT + frame.bobY, next[1], yaw.current, pitch.current, feel.current.distance, feel.current.bob);
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));
