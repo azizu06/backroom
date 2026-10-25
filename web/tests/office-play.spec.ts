@@ -1,6 +1,9 @@
+import { workspaceRoute, ROOM_SPAWNS, type Vec2 } from '../lib/office/layout';
+import { OFFICE_ANCHORS } from '../lib/office/state';
 import { test, expect, type Page } from '@playwright/test';
-import { openMenu } from './office-menu';
+import { SERVER_ROOM, SERVER_ROOM_BOX } from '../lib/office/play';
 import type { Gx10Status } from '../lib/gx10/status';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 const HINT = 'Click to look · WASD move · ←/→ turn · E interact · O overview · Esc exit';
@@ -87,6 +90,13 @@ async function walkTo(page: Page, x: number, z: number, tolerance = 0.15) {
   }
   expect((await bearingTo(page, x, z)).distance).toBeLessThanOrEqual(tolerance * 2);
 }
+/** Follow the same grid aisles as agents/story; never hard-code the retired room corridors. */
+async function followRoute(page: Page, target: Vec2) {
+  const at = await player(page);
+  const route = workspaceRoute([at.x, at.z], target);
+  expect(route.at(-1)).toEqual(target);
+  for (const [x, z] of route.slice(1)) await walkTo(page, x, z);
+}
 async function startPlay(page: Page, setup?: () => Promise<void>) {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -94,9 +104,9 @@ async function startPlay(page: Page, setup?: () => Promise<void>) {
   await requireWebGL(page);
   await setup?.();
   const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await openMenu(page);
+  await select.selectOption('tween'); // Establish the view that Escape should restore, regardless of motion preference.
+  await expect(select).toHaveValue('tween');
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
@@ -104,13 +114,17 @@ async function startPlay(page: Page, setup?: () => Promise<void>) {
 }
 
 test('play mode walks to Alex, opens the talk panel and exits back to the previous view', async ({ page }) => {
+  test.setTimeout(120_000);
   const errors = await startPlay(page);
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('.office-caption')).toHaveText(HINT);
   await expect(viewport.locator('.play-crosshair')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(page.locator('.play-overview')).toBeVisible();
   const start = await player(page);
 
+  const alex = OFFICE_ANCHORS.collections.position;
+  await followRoute(page, [alex[0], alex[1] + 1.3]);
+  await face(page, ...alex);
   const prompt = page.getByText('E · Talk to Alex');
   await holdUntil(page, 'w', () => prompt.isVisible());
   await expect(prompt).toBeVisible();
@@ -118,7 +132,7 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
   await expect(viewport.locator('[data-agent-tag]', { hasText: 'Alex' })).toBeHidden();
   const moved = await player(page);
   expect(moved.z).toBeLessThan(start.z - 0.1);
-  expect(Math.abs(moved.x - start.x)).toBeLessThan(0.05);
+  expect(Math.abs(moved.x - alex[0])).toBeLessThan(0.2);
 
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: /Alex/ });
@@ -131,7 +145,7 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
   await expect(surface(page)).toBeFocused();
 
   await page.keyboard.press('Escape');
-  await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await expect(page.getByLabel('Office view')).toHaveValue('tween');
   await expect(viewport.locator('.play-crosshair')).toHaveCount(0);
   await expect(surface(page)).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -142,21 +156,20 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   const errors = await startPlay(page, async () => {
     // Retry until hydrated: a click before hydration is a no-op.
     await expect(async () => {
-      // Preview controls sit in the corner menu (closed by default); a pick closes it again.
-      const menu = page.getByRole('button', { name: 'Backroom menu' });
-      if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
-      await page.getByRole('button', { name: 'Show Treasury denial' }).click();
-      await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
+      // Preview controls and receipts live in Full Floor, independent of scene labels.
+      await page.getByRole('navigation', { name: 'Office shortcuts' }).getByRole('button', { name: 'Full Floor', exact: true }).click();
+      await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+      await expect(page.locator('[data-audit-id]').first()).toContainText('DENY', { timeout: 500 });
     }).toPass();
+    await page.keyboard.press('Escape');
   });
 
-  // Along the corridor to the Treasury door (2.5, 1.5); its locked leaf closes the doorway.
-  await walkTo(page, 2.5, 0.8);
-  await face(page, 2.5, 1.5);
+  await followRoute(page, ROOM_SPAWNS.treasury.position);
+  await face(page, ...OFFICE_ANCHORS.treasury.center);
   const prompt = page.getByText('E · Treasury door');
   await expect(prompt).toBeVisible();
   const at = await player(page);
-  expect(at.z).toBeLessThan(1.2);
+  expect(at.z).toBeLessThan(OFFICE_ANCHORS.treasury.center[1]);
 
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: /Treasury/ });
@@ -187,15 +200,12 @@ test('play mode walks to the GX10 server room and reads live telemetry read-only
   });
   const errors = await startPlay(page);
 
-  // Down the corridor, through the server-room doorway (x 9.5), then in front of the rack.
-  await walkTo(page, 8.6, 0.2);
-  await walkTo(page, 10.9, 0.45);
-  await face(page, 10.9, -0.8);
+  await followRoute(page, ROOM_SPAWNS.server_room.position);
+  await face(page, ...SERVER_ROOM.position);
   const prompt = page.getByText('E · Check GX10 server');
   await expect(prompt).toBeVisible();
   const at = await player(page);
-  // The server box (z -1.325..-0.275) is solid: the player stays in front of its face.
-  expect(at.z).toBeGreaterThan(-0.275);
+  expect(at.x).toBeLessThan(SERVER_ROOM_BOX.minX);
 
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: 'GX10 server' });
@@ -318,8 +328,7 @@ test('play settings change speed and invert Y, persist per viewer and return foc
 
   // Leaving and re-entering Play keeps the saved values.
   await page.keyboard.press('Escape');
-  await expect(page.getByLabel('Office view')).toHaveValue('walk');
-  await openMenu(page);
+  await expect(page.getByLabel('Office view')).toHaveValue('tween');
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await page.getByRole('button', { name: 'Settings' }).click();

@@ -1,7 +1,8 @@
+import { FLOOR_FIXTURES } from "../layout";
 import { defineTarget } from "./types";
 
-/** GX10 rack in the server room at the corridor's east end (layout SPACES.server_room); Play makes it solid and interactable. */
-export const SERVER_ROOM = { position: [10.9, -0.8] as const, size: { width: 1.2, depth: 1.05 } } as const;
+/** GX10 rack against the east wall, clear of the pod and perimeter aisles. */
+export const SERVER_ROOM = { position: [FLOOR_FIXTURES.server.x, FLOOR_FIXTURES.server.z] as const, size: { width: FLOOR_FIXTURES.server.width, depth: FLOOR_FIXTURES.server.depth } } as const;
 
 export const serverTarget = defineTarget<{ kind: "server" }>({
   id: "server",

@@ -3,7 +3,7 @@ import { createReplayRecorder, parseReplay } from '../../../orchestrator/src/rep
 import { MemoryStateStore } from '@backroom/orchestrator';
 import { createReplayPlayer } from './player';
 import { OFFICE_ANCHORS } from '../office/state';
-import { CORRIDOR_Z } from '../office/layout';
+import { workspaceRoute } from '../office/layout';
 
 /** WalkMotion pace (m/s): visual interpolation only. */
 const WALK_SPEED = 2.4;
@@ -33,12 +33,16 @@ describe('read-only OfficeState replay', () => {
     expect(player.getSnapshot().entries.map(entry => entry.action)).toContain('plan');
     player.pause(); player.advance(1000);
     expect(player.getSnapshot().positionMs).toBe(1000);
-    player.play(); player.advance(250); player.pause();
-    // 0.5 s of walking (1000 to 1500 ms) from the Collections spot along the first leg toward the corridor.
-    const [, startZ] = OFFICE_ANCHORS.collections.position;
-    const walked = startZ + Math.sign(CORRIDOR_Z - startZ) * WALK_SPEED * 0.5;
-    expect(Math.abs(walked - startZ)).toBeLessThan(Math.abs(CORRIDOR_Z - startZ));
-    expect(player.source.getSnapshot().agents[0]?.pos[1]).toBeCloseTo(walked);
+    // Stay within the first routed leg even when a new layout puts its aisle less than 1.2 m away.
+    const [start, next] = workspaceRoute(OFFICE_ANCHORS.collections.position, OFFICE_ANCHORS.dana.position);
+    const distance = Math.hypot(next![0] - start![0], next![1] - start![1]);
+    const seconds = Math.min(0.5, distance / (2 * WALK_SPEED));
+    player.play(); player.advance(seconds * 1000 / 2); player.pause();
+    expect(player.getSnapshot().positionMs).toBeCloseTo(1000 + seconds * 1000);
+    const fraction = WALK_SPEED * seconds / distance;
+    for (const axis of [0, 1]) {
+      expect(player.source.getSnapshot().agents[0]?.pos[axis]).toBeCloseTo(start![axis]! + (next![axis]! - start![axis]!) * fraction);
+    }
     const frozen = player.source.getSnapshot().agents[0]?.pos;
     player.advance(500);
     expect(player.source.getSnapshot().agents[0]?.pos).toEqual(frozen);

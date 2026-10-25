@@ -1,7 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeAgent, type OfficeSnapshot } from './state';
 import { PALETTE, ROLES } from './palette';
-import { PLATE_TONES, deskPlate, deskPlateKey, deskPlates, noticeBoard } from './hud-diegetic';
+import { PLATE_TONES, canvasTextLines, deskPlate, deskPlateKey, deskPlates, noticeBoard } from './hud-diegetic';
+
+describe('shared measured canvas text', () => {
+  // Deliberately variable glyph widths: a character limit cannot pass these cases reliably.
+  const measure = (text: string) => [...text].reduce((sum, ch) => sum + (ch === ' ' ? 4 : /[ilI.·]/.test(ch) ? 3 : /[MW]/.test(ch) ? 12 : 8), 0);
+  it.each([
+    ['Jules · Checking vendor evidence', 130, 2],
+    ['Preview · sample tickets from the office snapshot', 140, 3],
+    ['Alex · Reviewing invoice 1042', 120, 2],
+    ['Ask me about issues/PRs', 100, 2],
+  ] as const)('wraps the complete demo text: %s', (text, width, maxLines) => {
+    const lines = canvasTextLines(text, measure, width, maxLines);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.length).toBeLessThanOrEqual(maxLines);
+    expect(lines.join(' ')).toBe(text);
+    expect(lines.every(line => measure(line) <= width)).toBe(true);
+  });
+  it('ellipsizes only the last available line and respects measured width', () => {
+    const lines = canvasTextLines('Preview · sample tickets from the office snapshot and more details', measure, 100, 3);
+    expect(lines).toHaveLength(3);
+    expect(lines.slice(0, -1).every(line => !line.includes('…'))).toBe(true);
+    expect(lines[2]!.endsWith('…')).toBe(true);
+    expect(lines.every(line => measure(line) <= 100)).toBe(true);
+  });
+  it('handles exact fits, long identifiers, whitespace and unusable bounds', () => {
+    expect(canvasTextLines('invoice', measure, measure('invoice'), 2)).toEqual(['invoice']);
+    expect(canvasTextLines('  Alex\n  reviewing ', measure, 50, 3).join('')).toBe('Alexreviewing');
+    expect(canvasTextLines('WWWWWW', measure, 24, 3)).toEqual(['WW', 'WW', 'WW']);
+    expect(canvasTextLines('Alex', measure, 0, 2)).toEqual([]);
+    expect(canvasTextLines('Alex', measure, 100, 0)).toEqual([]);
+    expect(canvasTextLines('Alex', measure, 100, NaN)).toEqual([]);
+    expect(canvasTextLines('', measure, 100, 3)).toEqual([]);
+  });
+});
 
 const row = (id: string, decision: string, agentId = 'a') => ({ id, agentId, seatId: 'collections', action: 'review', decision,
   ruleIds: [`RULE_${id}`], summary: `summary ${id}` }) as (typeof INITIAL_OFFICE.audit)[number];

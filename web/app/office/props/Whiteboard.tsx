@@ -9,6 +9,7 @@ import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { StaticBoxes } from '../mounts/StaticGeometry';
 import { BUILDING, WALL_THICKNESS } from '../../../lib/office/layout';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
+import { canvasTextLines } from '../../../lib/office/hud-diegetic';
 
 const DECISION_COLORS = { ALLOW: PALETTE.mint, DENY: ROLES.deny, ESCALATE: PALETTE.butter, RECORDED: PALETTE.lavender } as const;
 const DECISION_LABELS = { ALLOW: 'ALLOW', DENY: 'DENY', ESCALATE: 'HOLD', RECORDED: 'REC' } as const;
@@ -18,7 +19,7 @@ const MARKER_MATERIAL = new MeshStandardMaterial({ vertexColors: true });
 const MARKERS: FurniturePiece[] = [-0.2, 0, 0.2].map((x, i) => ({ at: [x, BOTTOM + 0.02, 0.08],
   size: [0.035, 0.16, 0.035], rotation: [0, 0, Math.PI / 2], color: [DECISION_COLORS.ALLOW, DECISION_COLORS.DENY, DECISION_COLORS.ESCALATE][i]! }));
 
-function drawBoard(ctx: CanvasRenderingContext2D, stats: WhiteboardStats) {
+export function drawBoard(ctx: CanvasRenderingContext2D, stats: WhiteboardStats) {
   ctx.fillStyle = ROLES.wall;
   ctx.fillRect(0, 0, TEX_W, TEX_H);
   ctx.textBaseline = 'alphabetic';
@@ -38,15 +39,15 @@ function drawBoard(ctx: CanvasRenderingContext2D, stats: WhiteboardStats) {
     // Numerals and labels stay navy for contrast; the decision colour is a bar under the number.
     ctx.fillStyle = ROLES.text;
     ctx.font = `700 64px ${PROP_FONT}`;
-    ctx.fillText(String(value), x, 118);
+    ctx.fillText(String(value), x, 100);
     ctx.fillStyle = DECISION_COLORS[decision];
-    ctx.fillRect(x - 44, 128, 88, 8);
+    ctx.fillRect(x - 44, 110, 88, 8);
     ctx.strokeStyle = ROLES.frame;
     ctx.lineWidth = 2;
-    ctx.strokeRect(x - 44, 128, 88, 8);
+    ctx.strokeRect(x - 44, 110, 88, 8);
     ctx.fillStyle = ROLES.text;
     ctx.font = `600 18px ${PROP_FONT}`;
-    ctx.fillText(DECISION_LABELS[decision], x, 160);
+    ctx.fillText(DECISION_LABELS[decision], x, 140);
   });
   ctx.textAlign = 'left';
   ctx.font = `500 18px ${PROP_FONT}`;
@@ -55,14 +56,15 @@ function drawBoard(ctx: CanvasRenderingContext2D, stats: WhiteboardStats) {
     ctx.fillText('No receipts yet', 20, 192);
   }
   stats.recent.forEach((row, i) => {
-    const y = 192 + i * 30;
+    const y = 164 + i * 40;
     ctx.fillStyle = DECISION_COLORS[row.decision];
     ctx.fillRect(20, y - 14, 14, 14);
     ctx.strokeStyle = ROLES.frame;
     ctx.lineWidth = 2;
     ctx.strokeRect(20, y - 14, 14, 14);
     ctx.fillStyle = ROLES.text;
-    ctx.fillText(`${DECISION_LABELS[row.decision]} · ${row.summary}`, 44, y);
+    canvasTextLines(`${DECISION_LABELS[row.decision]} · ${row.summary}`, text => ctx.measureText(text).width, TEX_W - 64, 2)
+      .forEach((text, line) => ctx.fillText(text, 44, y + line * 20));
   });
 }
 

@@ -58,3 +58,7 @@
 .office-shell [data-office-mount=inbox] a { color: #e5bf91; }
 /* Real-vs-Sim docks below the office instead of floating over its controls: narrow screens (class set by the panel) or live lobby panels. */
 .real-sim-overlay.real-sim-docked, body:has(.office-shell [data-office-mount=inbox]) .real-sim-overlay { position: static; width: 100%; border-width: 1px 0 0; border-radius: 0; padding: 16px 24px; }
+
+/* Physical workstation footprints in the shared square floor plan. */
+.plan-desk { position: absolute; transform: translate(-50%, -50%); background: var(--office-cream); border: 1px solid var(--office-navy); border-radius: 2px; }
+.office-shell .plan-room { width: auto; height: auto; max-width: 22%; padding: 4px; z-index: 1; }
