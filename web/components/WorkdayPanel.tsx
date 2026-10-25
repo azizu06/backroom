@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { isReplayPage } from '../lib/replay/mode';
 import { ROLE_WORK } from '../lib/workday/flow';
 import type { HandoffAgentId } from '../lib/office/handoffs';
 
@@ -10,6 +11,7 @@ export function WorkdayPanel() {
   const [status, setStatus] = useState('ready');
   const [stale, setStale] = useState(false);
   useEffect(() => {
+    if (isReplayPage()) return;
     let active = true;
     const refresh = async () => {
       try {
