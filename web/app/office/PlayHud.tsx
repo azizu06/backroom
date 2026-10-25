@@ -358,7 +358,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    {onOverview && <button className='play-overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
+    {onOverview && <button className='play-overview' aria-label='Overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
     <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>

@@ -65,7 +65,8 @@ test('score card hides behind a wall in first person and returns in overview', a
   await view.selectOption({ label: 'Play (first person)' });
   await expect(page.getByRole('application', { name: /First-person office/ })).toHaveAttribute('data-player-x', '9.000');
   await expect(score).toHaveCSS('visibility', 'hidden');
-  await openMenu(page);
-  await view.selectOption({ label: 'Orbit camera' });
+  // First person hides the corner menu; O returns to the overview camera.
+  await page.keyboard.press('o');
+  await expect(view).not.toHaveValue('play');
   await expect(score).toHaveCSS('visibility', 'visible');
 });

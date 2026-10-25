@@ -162,6 +162,7 @@ async function face(page: Page, x: number, z: number, tolerance = 0.08) {
 test('play mode: facing a handoff agent and pressing E shows the handoff details', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/office?handoffs=mock&view=overview');
+  await openPanels(page);
   await requireWebGL(page);
   // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
   await expect(log(page)).toContainText('INV-1043', { timeout: 10_000 });

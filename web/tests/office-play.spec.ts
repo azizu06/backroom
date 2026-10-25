@@ -282,7 +282,7 @@ test.describe('play mode on a phone', () => {
     }).toPass();
     await expect(select).toHaveValue('play');
     const caption = page.getByTestId('office-viewport').locator('.office-caption');
-    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Overview to leave');
+    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Exit Play to leave');
     await expect(caption).not.toContainText('WASD');
     await expect(page.locator('.play-joystick')).toBeVisible();
     await expect(page.locator('.play-touch-hint')).toHaveCount(0);
