@@ -82,20 +82,29 @@ it('leaves a restored payment unchanged when recovery runs twice', async () => {
   expect(await store.getPayment('ar:1042:1')).toMatchObject({ result: { invoiceState: 'paid' } });
 });
 
-it('skips a new link id when the invoice installment deposit already exists', async () => {
-  const client = bank(); const { store } = await promised();
-  const first = service(client, [link]);
-  await first.pay(link.id);
-  const fresh = { ...link, id: 'new-link' };
+it('ignores a deposit an earlier company reset left for invoice 1042; the new link pays and reconciles', async () => {
+  const client = bank(); const { store, lease } = await promised();
+  await client.deposit({ accountId: 'mock', invoiceId: '1042', installment: 1, amountCents: 99000 });
   const prior = await client.listDeposits('mock');
+  expect(prior.map(row => row.description)).toEqual([paymentMemo({ invoiceId: '1042', installment: 1 })]);
+  const fresh = { ...link, id: 'new-link' };
   const decision = selectRecoverableLinkIds([{ id: fresh.id, invoiceId: fresh.invoiceId, installment: fresh.installment }],
     prior, [fresh.id]);
-  expect(decision).toEqual({ ids: [], skipped: [{ linkId: fresh.id, reason: 'NEW_LINK_EXISTING_DEPOSIT' }] });
-  expect(prior.map(row => row.description)).toEqual([paymentMemo({ invoiceId: '1042', installment: 1 })]);
-  const restarted = service(client, [link, fresh]);
-  await recoverDemoPayments(restarted, decision.ids, store);
-  expect((await restarted.view(fresh.id)).payment).toBeUndefined();
-  const hazard = service(client, [fresh]);
-  expect((await hazard.recover([fresh.id], store)).restored.map(row => row.linkId)).toEqual([fresh.id]);
-  expect((await hazard.view(fresh.id)).payment?.depositId).toBe(prior[0]!._id);
+  expect(decision).toEqual({ ids: [fresh.id], skipped: [] });
+  const host = service(client, [fresh]);
+  await recoverDemoPayments(host, decision.ids, store);
+  expect((await host.view(fresh.id)).payment).toBeUndefined();
+  const posted = await host.pay(fresh.id);
+  expect(posted).toMatchObject({ status: 'pending_reconciliation', amountCents: fresh.amountCents });
+  expect(posted.depositId).not.toBe(prior[0]!._id);
+  expect((await host.reconcile(fresh.id, store, lease, 'promised')).status).toBe('partially_paid');
+  expect((await store.listAudit()).filter(row => row.ruleIds.includes('EXACT_PAYMENT_MATCH'))).toHaveLength(1);
+});
+
+it('still skips a link minted this boot whose own memo was already deposited', async () => {
+  const client = bank();
+  await service(client, [link]).pay(link.id);
+  const decision = selectRecoverableLinkIds([{ id: link.id, invoiceId: link.invoiceId, installment: link.installment }],
+    await client.listDeposits('mock'), [link.id]);
+  expect(decision).toEqual({ ids: [], skipped: [{ linkId: link.id, reason: 'NEW_LINK_EXISTING_DEPOSIT' }] });
 });
