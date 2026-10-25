@@ -16,6 +16,8 @@ import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights
 import { ROLES } from '../../lib/office/palette';
 import { BUILDING, sightBlocked, type Vec2 } from '../../lib/office/layout';
 import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
+import { bakedReplacesHall } from '../../lib/office/baked-art';
+import { useBakedHallReady } from './mounts/BakedArt';
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
@@ -65,6 +67,14 @@ const { base } = OFFICE_LIGHTING;
 registerSceneFrameRequester(invalidate);
 
 const FLOOR_SIZE = [BUILDING.maxX - BUILDING.minX + 0.2, BUILDING.maxZ - BUILDING.minZ + 0.2] as const;
+
+function ProceduralFloor() {
+  const hall = useBakedHallReady();
+  if (bakedReplacesHall(hall, 'floor')) return null;
+  return <>
+    <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
+  </>;
+}
 /** First person only: a wall between the eye and a label's floor point hides the label (the overview sees over the cut-away walls). */
 function behindWall(camera: Camera, x: number, z: number): boolean {
   return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked(camera.position.x, camera.position.z, x, z);
@@ -228,8 +238,8 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     <OfficeLights snapshot={snapshot} lowPower={lowPower} />
     <Instances limit={240} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
-    {/* Floor slab; walls, windows and the ceiling are the WorldShell mount. */}
-    <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
+    {/* Floor slab; walls, windows and the ceiling are the WorldShell mount. The baked hall swaps the floor when loaded. */}
+    <ProceduralFloor />
     {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}
     {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     <ContactDynamic name='office:agents'>{snapshot.agents.map(agent => <Fragment key={agent.id}>

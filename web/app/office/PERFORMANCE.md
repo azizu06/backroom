@@ -132,3 +132,23 @@ requests. Both the GLB and atlas meet their size budgets.
 
 Bake handoff: `tools/bake/propkit.bake.md`. Run evidence and planner screenshot
 placeholders: `docs/evidence/baked-art/propkit-run-notes.md`.
+## Baked shared hall (Phase 1 pipeline, measurements pending)
+
+Source budget: hall uses **9 mesh draws in Play**, **3 in overview** (floor and
+north/west walls), one shared material and one lightmap capped at 2048 × 2048.
+The `walls` parent has no mesh. The exterior adds **1 draw in Play only**, with a
+lightmap capped at 1024 × 1024. Hall replaces the procedural floor instances and
+WorldShell batches only after both the GLB and matching wall-collider sidecar load.
+There are **0 shadow-pass draws** from either baked piece; their MeshBasicMaterials
+use `toneMapped: false`. Desks, boards, agents and live lights stay independent.
+
+| Measurement | Required | Current evidence |
+| --- | --- | --- |
+| hall.glb bytes | ≤ 2,500,000 | Not baked; artifact test pending |
+| hall map | ≤ 2048 × 2048 | Enforced by generator argument clamp |
+| exterior map | ≤ 1024 × 1024 | Enforced by generator argument clamp |
+| Moving Play all-pass draws | < 300 | Needs GX10 outputs and same-camera browser measurement |
+
+These are source-derived counts, not `renderer.info` measurements. No GLB size,
+frame-time improvement, or complete scene budget pass is claimed before the bake.
+Run notes: `docs/evidence/baked-art/hall-run-notes.md`.

@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "BUILDING": {
+    "minX": -12,
+    "maxX": 12,
+    "minZ": -7.5,
+    "maxZ": 7.5
+  },
+  "WALL_HEIGHT": 3,
+  "WALL_THICKNESS": 0.16,
+  "WALLS": [
+    {
+      "id": "north",
+      "axis": "x",
+      "fixed": -7.5,
+      "from": -12,
+      "to": 12,
+      "exterior": true,
+      "overviewHeight": 1.1
+    },
+    {
+      "id": "south",
+      "axis": "x",
+      "fixed": 7.5,
+      "from": -12,
+      "to": 12,
+      "exterior": true,
+      "overviewHeight": 0.35
+    },
+    {
+      "id": "west",
+      "axis": "z",
+      "fixed": -12,
+      "from": -7.5,
+      "to": 7.5,
+      "exterior": true,
+      "overviewHeight": 1.1
+    },
+    {
+      "id": "east",
+      "axis": "z",
+      "fixed": 12,
+      "from": -7.5,
+      "to": 7.5,
+      "exterior": true,
+      "overviewHeight": 0.35
+    }
+  ],
+  "WINDOWS": [
+    {
+      "wall": "west",
+      "at": -6,
+      "width": 1.6,
+      "space": "collections"
+    },
+    {
+      "wall": "west",
+      "at": -3,
+      "width": 1.6,
+      "space": "collections"
+    },
+    {
+      "wall": "north",
+      "at": -0.8,
+      "width": 1.2,
+      "space": "payables"
+    },
+    {
+      "wall": "north",
+      "at": 4.9,
+      "width": 1.6,
+      "space": "vendor_onboarding"
+    },
+    {
+      "wall": "north",
+      "at": 7.2,
+      "width": 1.4,
+      "space": "meeting"
+    },
+    {
+      "wall": "north",
+      "at": 10.8,
+      "width": 1.4,
+      "space": "meeting"
+    },
+    {
+      "wall": "east",
+      "at": -6,
+      "width": 1.6,
+      "space": "meeting"
+    },
+    {
+      "wall": "east",
+      "at": -3,
+      "width": 1.6,
+      "space": "meeting"
+    },
+    {
+      "wall": "east",
+      "at": 3,
+      "width": 1.6,
+      "space": "break_room"
+    },
+    {
+      "wall": "east",
+      "at": 6,
+      "width": 1.6,
+      "space": "break_room"
+    },
+    {
+      "wall": "south",
+      "at": 8,
+      "width": 1.6,
+      "space": "break_room"
+    },
+    {
+      "wall": "south",
+      "at": 10.6,
+      "width": 1.6,
+      "space": "break_room"
+    },
+    {
+      "wall": "south",
+      "at": -1.5,
+      "width": 1.6,
+      "space": "dana"
+    },
+    {
+      "wall": "south",
+      "at": -10.4,
+      "width": 1.6,
+      "space": "lobby"
+    }
+  ],
+  "DOORWAYS": [
+    {
+      "id": "collections",
+      "kind": "leaf",
+      "axis": "x",
+      "at": [
+        -9,
+        -1.5
+      ],
+      "width": 1.44,
+      "joins": [
+        "collections",
+        "corridor"
+      ]
+    },
+    {
+      "id": "payables",
+      "kind": "leaf",
+      "axis": "x",
+      "at": [
+        -3.5,
+        -1.5
+      ],
+      "width": 1.44,
+      "joins": [
+        "payables",
+        "corridor"
+      ]
+    },
+    {
+      "id": "vendor_onboarding",
+      "kind": "leaf",
+      "axis": "x",
+      "at": [
+        2.5,
+        -1.5
+      ],
+      "width": 1.44,
+      "joins": [
+        "vendor_onboarding",
+        "corridor"
+      ]
+    },
+    {
+      "id": "meeting",
+      "kind": "open",
+      "axis": "x",
+      "at": [
+        8,
+        -1.5
+      ],
+      "width": 1.6,
+      "joins": [
+        "meeting",
+        "corridor"
+      ]
+    },
+    {
+      "id": "lobby",
+      "kind": "open",
+      "axis": "x",
+      "at": [
+        -9,
+        1.5
+      ],
+      "width": 2,
+      "joins": [
+        "lobby",
+        "corridor"
+      ]
+    },
+    {
+      "id": "dana",
+      "kind": "open",
+      "axis": "x",
+      "at": [
+        -3.5,
+        1.5
+      ],
+      "width": 1.6,
+      "joins": [
+        "dana",
+        "corridor"
+      ]
+    },
+    {
+      "id": "treasury",
+      "kind": "open",
+      "axis": "x",
+      "at": [
+        2.5,
+        4.8
+      ],
+      "width": 1.44,
+      "joins": [
+        "treasury",
+        "corridor"
+      ]
+    },
+    {
+      "id": "break_room",
+      "kind": "open",
+      "axis": "x",
+      "at": [
+        8,
+        1.5
+      ],
+      "width": 1.6,
+      "joins": [
+        "break_room",
+        "corridor"
+      ]
+    },
+    {
+      "id": "server_room",
+      "kind": "open",
+      "axis": "z",
+      "at": [
+        9.5,
+        0
+      ],
+      "width": 1.44,
+      "joins": [
+        "server_room",
+        "corridor"
+      ]
+    },
+    {
+      "id": "entrance",
+      "kind": "entrance",
+      "axis": "x",
+      "at": [
+        -7.2,
+        7.5
+      ],
+      "width": 1.6,
+      "joins": [
+        "lobby",
+        "outside"
+      ]
+    }
+  ],
+  "DOOR_OPENING_HEIGHT": 2.25,
+  "WINDOW_SILL": 0.9,
+  "WINDOW_HEAD": 2.5,
+  "TICKET_BOARD": {
+    "wall": "north",
+    "from": -3,
+    "to": 3,
+    "fixed": -7.5
+  },
+  "POD_BOUNDS": [
+    {
+      "id": 0,
+      "minX": -10.325,
+      "maxX": -5.675,
+      "minZ": -4.9,
+      "maxZ": -1.3,
+      "minY": 0.05,
+      "maxY": 2.2
+    },
+    {
+      "id": 1,
+      "minX": -2.325,
+      "maxX": 2.325,
+      "minZ": -4.9,
+      "maxZ": -1.3,
+      "minY": 0.05,
+      "maxY": 2.2
+    },
+    {
+      "id": 2,
+      "minX": 5.675,
+      "maxX": 10.325,
+      "minZ": -4.9,
+      "maxZ": -1.3,
+      "minY": 0.05,
+      "maxY": 2.2
+    }
+  ],
+  "WALL_COLLIDERS": [
+    {
+      "minX": -12,
+      "maxX": 12,
+      "minZ": -7.58,
+      "maxZ": -7.42
+    },
+    {
+      "minX": -12,
+      "maxX": -8,
+      "minZ": 7.42,
+      "maxZ": 7.58
+    },
+    {
+      "minX": -6.4,
+      "maxX": 12,
+      "minZ": 7.42,
+      "maxZ": 7.58
+    },
+    {
+      "minX": -12.08,
+      "maxX": -11.92,
+      "minZ": -7.5,
+      "maxZ": 7.5
+    },
+    {
+      "minX": 11.92,
+      "maxX": 12.08,
+      "minZ": -7.5,
+      "maxZ": 7.5
+    },
+    {
+      "minX": -8,
+      "maxX": -6.4,
+      "minZ": 7.42,
+      "maxZ": 7.58
+    }
+  ],
+  "PALETTE": {
+    "aqua": "#9EF2FB",
+    "cream": "#FFF7EC",
+    "peach": "#F6D3B8",
+    "butter": "#FFF0B3",
+    "blush": "#FFC9D9",
+    "lavender": "#D9CCFF",
+    "mint": "#CDF2DC",
+    "navy": "#4A5A7A",
+    "slate": "#7C88A6",
+    "coral": "#E8727A"
+  },
+  "ROLES": {
+    "wall": "#FFF7EC",
+    "ceiling": "#FFF7EC",
+    "floor": "#F6D3B8",
+    "rug": "#FFC9D9",
+    "desk": "#F6D3B8",
+    "partition": "#D9CCFF",
+    "plant": "#CDF2DC",
+    "lampLight": "#FFF0B3",
+    "fillLight": "#9EF2FB",
+    "screenGlow": "#9EF2FB",
+    "frame": "#4A5A7A",
+    "text": "#4A5A7A",
+    "shadow": "#7C88A6",
+    "deny": "#E8727A",
+    "background": "#FFF7EC",
+    "roomPad": "#FFF7EC",
+    "aisle": "#FFC9D9",
+    "statusOk": "#CDF2DC",
+    "statusWarn": "#FFF0B3"
+  },
+  "BOARD_WINDOW_CONFLICTS": [
+    {
+      "wall": "north",
+      "at": -0.8,
+      "width": 1.2,
+      "space": "payables"
+    }
+  ]
+}

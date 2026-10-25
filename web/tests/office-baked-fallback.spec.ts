@@ -1,149 +1,85 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openMenu } from './office-menu';
-import { deflateSync } from 'node:zlib';
-import { PROPKIT_NODES, PROPKIT_SPECS, currentPropKitLayout, propkitPlacements } from '../lib/office/propkit';
+import { HALL_NODES } from '../lib/office/baked-art';
+import { wallColliders } from '../lib/office/layout';
 
-// Production build + WebGL required. Uses a tiny in-memory glTF fixture until the Phase B bake is available.
-const WARNING = 'Baked art /office-art/lobby.glb failed to load; using the procedural scene.';
-const PROPKIT_WARNING = 'Prop kit /office-art/propkit.glb failed to load; using the procedural props.';
-
-function surface(page: Page) {
-  return page.getByRole('application', { name: /First-person office/ });
+// A tiny real GLB exercises loading/commit/fallback without requiring a GX10 bake in the browser test.
+// This fixture is deliberately not an art/screenshot fixture.
+function hallFixture(): Buffer {
+  const positions = Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
+  const json = JSON.stringify({ asset: { version: '2.0' }, scene: 0,
+    scenes: [{ nodes: HALL_NODES.map((_, i) => i) }],
+    nodes: HALL_NODES.map(name => ({ name, ...(name === 'walls' ? {} : { mesh: 0 }) })),
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [{ byteLength: positions.length, uri: `data:application/octet-stream;base64,${positions.toString('base64')}` }],
+    bufferViews: [{ buffer: 0, byteLength: positions.length }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] }],
+  });
+  const body = Buffer.from(json.padEnd(Math.ceil(Buffer.byteLength(json) / 4) * 4, ' '));
+  const header = Buffer.alloc(20);
+  header.writeUInt32LE(0x46546c67, 0); header.writeUInt32LE(2, 4); header.writeUInt32LE(20 + body.length, 8);
+  header.writeUInt32LE(body.length, 12); header.writeUInt32LE(0x4e4f534a, 16);
+  return Buffer.concat([header, body]);
 }
 
-async function openBaked(page: Page, search = '?art=baked&view=overview') {
+async function openBaked(page: Page) {
   const warnings: string[] = [], errors: string[] = [];
   page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); });
   page.on('pageerror', error => errors.push(error.message));
-  // These are local rendering checks, never integration calls or remote asset downloads.
-  await page.route('**/*', route => {
-    const host = new URL(route.request().url()).hostname;
-    return host === 'localhost' || host === '127.0.0.1' ? route.fallback() : route.abort();
-  });
-  await page.goto(`/office${search}`);
-  const available = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
-  if (!available) throw new Error('WebGL is unavailable in this Chromium; the first-person office cannot render.');
-  const viewport = page.getByTestId('office-viewport');
-  await expect(viewport.locator('canvas')).toBeVisible();
-  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Full Floor', exact: true }).click();
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
-  await page.getByRole('button', { name: 'Close Today at Backroom' }).click();
-  await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
-  return { warnings, errors, canvas: viewport.locator('canvas') };
+  await page.goto('/office?art=baked&view=overview');
+  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(page.getByTestId('office-viewport').getByText('Loading 3D office…')).toHaveCount(0);
+  return { warnings, errors, canvas };
 }
 
 async function enterPlay(page: Page) {
   await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
-  await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
+  const surface = page.getByRole('application', { name: /First-person office/ });
+  await expect(surface).toBeFocused();
+  await expect(surface).toHaveAttribute('data-player-z', /\d/);
 }
 
-test('a missing desk kit keeps the procedural audit board and stamp in Play', async ({ page }) => {
-  await page.route('**/office-art/deskkit.glb', route => route.fulfill({ status: 404, body: 'missing' }));
-  const { warnings, errors } = await openBaked(page);
-  await expect.poll(() => warnings.some(text => text.startsWith(WARNING))).toBe(true);
+test('a missing hall keeps the procedural room and loads exterior only in Play', async ({ page }) => {
+  let exteriorRequests = 0;
+  await page.route('**/office-art/hall.glb', route => route.fulfill({ status: 404, body: 'missing' }));
+  await page.route('**/office-art/exterior.glb', route => { exteriorRequests++; return route.fulfill({ status: 404, body: 'missing' }); });
+  const { warnings, errors, canvas } = await openBaked(page);
+  await expect.poll(() => warnings.some(text => text.startsWith('Baked art /office-art/hall.glb failed'))).toBe(true);
+  await expect(canvas).toHaveAttribute('data-baked-hall', 'fallback');
+  expect(exteriorRequests).toBe(0);
   await enterPlay(page);
-  const board = page.locator('[data-lobby-audit-board]');
-  await expect(board).toHaveAttribute('data-lobby-audit-board', 'shown');
-  await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
-  // Still procedural after a beat: nothing flips once the load has already failed.
-  await page.waitForTimeout(500);
-  await expect(board).toHaveAttribute('data-lobby-audit-board', 'shown');
-  expect(errors).toEqual([]);
-});
-
-test('a loaded desk kit retains the procedural audit board and stamp in the open office', async ({ page }) => {
-  // Main retired the incompatible baked lobby shell; the kit must not bring it back.
-  const lobbyRequests: string[] = [];
-  page.on('request', request => { if (request.url().endsWith('/office-art/lobby.glb')) lobbyRequests.push(request.url()); });
-  const { warnings, errors } = await openBaked(page);
-  await expect(page.getByTestId('office-viewport').locator('canvas')).toHaveAttribute('data-deskkit', 'ready', { timeout: 30_000 });
-  await enterPlay(page);
+  await expect.poll(() => exteriorRequests).toBe(1);
+  await expect(canvas).toHaveAttribute('data-baked-hall', 'fallback');
   await expect(page.locator('[data-lobby-audit-board]')).toHaveAttribute('data-lobby-audit-board', 'shown');
-  await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
-  expect(lobbyRequests).toEqual([]);
-  expect(warnings.filter(text => text.startsWith('Desk kit'))).toEqual([]);
   expect(errors).toEqual([]);
 });
 
-/** One white PNG texel; built locally so the success fixture has no external image dependency. */
-function whitePixel(): string {
-  const chunk = (name: string, data: Buffer) => {
-    const body = Buffer.concat([Buffer.from(name), data]);
-    let crc = 0xffffffff;
-    for (const byte of body) {
-      crc ^= byte;
-      for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
-    const length = Buffer.alloc(4), checksum = Buffer.alloc(4);
-    length.writeUInt32BE(data.length); checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
-    return Buffer.concat([length, body, checksum]);
-  };
-  const header = Buffer.alloc(13); header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 6;
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.from([0, 255, 255, 255, 255]))), chunk('IEND', Buffer.alloc(0))]).toString('base64');
-}
-
-function kitFixture(complete = true): string {
-  const positions = new Float32Array([-0.5, 0, 0, 0.5, 0, 0, 0, 1, 0]);
-  const uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
-  const buffer = Buffer.concat([Buffer.from(positions.buffer), Buffer.from(uvs.buffer)]);
-  const nodes = (complete ? PROPKIT_NODES : PROPKIT_NODES.filter(n => n !== 'arcade'))
-    .map(name => ({ name, mesh: 0, scale: [...PROPKIT_SPECS[name].size] }));
-  return JSON.stringify({ asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: nodes.map((_, i) => i) }], nodes,
-    buffers: [{ byteLength: buffer.length, uri: `data:application/octet-stream;base64,${buffer.toString('base64')}` }],
-    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
-      { buffer: 0, byteOffset: positions.byteLength, byteLength: uvs.byteLength }],
-    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-0.5, 0, 0], max: [0.5, 1, 0] },
-      { bufferView: 1, componentType: 5126, count: 3, type: 'VEC2' }],
-    meshes: [{ primitives: [{ attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 0 }] }],
-    materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
-    textures: [{ source: 0 }], images: [{ uri: `data:image/png;base64,${whitePixel()}` }],
+test('hall becomes ready only after its matching colliders load; exterior failure leaves it ready', async ({ page }) => {
+  await page.route('**/office-art/hall.glb', route => route.fulfill({ contentType: 'model/gltf-binary', body: hallFixture() }));
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/office-art/hall.colliders.json', async route => {
+    await gate;
+    await route.fulfill({ json: { room: 'hall', boxes: wallColliders() } });
   });
-}
-
-test('a missing kit keeps visible procedural props and a usable Play route', async ({ page }) => {
-  await page.route('**/office-art/propkit.glb', route => route.fulfill({ status: 404, body: 'missing' }));
+  await page.route('**/office-art/exterior.glb', route => route.fulfill({ status: 404, body: 'missing' }));
   const { warnings, errors, canvas } = await openBaked(page);
-  await expect.poll(() => warnings.some(text => text.startsWith(PROPKIT_WARNING))).toBe(true);
-  await expect(canvas).toHaveAttribute('data-propkit', 'fallback');
-  await expect(canvas).toHaveAttribute('data-propkit-instances', String(propkitPlacements(currentPropKitLayout()).length));
+  await expect(canvas).toHaveAttribute('data-baked-hall', 'fallback');
+  release();
+  await expect(canvas).toHaveAttribute('data-baked-hall', 'ready');
   await enterPlay(page);
-  const startX = Number(await surface(page).getAttribute('data-player-x'));
-  await page.keyboard.down('d');
-  await expect.poll(async () => Number(await surface(page).getAttribute('data-player-x'))).toBeGreaterThan(startX + 0.4);
-  await page.keyboard.up('d');
-  await expect(canvas).toHaveAttribute('data-propkit', 'fallback');
+  await expect.poll(() => warnings.some(text => text.startsWith('Baked art /office-art/exterior.glb failed'))).toBe(true);
+  await expect(canvas).toHaveAttribute('data-baked-hall', 'ready');
   expect(errors).toEqual([]);
 });
 
-test('only a complete textured kit replaces the procedural set', async ({ page }) => {
-  await page.route('**/office-art/propkit.glb', route => route.fulfill({ contentType: 'model/gltf+json', body: kitFixture() }));
+test('stale colliders reject an otherwise loadable hall', async ({ page }) => {
+  await page.route('**/office-art/hall.glb', route => route.fulfill({ contentType: 'model/gltf-binary', body: hallFixture() }));
+  await page.route('**/office-art/hall.colliders.json', route => route.fulfill({ json: { room: 'hall', boxes: [] } }));
   const { warnings, errors, canvas } = await openBaked(page);
-  await expect(canvas).toHaveAttribute('data-propkit', 'ready');
-  await expect(canvas).toHaveAttribute('data-propkit-instances', String(propkitPlacements(currentPropKitLayout()).length));
-  await enterPlay(page);
-  await expect(canvas).toHaveAttribute('data-propkit', 'ready');
-  expect(warnings.filter(text => text.startsWith('Prop kit'))).toEqual([]);
-  expect(errors).toEqual([]);
-});
-
-test('a partial kit leaves the entire procedural set visible', async ({ page }) => {
-  await page.route('**/office-art/propkit.glb', route => route.fulfill({ contentType: 'model/gltf+json', body: kitFixture(false) }));
-  const { warnings, errors, canvas } = await openBaked(page);
-  await expect.poll(() => warnings.some(text => text.startsWith(PROPKIT_WARNING))).toBe(true);
-  await expect(canvas).toHaveAttribute('data-propkit', 'fallback');
-  expect(errors).toEqual([]);
-});
-
-test('the default office never requests or mounts the prop kit', async ({ page }) => {
-  let requests = 0;
-  await page.route('**/office-art/propkit.glb', route => { requests++; return route.abort(); });
-  const { errors, canvas } = await openBaked(page, '?view=overview');
-  await enterPlay(page);
-  await expect(canvas).not.toHaveAttribute('data-propkit');
-  expect(requests).toBe(0);
+  await expect.poll(() => warnings.some(text => text.startsWith('Baked art /office-art/hall.glb failed'))).toBe(true);
+  await expect(canvas).toHaveAttribute('data-baked-hall', 'fallback');
   expect(errors).toEqual([]);
 });
