@@ -70,3 +70,11 @@ export function precallRows(card: PrecallCard): { label: string; value: string }
     ...card.warnings.map(warning => ({ label: 'Warning', value: warning })),
   ];
 }
+
+/** Whether the desk phone may offer Request call, and the one-line reason when it may not. The server gate still decides. */
+export function precallGate(card: PrecallCard | null, mock: boolean): { ready: boolean; note?: string } {
+  if (mock || card?.status === 'ready') return { ready: true };
+  if (card?.status === 'blocked') return { ready: false, note: `Blocked: ${card.reason ?? 'pre-call check failed'}` };
+  if (card?.status === 'paused') return { ready: false, note: `Paused: ${card.reason ?? 'pre-call check paused'}` };
+  return { ready: false, note: 'Pre-call not ready' };
+}

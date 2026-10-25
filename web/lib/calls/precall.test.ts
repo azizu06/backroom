@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { GET as precallRoute } from '../../app/api/calls/precall/route';
-import { installPrecallEvidence, precallCard, precallRows, type PrecallSignal } from './precall';
+import { installPrecallEvidence, precallCard, precallGate, precallRows, type PrecallCard, type PrecallSignal } from './precall';
 
 const MAPS_URL = 'https://www.google.com/maps/place/?q=place_id:abc';
 const row = (type: string, value: unknown, label: string, extra: Partial<PrecallSignal> = {}): PrecallSignal =>
@@ -65,5 +65,22 @@ describe('desk phone pre-call card', () => {
     response = await precallRoute();
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'PRECALL_UNAVAILABLE' });
+  });
+});
+
+describe('desk phone Request call gate', () => {
+  const card = (status: PrecallCard['status'], reason?: string) =>
+    ({ ...precallCard({ preCall: { status: 'ready' }, signals: [] }), status, ...(reason ? { reason } : {}) });
+  it('disables Request call with the blocked reason', () => {
+    expect(precallGate(card('blocked', 'no consent on file'), false)).toEqual({ ready: false, note: 'Blocked: no consent on file' });
+  });
+  it('disables Request call while pre-call evidence is missing or not prepared', () => {
+    expect(precallGate(null, false)).toEqual({ ready: false, note: 'Pre-call not ready' });
+    expect(precallGate(card('not prepared'), false)).toEqual({ ready: false, note: 'Pre-call not ready' });
+    expect(precallGate(card('paused', 'calling hours'), false)).toEqual({ ready: false, note: 'Paused: calling hours' });
+  });
+  it('enables Request call only when ready, or in the scripted mock preview that never dials', () => {
+    expect(precallGate(card('ready'), false)).toEqual({ ready: true });
+    expect(precallGate(null, true)).toEqual({ ready: true });
   });
 });
