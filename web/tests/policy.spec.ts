@@ -16,7 +16,7 @@ test('owner edits badge limits and subsequent gateway decisions use v2 with immu
   expect((await request.get('/api/policy')).status()).toBe(401);
   expect((await offer('policy-before')).kind).toBe('ESCALATE');
   await page.goto('/policy');
-  await page.getByLabel('Owner demo PIN').fill('local-owner-pin-only');
+  await page.getByLabel('Owner PIN').fill('local-owner-pin-only');
   await page.getByRole('button', { name: 'Unlock policy' }).click();
   await expect(page.getByText('Saved policy v1', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Maximum installments', { exact: true })).toHaveValue('2');
@@ -37,9 +37,9 @@ test('owner edits badge limits and subsequent gateway decisions use v2 with immu
   expect(await snapshot.json()).toMatchObject({ escalation: { policyVersion: 2, quote: { text: expect.stringContaining('3 in v2') } } });
   await page.screenshot({ path: '../docs/evidence/policy-editor/v2.png', fullPage: true });
   await page.getByRole('button', { name: 'Lock editor' }).click();
-  await expect(page.getByLabel('Owner demo PIN')).toHaveValue('');
+  await expect(page.getByLabel('Owner PIN')).toHaveValue('');
   await page.reload();
-  await page.getByLabel('Owner demo PIN').fill('local-owner-pin-only');
+  await page.getByLabel('Owner PIN').fill('local-owner-pin-only');
   await page.getByRole('button', { name: 'Unlock policy' }).click();
   await expect(page.getByText('Saved policy v2', { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });

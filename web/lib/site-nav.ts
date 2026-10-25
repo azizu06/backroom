@@ -1,14 +1,14 @@
 export const navLinks = [
   { label: 'Office', href: '/office' },
   { label: 'Inbox', href: '/inbox' },
-  { label: 'Audit Wall', href: '/audit' },
-  { label: 'Attack Demo', href: '/attack' },
+  { label: 'Audit wall', href: '/audit' },
+  { label: 'Attack lab', href: '/attack' },
   { label: 'Operator', href: '/operator' },
   { label: 'Controller', href: '/controller' },
 ] as const;
 
-/** Small trailing link to the full disclosure; replaces a top-level "Real vs simulated" item. */
-export const whatsRealLink = { label: 'What’s real', href: '/real-vs-sim' } as const;
+/** Small trailing link to the integration status page. */
+export const whatsRealLink = { label: 'System Status', href: '/real-vs-sim' } as const;
 
 export type SiteNavPlacement = 'layout' | 'office';
 

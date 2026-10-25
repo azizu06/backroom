@@ -127,7 +127,7 @@ test('Dana signs in once; a live escalation appears by itself, a forged decision
   expect(await (await (await sent).response())?.json()).toMatchObject({ escalation: { method: 'passkey', status: 'approved' } });
   await expect(page.getByRole('heading', { name: 'Your decision is recorded.' })).toBeVisible();
   const checked = await tool('check_approval', { escalation_id: id });
-  expect(checked).toMatchObject({ approval_status: 'approved', can_confirm: false, decision: { kind: 'Approve' } });
+  expect(checked).toMatchObject({ kind: 'ALLOW', approval_status: 'approved', can_confirm: true, decision: { kind: 'Approve' }, plan: { installments: 4 } });
   await page.getByRole('button', { name: 'Back to inbox' }).click();
   await expect(page.getByRole('heading', { name: 'All clear.' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

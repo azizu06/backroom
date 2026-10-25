@@ -1,7 +1,8 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { identityReply, type VoiceSession } from './index';
+import { identityFromAnswer, type InterpretAnswer } from './answer';
+import { wrongPersonSpeak, type VoiceSession } from './index';
 import { voiceTools } from './tools';
 
 interface JournalData { sessions: VoiceSession[]; events: { id: string; type: string; callId: string; at: string }[] }
@@ -27,6 +28,10 @@ export class VoiceJournal {
     this.tail = run.catch(() => undefined);
     return run;
   }
+  /** Serialized read of committed state; never writes. */
+  read<T>(view: (data: JournalData) => T): Promise<T> {
+    return this.tail.then(() => view(structuredClone(this.data)));
+  }
   register(session: VoiceSession) { return this.transact(data => {
     if (data.sessions.some(s => s.id === session.id)) throw new Error('SESSION_EXISTS');
     data.sessions.push(structuredClone(session));
@@ -47,9 +52,26 @@ const normalize = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu
 const disclosureCore = (welcome: string) => normalize(welcome).replace(/^(?:hello|hey|hi)/, '');
 const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 const safeStops = ['record_opt_out', 'request_human', 'mark_dispute', 'report_already_paid'];
+/** First unclear answer gets one rephrased re-ask; the second ends with a callback offer. */
+const MAX_IDENTITY_FAILURES = 2;
+/** The same refused request this many times in a row is a loop, not progress. */
+const MAX_REPEATED_DENIALS = 3;
+const OPT_OUT = /\b(stop (calling|contacting|texting)( me)?|stop (the )?collection|(dont|don't|do not) (ever )?(call|contact)|never (call|contact)|no more calls|remove (me|my number)|take me off|unsubscribe|leave me alone|lose (this|my) number|opt(-| )?out)\b/i;
+const BANKRUPTCY = /\b(bankrupt(cy)?|chapter (7|11|13))\b/i;
+const HUMAN = /\b(speak|talk|transfer me|put me through|connect me)\b.{0,16}\b((a|an) (real |actual |live )?(human|person|representative)|(your|a|the) (manager|supervisor)|dana)\b/i;
+/** Caller words that stop collection in code, whatever the model does. Stops only ever end negotiation. */
+export function callerStop(text: string): 'record_opt_out' | 'request_human' | undefined {
+  if (OPT_OUT.test(text)) return 'record_opt_out';
+  if (BANKRUPTCY.test(text) || HUMAN.test(text)) return 'request_human';
+  return undefined;
+}
 
 export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret: string; toolSecret: string; gatewaySecret: string;
   gateway: (tool: string, request: Request) => Promise<Response>; agentId?: string;
+  /** Optional language-only reading of the caller's answer; code still decides identity. */
+  interpretAnswer?: InterpretAnswer;
+  /** Longest wait for a caller turn that has not arrived yet when identity is checked. */
+  answerWaitMs?: number;
   /** Gateway call id (voice session id), not the provider call id. Closes that call's open approvals. */
   onCallEnded?: (gatewayCallId: string) => Promise<void> }) {
   if (![options.eventSecret, options.toolSecret, options.gatewaySecret].every(s => s.length > 0)) throw new Error('VOICE_SECRETS_REQUIRED');
@@ -59,6 +81,22 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
     }));
     if (!r.ok) throw new HTTPError(r.status, 'GATEWAY_REJECTED');
     return await r.json() as Record<string, unknown>;
+  };
+  const wait = options.answerWaitMs ?? 1200;
+  /** Runs outside the journal lock so a slow model never blocks call events. Any failure leaves code's reading. */
+  const interpretIdentity = async (sessionId: string) => {
+    const read = () => options.journal.read(data => data.sessions.find(s => s.id === sessionId));
+    let session = await read();
+    // The caller's turn event can land just after the tool request; give it a moment instead of judging silence.
+    for (let waited = 0; session?.identity && !session.stopped && session.identity.turns <= session.identity.countedAt && waited < wait; waited += 100) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      session = await read();
+    }
+    const identity = session?.identity;
+    if (!options.interpretAnswer || !identity || session?.stopped || identity.replies.length === 0) return undefined;
+    try {
+      return { replies: JSON.stringify(identity.replies), answer: await options.interpretAnswer({ question: identity.question, replies: identity.replies }) };
+    } catch { return undefined; }
   };
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
@@ -75,6 +113,7 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
       try { body = JSON.parse(raw) as Record<string, unknown>; } catch { throw new HTTPError(400, 'INVALID_JSON'); }
       if (!body || Array.isArray(body) || typeof body.call_id !== 'string' || typeof body.webhook_request_id !== 'string'
         || !/^[A-Za-z0-9_.:-]{1,200}$/.test(body.call_id) || !/^[A-Za-z0-9_.:-]{1,200}$/.test(body.webhook_request_id)) throw new HTTPError(400, 'INVALID_ENVELOPE');
+      const interpreted = tool === 'verify_identity_result' ? await interpretIdentity(body.call_id) : undefined;
       return await options.journal.transact(async data => {
         if (event) {
           // https://docs.cartesia.ai/line/infrastructure/observability#webhooks
@@ -97,14 +136,22 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
             const text = turn.text ?? '';
             const core = disclosureCore(session.welcome);
             if (turn.role === 'assistant' && turn.was_interrupted === false && core.length > 0 && normalize(text).includes(core) && !session.disclosureComplete) {
-              session.disclosureComplete = true; session.userReply = ''; // Earlier background speech is not an answer to this question.
+              // Earlier background speech is not an answer to this question.
+              session.disclosureComplete = true; session.identity = { question: text, replies: [], turns: 0, failures: 0, countedAt: 0 };
+            } else if (turn.role === 'assistant' && session.identity && text.includes('?') && normalize(text).includes(normalize(session.contactName))) {
+              // A re-ask opens a new answer window, so stale chatter cannot answer it.
+              session.identity.question = text; session.identity.replies = [];
             }
             if (turn.role === 'user') {
-              session.userReply = session.disclosureComplete && turn.was_interrupted === false ? text.slice(0, 1000).replace(/\+?\d[\d ()-]{7,}\d/g, '[number]') : '';
-              const optOut = /\b(stop (calling|contacting|collection)|dont call|don't call|do not (call|contact)|never call|remove my number|take me off|opt out)\b/i.test(text);
-              if (optOut || /\b(bankrupt(cy)?|chapter (7|11|13))\b/i.test(text)) {
+              // Barge-in and short answers still count: keep every non-empty caller turn after disclosure.
+              if (session.identity && normalize(text)) {
+                session.identity.replies = [...session.identity.replies, text.slice(0, 1000).replace(/\+?\d[\d ()-]{7,}\d/g, '[number]')].slice(-4);
+                session.identity.turns += 1;
+              }
+              const stop = callerStop(text);
+              if (stop) {
                 session.stopped = true;
-                await forward(optOut ? 'record_opt_out' : 'request_human', { call_id: session.id, webhook_request_id: body.webhook_request_id });
+                await forward(stop, { call_id: session.id, webhook_request_id: body.webhook_request_id });
               }
             }
           }
@@ -131,10 +178,38 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
           speak: session.stopped ? 'Collection is paused. A human will follow up.' : `Repeat this complete disclosure first: ${session.welcome}`,
         };
         else {
-          const payload = { ...body };
-          if (tool === 'verify_identity_result') payload.result = identityReply(session.userReply, session.contactName);
+          const payload = { ...body }, identity = session.identity;
+          if (tool === 'verify_identity_result') {
+            // Use the model's reading only if no caller turn arrived while it was interpreting.
+            const answer = interpreted && identity && JSON.stringify(identity.replies) === interpreted.replies ? interpreted.answer : undefined;
+            payload.result = identityFromAnswer(answer, identity?.replies ?? [], session.contactName);
+          }
           result = await forward(tool, payload);
           if (safeStops.includes(tool) || payload.result === 'wrong_person') session.stopped = true;
+          if (tool === 'verify_identity_result') {
+            result = { ...result, identity: payload.result };
+            // Code owns the wrong-person line: business name and callback number only.
+            if (payload.result === 'wrong_person') result = { ...result, can_confirm: false, next_step: 'say_and_end', speak: wrongPersonSpeak(session) };
+            if (payload.result === 'uncertain' && identity) {
+              // Only an answer heard since the last count is a failure; a repeated check is not.
+              if (identity.turns > identity.countedAt) { identity.failures += 1; identity.countedAt = identity.turns; }
+              if (identity.failures >= MAX_IDENTITY_FAILURES) {
+                session.stopped = true;
+                result = { ...result, can_confirm: false, next_step: 'offer_callback_and_end',
+                  speak: `I'm sorry, I couldn't confirm I'm speaking with ${session.contactName}, so I can't go over the account on this call. Please call us back when it's convenient.` };
+              } else result = { ...result, next_step: 'ask_again_once' };
+            }
+          }
+        }
+        if (!safeStops.includes(tool)) {
+          // A model stuck re-sending the same refused request ends the call politely instead of looping.
+          const key = JSON.stringify([tool, Object.entries(body).filter(([k]) => k !== 'call_id' && k !== 'webhook_request_id').sort(([a], [b]) => a.localeCompare(b))]);
+          session.loop = result.kind !== 'DENY' ? undefined : { key, repeats: session.loop?.key === key ? session.loop.repeats + 1 : 1 };
+          if (session.loop && session.loop.repeats >= MAX_REPEATED_DENIALS) {
+            session.stopped = true;
+            result = { ...result, can_confirm: false, next_step: 'offer_callback_and_end',
+              speak: "I'm sorry, I'm not able to sort this out on this call. Please call us back and we'll help you then." };
+          }
         }
         const next = randomUUID();
         session.deliveries[nonce] = { fingerprint, next }; session.nonce = next;

@@ -179,6 +179,7 @@ export class SpacetimeStateStore implements StateStore {
   async completeTask(...args: Parameters<ReducerEngine['completeTask']>) { return this.call<'completeTask'>('completeTask', args); }
   async createEscalation(...args: Parameters<ReducerEngine['createEscalation']>) { return this.call<'createEscalation'>('createEscalation', args); }
   async createCallEscalation(...args: Parameters<ReducerEngine['createCallEscalation']>) { return this.call<'createCallEscalation'>('createCallEscalation', args); }
+  async setCallPresence(...args: Parameters<ReducerEngine['setCallPresence']>) { return this.call<'setCallPresence'>('setCallPresence', args); }
   async expireEscalations(...args: Parameters<ReducerEngine['expireEscalations']>) { return this.call<'expireEscalations'>('expireEscalations', args); }
   async getEscalation(...args: Parameters<ReducerEngine['getEscalation']>) { return this.call<'getEscalation'>('getEscalation', args); }
   async appendAudit(...args: Parameters<ReducerEngine['appendAudit']>) { return this.call<'appendAudit'>('appendAudit', args); }

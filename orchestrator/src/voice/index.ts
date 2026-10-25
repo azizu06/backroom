@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { computeEnvelope, DEFAULT_POLICY, evaluate, type Context, type Policy } from '@backroom/policy';
+import { identityFromAnswer, type IdentityResult } from './answer';
 
 export interface DialInput {
   sessionId: string; agentId: string; fromNumberId: string; clientId: string;
@@ -10,8 +11,21 @@ export interface DialInput {
 }
 export interface VoiceSession {
   id: string; contactName: string; welcome: string; nonce: string; providerCallId?: string;
-  disclosureComplete: boolean; userReply: string; stopped: boolean;
+  disclosureComplete: boolean; stopped: boolean;
   deliveries: Record<string, { fingerprint: string; next: string }>;
+  /** Caller turns since the identity question was last asked, plus the bounded re-ask count. */
+  identity?: { question: string; replies: string[]; turns: number; failures: number; countedAt: number };
+  /** Consecutive identical refused tool requests. */
+  loop?: { key: string; repeats: number };
+  /** Trusted dial input for code-owned closing lines. Never an invoice, amount or contact detail. */
+  businessName?: string; callbackNumber?: string;
+}
+/** Wrong person: the business name and callback number only. No contact name, invoice or amount. */
+export function wrongPersonSpeak(session: Pick<VoiceSession, 'businessName' | 'callbackNumber'>): string {
+  const from = session.businessName ? ` on behalf of ${session.businessName}` : '';
+  const digits = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(session.callbackNumber ?? '');
+  const back = digits ? ` at ${digits[1]}-${digits[2]}-${digits[3]}` : '';
+  return `Sorry for the trouble. This is an AI assistant calling${from}. If you know the right person, please ask them to call us back${back}. Goodbye.`;
 }
 export interface DialOptions {
   apiKey: string; http?: typeof fetch; now?: Date; allowDemoOverride?: boolean;
@@ -56,7 +70,8 @@ export async function dialCollectionCall(input: DialInput, options: DialOptions)
   if (decision.kind !== 'ALLOW') throw new Error(decision.ruleIds.join(','));
   await options.audit({ action: 'CALL_PERMIT', ruleIds: decision.ruleIds, sessionId: input.sessionId, at: now.toISOString() });
   const session: VoiceSession = { id: input.sessionId, contactName: input.contactName, welcome: renderWelcome(input),
-    nonce: randomUUID(), disclosureComplete: false, userReply: '', stopped: false, deliveries: {} };
+    nonce: randomUUID(), disclosureComplete: false, stopped: false, deliveries: {},
+    businessName: input.businessName, callbackNumber: input.callbackNumber };
   await options.prepare(session, input);
   // No balance/principal/fee enters the model context before the identity-gated gateway.
   const dynamic_variables = {
@@ -75,13 +90,11 @@ export async function dialCollectionCall(input: DialInput, options: DialOptions)
   return { sessionId: input.sessionId, callId: call.agent_call_id };
 }
 
-/** Conservative interpretation of the provider's actual user turn, never a model's claimed identity. */
-export function identityReply(text: string, contactName: string): 'confirmed' | 'wrong_person' | 'uncertain' {
-  const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
-  const reply = normalize(text), name = normalize(contactName);
-  if (/\b(no|not|wrong|isnt|is not)\b/.test(reply)) return 'wrong_person';
-  const accepted = ['yes', 'yep', 'yeah', 'speaking', 'thats me', 'yes thats me', 'yes speaking',
-    `this is ${name}`, `${name} here`, `yes this is ${name}`, `yes this is ${name} speaking`, `youre speaking to ${name}`,
-    `yeah this is ${name}`, `yeah this is ${name} speaking`, `yep this is ${name}`, `yep this is ${name} speaking`];
-  return accepted.includes(reply) ? 'confirmed' : 'uncertain';
+/** Code-only reading of the provider's actual user turn, never a model's claimed identity. */
+export function identityReply(text: string, contactName: string): IdentityResult {
+  return identityFromAnswer(undefined, [text], contactName);
+}
+/** All caller turns since the identity question was last asked; a clear no in any of them wins. */
+export function identityFromReplies(replies: string[], contactName: string): IdentityResult {
+  return identityFromAnswer(undefined, replies, contactName);
 }

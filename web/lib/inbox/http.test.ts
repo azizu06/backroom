@@ -8,6 +8,7 @@ import { createApprovalHTTP } from '../approvals/http';
 import { createInboxHTTP } from './http';
 import { inboxPresets } from './presets';
 import { readInboxBankChange } from './proposals';
+import * as vendorChecks from './checks';
 
 const tempDirs: string[] = [];
 
@@ -45,7 +46,7 @@ describe('judge inbox HTTP boundary', () => {
 
     expect(result).toMatchObject({ status: 'paid', paymentRail: 'nessie', receiptId: 'sandbox-debit-4401',
       reconciliation: { match: 'EXACT', debitId: 'sandbox-debit-4401', transactionId: 'sandbox-debit-4401' } });
-    expect(result.notice).toContain('Nessie sandbox debit matched exactly');
+    expect(result.notice).toContain('Nessie debit matched exactly');
     expect((await state.listAudit()).find(row => row.action === 'reconcile')).toMatchObject({
       ruleIds: ['EXACT_PAYMENT_MATCH'], inputs: { transactionKind: 'withdrawal', invoiceId: '4401', amountCents: 64000 },
     });
@@ -213,7 +214,7 @@ describe('judge inbox HTTP boundary', () => {
     expect(opened.decision).toMatchObject({ kind: 'ESCALATE', ruleIds: ['BANK_CHANGE_HOLD'] });
     expect(opened.decision.ruleIds).not.toContain('INVALID_INPUT');
     expect(opened.status).toBe('awaiting_controller');
-    expect(opened.notice).toContain('simulated');
+    expect(opened.notice).toContain('offline records');
     expect(opened.evidenceRefs).toEqual(expect.arrayContaining(['simulated:crs:cedar', 'simulated:ofac:cedar', 'simulated:apify:cedar']));
     expect(opened.approvalHref).toBe(`/approve/${encodeURIComponent(opened.escalationId)}`);
     expect(await readInboxBankChange(opened.escalationId)).toMatchObject({ status: 'awaiting_controller', accountId: 'bank-master:cedar', verified: true });
@@ -265,10 +266,27 @@ describe('judge inbox HTTP boundary', () => {
     expect(result.status).toBe('held');
     expect(result.decision.ruleIds).toContain('INVALID_INPUT');
     expect(result.decision.ruleIds).not.toContain('BANK_CHANGE_HOLD');
-    expect(result.notice).not.toContain('simulated');
+    expect(result.notice).not.toContain('offline records');
     expect(result.evidenceRefs.join(' ')).not.toContain('simulated:');
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(await readInboxBankChange(result.escalationId)).toBeUndefined();
+  });
+
+  it.each([69, 70, 88])('returns the audited CRS fraud score %s with the bank-change hold', async score => {
+    const state = new MemoryStateStore();
+    const base = vendorChecks.createInboxVendorGate({});
+    const gate = vi.spyOn(vendorChecks, 'createInboxVendorGate').mockReturnValue({ ...base, risk: {
+      async check() { return { score, label: 'CRS sandbox: test identity #13', checkedAt: '2026-10-24T18:05:00.000Z', responseHash: 'ab'.repeat(32) }; },
+    } });
+    try {
+      const preset = inboxPresets.find(row => row.id === 'bc-legitimate')!;
+      const result = await (await createInboxHTTP({ store: () => state, agents: async () => {} })(submission({ ...preset, presetId: preset.id }))).json();
+      expect(result.bankChangeFraud).toEqual({ score, label: 'CRS sandbox: test identity #13', checkedAt: '2026-10-24T18:05:00.000Z' });
+      expect(result.decision.ruleIds).toContain(score >= 70 ? 'FRAUD_RISK_HOLD' : 'BANK_CHANGE_HOLD');
+      expect(result.status).toBe(score >= 70 ? 'held' : 'awaiting_controller');
+      expect(result.receiptId).toBeUndefined();
+      expect((await state.listAudit()).find(row => row.action === 'bank_change_fraud_check')?.inputs?.fraudRiskScore).toBe(score);
+    } finally { gate.mockRestore(); }
   });
 
 });

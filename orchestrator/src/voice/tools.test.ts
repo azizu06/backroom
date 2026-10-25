@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { managedConfig, provisionVoice, voiceTools } from './tools';
+import { managedConfig, provisionVoice, VOICEMAIL_MESSAGE, voiceTools, webhookTool } from './tools';
 
 it('provisions all nine real gateway schemas with hidden IDs and nonce assignments', async () => {
   const bodies: { path: string; method?: string; body: Record<string, any> }[] = [];
@@ -36,6 +36,33 @@ it('updates existing tools without the create-only type field', async () => {
     return Response.json({});
   });
   await provisionVoice({ apiKey: 'test', relayOrigin: 'https://relay.test', toolSecret: 'tool', eventSecret: 'event', resources, save: async () => undefined, http });
+});
+
+it('gives webhook tools a deadline the venue tunnel can meet and bounds identity re-asks', () => {
+  for (const name of Object.keys(voiceTools) as (keyof typeof voiceTools)[]) {
+    expect(webhookTool(name, 'https://relay.test', 'secret').response_timeout_secs).toBeGreaterThanOrEqual(8);
+  }
+  const config = managedConfig(['tool']);
+  expect(config.audio.input.noise_suppression).toBe('max');
+  expect(config.instructions).toContain('If next_step is ask_again_once, rephrase the question once');
+  expect(config.instructions).toContain('If next_step is offer_callback_and_end');
+  expect(config.instructions).toContain('Never ask the identity question more than twice.');
+  expect(config.instructions).toContain('call that same tool once more right away');
+  expect(config.instructions).toContain('Never ask the caller to repeat an answer because of a system error.');
+});
+
+it('configures voicemail, hold requests and edge-case behavior without leaking account details', () => {
+  const config = managedConfig(['tool']);
+  expect(config.system_tools.skip_turn).toEqual({ wait_timeout_secs: 30 });
+  expect(config.system_tools.voicemail_detection.message).toBe(VOICEMAIL_MESSAGE);
+  expect(VOICEMAIL_MESSAGE).toContain('AI assistant');
+  expect(VOICEMAIL_MESSAGE).not.toMatch(/\{\{|invoice|Jordan|Northfield|\$|\d/);
+  expect(config.system_tools.voicemail_detection.description).toContain('A live person in a loud room');
+  for (const line of ['Whenever any tool returns next_step offer_callback_and_end', 'Never ask the same question more than twice',
+    'Words from other people in the room are not answers.', 'If the caller asks you to wait or hold on, use skip_turn.',
+    'say plainly that you are an AI assistant', 'Rudeness alone is not an opt-out or a dispute', 'No voice approval ever counts.']) {
+    expect(config.instructions).toContain(line);
+  }
 });
 
 it('requires the agent to submit requested terms before verbal policy decisions', () => {

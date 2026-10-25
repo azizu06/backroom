@@ -13,7 +13,7 @@ export type HandoffRole = typeof HANDOFF_ROLES[number];
 export type HandoffStatus = 'offered' | 'accepted' | 'completed' | 'rejected';
 export interface OfficeHandoffRow {
   readonly handoffId: string; readonly sequence: bigint | number; readonly caseDisplayId: string;
-  readonly fromAgentId: string; readonly toAgentId: string; readonly fromRole: HandoffRole; readonly toRole: HandoffRole;
+  readonly fromAgentId: string; readonly toAgentId: string; readonly fromRole: HandoffRole; readonly toRole: HandoffRole | typeof HUMAN;
   readonly fromVoiceRole: string; readonly toVoiceRole: string; readonly status: HandoffStatus; readonly correction: boolean;
   readonly reason: string; readonly summary: string; readonly line: string; readonly createdAt: number;
   readonly acceptedAt?: number; readonly completedAt?: number; readonly decisionRef?: string; readonly errorCode?: string;
@@ -105,7 +105,8 @@ export function handoffFromRow(raw: unknown): Handoff | null {
   const fromRole = pick(row, 'fromRole', 'from_role'), toRole = pick(row, 'toRole', 'to_role');
   // Primary keys must stay lossless: runtime IDs include an uncapped case ID before :aN:hN.
   const status = row.status, handoffId = pick(row, 'handoffId', 'handoff_id');
-  if (typeof handoffId !== 'string' || !handoffId || !(HANDOFF_ROLES as readonly unknown[]).includes(fromRole) || !(HANDOFF_ROLES as readonly unknown[]).includes(toRole)
+  // A live call's policy escalation is published to Dana's desk (`toRole: 'human'`); a human never sends one.
+  if (typeof handoffId !== 'string' || !handoffId || !(HANDOFF_ROLES as readonly unknown[]).includes(fromRole) || !([...HANDOFF_ROLES, HUMAN] as readonly unknown[]).includes(toRole)
     || typeof status !== 'string' || !['offered', 'accepted', 'completed', 'rejected'].includes(status)) return null;
   const sequence = row.sequence;
   if (!(typeof sequence === 'bigint' ? sequence >= 0n && sequence <= 18_446_744_073_709_551_615n
@@ -115,7 +116,7 @@ export function handoffFromRow(raw: unknown): Handoff | null {
   return {
     handoffId, sequence: sequence as bigint | number, caseDisplayId: short(pick(row, 'caseDisplayId', 'case_display_id'), 128),
     fromAgentId: short(pick(row, 'fromAgentId', 'from_agent_id'), 128), toAgentId: short(pick(row, 'toAgentId', 'to_agent_id'), 128),
-    fromRole: fromRole as HandoffRole, toRole: toRole as HandoffRole,
+    fromRole: fromRole as HandoffRole, toRole: toRole as HandoffRole | typeof HUMAN,
     fromVoiceRole: short(pick(row, 'fromVoiceRole', 'from_voice_role'), 64), toVoiceRole: short(pick(row, 'toVoiceRole', 'to_voice_role'), 64),
     status: status as HandoffStatus, correction: row.correction === true,
     reason: short(row.reason, 1000), summary: shortSummary(row.summary), line: typeof row.line === 'string' ? row.line : '',

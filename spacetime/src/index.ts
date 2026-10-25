@@ -166,7 +166,7 @@ const args = { requestId: t.string(), payload: t.string() };
 type Method = Exclude<keyof ReducerEngine, 'execute' | 'policies' | 'currentPolicyVersion' | 'modelsEnabled' | 'llmEnabled' | 'agents' | 'tasks' | 'escalations' | 'audit' | 'payments' | 'paymentFingerprints' | 'invoices'>;
 const timeAt: Partial<Record<Method, number>> = { savePolicyLimits: 2, setLlmEnabled: 1, registerAgent: 2, heartbeat: 1, claimTask: 1,
   renewLease: 1, assertLease: 1, reapExpired: 0, setAgentState: 2, setAgentTarget: 2, pauseTask: 1, advanceTask: 1,
-  completeTask: 2, createEscalation: 2, createCallEscalation: 1, decideEscalation: 1, expireEscalations: 0,
+  completeTask: 2, createEscalation: 2, createCallEscalation: 1, setCallPresence: 3, decideEscalation: 1, expireEscalations: 0,
   reservePayment: 3, recordPayment: 2, transitionInvoice: 4 };
 function invoke(method: Method) {
   return spacetimedb.reducer(args, (ctx, { requestId, payload }) => {
@@ -263,6 +263,10 @@ function guard(ctx: Ctx, engine: ReducerEngine, method: Method, values: unknown[
     const agent = engine.getAgent(input.fromAgent);
     if (!ctx.db.badge.seatId.find(input.seat) || (agent && agent.seatId !== input.seat)) throw new SenderError('INVALID_BADGE');
   }
+  if (method === 'setCallPresence') {
+    const agent = engine.getAgent(String(values[0]));
+    if (!ctx.db.badge.seatId.find(String(values[1])) || (agent && agent.seatId !== values[1])) throw new SenderError('INVALID_BADGE');
+  }
   if (method === 'decideEscalation') {
     const grant = values[0] as ApprovalGrant;
     const human = ctx.db.human.id.find(grant?.human);
@@ -289,6 +293,7 @@ export const complete_task = invoke('completeTask');
 export const create_escalation = invoke('createEscalation');
 export const get_escalation = invoke('getEscalation');
 export const create_call_escalation = invoke('createCallEscalation');
+export const set_call_presence = invoke('setCallPresence');
 export const decide_escalation = invoke('decideEscalation');
 export const expire_escalations = invoke('expireEscalations');
 export const append_audit = invoke('appendAudit');
@@ -481,7 +486,7 @@ export const record_payment_link = spacetimedb.reducer({ id: t.string(), planId:
 // Agent runtime reducers: the same pure engine as MemoryHandoffStore, one transaction each.
 // Payload is the canonical JSON array of the AgentCaseStore call; time comes from ctx.timestamp.
 type AgentMethod = 'openCase' | 'startActivation' | 'assertActive' | 'recordArtifacts' | 'commitHandoff' | 'rejectHandoff'
-  | 'finishActivation' | 'stopCase' | 'resumeCase' | 'getCase' | 'listPublic';
+  | 'finishActivation' | 'stopCase' | 'resumeCase' | 'getCase' | 'listPublic' | 'escalateToHuman' | 'resolveHumanEscalation';
 function loadCase(ctx: Ctx, caseId: string): agents.CaseState {
   const row = ctx.db.agent_case.id.find(String(caseId));
   if (!row) throw new SenderError('AGENT_CASE_NOT_FOUND');
@@ -519,6 +524,20 @@ function agentInvoke(method: AgentMethod) {
           .sort((a, b) => Number(a.sequence - b.sequence)).map(r => ({ ...r, sequence: Number(r.sequence) }));
       } else if (method === 'getCase') {
         value = ctx.db.agent_case.id.find(String(v[0])) ? loadCase(ctx, v[0]) : null;
+      } else if (method === 'escalateToHuman') {
+        const prior = ctx.db.agent_case.id.find(String(v[0]?.caseId));
+        const before = prior ? JSON.parse(prior.json) as agents.CaseState : undefined;
+        const { state, record, created } = agents.escalateToHuman(prior ? JSON.parse(prior.json) : undefined, { ...v[0], now: at, sequence });
+        if (created) persistCase(ctx, before, state);
+        value = agents.toPublicHandoff(state, record);
+      } else if (method === 'resolveHumanEscalation') {
+        if (ctx.db.agent_case.id.find(String(v[0]))) {
+          const before = loadCase(ctx, v[0]);
+          const state = loadCase(ctx, v[0]);
+          const row = agents.resolveHumanEscalation(state, { escalationId: String(v[1]), outcome: v[2], now: at });
+          persistCase(ctx, before, state);
+          value = row ? agents.toPublicHandoff(state, row) : null;
+        }
       } else if (method === 'openCase') {
         const prior = ctx.db.agent_case.id.find(String(v[0]?.caseId));
         const state = agents.openCase(prior ? JSON.parse(prior.json) : undefined, { ...v[0], now: at });
@@ -559,6 +578,8 @@ export const agent_stop_case = agentInvoke('stopCase');
 export const agent_resume_case = agentInvoke('resumeCase');
 export const agent_get_case = agentInvoke('getCase');
 export const agent_list_public = agentInvoke('listPublic');
+export const agent_escalate_to_human = agentInvoke('escalateToHuman');
+export const agent_resolve_human_escalation = agentInvoke('resolveHumanEscalation');
 // Deliberately anonymous, visual-only ingress. Never touches business tables.
 export const office_presence_upsert = spacetimedb.reducer({ viewerId: t.string(), name: t.string(), x: t.f32(), z: t.f32(), yaw: t.f32(), mode: t.string() }, (ctx, input) => {
   let row;

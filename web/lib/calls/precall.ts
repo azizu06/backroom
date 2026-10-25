@@ -1,3 +1,4 @@
+import { displayProvenance } from '../provenance';
 /** A recorded pre-call signal row (orchestrator collections/signals.ts SignalRow), as the host holds it. */
 export interface PrecallSignal { source: string; type: string; value: unknown; observedAt: string; label: string; sourceUrl?: string }
 /** What the host already published: services.preCall plus the Apify rows it recorded for invoice 1042. */
@@ -65,7 +66,7 @@ export function precallCard(evidence: PrecallEvidence | null | undefined): Preca
 export function precallRows(card: PrecallCard): { label: string; value: string }[] {
   return [
     { label: 'Business', value: card.business === 'unknown' ? card.businessDetail : `${card.business === 'open' ? 'Open' : 'Closed'} · ${card.businessDetail}` },
-    { label: 'Source', value: card.sourceHost ? `${card.source} · ${card.sourceHost}` : card.source },
+    { label: 'Source', value: card.sourceHost ? `${displayProvenance(card.source)} · ${card.sourceHost}` : displayProvenance(card.source) },
     ...(card.checkedAt ? [{ label: 'Checked', value: card.checkedAt }] : []),
     { label: 'Phone match', value: card.phoneMatch },
     { label: 'Pre-call', value: card.reason ? `${card.status} · ${card.reason}` : card.status },
