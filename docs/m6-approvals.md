@@ -75,11 +75,16 @@ must stay open in the foreground.
   are `{ kind: 'Approve' | 'Deny' }` or `{ kind: 'Counter', terms: ApprovalTerms }`.
   A verified decision carries `method: 'passkey'`, `decidedAt` and credential id.
 - `check_approval` reads this call's StateStore row and returns `approval_status`,
-  `decision`, and `counter_terms` when applicable. It still returns
-  `can_confirm: false`: controller review does not create an ALLOW, execute a
-  payment, or bypass a fresh policy check. The voice owner relays the recorded
-  result. Applying an exception to a new committed plan remains a separately
-  policy-checked controller action.
+  `decision`, and `counter_terms` when applicable. Policy always runs first; a
+  passkey decision on this call only lifts a term-limit ESCALATE
+  (`MAX_INSTALLMENTS`, `MIN_FIRST_PCT`, `MAX_PLAN_DAYS`, `MAX_DISCOUNT`) for the
+  exact terms Dana authorized. It never lifts a DENY or a stop signal. An
+  `Approve` makes `check_approval` (and `propose_plan` with the same terms) return
+  `ALLOW`, `can_confirm: true` and a `plan_id`, audited with rule `DANA_APPROVED`
+  and the escalation id. A `Counter` returns `can_confirm: false`; once the caller
+  accepts, `propose_plan` with exactly the counter terms is `ALLOW`. Other terms
+  still escalate. `send_payment_link` re-checks policy the same way, and its
+  amount stays code-computed (NF-027).
 - A live call (`callId` set) stays `pending` for the call, up to
   `APPROVAL_WINDOW_MS` (default 300000, maximum 900000). It also closes when the
   voice relay reports `call_completed` or `call_failed`. That status is

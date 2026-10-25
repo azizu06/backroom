@@ -4,11 +4,20 @@ import {
   type Context,
   type Decision,
   type Plan,
+  type RuleId,
 } from "../../../policy/src/index";
 import type { GatewayCall, PlanTerms } from "./store";
 
 export type GatewayPolicyState = Pick<Context, "policy" | "signals">;
-export type GatewayPolicyDecision = Decision;
+/** Gateway-only rule id: Dana's passkey decision authorized these exact terms. Not a policy rule. */
+export const DANA_APPROVED = "DANA_APPROVED";
+export type ApprovedDecision = {
+  kind: "ALLOW";
+  ruleIds: (RuleId | typeof DANA_APPROVED)[];
+  policyVersion: number;
+  escalationId: string;
+};
+export type GatewayPolicyDecision = Decision | ApprovedDecision;
 export type DecidePlan = (
   call: GatewayCall,
   plan: PlanTerms,

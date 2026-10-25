@@ -20,7 +20,8 @@ test('Dana registers, reviews evidence and relays Deny / Approve / Counter with 
     expect(res.ok()).toBe(true);
     return res.json();
   }
-  for (const kind of ['Deny', 'Approve', 'Counter']) {
+  // Approve last: once Dana approves these exact terms on the call, proposing them again is ALLOW.
+  for (const kind of ['Deny', 'Counter', 'Approve']) {
     const started = Date.now();
     const proposed = await tool('propose_plan', { installments: 4, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
     expect(proposed.kind).toBe('ESCALATE');
@@ -49,7 +50,8 @@ test('Dana registers, reviews evidence and relays Deny / Approve / Counter with 
     expect(replay.status()).toBe(403);
     const checked = await tool('check_approval', { escalation_id: id });
     expect(checked.approval_status).toBe(kind === 'Deny' ? 'denied' : kind === 'Approve' ? 'approved' : 'counter');
-    expect(checked.can_confirm).toBe(false);
+    expect(checked.can_confirm).toBe(kind === 'Approve');
+    if (kind === 'Approve') expect(checked).toMatchObject({ kind: 'ALLOW', rule_ids: ['MAX_INSTALLMENTS', 'DANA_APPROVED'], plan: { installments: 4 } });
     expect(checked.decision.kind).toBe(kind);
     if (kind === 'Counter') expect(checked.counter_terms.installments).toBe(3);
   }
