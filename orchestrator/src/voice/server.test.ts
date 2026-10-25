@@ -377,6 +377,47 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
       expect(Date.now() - started).toBeLessThan(2000);
       expect(pending.body).toMatchObject({ approval_status: 'pending', next_step: 'poll_again' });
     });
+    it('answers a retried check with the current status instead of duplicate, and returns a decision at once', async () => {
+      const f = await escalated({ approvalHoldMs: 120, approvalPollMs: 20 });
+      const first = await f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      const retry = await f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      expect(retry.body).not.toHaveProperty('duplicate');
+      expect(retry.body).toMatchObject({ approval_status: 'pending', can_confirm: false, next_step: 'poll_again',
+        next_delivery_nonce: first.body.next_delivery_nonce });
+      await f.decide('Approve');
+      const started = Date.now();
+      const approved = await f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      expect(Date.now() - started).toBeLessThan(100);
+      expect(approved.body).toMatchObject({ can_confirm: true, approval_status: 'approved', next_step: 'confirm_plan',
+        next_delivery_nonce: first.body.next_delivery_nonce });
+    });
+    it('gives an in-flight retry of a held check Dana\'s decision, not duplicate', async () => {
+      const f = await escalated({ approvalHoldMs: 5000, approvalPollMs: 20 });
+      const held = f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      await sleep(80);
+      const retried = f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      await sleep(80);
+      await f.decide('Approve');
+      for (const result of await Promise.all([held, retried])) {
+        expect(result.status).toBe(200);
+        expect(result.body).not.toHaveProperty('duplicate');
+        expect(result.body).toMatchObject({ can_confirm: true, approval_status: 'approved', next_step: 'confirm_plan' });
+      }
+    });
+    it('keeps holding when the gateway fails during a pending check, never an error or an ending step', async () => {
+      const f = await escalated({ approvalHoldMs: 120, approvalPollMs: 20 });
+      const real = f.gateway.getMockImplementation()!;
+      f.gateway.mockImplementation(async () => new Response('{}', { status: 502 }));
+      const failed = await f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      expect(failed.status).toBe(200);
+      expect(failed.body).toMatchObject({ approval_status: 'unknown', can_confirm: false, next_step: 'poll_again',
+        speak: 'Still waiting on Dana, thanks for holding.' });
+      expect(failed.body).not.toHaveProperty('error');
+      f.gateway.mockImplementation(real);
+      await f.decide('Approve');
+      const approved = await f.tool('check_approval', failed.body.next_delivery_nonce, { escalation_id: f.escalationId });
+      expect(approved.body).toMatchObject({ can_confirm: true, next_step: 'confirm_plan' });
+    });
     it('stops holding when the call ends', async () => {
       const f = await escalated({ approvalHoldMs: 5000, approvalPollMs: 20 });
       const held = f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
