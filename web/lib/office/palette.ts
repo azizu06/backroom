@@ -38,3 +38,32 @@ export const ROLES = {
 } as const;
 
 export type RoleName = keyof typeof ROLES;
+
+/**
+ * The world outside the windows (scene mounts WorldShell and Outdoors). Kept apart from PALETTE so the
+ * indoor roles stay pastel; these are the only outdoor colours, never literals in scene code.
+ */
+export const OUTDOOR = {
+  skyTop: "#6FA8DC",
+  skyHorizon: "#CFE8F3",
+  sun: "#FFE9A8",
+  sunHalo: "#FFF4CF",
+  grass: "#9CCB7E",
+  grassDark: "#7FB466",
+  foliage: "#5E9E5A",
+  foliageLight: "#86BF6A",
+  bush: "#6FAE5E",
+  trunk: "#8A6A4F",
+  hills: "#8FB9A0",
+  hillsFar: "#A9C8C2",
+  path: "#E4D6BF",
+  glass: "#BFE3F0",
+  windowFrame: "#F2EADC",
+  ceilingPanel: "#FFF8DD",
+  counter: "#E9DDCB",
+  fridge: "#E8EEF0",
+  sofa: "#B9A6D9",
+  screen: "#2E3A52",
+} as const;
+
+export type OutdoorName = keyof typeof OUTDOOR;

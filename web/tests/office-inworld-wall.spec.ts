@@ -90,11 +90,12 @@ test('the audit wall hangs in the lobby and, on a preview feed, paints no receip
   const errors = await startPlay(page);
   const canvas = page.getByTestId('office-viewport').locator('canvas');
 
-  // West lobby wall, centred at z = 3. Stand at arm's length and look straight at it.
-  await walkTo(page, -6.8, 3.0);
-  await face(page, -7.89, 3.0);
+  // East lobby wall (interior, so the west windows stay clear), centred at z = 5.3. Stand at arm's length and look straight at it.
+  await walkTo(page, -9, 2.6);
+  await walkTo(page, -7.1, 5.3);
+  await face(page, -6.11, 5.3);
   const at = await player(page);
-  expect(at.x).toBeLessThan(-6.5);
+  expect(at.x).toBeGreaterThan(-7.6);
 
   // Preview rows are not the audit log, so the wall paints none of them and says so (live ids are covered by the unit tests).
   expect(await canvas.getAttribute('data-audit-wall')).toBe('');
@@ -114,15 +115,14 @@ test('the inbox tray sits on the Payables desk: walk up, see E: open, open the i
   const canvas = page.getByTestId('office-viewport').locator('canvas');
   await expect(canvas).toHaveAttribute('data-inbox-prompt', '');
 
-  // Lobby aisle, through the Payables doorway (x -0.65..0.65), then to the aisle end of the desk.
-  await walkTo(page, -4.6, 0.45);
-  await walkTo(page, 0, 0.45);
-  await walkTo(page, 0, -1.0);
+  // Corridor, through the Payables doorway (x -4.15..-2.85), then to the aisle end of the desk.
+  await walkTo(page, -3.5, 0.3);
+  await walkTo(page, -3.5, -2.3);
   await expect(page.locator('.play-prompt')).not.toContainText('inbox tray'); // Sam is ahead; the tray is out of reach
   await expect(canvas).toHaveAttribute('data-inbox-prompt', '');
 
-  await walkTo(page, -0.8, -2.15);
-  await face(page, -0.8, -2.7);
+  await walkTo(page, -4.3, -4.15);
+  await face(page, -4.3, -4.7);
   await expect(page.getByText('E · Open inbox tray · 3 in inbox')).toBeVisible();
   await expect(canvas).toHaveAttribute('data-inbox-prompt', 'E: open');
 

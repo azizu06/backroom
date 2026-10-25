@@ -15,6 +15,7 @@ import { monitorScreen } from '../../../lib/office/props/monitors';
 import { bakedReplacesAuditBoard } from '../../../lib/office/baked-art';
 import { useBakedLobbyReady } from '../mounts/BakedArt';
 import { useCanvasTexture } from './useCanvasTexture';
+import { LOBBY_BOARD as BOARD } from '../../../lib/office/layout';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 /** Peak additive opacity of a busy desk's monitor halo, and of the lobby board rim. */
@@ -27,7 +28,7 @@ const HALO: [number, number, number] = [-0.35, 1.18, -0.28];
 /** Just in front of the DeskMonitors screen plane (z -0.171). */
 const CURSOR_Z = -0.163;
 const PLANT: [number, number, number] = [0.85, 0.91, -0.3];
-const LOBBY_BOARD: [number, number, number] = [-5.9, 1.25, 3.78];
+const LOBBY_BOARD: [number, number, number] = [BOARD[0], 1.25, BOARD[1] + 0.12];
 
 function subscribeReducedMotion(onChange: () => void) {
   const query = window.matchMedia(REDUCED_MOTION_QUERY);

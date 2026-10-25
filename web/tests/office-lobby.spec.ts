@@ -120,7 +120,7 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
 });
 
 /** Room centres (OFFICE_ANCHORS[room].center) the focus camera targets. */
-const PAYABLES = [0, -3] as const, COLLECTIONS = [-5, -3] as const;
+const PAYABLES = [-3.5, -5] as const, COLLECTIONS = [-9, -5] as const;
 
 /** Screen position of a world point under the scene's room focus camera (orthographic, target + (13, 15, 17), zoom min(w/10, h/8)). */
 function projectFocus([px, py, pz]: readonly [number, number, number], width: number, height: number, [cx, cz]: readonly [number, number] = PAYABLES): [number, number] {
@@ -186,8 +186,9 @@ async function patchColor(page: Page, canvas: Locator, point: Point, focus: read
 /** The scene clears to the palette's cream background; a lit surface differs from it by at least a few levels per channel. */
 const BACKGROUND = [1, 3, 5].map(i => parseInt(ROLES.background.slice(i, i + 2), 16));
 const offBackground = (rgb: readonly number[]) => Math.max(...rgb.map((v, i) => Math.abs(v - BACKGROUND[i]!)));
-/** A blank part of the Payables board (right of the empty-audit note) and a point just above it, which is background. */
-const PAYABLES_BOARD: Point = [1.74, 1.47, -5.349], ABOVE_PAYABLES_BOARD: Point = [1.74, 3.3, -5.349];
+/** A blank part of the Payables board (right of the empty-audit note) and a point just above it, off the board. */
+const PAYABLES_BOARD: Point = [-1.76, 1.47, -7.349], ABOVE_PAYABLES_BOARD: Point = [-1.76, 3.3, -7.349];
+const colorDistance = (a: readonly number[], b: readonly number[]) => Math.max(...a.map((v, i) => Math.abs(v - b[i]!)));
 /** Bright board pixels that are not the cream background: the focus camera settled and the board drew. */
 async function payablesBoardDrawn(page: Page, canvas: Locator): Promise<number> {
   const color = await patchColor(page, canvas, PAYABLES_BOARD);
@@ -202,7 +203,7 @@ async function patchWarmth(page: Page, canvas: Locator, point: Point, focus: rea
   return sum / (data!.length / 4);
 }
 
-const TREASURY = [5, 3.4] as const;
+const TREASURY = [2.5, 4.9] as const;
 
 /** How far the mean red channel of RGBA pixels stands above the other two (the DENY sign's #ed6252 is about 140). */
 function redness(data: readonly number[]): number {
@@ -213,11 +214,11 @@ function redness(data: readonly number[]): number {
 }
 
 /**
- * Red margins of the DENY sign board (centred (6.35, 1.1, 0.55), 1.6 x 0.72, facing +z), right half only:
+ * Red margins of the DENY sign board (centred (3.85, 1.1, 0.9), 1.6 x 0.72, facing +z), right half only:
  * clear of the 'DENIED' and rule text, whose position on screen shifts with the canvas size, and of the door ring and flash.
  */
 // Red board spots with no ink on the taller two-line DENY sign: between the rule rows, between header and rules, and the bottom strip.
-const SIGN_MARGINS = [[6.95, 1.04, 0.56], [7.05, 1.44, 0.56], [5.75, 1.04, 0.56], [6.35, 0.63, 0.56]] as const;
+const SIGN_MARGINS = [[4.45, 1.04, 0.91], [4.55, 1.44, 0.91], [3.25, 1.04, 0.91], [3.85, 0.63, 0.91]] as const;
 
 /** Redness at every sign margin point under the Treasury focus camera. */
 async function signRedness(page: Page, canvas: Locator): Promise<number[]> {
@@ -235,9 +236,10 @@ test('office props render in the 3D scene', async ({ page }) => {
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
-  // The blank board turns bright once the focus camera settles; just above it is the cream scene background.
+  // The blank board turns bright once the focus camera settles.
   await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
-  expect(offBackground(await patchColor(page, canvas, ABOVE_PAYABLES_BOARD))).toBeLessThan(6);
+  // Just above it the grounds outside the building show, not more board.
+  expect(colorDistance(await patchColor(page, canvas, ABOVE_PAYABLES_BOARD), await patchColor(page, canvas, PAYABLES_BOARD))).toBeGreaterThan(12);
   // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
   // (The Canvas keeps a hidden '3D unavailable' fallback inside <canvas>; only a visible one means failure.)
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
@@ -259,9 +261,9 @@ test('office desk monitors survive the Collections escalation preview', async ({
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Collections', exact: true }).click();
   // Once the focus camera settles, the empty right strip of the Collections screen shows the aqua panel (blue above red),
   // while the lit peach desk top beside it stays bright and warm (red above blue).
-  await expect.poll(() => patchBrightness(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
-  await expect.poll(() => patchWarmth(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(15);
-  await expect.poll(() => patchWarmth(page, canvas, [-5.074, 1.135, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(-15);
+  await expect.poll(() => patchBrightness(page, canvas, [-9.6, 0.912, -4.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
+  await expect.poll(() => patchWarmth(page, canvas, [-9.6, 0.912, -4.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(15);
+  await expect.poll(() => patchWarmth(page, canvas, [-9.074, 1.135, -5.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(-15);
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
   expect(errors).toEqual([]);

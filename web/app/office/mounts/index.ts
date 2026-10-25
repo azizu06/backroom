@@ -19,13 +19,20 @@ import { InboxTrayMount } from './InboxTrayMount';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
 import { RoomDetail } from './RoomDetail';
+import { RoomProps } from './RoomProps';
 import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
+import { Outdoors } from './Outdoors';
+import { SharedRooms } from './SharedRooms';
+import { WorldShell } from './WorldShell';
 import type { SceneMount } from './types';
 
 export type { SceneMount, SceneMountProps } from './types';
 export const SCENE_MOUNTS: readonly SceneMount[] = [
+  { id: 'outdoors', instanced: false, Component: Outdoors },
+  { id: 'world-shell', instanced: false, Component: WorldShell },
+  { id: 'shared-rooms', instanced: false, Component: SharedRooms },
   { id: 'doors', instanced: true, Component: Doors },
   { id: 'interactive-doors', instanced: false, Component: InteractiveDoors },
   { id: 'carry-folder', instanced: false, Component: CarryFolder },
@@ -34,6 +41,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'room-detail', instanced: false, Component: RoomDetail },
+  { id: 'room-props', instanced: false, Component: RoomProps },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'baked-art', instanced: false, Component: BakedArt },
   { id: 'desk-kit', instanced: false, Component: DeskKit },

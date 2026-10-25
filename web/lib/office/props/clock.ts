@@ -29,13 +29,13 @@ export function msUntilNextMinute(now: number): number {
 }
 
 /**
- * Hangs on the left wall above the aisle between Lobby and Collections,
+ * Hangs on the corridor's west end wall between Lobby and Collections,
  * so it is visible whenever either of those rooms is visible.
  */
 export const CLOCK_INTERACTION: OfficePropInteraction = {
   id: 'clock',
   prompt: 'Check clock',
-  position: [-7.5, 0.6],
+  position: [-11.5, 0],
   radius: 1.4,
   visible: snapshot => visibleRooms(snapshot).some(room => room === 'lobby' || room === 'collections'),
   panel(snapshot, now) {

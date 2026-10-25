@@ -3,6 +3,9 @@ import { PALETTE, ROLES } from '../palette';
 import { OFFICE_ANCHORS, type AnchorId } from '../state';
 import { DESKS } from '../targets/desk';
 import { DRESSING, SHELF_HEIGHT } from './dressing';
+import { BUILDING, SPACES, WALL_THICKNESS, roomPoint } from '../layout';
+
+const BACK_FACE = BUILDING.minZ + WALL_THICKNESS / 2;
 
 export interface DetailPiece extends FurniturePiece { shape: 'box' | 'cylinder' }
 export interface RoomDetailItem {
@@ -92,24 +95,26 @@ function clutter(room: typeof DESKS[number]): RoomDetailItem[] {
  * No new floor obstacle or Play target, collider hook, light, texture or animation is needed.
  */
 export const ROOM_DETAILS: readonly RoomDetailItem[] = [
-  rug('lobby', -6.7, 2.55, 0.85, 1.2, PALETTE.aqua),
-  rug('collections', -3.4, -3.1, 0.65, 1.2, PALETTE.mint),
-  rug('payables', 1.6, -3.1, 0.65, 1.2, PALETTE.butter),
-  rug('vendor_onboarding', 6.6, -3.1, 0.65, 1.2, PALETTE.lavender),
-  rug('dana', 1.55, 2.15, 0.65, 0.75, PALETTE.blush),
-  rug('treasury', 6.8, 3, 0.95, 1.2, PALETTE.aqua),
-  art('lobby', -7.87, 0.78, 3.05, Math.PI / 2, PALETTE.lavender),
-  art('collections', -6.1, 0.78, -5.37, 0, PALETTE.mint),
+  rug('lobby', ...roomPoint('lobby', -1.7, -0.35), 0.85, 1.2, PALETTE.aqua),
+  rug('collections', ...roomPoint('collections', 1.6, -0.1), 0.65, 1.2, PALETTE.mint),
+  rug('payables', ...roomPoint('payables', 1.6, -0.1), 0.65, 1.2, PALETTE.butter),
+  rug('vendor_onboarding', ...roomPoint('vendor_onboarding', 1.6, -0.1), 0.65, 1.2, PALETTE.lavender),
+  rug('dana', ...roomPoint('dana', 1.55, -1.25), 0.65, 0.75, PALETTE.blush),
+  rug('treasury', ...roomPoint('treasury', 1.8, -0.4), 0.95, 1.2, PALETTE.aqua),
+  // Wall art: x or z on the inner face of the wall it hangs on (BACK_FACE or a partition's face).
+  // On the lobby's east wall beside the audit wall; the west wall is windows.
+  art('lobby', SPACES.lobby.rect.maxX - WALL_THICKNESS / 2 - 0.02, 1.5, 6.95, -Math.PI / 2, PALETTE.lavender),
+  art('collections', roomPoint('collections', -1.1, 0)[0], 1.5, BACK_FACE + 0.05, 0, PALETTE.mint),
   // Payables' back wall already carries the interactive whiteboard.
-  art('payables', -2.4, 0.46, -1.95, Math.PI / 2, PALETTE.aqua),
-  art('vendor_onboarding', 5.9, 0.78, -5.37, 0, PALETTE.lavender),
-  art('dana', -2.4, 0.46, 3.5, Math.PI / 2, PALETTE.blush),
-  art('treasury', 2.6, 0.46, 3.1, Math.PI / 2, PALETTE.aqua),
+  art('payables', SPACES.payables.rect.minX + WALL_THICKNESS / 2 + 0.02, 1.5, roomPoint('payables', 0, 1.05)[1], Math.PI / 2, PALETTE.aqua),
+  art('vendor_onboarding', roomPoint('vendor_onboarding', 0.9, 0)[0], 1.5, BACK_FACE + 0.05, 0, PALETTE.lavender),
+  art('dana', SPACES.dana.rect.minX + WALL_THICKNESS / 2 + 0.02, 1.5, roomPoint('dana', 0, 0.1)[1], Math.PI / 2, PALETTE.blush),
+  art('treasury', SPACES.treasury.rect.minX + WALL_THICKNESS / 2 + 0.02, 1.5, roomPoint('treasury', 0, -0.3)[1], Math.PI / 2, PALETTE.aqua),
   ...DESKS.flatMap(clutter),
   // Shelf tops are empty. Keep the entire plant inside each existing shelf collider.
   ...DRESSING.shelves.map(shelf => plant(shelf.room, shelf.x, SHELF_HEIGHT, shelf.z)),
-  plant('dana', -0.92, 0.91, 3.8),
-  plant('treasury', 5.62, 1.4, 4.3),
+  plant('dana', roomPoint('dana', -0.92, 0.4)[0], 0.91, roomPoint('dana', -0.92, 0.4)[1]),
+  plant('treasury', roomPoint('treasury', 0.62, 0.9)[0], 1.4, roomPoint('treasury', 0.62, 0.9)[1]),
 ];
 
 /** Stable ordering keeps batch transforms unchanged when only live snapshot data changes. */

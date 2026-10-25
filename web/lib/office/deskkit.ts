@@ -4,6 +4,7 @@ import { DESKS } from './targets/desk';
 import { MONITOR_FACE } from './props/monitors';
 import { DRESSING, type DressingPlant, type DressingShelf } from './props/dressing';
 import { ROOM_DETAILS, type RoomDetailItem } from './props/roomDetail';
+import { roomPoint } from './layout';
 
 /**
  * Desk kit (tools/bake/deskkit.py -> deskkit.glb): named stylized props placed on the existing procedural anchors
@@ -42,7 +43,7 @@ export interface KitPlacement {
 }
 
 /** Procedural Treasury vault (TreasuryVault.tsx): body centre on the floor and its size; the door is on the -z face. */
-export const TREASURY_VAULT = { x: 5, z: 4, width: 1.8, height: 1.4, depth: 1.25 } as const;
+export const TREASURY_VAULT = { x: roomPoint('treasury', 0, 0.6)[0], z: roomPoint('treasury', 0, 0.6)[1], width: 1.8, height: 1.4, depth: 1.25 } as const;
 /** Bookshelf width in the kit; each placement scales x to the procedural shelf width. */
 export const KIT_SHELF_WIDTH = 1.4;
 /** Desk-local offsets (furniture.ts deskPieces), floor or desk-top contact points. */

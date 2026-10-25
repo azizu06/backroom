@@ -136,6 +136,7 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
 });
 
 test('play mode walks to the locked Treasury door by keyboard and shows the denial', async ({ page }) => {
+  test.setTimeout(60_000);
   const errors = await startPlay(page, async () => {
     // Retry until hydrated: a click before hydration is a no-op.
     await expect(async () => {
@@ -144,13 +145,13 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
     }).toPass();
   });
 
-  await walkTo(page, -4.6, 0.45);
-  await walkTo(page, 5, 0.45);
-  await face(page, 5, 1.15);
+  // Along the corridor to the Treasury door (2.5, 1.5); its locked leaf closes the doorway.
+  await walkTo(page, 2.5, 0.8);
+  await face(page, 2.5, 1.5);
   const prompt = page.getByText('E · Treasury door');
   await expect(prompt).toBeVisible();
   const at = await player(page);
-  expect(at.z).toBeLessThan(1.05);
+  expect(at.z).toBeLessThan(1.2);
 
   await page.keyboard.press('e');
   const dialog = page.getByRole('dialog', { name: /Treasury/ });
@@ -164,7 +165,7 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
 
 test('play mode walks to the GX10 server room and reads live telemetry read-only', async ({ page }) => {
   // Longest walk in the suite; headless software WebGL renders slowly.
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const methods: string[] = [];
   await page.route('**/api/gx10', async route => {
     methods.push(route.request().method());
@@ -181,11 +182,10 @@ test('play mode walks to the GX10 server room and reads live telemetry read-only
   });
   const errors = await startPlay(page);
 
-  // Around the partitions and door posts: lobby aisle, along z 0.45, then in front of the server.
-  await walkTo(page, -4.6, 0.45);
-  await walkTo(page, 5, 0.45);
-  await walkTo(page, 7.1, 0.4);
-  await face(page, 7.1, -0.8);
+  // Down the corridor, through the server-room doorway (x 9.5), then in front of the rack.
+  await walkTo(page, 8.6, 0.2);
+  await walkTo(page, 10.9, 0.45);
+  await face(page, 10.9, -0.8);
   const prompt = page.getByText('E · Check GX10 server');
   await expect(prompt).toBeVisible();
   const at = await player(page);

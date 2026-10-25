@@ -27,7 +27,7 @@ export function whiteboardStats(snapshot: OfficeSnapshot): WhiteboardStats {
 export const WHITEBOARD_INTERACTION: OfficePropInteraction = {
   id: 'whiteboard',
   prompt: 'Read whiteboard',
-  position: [1.1, -4.95],
+  position: [-2.4, -6.95],
   radius: 1.6,
   visible: snapshot => visibleRooms(snapshot).includes('payables'),
   panel(snapshot) {

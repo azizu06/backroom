@@ -7,6 +7,7 @@ import type { OfficeSnapshot } from '../../../lib/office/state';
 import { WHITEBOARD_INTERACTION, whiteboardStats, type WhiteboardStats } from '../../../lib/office/props/whiteboard';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { StaticBoxes } from '../mounts/StaticGeometry';
+import { BUILDING } from '../../../lib/office/layout';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 const DECISION_COLORS = { ALLOW: PALETTE.mint, DENY: ROLES.deny, ESCALATE: PALETTE.butter, RECORDED: PALETTE.lavender } as const;
@@ -70,7 +71,7 @@ function Board({ snapshot }: { snapshot: OfficeSnapshot }) {
   const { allow, deny, escalate, inbox, recent } = stats;
   const key = JSON.stringify({ allow, deny, escalate, inbox, recent });
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawBoard(ctx, stats), [key]);
-  return <group name='prop:whiteboard' position={[1.1, 0, -5.38]}>
+  return <group name='prop:whiteboard' position={[WHITEBOARD_INTERACTION.position[0], 0, BUILDING.minZ + 0.12]}>
     <mesh position={[0, BOTTOM + HEIGHT / 2, 0]} castShadow receiveShadow>
       <boxGeometry args={[WIDTH, HEIGHT, 0.06]} /><meshStandardMaterial color={ROLES.frame} roughness={0.8} />
     </mesh>
@@ -85,7 +86,7 @@ function Board({ snapshot }: { snapshot: OfficeSnapshot }) {
   </group>;
 }
 
-/** Payables back-wall board above the low wall, facing +z. Shown only while payables is visible. */
+/** Payables back-wall board, facing +z. Shown only while payables is visible. */
 export function Whiteboard({ snapshot }: { snapshot: OfficeSnapshot }) {
   return WHITEBOARD_INTERACTION.visible(snapshot) ? <Board snapshot={snapshot} /> : null;
 }

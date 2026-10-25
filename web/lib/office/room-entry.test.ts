@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ROOM_ENTRY_MS, roomAt } from './room-entry';
+import { ROOM_ENTER_RADIUS, ROOM_ENTRY_MS, ROOM_LEAVE_RADIUS, roomAt } from './room-entry';
+import { CORRIDOR_Z } from './layout';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
 
 const rooms = Object.keys(OFFICE_ANCHORS) as AnchorId[];
@@ -9,38 +10,43 @@ describe('room entry', () => {
     expect(roomAt(OFFICE_ANCHORS[room].center, null, rooms)).toBe(room);
   });
 
-  it('enters strictly inside 2.2 m and leaves strictly beyond 2.8 m', () => {
-    expect(roomAt([2.2, -3], null, ['payables'])).toBeNull();
-    expect(roomAt([2.199, -3], null, ['payables'])).toBe('payables');
-    expect(roomAt([2.8, -3], 'payables', ['payables'])).toBe('payables');
-    expect(roomAt([2.801, -3], 'payables', ['payables'])).toBeNull();
+  const [px, pz] = OFFICE_ANCHORS.payables.center;
+  const E = ROOM_ENTER_RADIUS, L = ROOM_LEAVE_RADIUS;
+  const east = (d: number): [number, number] => [px + d, pz];
+  it('enters strictly inside the enter radius and leaves strictly beyond the leave radius', () => {
+    expect(roomAt(east(E), null, ['payables'])).toBeNull();
+    expect(roomAt(east(E - 0.001), null, ['payables'])).toBe('payables');
+    expect(roomAt(east(L), 'payables', ['payables'])).toBe('payables');
+    expect(roomAt(east(L + 0.001), 'payables', ['payables'])).toBeNull();
   });
 
   it('does not flicker when walking along an entry boundary', () => {
-    let current = roomAt([2.1, -3], null, ['payables']);
-    for (const x of [2.21, 2.19, 2.4, 2.2, 2.79, 2.19]) {
-      current = roomAt([x, -3], current, ['payables']);
+    let current = roomAt(east(E - 0.1), null, ['payables']);
+    for (const d of [E + 0.01, E - 0.01, E + 0.2, E, L - 0.01, E - 0.01]) {
+      current = roomAt(east(d), current, ['payables']);
       expect(current).toBe('payables');
     }
-    current = roomAt([2.81, -3], current, ['payables']);
-    for (const x of [2.7, 2.3, 2.21, 2.2]) {
-      current = roomAt([x, -3], current, ['payables']);
+    current = roomAt(east(L + 0.01), current, ['payables']);
+    for (const d of [L - 0.1, E + 0.1, E + 0.01, E]) {
+      current = roomAt(east(d), current, ['payables']);
       expect(current).toBeNull();
     }
-    expect(roomAt([2.1, -3], current, ['payables'])).toBe('payables');
+    expect(roomAt(east(E - 0.1), current, ['payables'])).toBe('payables');
   });
 
   it('keeps the current room in the hysteresis band, then switches directly to a neighbour', () => {
-    expect(roomAt([-2.4, -3], 'collections', rooms)).toBe('collections');
-    expect(roomAt([-2.1, -3], 'collections', rooms)).toBe('payables');
-    expect(roomAt([-2.1, -3], 'payables', rooms)).toBe('payables');
+    const [cx, cz] = OFFICE_ANCHORS.collections.center;
+    // Inside Payables' enter radius but still within Collections' leave radius.
+    expect(roomAt([cx + L - 0.2, cz], 'collections', rooms)).toBe('collections');
+    expect(roomAt([cx + L + 0.1, cz], 'collections', rooms)).toBe('payables');
+    expect(roomAt([cx + L + 0.1, cz], 'payables', rooms)).toBe('payables');
   });
 
-  it('detects exits to the aisle and ignores hidden or removed rooms', () => {
-    expect(roomAt([0, 0.3], 'payables', rooms)).toBeNull();
-    expect(roomAt([0, -3], null, ['collections'])).toBeNull();
-    expect(roomAt([0, -3], 'payables', ['collections'])).toBeNull();
-    expect(roomAt([0, -3], null, [])).toBeNull();
+  it('detects exits to the corridor and ignores hidden or removed rooms', () => {
+    expect(roomAt([px, CORRIDOR_Z], 'payables', rooms)).toBeNull();
+    expect(roomAt([px, pz], null, ['collections'])).toBeNull();
+    expect(roomAt([px, pz], 'payables', ['collections'])).toBeNull();
+    expect(roomAt([px, pz], null, [])).toBeNull();
     expect(roomAt([NaN, 0], 'lobby', rooms)).toBeNull();
     expect(ROOM_ENTRY_MS).toBe(1600);
   });

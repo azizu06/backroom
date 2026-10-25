@@ -1,8 +1,9 @@
 import { visibleRooms, type OfficeAudit, type OfficeSnapshot } from '../state';
 import { truncateSummary } from './whiteboard';
+import { LOBBY_AUDIT_WALL } from '../layout';
 
-/** Lobby west wall (face at x = -7.92), between the shelf (z 1.2..2.4) and the corner plant; faces +x. */
-export const AUDIT_WALL = { x: -7.89, z: 3.0, bottom: 0.95, width: 2.4, height: 1.6, faceWidth: 2.26, faceHeight: 1.46 } as const;
+/** Lobby east wall (an interior wall, so the west windows stay clear); faces west into the lobby. */
+export const AUDIT_WALL = { ...LOBBY_AUDIT_WALL, bottom: 0.95, width: 2.4, height: 1.6, faceWidth: 2.26, faceHeight: 1.46 } as const;
 export const AUDIT_WALL_MAX_ROWS = 6;
 export const AUDIT_WALL_SUMMARY_MAX = 38;
 export const RECEIPT_ID_MAX = 16;

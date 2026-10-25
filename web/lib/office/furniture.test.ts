@@ -18,9 +18,9 @@ describe('static office furniture', () => {
 
   it('rotates Dana’s chair and paper around the anchor and turns her screen back to the room', () => {
     const pieces = deskPieces('dana');
-    expect(pieces[5]!.at).toEqual([-0.65, 0.95, 3.3]);
+    expect(pieces[5]!.at).toEqual([OFFICE_ANCHORS.dana.center[0] - 0.65, 0.95, OFFICE_ANCHORS.dana.center[1] - 0.1]);
     expect(pieces[5]!.rotation![1]).toBeCloseTo(Math.PI - 0.12);
-    expect(pieces[7]!.at[2]).toBeCloseTo(4.54);
+    expect(pieces[7]!.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] + 1.14);
     const screen = deskScreenPiece('dana');
     expect(screen.at[0]).toBeCloseTo(OFFICE_ANCHORS.dana.center[0] - MONITOR_FACE.x);
     expect(screen.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] - MONITOR_FACE.z + 0.05);
@@ -38,7 +38,7 @@ describe('static office furniture', () => {
     expect(screen.color).toBe(ROLES.screenGlow);
   });
 
-  it('retains the three fixed plant footprints', () => {
-    expect(PLANT_SPOTS).toEqual([[-7.1, -4.6], [7.1, -4.6], [1.7, 4.5]]);
+  it('keeps the fixed plant footprints in their corners', () => {
+    expect(PLANT_SPOTS).toEqual([[-11.1, -6.6], [4.6, -6.6], [-1.8, 6], [11.3, -6.8], [11.3, 6.8], [-11.3, 1]]);
   });
 });

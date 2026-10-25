@@ -30,7 +30,7 @@ describe('test-only play spawn', () => {
   const colliders = officeColliders(['lobby', 'collections', 'payables', 'vendor_onboarding', 'treasury'], [SERVER_ROOM_BOX]);
   it('reads ?playSpawn=x,z and clamps it to the floor', () => {
     expect(playSpawn('?playSpawn=5,0.6', colliders)).toEqual([5, 0.6]);
-    expect(playSpawn('?playSpawn=-99,0.6', colliders)).toEqual([FLOOR.minX + PLAYER_RADIUS, 0.6]);
+    expect(playSpawn('?playSpawn=-99,-0.6', colliders)).toEqual([FLOOR.minX + PLAYER_RADIUS, -0.6]);
   });
   it('falls back to the lobby spawn when missing, malformed or inside a collider', () => {
     const spawn = [SPAWN.position[0], SPAWN.position[1]];
@@ -38,6 +38,6 @@ describe('test-only play spawn', () => {
     expect(playSpawn('?playSpawn=1', colliders)).toEqual(spawn);
     expect(playSpawn('?playSpawn=NaN,1', colliders)).toEqual(spawn);
     expect(playSpawn('?playSpawn=,1', colliders)).toEqual(spawn);
-    expect(playSpawn('?playSpawn=7.1,-0.8', colliders)).toEqual(spawn);
+    expect(playSpawn(`?playSpawn=${SERVER_ROOM_BOX.minX + 0.6},-0.8`, colliders)).toEqual(spawn);
   });
 });

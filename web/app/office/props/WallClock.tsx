@@ -1,5 +1,6 @@
 'use client';
 
+import { BUILDING } from '../../../lib/office/layout';
 import { useEffect, useState } from 'react';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { CLOCK_INTERACTION, clockFace, msUntilNextMinute } from '../../../lib/office/props/clock';
@@ -54,7 +55,7 @@ function Clock() {
   const face = clockFace(now);
   // Redrawing the face invalidates once, which also renders the new hand angles.
   const texture = useCanvasTexture(TEX, TEX, drawFace, [face.text]);
-  return <group name='prop:clock' position={[-7.9, 1.75, 0.6]}>
+  return <group name='prop:clock' position={[BUILDING.minX + 0.1, 1.75, CLOCK_INTERACTION.position[1]]}>
     <mesh position={[0.26, 0, 0]} receiveShadow>
       <boxGeometry args={[0.52, 0.08, 0.08]} /><meshStandardMaterial color={ROLES.shadow} />
     </mesh>
@@ -73,7 +74,7 @@ function Clock() {
   </group>;
 }
 
-/** Left-wall clock on a fixed bracket, angled toward overview. Exact time and receipts remain in its panel. */
+/** Corridor west-wall clock on a fixed bracket, angled toward overview. Exact time and receipts remain in its panel. */
 export function WallClock({ snapshot }: { snapshot: OfficeSnapshot }) {
   return CLOCK_INTERACTION.visible(snapshot) ? <Clock /> : null;
 }

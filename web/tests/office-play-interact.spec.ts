@@ -53,41 +53,43 @@ async function face(page: Page, x: number, z: number, tolerance = 0.08) {
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   for (const side of ['front', 'back'] as const) {
     test(`interior door starts open, closes to block walking and reopens (${reducedMotion}, ${side})`, async ({ page }) => {
+      // The bigger office renders more per frame in headless software WebGL.
+      test.setTimeout(60_000);
       const errors: string[] = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.emulateMedia({ reducedMotion });
       // Stand beside the frame and deliberately face the swung-open leaf, from either side.
-      await start(page, side === 'front' ? '-0.15,0' : '-0.15,-1.05');
-      await face(page, -0.65, 0, 0.2);
+      await start(page, side === 'front' ? '-3.65,-0.85' : '-3.65,-1.9');
+      await face(page, -4.15, -0.85, 0.2);
       await expect(prompt(page)).toHaveText('E · Close door');
       await expect(page.getByTestId('office-door-payables')).toHaveText('Payables door open');
       await page.keyboard.press('e');
-      await face(page, 0, -0.65, 0.2);
+      await face(page, -3.5, -1.5, 0.2);
       await expect(prompt(page)).toHaveText('E · Open door');
       await expect(page.getByTestId('office-door-payables')).toHaveText('Payables door closed');
       // Walk squarely into the leaf so a diagonal heading cannot slide along the barrier.
-      await face(page, -0.15, side === 'front' ? -3 : 2);
+      await face(page, -3.65, side === 'front' ? -3.85 : 1.15);
       await page.keyboard.down('w');
       try {
-        const barrier = side === 'front' ? -0.31 : -0.99;
+        const barrier = side === 'front' ? -1.16 : -1.84;
         await expect.poll(async () => Math.abs(Number(await surface(page).getAttribute('data-player-z')) - barrier)).toBeLessThan(0.02);
         await page.waitForTimeout(300);
         const stopped = Number(await surface(page).getAttribute('data-player-z'));
-        if (side === 'front') expect(stopped).toBeGreaterThan(-0.32);
-        else expect(stopped).toBeLessThan(-0.98);
+        if (side === 'front') expect(stopped).toBeGreaterThan(-1.17);
+        else expect(stopped).toBeLessThan(-1.83);
       } finally { await page.keyboard.up('w'); }
-      await face(page, 0, -0.65, 0.2);
+      await face(page, -3.5, -1.5, 0.2);
       await page.keyboard.press('e');
-      await face(page, -0.65, 0, 0.2);
+      await face(page, -4.15, -0.85, 0.2);
       await expect(prompt(page)).toHaveText('E · Close door');
       await expect(page.getByTestId('office-door-payables')).toHaveText('Payables door open');
       await expect(page.getByRole('dialog')).toHaveCount(0);
-      await face(page, 0, side === 'front' ? -3 : 2);
+      await face(page, -3.5, side === 'front' ? -3.85 : 1.15);
       await page.keyboard.down('w');
       try {
         await page.waitForFunction(side => {
           const z = Number(document.querySelector<HTMLElement>('[data-player-z]')?.dataset.playerZ);
-          return side === 'front' ? z < -1.05 : z > -0.25;
+          return side === 'front' ? z < -1.9 : z > -1.1;
         }, side, { polling: 'raf' });
       } finally { await page.keyboard.up('w'); }
       expect(errors).toEqual([]);
@@ -99,7 +101,7 @@ test('folder is held locally, world prompts take priority, and it can be put dow
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await start(page, '-4.4,4.45');
+  await start(page, '-7,4.75');
   await expect(prompt(page)).toHaveText('E · Pick up folder');
   await page.keyboard.press('e');
   await expect(page.getByTestId('office-carry-folder')).toHaveText('Held invoice folder');
