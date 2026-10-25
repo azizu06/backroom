@@ -1,11 +1,122 @@
-# Local demo operations (Refs #2)
+# Demo runbook
 
-This is the rehearsal host for spec §6.2, §6.3 and the three §8.2 dress rehearsals.
-It is **local SpacetimeDB state + mock bank transport + synthetic, already verified caller**.
-`STATE_STORE=memory` is available for tests/offline rehearsal.
-The office subscribes to the selected StateStore in SpacetimeDB mode; memory
-mode retains its labeled preview. The optional voice relay forwards tools to the
-web host's gateway; external sponsor checks remain separate. Keep the rehearsal banner visible.
+Use the table script below on the running host's public HTTPS origin. Open the
+prepared Office bookmark once; after that, use the in-app links and QR codes,
+not typed paths. The office's **Backroom menu** contains the shared navigation;
+normal pages show the same links directly. In Play mode, **Operator** is also in
+the HUD. Escape releases mouse capture before clicking navigation.
+
+Company data is synthetic. Read **System Status** and the visible service labels
+for the actual host mode: mock bank, real sandbox adapters and recorded replay
+are different things. Selecting SpacetimeDB proves stored state, not that every
+other adapter is durable. Keep all mode and AI-caller disclosures visible. This table script follows [spec](spec.md) M4/M6/M7 (call, passkey, payment), M8 (vendor/inbox) and M10 (office view).
+
+## Before every take
+
+1. Assign the presenter, caller, Dana and backup operator. If an AI is playing the
+   caller in a rehearsal, disclose that explicitly; it is not a human-caller test.
+2. Click **Operator**, enter the private operator code and **Sign in**. This
+   unlocks operations, not approvals. Dana scans **Dana's controller** QR, enrolls
+   her passkey if needed, and clicks **Sign in with passkey** on the same HTTPS
+   origin. Keep her phone awake. Never show the enrollment code to the audience.
+3. Click **Reset company**, then **Confirm reset company**, immediately before
+   each take. Wait for success, click **Reload the office**, and use fresh payment
+   links. Reset replaces this owned company's active state; it does not reverse
+   sandbox payments, cancel a call or clear a real opt-out. An external shared
+   state host may refuse reset: have the state owner prepare a fresh owned run.
+4. In **Operator → Advanced**, run **Check dependencies** and **Run preflight**.
+   Check **System Status** and **State connected**. A reachable API is not a
+   completed call or payment. Enable models only for the prepared live agent take.
+5. Before judging, the engineer runs this on the prepared, built checkout:
+
+   ```sh
+   node tools/judge-check.mjs --live-origin <origin>
+   ```
+
+   Replace `<origin>` with the private HTTPS origin, without a path. The command
+   runs the local scripted judge path, then three read-only live GET probes:
+   service status, Dana enrollment and active payment-link shape. It does not
+   dial, approve or pay on the live host. PASS is not proof of a completed live
+   phone call; preserve the actual call and deposit receipts separately.
+
+## Call → Dana → payment → audit
+
+1. Click **Office**, walk to the Collections desk phone and press **Request call**.
+   Use only the prepared, consented test target and the existing call permit.
+   A disabled voice host places no call. Do not retry an ambiguous dial until the
+   operator checks whether it connected.
+2. Let the fixed welcome finish: the caller must hear that this is an **AI
+   assistant**, that it acts for Northfield Studio, and that the call is recorded.
+   The caller answers the Jordan identity question. No amount or payment terms
+   should be discussed before identity confirmation.
+3. The caller asks: **“Can I split it into seven installments, with fifteen
+   percent for the first payment, over thirty days?”** Keep the late fee and ask
+   for no discount. The agent sends those exact terms to policy, receives an
+   escalation and says it will check with Dana. It must not silently substitute
+   an in-policy plan or treat the caller's words as approval.
+4. Dana's already-open **Controller** page receives the request. Check **7
+   payments**, **15%**, **30 days**, fee retained and no discount; select the live
+   request rather than a separate seeded example. Tap **Approve with passkey**
+   and finish the phone's passkey prompt. Wait for **Your decision is recorded.**
+5. Let the agent continue without another caller prompt. Allow about **15 seconds**
+   for its approval check, exact-plan confirmation and payment-link offer. If it
+   remains stuck, report the observed failure and use the prepared backup; do not
+   approve by voice or invent a confirmed plan.
+6. Click **Calls** and wait for **Payment link ready**, or click **Payment link ·
+   ready** in navigation. Click **Pay $743.00** to open that authorized pay page
+   (the phone can scan its QR instead), then press **Pay $743.00** on the page.
+   Wait for **Payment matched. Invoice partially paid.** Use the new call's link,
+   not the independent seeded payment. The lobby kiosk's QR/link is another
+   route; the Payment link page has the explicit Pay button on current main.
+7. Finish the call so its outcome can be reconciled. Click **Audit wall** and
+   follow the current call's evidence: exact amount/payment match, invoice 1042
+   `partially_paid`, then **collections → reconciler → auditor** and its case
+   summary. The normal invoice path separately shows
+   **intake → extractor → vendor → payables → auditor**. Show the actual evidence,
+   not a generic completed row or a renderer animation as proof of settlement.
+
+Say which bank mode was used. A mock Nessie receipt is a rehearsal result; a
+live sandbox deposit is still sandbox money. The automated judge path uses
+scripted turns, software passkeys and mocked sponsor HTTP. Its optional durable
+lane reads actual disposable SpacetimeDB rows; it does not prove live telephony
+or restart recovery.
+
+## Other table moments
+
+| Moment | In-app click path and expected evidence |
+| --- | --- |
+| Start the workday | **Inbox → Start the workday** after operator sign-in and models ON; the office menu also has this button. It submits three seeded invoices (4401, 4481, 4482) and one bank-change attack. Watch the Workday panel and audit receipts. It submits no payments; repeated presses do not launch another batch until reset. |
+| One invoice | **Inbox → Normal approved invoice**; follow its **Decision receipt** to **Audit wall**. Vendor evidence can hold when checks are unavailable; do not describe a hold as clearance. |
+| Attack lab | **Attack lab → Lookalike vendor changes bank details → Run attack**. Keep **Scripted** selected for the deterministic take. Show `BANK_CHANGE_HOLD`, **Money moved: no** and **Payment attempts: 0**. Live assessment is a separate opt-in, not a payment route. |
+| x402 | **Operator → Pay a vendor (x402) → Pay vendor with x402 · TESTNET**, then the confirmation. This requires the prepared host's `X402_LIVE=1`, macOS Keychain signer and funded Base Sepolia test wallet; it is a $0.01 test-USDC payment, once per host process. Show the actual receipt. If unavailable, say so; **OFFLINE** buttons are explicitly simulated and cannot stand in for a testnet result. Reset company does not re-arm the once-per-process testnet action. |
+| Policy and explanation | **Policy** shows the saved badge; **Audit wall** provides cited explanations. An operator sign-in is not Dana's passkey approval. |
+| Integration truth | **System Status** lists the actual service evidence. Keep sandbox, simulated, unverified and replay labels in view. |
+
+## Offline standby
+
+Prepare this on the owned fallback laptop before judging. Build once on the
+approved build host, preserve the canonical LF recording files, and use a
+separate checkout/port from the live host:
+
+```sh
+DEMO_LIVE=0 DEMO_VOICE=0 DEMO_LLM=off DEMO_AGENTS=0 STATE_STORE=memory \
+  DEMO_TUNNEL=0 DEMO_PREBUILT=1 DEMO_PORT=3350 pnpm demo:up
+```
+
+During setup, save a bookmark to the fallback origin's
+`/office?replay=core-offline`. At the table, click that prepared bookmark, keep
+**REPLAY** visible, choose **Play**, and use **Full audit wall** to follow the
+verified recorded chain. No call or provider connection is needed. The bundled
+recording is synthetic state/audit, with no call audio. Do not claim it is a live
+call or fresh integration evidence. The full recording and audit were verified
+at desktop and phone widths with zero API requests and zero page errors (#337).
+See [replay mode](replay-mode.md) for controls and format.
+
+The automated standby check, after a production build, is:
+
+```sh
+pnpm --filter @backroom/web exec playwright test --config tests/offline-standby.config.ts
+```
 
 ## In-app operator console and external-action inventory
 
@@ -40,7 +151,7 @@ spec §6. CLI commands remain available. Coverage and deliberate exclusions:
 
 | External action before this change | In-app coverage / reason to retain outside setup |
 | --- | --- |
-| `demo:up`, `demo:down`, build/install, tunnels, voice relay/attack-server startup | Retained as host bootstrap/recovery: a stopped app cannot start itself; process lifecycle belongs to the owned supervisor. Attack startup is another worker's task. |
+| `demo:up`, `demo:down`, build/install, tunnels, voice relay/attack-server startup | Retained as host bootstrap/recovery: a stopped app cannot start itself; process lifecycle belongs to the owned supervisor. The owned supervisor starts its mock attack server. |
 | `demo:up:gx10`, `demo:down:gx10`, SSH deploy, warm Mac provisioning, callback rebinding / host failover | Retained as deployment operations, never browser-driven shared infrastructure changes. Keep a prepared fallback URL. |
 | `demo:reset`, local `state:seed`, fresh approval/pay URLs | **Reset company** and **Refresh demo links**. Reset owns publish + seed + gateway setup. No separate seed button against a live database. Maincloud reset stays rejected by the existing supervisor. |
 | `demo:health [--live]`, `demo:health:gx10 --live`, `demo:preflight` | **Check dependencies** / **Run preflight**, using the same functions and running host's adapters. Probe results are reachability, not call/inference/payment proof. |
@@ -53,8 +164,8 @@ spec §6. CLI commands remain available. Coverage and deliberate exclusions:
 | Judge inbox / invoice submission and frozen trap runs | Link to existing **Judge inbox** form; raw submissions still traverse `/api/inbox`, policy and audit. No second intake pipeline. |
 | Controller enrollment, phone inbox and approve/deny | Link to **Controller inbox**; owned by the controller worker. Each approval stays bound to a passkey and its original expiry. |
 | Payment-link creation and pay/reconcile | **Refresh demo links** exposes seeded gateway links; **Authorized call payment** reuses the existing active-link/QR component. Actual link generation stays in the policy gateway; payment stays on its existing page. |
-| `x402:live` Payables vendor payment (#7) | **Pay vendor with x402 · SIMULATED** (in-process mock vendor/facilitator), **Try blocked x402 invoice · SIMULATED** (policy hold, zero signing) and **Pay vendor with x402 · TESTNET** (only with host `X402_LIVE=1`, macOS Keychain wallet; $0.01 Base Sepolia test USDC, once per host process). `x402:wallet` setup and faucet funding stay outside. See [x402](x402.md#in-the-app-operator-console). |
-| Attack-demo triggers | Link to existing **Attack demo** page, whose server is started by the other worker. The console does not bypass its live/mock controls. |
+| `x402:live` Payables vendor payment (#7) | **Pay vendor with x402 · OFFLINE** (in-process mock vendor/facilitator), **Try blocked x402 invoice · OFFLINE** (policy hold, zero signing) and **Pay vendor with x402 · TESTNET** (only with host `X402_LIVE=1`, macOS Keychain wallet; $0.01 Base Sepolia test USDC, once per host process). `x402:wallet` setup and faucet funding stay outside. See [x402](x402.md#in-the-app-operator-console). |
+| Attack-demo triggers | Link to existing **Attack demo** page, whose mock server is started by the owned supervisor. The console does not bypass its live/mock controls. |
 | Policy edits, audit unlock, cited ask-why, replay and real-vs-sim disclosure | Links to existing app views. Their own authorization and provenance labels remain in force. |
 | `demo:live --confirm-sandbox`, live vision/inbox benchmarks, measurements, `state:live`, `demo:parity`, automated rehearsals / recordings | Retained as engineering evidence tools: can provision databases, write receipts or contact services; not needed to operate the judge-facing app. No browser sandbox-deposit or software-passkey shortcut. |
 
@@ -77,8 +188,7 @@ pnpm demo:reset            # fresh DB, seed_company, scripted public gateway/red
 ```
 
 For a phone passkey use `pnpm demo:up` with the default HTTPS tunnel instead.
-Reset immediately before the pitch, reopen the printed approval/pay URLs, and
-reload the office. The approval stays open for the live call, up to five minutes, and closes when the call ends. It starts during reset. A fresh publish
+Reset immediately before the pitch, click **Reload the office**, and use the controller QR and current Payment link navigation. The approval stays open for the live call, up to five minutes, and closes when the call ends. It starts during reset. A fresh publish
 can take longer than a few seconds: keep the labeled offline replay ready.
 Stop only this worktree's host with `pnpm demo:down` before changing modes.
 
@@ -140,7 +250,7 @@ DEMO_PUBLIC_URL=https://backroom.tail289372.ts.net pnpm demo:up
 
 The passkey is bound to that Funnel origin. Re-enroll it if the origin changes. Funnel must already forward to `127.0.0.1:3000` (or the chosen `DEMO_PORT`).
 
-The printed URLs include `/attack` for the judge's hostile-document proof.
+Use **Attack lab** in navigation for the judge's hostile-document proof.
 The supervisor owns its private loopback server on port 8790 (`ATTACK_DEMO_PORT`
 overrides it), checks that port before starting, and sets `ATTACK_DEMO_BASE_URL`
 for the web proxy. It shares the private `TOOL_GATEWAY_SECRET` server-side only.
@@ -157,7 +267,7 @@ If its port is busy, choose a free
 For a fully offline, phone-free rehearsal:
 
 ```sh
-DEMO_AGENTS=0 STATE_STORE=memory DEMO_TUNNEL=0 DEMO_PORT=3300 pnpm demo:up
+DEMO_LIVE=0 DEMO_VOICE=0 DEMO_LLM=off DEMO_AGENTS=0 STATE_STORE=memory DEMO_TUNNEL=0 DEMO_PORT=3300 pnpm demo:up
 ```
 
 The existing agent team narrates accepted `/inbox` submissions by default on the
@@ -168,8 +278,7 @@ Global LLM OFF still prevents all SDK queries. Narration can hold, never pay or
 approve, and cannot change the inbox receipt. Existing vendor guards can end the
 chain early (Northfield vendor CRS identities are currently unmapped); this is a
 hold, not vendor clearance. Handoff rows are published to `agent_handoff_public`;
-the office does not yet subscribe to that table, so the reducer test proves row
-publication, not visible handoff animation. See [agent host wiring and tests](agents.md#judge-inbox-host).
+the office subscribes to those public handoffs. A visible courier remains a view of the recorded handoff, not payment authority. See [agent host wiring and tests](agents.md#judge-inbox-host).
 The demo case cap is $0.50 and the persistent ledger hard stop is $40. The mocked
 five-role chain reports $0.002 in synthetic receipts with $0 actual spend.
 
@@ -198,11 +307,9 @@ running with mock effects. No fixture consent is permission to call a real perso
 
 Reset preserves controller enrollment in the running process, the tunnel URL and
 server secrets. It replaces the installed StateStore, approvals, payment links, receipts and
-mock deposits; reopen the new printed links. The seeded approval stays open for
+mock deposits; use the refreshed in-app links. The seeded approval stays open for
 the call, up to five minutes (`APPROVAL_WINDOW_MS`), and closes when the call
-ends: reset immediately before the pitch. Stop/start
-loses process-local passkey enrollment and changes the quick-tunnel origin;
-enroll again. Reset does **not** cancel a real call, clear a real opt-out, delete
+ends: reset immediately before the pitch. After stop/start, check the public origin and Dana enrollment; enroll again if the origin or credential store changed. Reset does **not** cancel a real call, clear a real opt-out, delete
 `.env.voice/`, touch `.nessie-state/`, or undo sponsor bank transactions.
 
 Private `.demo/` contains 0600 controls, per-process logs and `voice.env` with the
@@ -288,7 +395,7 @@ network activity; preflight itself is read-only and makes no model calls.
   (`/__state/`, `web/lib/demo/state-proxy.ts`), so the public page shows **State
   connected**. Reload the office after reset so it subscribes to the new DB. Memory
   mode remains a labeled preview. Confirm the office connection indicator before judging.
-- Dana: open public `/controller` on the passkey phone. Use the private
+- Dana: scan **Operator → Dana's controller** QR on the passkey phone. Use the private
   `CONTROLLER_ENROLLMENT_SECRET` from `.env.local` or generated `.demo/private.env`;
   never display it. Complete registration before resetting for the pitch, then tap
   **Sign in with passkey** and leave the page open (screen on, volume up): each new
@@ -318,47 +425,7 @@ in the web host and forwards authenticated tools to its GatewayStore. The
 phone → Dana → pay loop is wired: approvals, payment links/QR, pay pages and
 reconciliation use the web host's shared gateway and installed StateStore.
 See [payment delivery](payment-delivery.md) for the verified headless QR/pay
-receipt and the process-local link lifetime. A live phone end-to-end receipt is
-still pending A0; the echo T1 test is not that receipt. Browser voice's current
-smoke command is documented in `docs/t1-cartesia.md`.
-
-## Single-URL click script
-
-1. Open the printed public **Office** URL on the big screen. Check **State connected**.
-2. Click **Operator**, enter the operator code once, **Sign in**, then **Reset company**
-   when the script calls for it.
-3. **Open the office**, walk to the Collections desk phone and press **Request call**
-   (rings only with `DEMO_VOICE=1`; otherwise it says no call placed).
-4. Dana's phone scans the console's controller QR (public `/controller`) and signs in
-   with the passkey, the only approval authority.
-5. From the console, open **Inbox**, **Audit wall** and **Attack demo**; **Advanced**
-   holds **Policy editor**. None asks for the code again. `/real-vs-sim` stays at its
-   printed URL until the shared nav lands.
-
-Proof against an owned host: `SINGLE_ORIGIN_URL=<public origin> pnpm --filter
-@backroom/web exec playwright test --config playwright.single-origin.config.ts`.
-
-## Three-minute sequence (truthful current checkout)
-
-Assign people before the take: **presenter**, **Dana**, **demo operator**,
-**network/backup operator**. Any teammate may fill each role; do not assume whose
-phone holds the passkey. Use **Operator → Reset company** immediately before the
-opening (or the retained `demo:reset` CLI), refresh demo links and reload the office.
-
-| Time | Speaker / operator | Action and claim |
-| --- | --- | --- |
-| 0:00–0:20 | Presenter; demo operator | Show the rehearsal banner and the office connection indicator. “Three finance seats, one human controller. This take uses synthetic company data and mock bank transport.” The seeded request rings on Dana's signed-in `/controller` page; no link is opened. |
-| 0:20–0:45 | Presenter; Dana | “Four payments exceed the code's badge.” Dana presses Deny and completes a real passkey assertion while the request is open. It stays open for the call, up to five minutes, and closes when the call ends. Show the resulting human audit entry. Do not describe the seeded identity as a live verification. |
-| 0:45–1:15 | Demo operator; presenter | Open the printed pay URL, press Pay with simulated card, then show `partially_paid` and the exact-match reconciliation audit. “The real policy, SDK and reducer path ran over an in-memory mock HTTP transport.” No card data and no real money. |
-| 1:15–1:45 | Demo operator; presenter | Invite a judge email/invoice in `/inbox`, submit it, and follow its exact audit link. Open the printed `/attack` URL for the hostile-document proof (mock by default; assessment only, no payment). Use the frozen #4419 or #4471 preset for the inbox trap proof. With OFF, unrecognized raw text escalates deterministically; arbitrary extraction and live vendor checks are not promised. |
-| 1:45–2:15 | Presenter; audit operator | On `/audit`, select a cited event and ask why. LLM defaults OFF, so this is a cited deterministic answer. Show saved policy text and code/human attribution. Do not claim cloud narration was exercised. |
-| 2:15–2:45 | Network operator; presenter | Show Operator → Check dependencies and `/real-vs-sim`. Separate configured key, reachable API, routed model call, and actual call/deposit receipts. Red means unavailable or unverified; say it plainly. |
-| 2:45–3:00 | Presenter | “The renderer is a view. Code owns the money and the record; a passkey owns approvals.” State that the phone → Dana → pay loop is wired and the live phone receipt is still pending A0; invite policy Q&A. Report only actual eval receipt numbers. |
-
-The target §6.2 sequence is live consent/company intake → judge call → Dana
-passkey → pay/reconcile → judge inbox → cited why. Run that pitch only after all
-those paths are connected and rehearsed. The operations script alone does not
-satisfy that acceptance gate. Never present a recording, mock or preview as live.
+receipt and the process-local link lifetime. Use the dated evidence in [Cartesia call tests](t1-cartesia.md) for actual phone results; an echo test or local browser proof is not a completed live call.
 
 ## Backup order and three dress rehearsals
 
@@ -380,13 +447,12 @@ phone by Sun 3 AM. This document does not claim those rehearsals happened.
    contains synthetic state/audit, **no call audio**; pair an actual recorded clip
    with it for the last voice fallback. See `docs/replay-mode.md`.
 2. **GX10 down:** use exported router `route()`'s cloud fallback only after a
-   successful cloud probe/live smoke. Last known OpenRouter response in this
-   task was HTTP 402. A green GX10 `/models` read is not model-quality or fallback
+   successful cloud probe/live smoke. A green GX10 `/models` read is not model-quality or fallback
    proof. Keep OFF for deterministic demo paths when cloud is unavailable; do
    not label OFF as “cloud fallback.” Use the existing real-vs-sim router banner
    where actual router observations exist; no shared GX10 process is stopped.
 3. **3D breaks:** office controls offer fixed/tween camera then **2D plan**;
-   finally show `/audit` alone. Memory mode remains a labeled preview; backend policy
+   finally click **Audit wall** from navigation. Memory mode remains a labeled preview; backend policy
    and the shared audit work without the renderer. Close the 3D tab during the terminal
    proof to demonstrate that rendering grants no authority.
 4. **CRS / Apify / Nessie down:** try live first only in the owning opt-in smoke;
@@ -563,10 +629,7 @@ handler/authentication. The loopback socket is required by the private voice
 bridge; both listeners close together. Local fallback DB binds **100.117.44.20:3341**,
 voice **127.0.0.1:3342**. Startup prints `ss -ltn`; the runner checks each selected
 port before launch. The quick tunnel forwards HTTPS pages and `/_cartesia/*` to
-web. From the Mac, use the printed Tailscale `/office` URL when the DB is local:
-a public HTTPS office cannot subscribe to an insecure private `ws://` DB. Phone
-approval/pay pages use the HTTPS tunnel and server APIs. Maincloud uses WSS and
-makes the public office subscription accessible too.
+web. From the Mac, use the prepared public Office link. The owned host proxies local state subscriptions through its same-origin `__state` bridge; check **State connected** on the judging device. Approval/pay pages use the same HTTPS origin.
 
 If the Maincloud worker has published a **fresh database for this host**, place
 its private settings in `~/work/backroom-judge-host/state.env`:
@@ -613,7 +676,7 @@ directory.
    approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
    credential copy or passkey registration belongs in this minute.
 2. For fresh seeded links, run `pnpm demo:reset` on the **local** standby, then
-   reopen its printed links (the approval stays open for the call, up to five minutes, and closes when the call ends).
+   use its current controller QR and Payment link navigation (the approval stays open for the call, up to five minutes, and closes when the call ends).
 3. When GX10 health recovers, switch back to its saved URLs after a read-only
    health check. Do not stop/restart either origin during a live take.
 
