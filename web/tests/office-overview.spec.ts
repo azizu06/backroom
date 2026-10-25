@@ -84,23 +84,27 @@ async function dragOrbit(page: Page) {
   const y = box!.y + box!.height * 0.65;
   await page.mouse.move(x, y);
   await page.mouse.down();
+  // Drag right to decrease azimuth: home (~0.65) has room toward -0.7.
   await page.mouse.move(x + 200, y, { steps: 20 });
   await page.mouse.up();
-  await expect.poll(async () => Math.abs(Number(await viewport.getAttribute('data-office-azimuth')) - before), { timeout: 10_000 }).toBeGreaterThan(0.3);
+  await expect.poll(async () => before - Number(await viewport.getAttribute('data-office-azimuth')), { timeout: 10_000 }).toBeGreaterThanOrEqual(0.1);
+  const after = Number(await viewport.getAttribute('data-office-azimuth'));
+  expect(after).toBeGreaterThanOrEqual(-0.7);
+  expect(after).toBeLessThanOrEqual(0.9);
 }
 
 test.describe('explicit orbit camera with reduced motion', () => {
   test.use({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 } });
   test.setTimeout(60_000);
 
-  test('selecting Orbit Camera enables a 200 px canvas drag and wheel zoom', async ({ page }) => {
+  test('selecting Orbit Camera enables a 200 px canvas drag and keeps wheel zoom disabled', async ({ page }) => {
     await page.goto('/office?view=overview');
     await page.getByLabel('Office view').selectOption({ label: 'Orbit Camera' });
     await dragOrbit(page);
     const viewport = page.getByTestId('office-viewport');
     const before = Number(await viewport.getAttribute('data-office-zoom'));
     await page.mouse.wheel(0, -400);
-    await expect.poll(async () => Number(await viewport.getAttribute('data-office-zoom')), { timeout: 10_000 }).toBeGreaterThan(before);
+    await expect(viewport).toHaveAttribute('data-office-zoom', String(before));
     await expect(page.locator('.room-inspector')).toHaveCount(0);
   });
 
@@ -145,7 +149,7 @@ test.describe('touch orbit camera', () => {
   test.use({ hasTouch: true, reducedMotion: 'reduce', viewport: { width: 720, height: 1000 } });
   test.setTimeout(60_000);
 
-  test('one finger rotates and a pinch zooms after choosing orbit on a narrow screen', async ({ page, context }) => {
+  test('one finger rotates and pinch zoom stays disabled after choosing orbit on a narrow screen', async ({ page, context }) => {
     await page.goto('/office?view=overview');
     const select = page.getByLabel('Office view');
     await expect(select).toHaveValue('tween');
@@ -163,7 +167,10 @@ test.describe('touch orbit camera', () => {
       await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + step * 20, y, id: 1 }] });
     }
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await expect.poll(async () => Math.abs(Number(await viewport.getAttribute('data-office-azimuth')) - before), { timeout: 10_000 }).toBeGreaterThan(0.3);
+    await expect.poll(async () => before - Number(await viewport.getAttribute('data-office-azimuth')), { timeout: 10_000 }).toBeGreaterThanOrEqual(0.1);
+    const after = Number(await viewport.getAttribute('data-office-azimuth'));
+    expect(after).toBeGreaterThanOrEqual(-0.7);
+    expect(after).toBeLessThanOrEqual(0.9);
     const zoom = Number(await viewport.getAttribute('data-office-zoom'));
     await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x - 40, y, id: 1 }, { x: x + 40, y, id: 2 }] });
     for (let step = 1; step <= 5; step++) {
@@ -171,7 +178,7 @@ test.describe('touch orbit camera', () => {
       await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - spread, y, id: 1 }, { x: x + spread, y, id: 2 }] });
     }
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await expect.poll(async () => Number(await viewport.getAttribute('data-office-zoom')), { timeout: 10_000 }).toBeGreaterThan(zoom);
+    await expect(viewport).toHaveAttribute('data-office-zoom', String(zoom));
     await session.detach();
   });
 });
