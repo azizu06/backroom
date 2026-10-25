@@ -8,6 +8,8 @@ import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, type HandoffAgentId } from '../../
 import { nextChange, type HandoffFrame, type HandoffStage } from '../../../lib/office/handoff-plan';
 import { setHandoffText } from '../../../lib/office/handoff-text';
 import { Bear, createBearRig, poseBear, type BearRig } from '../avatars/Bear';
+import { AgentAnimator } from '../avatars/agentAnimator';
+import { handoffCueKey } from '../../../lib/office/agent-motion';
 
 /** Looks up the HTML tag (name + speech bubble) Office renders for a handoff agent. */
 export type HandoffTagLookup = (actor: HandoffAgentId) => HTMLDivElement | undefined;
@@ -48,6 +50,7 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
   const bodies = useRef(new Map<HandoffAgentId, Group>());
   const humanLegs = useRef<Group | null>(null);
   const rigs = useRef(new Map<HandoffAgentId, BearRig>(FLOOR_AGENTS.map(id => [id, createBearRig()])));
+  const animators = useRef(new Map<HandoffAgentId, AgentAnimator>([...rigs.current].map(([id, rig]) => [id, new AgentAnimator(handoffCueKey(id), id, rig)])));
   const rings = useRef(new Map<HandoffAgentId, Mesh>());
   const human = useRef<Group>(null);
   const folders = useRef<(Group | null)[]>([]);
@@ -65,17 +68,25 @@ export function HandoffLayer({ stage, tag }: { stage: HandoffStage; tag?: Handof
       const body = actor.id === HUMAN ? human.current : bodies.current.get(actor.id);
       if (!body) continue;
       body.position.set(actor.position[0], 0, actor.position[1]);
-      // Standing agents snap to face their partner: no frames are requested while nobody moves, so a turn could stall.
-      if (reduced || !actor.moving) body.rotation.y = actor.heading;
-      else {
-        const turn = MathUtils.euclideanModulo(actor.heading - body.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
-        body.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-      }
       const rig = rigs.current.get(actor.id);
-      if (rig) {
+      const animator = animators.current.get(actor.id);
+      if (rig && animator) {
         rig.carry = carriers.has(actor.id) ? 'front' : 'none';
         poseBear(rig, actor.stride, actor.moving, reduced);
-      } else humanLegs.current?.children.forEach((leg, i) => { leg.rotation.x = legSwing(actor.stride, i, actor.moving, reduced); });
+        // Body turn (requests frames until it settles), head look, walk bob and greet/talk beats.
+        const input = animator.input;
+        input.x = actor.position[0]; input.z = actor.position[1]; input.heading = actor.heading; input.moving = actor.moving;
+        input.stride = actor.stride; input.desk = NaN; input.reduced = reduced;
+        animator.animate(state, delta, body);
+      } else {
+        // Dana snaps to face her partner: no frames are requested while nobody moves, so a turn could stall.
+        if (reduced || !actor.moving) body.rotation.y = actor.heading;
+        else {
+          const turn = MathUtils.euclideanModulo(actor.heading - body.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
+          body.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
+        }
+        humanLegs.current?.children.forEach((leg, i) => { leg.rotation.x = legSwing(actor.stride, i, actor.moving, reduced); });
+      }
       const ring = rings.current.get(actor.id);
       if (ring) {
         ring.visible = actor.returning;

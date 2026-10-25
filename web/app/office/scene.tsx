@@ -22,6 +22,8 @@ import { useBakedLobbyReady } from './mounts/BakedArt';
 import { bakedReplacesPartition } from '../../lib/office/baked-art';
 import { PresenceGhosts } from './PresenceGhosts';
 import { Bear, createBearRig, poseBear } from './avatars/Bear';
+import { useAgentAnimator } from './avatars/agentAnimator';
+import { agentCueKey, deskHeading } from '../../lib/office/agent-motion';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
@@ -63,6 +65,7 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
   const reduced = useReducedMotion();
   const body = useRef<Group>(null);
   const [rig] = useState(createBearRig);
+  const animator = useAgentAnimator(agentCueKey(agent.id), agent.id, rig);
   useFrame((state, delta) => {
     const walk = motion;
     if (paused) return;
@@ -71,9 +74,13 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     if (walk.moving) state.invalidate();
     if (!body.current) return;
     body.current.position.set(walk.position[0], 0, walk.position[1]);
-    const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
-    body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-    poseBear(rig, walk.distance, walk.moving && !tween && !recorded, reduced);
+    const moving = walk.moving && !tween && !recorded;
+    poseBear(rig, walk.distance, moving, reduced);
+    // Body turn, head look, breathing, typing and greet/talk beats (lib/office/agent-motion.ts).
+    const input = animator.input;
+    input.x = walk.position[0]; input.z = walk.position[1]; input.heading = walk.heading; input.moving = moving;
+    input.stride = walk.distance; input.desk = walk.moving ? NaN : deskHeading(agent.seatId, walk.position[0], walk.position[1]); input.reduced = reduced;
+    animator.animate(state, delta, body.current);
   });
   const bakedVersion = useSyncExternalStore(subscribeBakedCharacters, bakedCharacterVersion, () => 0);
   // The character mount sets this only after that agent's GLB clone exists. Otherwise the bear stays.
