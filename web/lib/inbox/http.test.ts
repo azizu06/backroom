@@ -136,6 +136,16 @@ describe('judge inbox HTTP boundary', () => {
     expect(await state.listAudit()).toHaveLength(accepted);
   });
 
+  it('accepts only the demo host declared loopback origin beside the public origin', async () => {
+    const state = new MemoryStateStore();
+    const handler = createInboxHTTP({ store: () => state, origin: () => 'https://demo.example',
+      loopbackOrigin: () => 'http://127.0.0.1:3477',
+      modelRoute: vi.fn().mockResolvedValue({ output: { kind: 'unknown' }, route: 'local', model: 'mock', costUsd: 0, latencyMs: 1 }) });
+    expect((await handler(submission({}, undefined, 'http://127.0.0.1:3477/api/inbox', 'http://127.0.0.1:3477'))).status).toBe(200);
+    expect((await handler(submission({}, undefined, 'http://127.0.0.1:3477/api/inbox', 'http://localhost:3477'))).status).toBe(403);
+    expect((await handler(submission({}, undefined, 'http://127.0.0.1:3477/api/inbox', 'http://127.0.0.1:3478'))).status).toBe(403);
+  });
+
   it('rejects cross-origin, oversized, unsupported and empty submissions without writing audit records', async () => {
     const state = new MemoryStateStore(), handler = createInboxHTTP({ store: () => state });
     const foreign = submission(); foreign.headers.set('origin', 'https://untrusted.example');
