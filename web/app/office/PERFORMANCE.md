@@ -81,3 +81,54 @@ These counts are a source inventory, not new renderer measurements. The planner 
 run the perf overlay and square walkthrough against a build. This checkout registers
 only `lobby.glb`, not a full baked hall; hiding the entire procedural shell on lobby
 readiness would remove the rest of the office, so the existing baked behaviour is retained.
+## Shared-office prop kit (Phase C, 2026-10-25)
+
+`?art=baked` adds the room-relative prop kit. Both the temporary procedural set and
+loaded kit use one InstancedMesh per named node: at most **12 main-camera draws**,
+one shared material and no directional shadow draws. Instance matrices are static;
+the mount does not subscribe to frames or poll. The bake uses one embedded atlas
+capped at **1024 × 1024** and refuses a GLB over **1,500,000 bytes**.
+
+The fallback's floor envelopes match the flag-gated colliders even during a failed
+load. Only a fully validated kit replaces it. The delivered GLB has **12 mesh nodes,
+12 triangle primitives, one material and one embedded PNG**. Counts below come from
+GLB index accessors (`count / 3`), cross-checked against the index data and node
+manifest by `lib/office/propkit-bake.test.ts`. Instance counts come from
+`propkitPlacements(currentPropKitLayout())` for the current 24 × 15 m, three-pod room.
+
+| Node | GLB triangles | Instances | Placed triangles |
+| --- | ---: | ---: | ---: |
+| plant_tall | 260 | 4 | 1,040 |
+| plant_small | 260 | 2 | 520 |
+| bookshelf | 1,500 | 1 | 1,500 |
+| water_cooler | 360 | 1 | 360 |
+| coffee_station | 660 | 1 | 660 |
+| wall_art_a | 300 | 1 | 300 |
+| wall_art_b | 300 | 1 | 300 |
+| floor_lamp | 240 | 1 | 240 |
+| pendant_lamp | 180 | 6 | 1,080 |
+| rug_large | 144 | 3 | 432 |
+| office_tv | 300 | 1 | 300 |
+| arcade | 480 | 1 | 480 |
+| Total | **4,984** | **23** | **7,212** |
+
+**Derived rendering cost: at most 12 main-camera calls before culling**, one per
+instanced node, with zero directional/contact-shadow submissions from the kit.
+These are asset/runtime-derived counts, not a live `renderer.info` measurement.
+The existing moving-Play budget remains **<300 all-pass calls**; a fresh full-scene
+measurement and screenshots are assigned to the planner (no browser server in
+this sandbox).
+
+| Delivered artifact | Measured size | Budget / verification |
+| --- | ---: | --- |
+| propkit.glb | **953,688 bytes** | <=1,500,000 bytes |
+| propkit_lightmap.png | **603,525 bytes** | **1024 × 1024**; <=1024 px per side |
+| propkit.nodes.json | 5,505 bytes | All 12 nodes, bounds, footprints and triangle counts match |
+| propkit.colliders.json | 914 bytes | Seven node-local solid envelopes match runtime placements |
+
+The standalone PNG is byte-identical to the GLB's embedded image. Runtime loads
+only the GLB; the PNG and JSON files are verification artifacts, not extra texture
+requests. Both the GLB and atlas meet their size budgets.
+
+Bake handoff: `tools/bake/propkit.bake.md`. Run evidence and planner screenshot
+placeholders: `docs/evidence/baked-art/propkit-run-notes.md`.

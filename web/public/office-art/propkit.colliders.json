@@ -1,0 +1,55 @@
+{
+  "kit": "propkit",
+  "space": "node-local",
+  "boxes": [
+    {
+      "name": "plant_tall",
+      "minX": -0.4,
+      "maxX": 0.4,
+      "minZ": -0.4,
+      "maxZ": 0.4
+    },
+    {
+      "name": "plant_small",
+      "minX": -0.25,
+      "maxX": 0.25,
+      "minZ": -0.25,
+      "maxZ": 0.25
+    },
+    {
+      "name": "bookshelf",
+      "minX": -0.55,
+      "maxX": 0.55,
+      "minZ": -0.21,
+      "maxZ": 0.21
+    },
+    {
+      "name": "water_cooler",
+      "minX": -0.275,
+      "maxX": 0.275,
+      "minZ": -0.275,
+      "maxZ": 0.275
+    },
+    {
+      "name": "coffee_station",
+      "minX": -0.55,
+      "maxX": 0.55,
+      "minZ": -0.3,
+      "maxZ": 0.3
+    },
+    {
+      "name": "floor_lamp",
+      "minX": -0.25,
+      "maxX": 0.25,
+      "minZ": -0.25,
+      "maxZ": 0.25
+    },
+    {
+      "name": "arcade",
+      "minX": -0.4,
+      "maxX": 0.4,
+      "minZ": -0.4,
+      "maxZ": 0.4
+    }
+  ]
+}
