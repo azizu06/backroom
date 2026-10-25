@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `3e1da0e8121c6517f1ddeb6762ba209890980c4d`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `fa766ca5a4fe97915cbac32d8661254e1a47381b`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -27,6 +27,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | P01 AP withdrawal + reconciliation through the Dispatcher (synthetic bank HTTP, once per invoice) | 1/1 (100%) |
 | P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | 3/3 (100%) |
 | C14 simulated email fallback through the Dispatcher (trusted contact, daily dedupe, no amount or dial) | 1/1 (100%) |
+| C14 demo host call route: signed-in consumer click -> CALL_DENIED -> host planner email preview (queued, duplicate, next day; no dial) | 1/1 (100%) |
 | AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | 10/10 (100%) |
 | Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider, email-only clients get a simulated follow-up with no amount (C11, C13-C16, C22) | 6/6 (100%) |
 | In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: button withheld, 409, no provider attempt) | 7/7 (100%) |
@@ -55,6 +56,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **recovery**: Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.
 - **durableRecovery**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.
 - **emailDispatcher**: Production createRoleRegistry collectionsPlanner role -> Dispatcher -> ClaudeAgentRuntime with scripted QueryFn. Product runCollectionsPlanner invokes the policy-checked email fallback on trusted case data and a shared MemoryEmailOutbox; a second dispatcher case proves invoice/day dedupe. No manual eval invocation of runEmailFollowUp, no network or live delivery. A host must opt into the planner role and supply its trusted contact/outbox; office/UI binding is not measured.
+- **emailHost**: Authenticated createCallRequestHTTP (operator sign-in, seeded consumer scenario) -> production createDemoServices.emailOnlyRefusal pre-call (offline: mock bank, FAKE CRS/Apify) -> CALL_DENIED B2B_ONLY_CALLS -> follow-up hook mapped as in web/lib/demo/runtime.ts -> production createInboxAgents.submitCallRefusal with services.collectionsPlanner -> Dispatcher + ClaudeAgentRuntime (scripted QueryFn) -> MemoryEmailOutbox. The eval pins the dedupe clock and counts voice starts. The Next route module, demo bootstrap install, browser, live host, real email delivery and Cartesia are not executed.
 - **arConversations**: Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.
 - **judgeCalls**: Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, paid_then_invented, invented_then_paid, opt_out. The opt-out control must not escalate.
 - **gx10Failover**: Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.
