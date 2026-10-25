@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bakedArtRequested } from '../../app/office/mounts/BakedArt';
-import { bakedReplacesAuditBoard, bakedReplacesPartition, bakedReplacesProps, withoutHiddenAuditBoard } from './baked-art';
+import { bakedPieceActive, bakedPieceReady, bakedReplacesAuditBoard, bakedReplacesPartition, bakedReplacesProps, setBakedPieceReady, subscribeBakedReady, withoutHiddenAuditBoard } from './baked-art';
 import { officeColliders } from './play';
 
 describe('baked art flag', () => {
@@ -36,5 +36,26 @@ describe('procedural pieces the baked lobby replaces', () => {
     const baked = withoutHiddenAuditBoard(all, true);
     expect(baked.some(board)).toBe(false);
     expect(baked).toHaveLength(all.length - 1);
+  });
+});
+
+describe('baked ready store', () => {
+  it('replaces procedural pieces only when the query is on and the piece is loaded', () => {
+    const calls: number[] = [];
+    const off = subscribeBakedReady(() => calls.push(1));
+    expect(bakedPieceActive('?art=baked', 'lobby')).toBe(false);
+    setBakedPieceReady('lobby', true);
+    expect(bakedPieceReady('lobby')).toBe(true);
+    expect(bakedPieceActive('?art=baked', 'lobby')).toBe(true);
+    expect(bakedPieceActive('', 'lobby')).toBe(false);
+    setBakedPieceReady('lobby', true);
+    expect(calls).toHaveLength(1);
+    setBakedPieceReady('lobby', false);
+    expect(bakedPieceActive('?art=baked', 'lobby')).toBe(false);
+    expect(calls).toHaveLength(2);
+    off();
+    setBakedPieceReady('lobby', true);
+    setBakedPieceReady('lobby', false);
+    expect(calls).toHaveLength(2);
   });
 });

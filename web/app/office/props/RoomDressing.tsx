@@ -10,7 +10,7 @@ import {
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { ROLES } from '../../../lib/office/palette';
 import { bakedReplacesProps } from '../../../lib/office/baked-art';
-import { useBakedArtRequested } from '../mounts/BakedArt';
+import { useBakedLobbyReady } from '../mounts/BakedArt';
 import { deskKitReplaces } from '../../../lib/office/deskkit';
 import { useDeskKitReady } from '../mounts/DeskKit';
 
@@ -69,7 +69,7 @@ const DressingMeshes = memo(function DressingMeshes({ dressing }: { dressing: Dr
 export function RoomDressing({ snapshot }: { snapshot: OfficeSnapshot }) {
   const rooms = visibleRooms(snapshot).join(',');
   // Rebuilt only when the set of visible rooms changes, not on every snapshot.
-  const baked = useBakedArtRequested();
+  const baked = useBakedLobbyReady();
   const kit = useDeskKitReady();
   const dressing = useMemo(() => {
     const all = dressingFor(snapshot);

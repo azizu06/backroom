@@ -16,39 +16,19 @@ try {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
-    const panel = page.getByRole('complementary', { name: 'Real versus simulated disclosure' });
-    await panel.waitFor();
-    await page.getByText('LLM enabled', { exact: false }).waitFor();
+    const pill = page.getByRole('complementary', { name: 'Demo disclosure' });
+    await pill.waitFor();
     await page.locator('canvas').waitFor();
-    // Let the headless GPU paint the office before capturing the disclosure overlay.
+    // Let the headless GPU paint the office before capturing the pill.
     await page.waitForTimeout(800);
-    assert.equal(await panel.locator('li').count(), 10);
-    // At <=760px the panel body starts collapsed; elsewhere it starts expanded. Either way the toggle round-trips.
-    const toggle = panel.getByRole('button', { name: /real versus simulated status/ });
-    const body = page.locator(`[id="${await toggle.getAttribute('aria-controls')}"]`);
-    const assertExpanded = async expanded => {
-      assert.equal(await toggle.getAttribute('aria-expanded'), String(expanded));
-      assert.equal(await body.isVisible(), expanded);
-      assert.equal(await panel.locator('li').filter({ visible: true }).count(), expanded ? 10 : 0);
-    };
-    const startsExpanded = name !== 'mobile';
-    await assertExpanded(startsExpanded);
-    await toggle.click();
-    await assertExpanded(!startsExpanded);
-    await toggle.click();
-    await assertExpanded(startsExpanded);
-    if (!startsExpanded) await toggle.click();
-    await assertExpanded(true);
-    // Narrow office layouts dock the panel below the office, so bring it into view before measuring.
-    await panel.scrollIntoViewIfNeeded();
-    const bounds = await panel.boundingBox();
+    assert.match(await pill.innerText(), /^Demo · synthetic company · (sandbox|mock bank|Nessie sandbox) money/);
+    const bounds = await pill.boundingBox();
     assert(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width && bounds.y + bounds.height <= viewport.height);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: resolve(out, `office-${name}.png`) });
-    await page.getByRole('link', { name: 'Details' }).click();
+    await page.getByRole('navigation', { name: 'Site' }).getByRole('link', { name: 'What’s real' }).click();
     await page.getByRole('heading', { level: 1, name: 'Real vs. simulated' }).waitFor();
-    assert.equal(await page.getByRole('complementary').count(), 1);
-    assert.equal(await page.getByRole('button', { name: /real versus simulated status/ }).count(), 0);
+    assert.equal(await page.getByRole('link', { name: 'What’s real' }).getAttribute('aria-current'), 'page');
     assert.equal(await page.locator('li').filter({ visible: true }).count(), 10);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: resolve(out, `details-${name}.png`), fullPage: true });
@@ -57,6 +37,7 @@ try {
     } }));
     await page.reload();
     await page.getByText('LLM OFF · model work paused', { exact: false }).waitFor();
+    await page.getByRole('complementary', { name: 'Demo disclosure' }).getByText(/· LLM OFF$/).waitFor();
     assert.equal(await page.getByText('LLM OFF', { exact: true }).filter({ visible: true }).count(), 3);
     // Without probe results the other three real services claim nothing.
     assert.equal(await page.getByText('Unverified', { exact: true }).filter({ visible: true }).count(), 3);
@@ -76,12 +57,12 @@ try {
     await setupButton.waitFor();
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     const controlBounds = await setupButton.boundingBox();
-    const disclosureBounds = await page.getByRole('complementary').boundingBox();
+    const disclosureBounds = await page.getByRole('complementary', { name: 'Demo disclosure' }).boundingBox();
     assert(controlBounds.y + controlBounds.height <= disclosureBounds.y);
     await page.goto(`${base}/approve/nonexistent-disclosure-check`);
-    await page.getByRole('complementary').waitFor();
+    await page.getByRole('complementary', { name: 'Demo disclosure' }).waitFor();
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log('PASS: desktop/mobile overlay and Hide/Show toggle, details, OFF and unavailable states; no overflow or page errors.');
+  console.log('PASS: desktop/mobile pill and What’s real link, details, OFF and unavailable states; no overflow or page errors.');
 } finally { await browser.close(); }

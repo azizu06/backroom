@@ -94,7 +94,8 @@ export function createSpacetimeOfficeState(config: OfficeConnectionConfig) {
         } catch { failed(); }
       };
       try {
-        connection = DbConnection.builder().withUri(config.uri).withDatabaseName(config.database).withAutomaticReconnect()
+        // A same-origin path (the demo host's state proxy) resolves against this page's address.
+        connection = DbConnection.builder().withUri(new URL(config.uri, globalThis.location?.href)).withDatabaseName(config.database).withAutomaticReconnect()
           .onConnect(db => {
             if (generation !== current) return;
             applied = false;
