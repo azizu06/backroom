@@ -162,7 +162,8 @@ export async function createDemoRuntime() {
         await state.enqueueTask({ id: `demo:reconcile:${id}`, seatId: 'collections', refs: [invoice.id], idempotencyKey: `ar:${invoice.id}:1`, steps: [] });
         const lease = await state.claimTask(agent, Date.now(), 12000);
         if (!lease) throw new Error('DEMO_RECONCILIATION_LEASE');
-        await service.reconcile(id, state, lease, 'promised');
+        const record = await service.reconcile(id, state, lease, 'promised');
+        if (record.status === 'paid' || record.status === 'partially_paid') services.recordDepositMatch(record.depositId);
         await mirrorFeed();
         await state.completeTask(lease, 'done', Date.now());
       }) });
@@ -176,7 +177,10 @@ export async function createDemoRuntime() {
       const links = call ? call.links.map(row => ({ id: row.id, invoiceId: call.invoiceId, installment: 1 })) : [];
       const decision = selectRecoverableLinkIds(links, prior, links.map(row => row.id));
       for (const skipped of decision.skipped) console.error('demo payment recovery skipped', skipped);
-      await recoverDemoPayments(service, decision.ids, state);
+      // A restored paid record is a stored EXACT_PAYMENT_MATCH receipt whose deposit is still in the bank feed.
+      for (const row of await recoverDemoPayments(service, decision.ids, state)) {
+        if (row.status === 'paid' || row.status === 'partially_paid') services.recordDepositMatch(row.depositId);
+      }
     } catch (error) {
       console.error('demo payment recovery failed', error);
     }

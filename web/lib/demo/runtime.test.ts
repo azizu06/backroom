@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { NessieClient, paymentMemo } from '@backroom/nessie';
 import { getStateStore, MemoryStateStore, PaymentService } from '@backroom/orchestrator';
@@ -156,4 +159,30 @@ it('does not give a new pay link a deposit that already existed for invoice 1042
   const linkId = runtime.status().payPath!.split('/').at(-1)!;
   expect((await getPaymentService().view(linkId)).payment).toBeUndefined();
   expect(logged).toHaveBeenCalledWith('demo payment recovery skipped', { linkId, reason: 'NEW_LINK_EXISTING_DEPOSIT' });
+});
+
+it('turns Nessie Verified from the live sandbox deposit that reconciled as EXACT_PAYMENT_MATCH', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  const claims = mkdtempSync(join(tmpdir(), 'nessie-proof-'));
+  for (const [key, value] of Object.entries({ DEMO_LIVE: '1', DEMO_LLM: 'off', NESSIE_API_KEY: 'private', NESSIE_ACCOUNT_ID: 'sandbox-account',
+    NESSIE_CLAIMS_DIR: claims, PRECALL_APIFY: 'fake', PRECALL_CRS: 'fake', GX10_ENABLED: 'false' })) vi.stubEnv(key, value);
+  const deposits: Record<string, unknown>[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    const { hostname, pathname } = new URL(String(url));
+    if (hostname !== 'prod-api.nessieisreal.com') throw new Error('offline test');
+    if (init?.method === 'POST') {
+      const row = { ...JSON.parse(String(init.body)), _id: 'sandbox-deposit-1', status: 'completed' };
+      deposits.push(row); return Response.json({ objectCreated: row });
+    }
+    return Response.json(pathname.endsWith('/deposits') ? deposits : { balance: 0 });
+  }));
+  try {
+    runtime = await createDemoRuntime();
+    expect(runtime.status().services?.nessie.proof?.kind).toBe('sandbox_read');
+    const linkId = runtime.status().payPath!.split('/').at(-1)!;
+    expect((await getPaymentService().pay(linkId)).status).toBe('partially_paid');
+    expect(runtime.status().services?.nessie.proof).toMatchObject({ kind: 'deposit_exact_match', depositId: 'sandbox-deposit-1' });
+  } finally {
+    vi.unstubAllGlobals(); vi.unstubAllEnvs(); rmSync(claims, { recursive: true, force: true });
+  }
 });
