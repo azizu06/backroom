@@ -1,3 +1,4 @@
+import { flowCaption, flowCase } from '../workday/flow';
 import { handoffAgentName, needsHandoffHuman, type Handoff, type HandoffAgentId } from './handoffs';
 import type { HandoffPlan } from './handoff-plan';
 import type { OfficeSnapshot } from './state';
@@ -18,11 +19,7 @@ const REVIEW: Record<HandoffAgentId, string> = {
 };
 
 /** Only the public display label is eligible; arbitrary case strings and free text are never echoed. */
-export function agentChatCase(row: Handoff): string {
-  const label = row.caseDisplayId.trim();
-  if (/^(?:INV|CASE)-\d{1,12}$/i.test(label) || /^••[\p{L}\p{N}]{1,16}$/u.test(label)) return label;
-  return 'this case';
-}
+export const agentChatCase = flowCase;
 
 export function agentChatMessages(row: Handoff) {
   const subject = agentChatCase(row), receiver = handoffAgentName(row.toRole);
@@ -63,9 +60,9 @@ export function agentChatTimeline(plan: HandoffPlan, source: AgentChatSource): A
     const replyAt = Math.max(start + AGENT_CHAT_MS, row.status === 'rejected' ? start : pass?.end ?? trip.arrive);
     return [
       { actor: trip.courier, phase: 'sender' as const, start, end: start + AGENT_CHAT_MS,
-        text: messages.sender, status: messages.senderStatus, source },
+        text: source === 'Live handoff' ? flowCaption(row) : messages.sender, status: messages.senderStatus, source },
       { actor: trip.receiver, phase: 'reply' as const, start: replyAt, end: replyAt + AGENT_CHAT_MS,
-        text: messages.reply, status: messages.receiverStatus, source },
+        text: source === 'Live handoff' ? flowCaption(row) : messages.reply, status: messages.receiverStatus, source },
     ];
   });
 }

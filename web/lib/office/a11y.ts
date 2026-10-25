@@ -3,7 +3,7 @@ import { OFFICE_ANCHORS, anchorLabel, matchingDenial, type AnchorId, type Office
 export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 export function seatLabel(agent: OfficeAgent): string {
-  return `${agent.name} · ${agent.id}, ${agent.state}${agent.escalationId ? `, escalation folder to ${anchorLabel(agent.targetAnchor)}` : ''}`;
+  return `${agent.name}, ${agent.state}${agent.escalationId ? `, escalation folder to ${anchorLabel(agent.targetAnchor)}` : ''}`;
 }
 
 export function roomLabel(room: AnchorId, snapshot: OfficeSnapshot): string {

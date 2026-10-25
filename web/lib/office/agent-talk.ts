@@ -197,7 +197,7 @@ export function agentTalk(snapshot: OfficeSnapshot, agentId: string): AgentTalk 
   };
   const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
   const last = audit.at(-1);
-  const askWhy = last ? `Why did ${agent.name} (${agent.id}) get ${last.decision} on “${last.summary}”?` : `What has ${agent.name} (${agent.id}) done, and why?`;
+  const askWhy = last ? `Why did ${agent.name} get ${last.decision} on “${last.summary}”?` : `What has ${agent.name} done, and why?`;
   return talk(desk, { name: agent.name, role: anchorLabel(agent.seatId), color, tag: { kind: 'agent', id: agent.id } }, askWhy);
 }
 
