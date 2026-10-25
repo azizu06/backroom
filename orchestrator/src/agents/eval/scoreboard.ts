@@ -199,6 +199,11 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.payables.P01.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}; requires ${key.payables.P01.requiredEvidence.join(', ')}. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ${p01DebitProbe.assessment.verdict} but request_payment returns ${p01DebitProbe.result.status}/${p01DebitProbe.result.verdict} [${p01DebitProbe.result.ruleIds}], with ${p01DebitProbe.mockDebits} debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open.` });
     continue;
   }
+  if (row.id === 'C05' && row.seams.includes('integration:not_executed')) {
+    const run = conversations.find(run => run.scenarioId === 'C05');
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C05.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: ${run?.hostileEvidence?.dedicatedRuleRecorded ?? false}. One spoken de-escalation and provider end-call are not executed; keep the integration gap open.` });
+    continue;
+  }
   if (row.id === 'C21' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C21');
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });

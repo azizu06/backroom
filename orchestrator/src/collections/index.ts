@@ -1,11 +1,12 @@
 import { DEFAULT_POLICY, evaluate, computeEnvelope, type Context, type Decision } from '@backroom/policy';
 import { validateCallPlan, renderCallPlan } from './plan';
 import { boundedHealthCheck, boundedCreditCheck } from './checks';
+import { CallPlannerUnavailableError, sanitizeCallPlannerFailure } from './planner';
 import type { AuditInput } from '../store';
 import type { PreCallInput, PreCallDependencies, PreCallResult } from './types';
 export type * from './types';
 export { createPreCallCreditCheck, createCrsPublicRecordsCheck } from './crs';
-export { createCallPlanner } from './planner';
+export { createCallPlanner, CallPlannerUnavailableError } from './planner';
 export { createCrsCreditCheck, createApifyHealthCheck } from './adapters';
 export { createApifyRunner, createPreCallHealthCheck, APIFY_DEMO_COMPANY } from './apify';
 export { fakeCreditCheck, fakeHealthCheck } from './fakes';
@@ -82,9 +83,18 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   const envelope = computeEnvelope(policy, context.signals?.active);
   await audit('envelope', { inputs: { envelope } });
   const planStarted = now();
-  const draft = await deps.planner.draft({ envelope, preferPlanFirst: !!health?.signals.some(signal => signal.type === 'distress_news' && signal.value), healthCheckPending: !health }).catch(() => undefined);
+  let draft: Awaited<ReturnType<PreCallDependencies['planner']['draft']>> | undefined;
+  let plannerFailure: ReturnType<typeof sanitizeCallPlannerFailure> | undefined;
+  try {
+    draft = await deps.planner.draft({ envelope, preferPlanFirst: !!health?.signals.some(signal => signal.type === 'distress_news' && signal.value), healthCheckPending: !health });
+  } catch (error) {
+    plannerFailure = error instanceof CallPlannerUnavailableError
+      ? error.diagnostic
+      : sanitizeCallPlannerFailure(error, 'planner', 'unknown');
+  }
   if (!draft) {
-    await audit('call_plan', { decision: 'DENY', latencyMs: now() - planStarted, inputs: { reason: 'Call planner unavailable' } });
+    await audit('call_plan', { decision: 'DENY', latencyMs: now() - planStarted,
+      inputs: { reason: 'Call planner unavailable', ...(plannerFailure && { failure: plannerFailure }) } });
     return { status: 'blocked', reason: 'Call planner unavailable' };
   }
   if ('kind' in draft && draft.kind === 'LLM_OFF') {
