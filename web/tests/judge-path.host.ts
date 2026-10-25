@@ -11,6 +11,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createVoiceHandler, VoiceJournal } from '../../orchestrator/src/voice/server';
+import { renderWelcome } from '../../orchestrator/src/voice';
+import { getGatewayStore, handleTool } from '../lib/gateway/runtime';
 
 process.chdir(fileURLToPath(new URL('../', import.meta.url)));
 
@@ -52,24 +55,52 @@ async function main() {
   const app = next({ dev: false, dir: process.cwd(), hostname: '127.0.0.1', port });
   await app.prepare();
   const runtime = await createDemoRuntime();
+  const journal = new VoiceJournal();
+  const voice = createVoiceHandler({ journal, eventSecret: 'judge-local-event', toolSecret: 'judge-local-relay',
+    gatewaySecret: 'judge-local-tool', gateway: handleTool, answerWaitMs: 0, onCallEnded: runtime.endVoiceCall });
   await getStateStore().expireEscalations(Date.now() + 86_400_000);
   // Reuse the trusted bootstrap ports, replacing only the model query and usage ledger.
   const root = globalThis as any;
-  root.backroomInboxAgents = createInboxAgents({ ...root.backroomInboxAgentConfig,
+  const installScriptedAgents = () => { root.backroomInboxAgents = createInboxAgents({ ...root.backroomInboxAgentConfig,
     query, credential: () => 'scripted-no-provider', ledger: new MemoryUsageLedger(),
-    vendor: { publicRecords: async () => ({ bankruptcies: 0, evidenceRef: `crs:sha256:${'b'.repeat(64)}` }) } });
+    vendor: { publicRecords: async () => ({ bankruptcies: 0, evidenceRef: `crs:sha256:${'b'.repeat(64)}` }) } }); };
+  installScriptedAgents();
   const attack = createServer(createAttackDemoListener());
   attack.listen(3050, '127.0.0.1');
   const handle = app.getRequestHandler();
   const server = createServer(async (req, res) => {
-    if (req.url === '/__judge/call' || req.url === '/__judge/end') {
+    if (req.url?.startsWith('/api/voice/')) {
+      let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 8192) { res.writeHead(413).end(); return; } }
+      const headers = new Headers();
+      for (const name of ['authorization', 'x-webhook-secret', 'content-type']) {
+        if (typeof req.headers[name] === 'string') headers.set(name, req.headers[name]);
+      }
+      const result = await voice(new Request(`${origin}${req.url}`, { method: req.method, headers, body: raw }));
+      res.writeHead(result.status, Object.fromEntries(result.headers)); res.end(await result.text()); return;
+    }
+    if (req.url === '/__judge/call' || req.url === '/__judge/end' || req.url === '/__judge/state' || req.url === '/__judge/reset') {
       if (req.method !== 'POST' || req.headers.authorization !== 'Bearer judge-local-tool') { res.writeHead(403).end(); return; }
       try {
         let raw = ''; for await (const chunk of req) { raw += chunk; if (raw.length > 1024) throw new Error('BODY_LIMIT'); }
         const { callId } = JSON.parse(raw);
-        if (req.url.endsWith('/call')) await runtime.registerVoiceCall(callId);
-        else await runtime.endVoiceCall(callId);
-        res.setHeader('Content-Type', 'application/json'); res.end('{"ok":true}');
+        if (req.url.endsWith('/reset')) {
+          await runtime.reset();
+          await getStateStore().expireEscalations(Date.now() + 86_400_000);
+          installScriptedAgents();
+          res.setHeader('Content-Type', 'application/json'); res.end('{"ok":true}'); return;
+        }
+        if (req.url.endsWith('/state')) {
+          const call = await getGatewayStore().transact(callId, row => structuredClone(row));
+          const session = await journal.read(data => data.sessions.find(row => row.id === callId));
+          res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ call, session })); return;
+        }
+        const welcome = renderWelcome({ businessName: 'Northfield Studio', invoiceId: '1042', contactName: 'Jordan' });
+        if (req.url.endsWith('/call')) {
+          await runtime.registerVoiceCall(callId);
+          await journal.register({ id: callId, contactName: 'Jordan', businessName: 'Northfield Studio', callbackNumber: '+12025550100',
+            welcome, nonce: 'judge-first', providerCallId: callId, disclosureComplete: false, stopped: false, deliveries: {} });
+        } else await runtime.endVoiceCall(callId);
+        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: true, welcome, nonce: 'judge-first' }));
       } catch { res.writeHead(500).end(); }
       return;
     }
