@@ -59,7 +59,8 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
   await expect(failure).toBeVisible({ timeout: 20_000 });
   await expect(failure).toContainText('Remit-to ••4821');
   await expect(tag(page, 'extractor')).toHaveAttribute('data-returning', 'true', { timeout: 10_000 });
-  await expect(log(page).locator("li[data-status='rejected']")).toContainText('VENDOR_MISMATCH');
+  // The feed keeps running, so later rejections can already be listed: look for this one rather than the only one.
+  await expect(log(page).locator("li[data-status='rejected']", { hasText: 'VENDOR_MISMATCH' }).first()).toBeVisible();
   await shot(page, 'fail-return');
 
   await expect(page.locator(".handoff-bubble[data-tone='correction']:not([hidden])").first()).toContainText('Correction', { timeout: 20_000 });

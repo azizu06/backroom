@@ -14,7 +14,9 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await page.goto('/office?view=overview');
       const canvas = page.getByTestId('office-viewport').locator('canvas');
       await expect(canvas).toBeVisible();
-      await expect.poll(() => canvas.boundingBox()).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height });
+      await expect(page.getByTestId('office-viewport').getByText('Loading 3D office…')).toHaveCount(0);
+      // The canvas starts at 300 x 150 until the renderer measures its container.
+      await expect.poll(() => canvas.boundingBox(), { timeout: 15_000 }).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height });
       const menu = page.getByRole('button', { name: 'Backroom menu' });
       await expect(menu).toHaveAttribute('aria-expanded', 'false');
       for (const name of ['Office view', 'Overview', 'Enter first person', 'Guide', 'Sound off', 'Office panels']) {
