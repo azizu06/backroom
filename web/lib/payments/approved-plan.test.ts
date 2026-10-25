@@ -82,6 +82,17 @@ describe('a payment link minted after Dana approves the plan', () => {
     await delivered(call, sent);
   });
 
+  it('rounds the live call\'s $742.50 first payment up to $743.00 and pays it through the sandbox bank', async () => {
+    const call = await liveCall();
+    const escalated = await call.tool('propose_plan', { installments: 37, first_payment_pct: 15, duration_days: 0, waive_fee: false, discount_pct: 0 });
+    expect((await call.approve(escalated.escalation_id)).status).toBe(200);
+    const approved = await call.tool('check_approval', { escalation_id: escalated.escalation_id });
+    expect(approved).toMatchObject({ kind: 'ALLOW', plan: { totalCents: 495000, firstPaymentCents: 74300 } });
+    const sent = await call.tool('send_payment_link', { plan_id: approved.plan_id });
+    expect(sent).toMatchObject({ kind: 'RECORDED', amount_cents: 74300, speak: expect.stringContaining('$743.00') });
+    await delivered(call, sent);
+  });
+
   it('still delivers a plan allowed directly by propose_plan', async () => {
     const call = await liveCall();
     const plan = await call.tool('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
@@ -99,7 +110,7 @@ describe('a payment link minted after Dana approves the plan', () => {
     const sent = await call.tool('send_payment_link', { plan_id: approved.plan_id });
     const id = sent.link_path.split('/').pop()!;
     const authorized = async () => authorizedPaymentLink((await call.store.findPaymentCall(id))!, id);
-    expect(await authorized()).toMatchObject({ planId: approved.plan_id, amountCents: 74250 });
+    expect(await authorized()).toMatchObject({ planId: approved.plan_id, amountCents: 74300 });
     await call.store.transact(CALL, c => { c.audits.find(a => a.id === approved.audit_id)!.ruleIds = ['MAX_INSTALLMENTS']; });
     expect(await authorized()).toBeUndefined();
     await call.store.transact(CALL, c => {

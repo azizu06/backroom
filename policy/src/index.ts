@@ -6,6 +6,12 @@ import type { Badge, Action, ActionRequest, Context, Decision, Policy, Plan } fr
 export type * from "./types";
 export { POLICY_SENTENCES, RULE_SENTENCES, type RuleId } from "./sentences";
 
+/** NF-027 first installment. Rounded up to a whole dollar for the integer-only bank, never above the total; later installments absorb the difference. */
+export function firstPaymentCents(totalCents: number, firstPaymentPct: number, installments: number): number {
+  if (installments === 1) return totalCents;
+  return Math.min(totalCents, Math.ceil(Math.round(totalCents * firstPaymentPct / 100) / 100) * 100);
+}
+
 function block(policy: Policy, rule: RuleId, kind: "DENY" | "ESCALATE", message: string): Decision {
   const sentenceId = RULE_SENTENCES[rule];
   const limits = policy.badges.collections.limits;
@@ -87,7 +93,7 @@ export function evaluate(badge: Badge, request: ActionRequest, context: Context)
         return block(policy, "INVALID_INPUT", "DENY", "I need a valid invoice before creating a link.");
       }
       const total = Math.round(invoice.principalCents * (1 - plan.discountPct / 100)) + (plan.waiveFees ? 0 : invoice.lateFeeCents);
-      const first = Math.round(total * plan.firstPaymentPct / 100);
+      const first = firstPaymentCents(total, plan.firstPaymentPct, plan.installments);
       if (!cents(action.amountCents) || action.amountCents !== first || first === 0) {
         return block(policy, "LINK_AMOUNT", "DENY", "This link does not match the approved first installment.");
       }

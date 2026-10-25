@@ -1,4 +1,5 @@
 import type { AuthorizedPaymentLink } from '@backroom/orchestrator';
+import { firstPaymentCents } from '../../../policy/src/index';
 import { DANA_APPROVED } from '../gateway/policy-adapter';
 import type { AuditEntry, GatewayCall } from '../gateway/store';
 
@@ -19,7 +20,7 @@ export function authorizedPaymentLink(call: GatewayCall, id: string, now = Date.
   }
   const total = Math.round(call.receivable.principalCents * (1 - plan.discountPct / 100))
     + (plan.waiveFee ? 0 : call.receivable.lateFeeCents);
-  const first = plan.installments === 1 ? total : Math.round(total * plan.firstPaymentPct / 100);
+  const first = firstPaymentCents(total, plan.firstPaymentPct, plan.installments);
   if (plan.totalCents !== total || plan.firstPaymentCents !== first || link.amountCents !== first) return;
   return { id: link.id, invoiceId: call.invoiceId, planId: plan.id, auditId: audit.id, policyVersion: call.policyVersion,
     installment: 1, amountCents: link.amountCents, totalCents: plan.totalCents, currency: 'USD' };

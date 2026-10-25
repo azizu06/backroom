@@ -46,8 +46,11 @@ describe("Dana's passkey decision unlocks exactly the terms she authorized", () 
     expect(audit).toMatchObject({ kind: "ALLOW", ruleIds: ["MAX_INSTALLMENTS", "DANA_APPROVED"], plan: seven,
       decision: { kind: "ALLOW", escalationId: id } });
     const sent = link(c, approved.plan_id);
-    // NF-027: 15% of principal + late fee, computed by code from the approved terms.
-    expect(sent).toMatchObject({ kind: "RECORDED", amount_cents: Math.round(495000 * 0.15) });
+    // NF-027: 15% of principal + late fee is $742.50, rounded up by code to a whole dollar the sandbox bank accepts.
+    expect(approved).toMatchObject({ plan: { totalCents: 495000, firstPaymentCents: 74300 } });
+    expect(approved.speak).toContain("$743.00");
+    expect(sent).toMatchObject({ kind: "RECORDED", amount_cents: 74300 });
+    expect(sent.speak).toContain("$743.00");
     expect(c.outbox).toEqual([{ type: "send_payment_link", linkId: c.links[0]!.id }]);
     expect(c.escalations).toHaveLength(1);
   });
@@ -58,7 +61,7 @@ describe("Dana's passkey decision unlocks exactly the terms she authorized", () 
     decide(c, id, { kind: "Approve" });
     const allowed = propose(c, seven);
     expectAllowed(allowed, seven);
-    expect(link(c, allowed.plan_id)).toMatchObject({ kind: "RECORDED", amount_cents: 74250 });
+    expect(link(c, allowed.plan_id)).toMatchObject({ kind: "RECORDED", amount_cents: 74300 });
     expect(c.escalations).toHaveLength(1);
   });
 
@@ -79,7 +82,7 @@ describe("Dana's passkey decision unlocks exactly the terms she authorized", () 
     expect(propose(c, seven)).toMatchObject({ kind: "ESCALATE", can_confirm: false });
     const accepted = propose(c, counter);
     expectAllowed(accepted, counter);
-    expect(link(c, accepted.plan_id)).toMatchObject({ kind: "RECORDED", amount_cents: Math.round(495000 * 0.25) });
+    expect(link(c, accepted.plan_id)).toMatchObject({ kind: "RECORDED", amount_cents: 123800 });
   });
 
   it("never turns a policy DENY into ALLOW, and a Deny or an unverified approval authorizes nothing", () => {
