@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "b0511785cae0e4bd7a3368cd5cacaa8fdca38bd5",
+    "baseCommit": "042013fef06b3b9a9d35b612558b09a4ac0562e5",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
@@ -12,7 +12,7 @@
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
-      "orchestrator/src/agents/eval/precall.ts": "ec46ddbf87457c7492518bf6d4a8bf95cefbe834d685b154e747c2e4897f0bee",
+      "orchestrator/src/agents/eval/precall.ts": "0fddff0cf575ab8fe6a81a546037bece950ed80e5eb89c2e9561208ba731f045",
       "orchestrator/src/agents/eval/call-button.ts": "5016f5366709333e75c15c9c489241166a2a7d444996bf51fae39e272b4356c2",
       "orchestrator/src/agents/eval/failover.ts": "9506d421ed7f91396eeed59c0752743a93c7ea887352a3159382d15dc607f36c",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
@@ -21,10 +21,11 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/durable-recovery.ts": "b7ecc566b2d562ec87e4f59ca6c67b7f2c3351b9160c024a6ba7670b2823da35",
       "orchestrator/src/agents/eval/crs-availability.ts": "dfa793bea72fcd7c7dfed0883df179f6b46c112a6c2214a1f854b4e04b965676",
+      "orchestrator/src/agents/eval/email-dispatcher.ts": "0becdf31065ececeff46f8b821347a3b1ecbc4ca6936e816d4f82221047e734d",
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "9ab9f3f472585f262578eeb77e8160ab2beb101a4c69a65f21498c5e2f2ef4e7"
+      "orchestrator/src/agents/eval/scoreboard.ts": "57dfeede90b89796671694af3920e7bc375fe53f2a43f5dbb3ca1917395f78f7"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -36,6 +37,12 @@
     },
     "crsRuntimeSources": {
       "orchestrator/src/collections/crs.ts": "210a1a7e30b6efea4f1e538293eaac8ca189b88955c700962b78f1ccc51fb6e4"
+    },
+    "emailRuntimeSources": {
+      "orchestrator/src/agents/roles/collections.ts": "e26aa0434bc252d798ef0a3f46925d7b0dcfd0f0d3847a2a55a203029cf7570c",
+      "orchestrator/src/agents/tools/collections.ts": "16e409e016232b6fe912cd48019c31c50950f1b349a463ab934837d7ac06921e",
+      "orchestrator/src/agents/roles/index.ts": "fb7cf1078027a0736eae39f646c86c6dcda999aa98c920512b1271aea3030ad9",
+      "orchestrator/src/collections/email.ts": "b73ddcb394b902dd85aa05951bc0c9646208fbe71882ffd6d7cc0e4210842243"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
@@ -73,11 +80,12 @@
     "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.",
     "recovery": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.",
     "durableRecovery": "Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.",
+    "emailDispatcher": "Production createRoleRegistry collectionsPlanner role -> Dispatcher -> ClaudeAgentRuntime with scripted QueryFn. Product runCollectionsPlanner invokes the policy-checked email fallback on trusted case data and a shared MemoryEmailOutbox; a second dispatcher case proves invoice/day dedupe. No manual eval invocation of runEmailFollowUp, no network or live delivery. A host must opt into the planner role and supply its trusted contact/outbox; office/UI binding is not measured.",
     "arConversations": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.",
     "judgeCalls": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, paid_then_invented, invented_then_paid, opt_out. The opt-out control must not escalate.",
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
-    "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
+    "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
     "callButton": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. C13: a client without consent is blocked at pre-call (CONSENT_REQUIRED) and the button request is 409 PRECALL_BLOCKED with no provider attempt; the desk-phone precallGate on the same published evidence withholds Request call with a Blocked reason (a ready pre-call offers it). No network and no Cartesia.",
     "inboxTeam": "Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. That HTTP entry reads DEMO_PUBLIC_URL and rejects a mismatched Origin. Its payables seat is forced to VENDOR_CRS=fake for the request and the previous value is restored, so a live setting cannot replace the lookalike hold or place a CRS call. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
@@ -152,6 +160,11 @@
     "dispatcherMemoryRecovery": {
       "numerator": 3,
       "denominator": 3,
+      "percent": 100
+    },
+    "dispatcherEmailFollowup": {
+      "numerator": 1,
+      "denominator": 1,
       "percent": 100
     },
     "runtimeBadgeIsolation": {
@@ -13189,6 +13202,80 @@
     "networkCalls": 0,
     "scope": "Offline replay of a committed CRS public-records projection through createCrsPublicRecordsCheck; not a new CRS request. Recorded identity #6 has bankruptcy evidence, not OFAC evidence. No identity mapping or live sanctions response for P07 is proved."
   },
+  "emailDispatcher": {
+    "id": "C14",
+    "mode": "consumer",
+    "match": true,
+    "checks": {
+      "dispatcherDone": true,
+      "collectionsRole": true,
+      "onePreview": true,
+      "dailyDedupe": true,
+      "noDial": true,
+      "noAmountOrInvoice": true,
+      "noLinkBeforeIdentity": true,
+      "disclosure": true,
+      "contactPrivate": true,
+      "auditChain": true
+    },
+    "first": {
+      "status": "done",
+      "reason": null,
+      "roles": [
+        "collections"
+      ],
+      "syntheticCostUsd": 0.000001
+    },
+    "repeat": {
+      "status": "done",
+      "reason": null
+    },
+    "providerRequests": 0,
+    "queuedPreviews": 1,
+    "emailAudits": [
+      {
+        "action": "email_followup_queued",
+        "decision": "ALLOW",
+        "ruleIds": [
+          "B2B_ONLY_CALLS"
+        ],
+        "inputs": {
+          "channel": "email",
+          "key": "email:1042:2026-10-27",
+          "label": "SIMULATED: email preview, not sent",
+          "simulated": true,
+          "toDomain": "client.example",
+          "withLink": false
+        }
+      },
+      {
+        "action": "email_followup_duplicate",
+        "decision": "ALLOW",
+        "ruleIds": [
+          "B2B_ONLY_CALLS"
+        ],
+        "inputs": {
+          "channel": "email",
+          "key": "email:1042:2026-10-27",
+          "label": "SIMULATED: email preview, not sent",
+          "simulated": true,
+          "toDomain": "client.example",
+          "withLink": false
+        }
+      }
+    ],
+    "tools": [
+      "collections.get_invoice_context",
+      "collections.can_call",
+      "collections.run_precall",
+      "collections.start_call",
+      "collections.get_invoice_context",
+      "collections.can_call",
+      "collections.run_precall",
+      "collections.start_call"
+    ],
+    "scope": "Production createRoleRegistry collectionsPlanner role -> Dispatcher -> ClaudeAgentRuntime with scripted QueryFn. Product runCollectionsPlanner invokes the policy-checked email fallback on trusted case data and a shared MemoryEmailOutbox; a second dispatcher case proves invoice/day dedupe. No manual eval invocation of runEmailFollowUp, no network or live delivery. A host must opt into the planner role and supply its trusted contact/outbox; office/UI binding is not measured."
+  },
   "durableRecovery": {
     "id": "P11",
     "status": "blocked",
@@ -14872,7 +14959,7 @@
       },
       "directError": "BANKRUPTCY_STOP",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C13",
@@ -14905,7 +14992,7 @@
       },
       "directError": "CONSENT_REQUIRED",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C14",
@@ -14938,7 +15025,7 @@
       },
       "directError": "B2B_ONLY_CALLS",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C15",
@@ -14977,7 +15064,7 @@
       },
       "directError": "OFAC_STOP",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C16",
@@ -15010,7 +15097,7 @@
       },
       "directError": "CLOSED_BUSINESS_STOP",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C22",
@@ -15043,7 +15130,7 @@
       },
       "directError": "CALL_WINDOW",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. A separate direct email-helper probe runs after each refusal: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     }
   ],
   "callButton": {
