@@ -6,11 +6,13 @@ import { visibleRooms } from '../../../lib/office/state';
 import { bakedReplacesAuditBoard } from '../../../lib/office/baked-art';
 import { useBakedLobbyReady } from './BakedArt';
 import { Block } from './shared';
+import { LOBBY_BOARD } from '../../../lib/office/layout';
+import { PAYLINK_KIOSK } from '../../../lib/office/targets/paylink';
 import type { SceneMountProps } from './types';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 /**
- * Lobby audit board (last three decisions) and the inbox counter, which is also the Play payment link kiosk (PAYLINK_KIOSK).
+ * Lobby audit board (last three decisions) and the east-wall inbox counter / Play payment link kiosk.
  * Under ?art=baked in first person the board hides (bakedReplacesAuditBoard); the counter always stays.
  */
 export function LobbyCounter({ snapshot }: SceneMountProps) {
@@ -26,9 +28,11 @@ export function LobbyCounter({ snapshot }: SceneMountProps) {
     return () => { delete host.dataset.lobbyAuditBoard; };
   }, [host, lobby, board]);
   if (!lobby) return null;
-  return <group position={[-5.9, 0, 3.9]}>
+  const [x, z] = LOBBY_BOARD;
+  return <><group position={[x, 0, z]}>
     {board && <Block at={[0, 1.25, 0]} size={[2, 1.45, 0.15]} color={ROLES.frame} />}
-    {board && snapshot.audit.slice(-3).map((row, i) => <Block key={row.id} at={[0, 1.65 - i * 0.35, -0.09]} size={[1.55, 0.09, 0.04]} color={row.decision === 'DENY' ? ROLES.deny : PALETTE.mint} />)}
-    <Block at={[1.5, 0.72, -0.8]} size={[0.8, 0.12, 1]} color={ROLES.desk} />
-  </group>;
+    {board && snapshot.audit.slice(-3).map((row, i) => <Block key={row.id} at={[0, 1.65 - i * 0.35, 0.09]} size={[1.55, 0.09, 0.04]} color={row.decision === 'DENY' ? ROLES.deny : PALETTE.mint} />)}
+  </group>
+  <Block at={[PAYLINK_KIOSK[0], 0.72, PAYLINK_KIOSK[1]]} size={[0.8, 0.12, 1]} color={ROLES.desk} />
+  </>;
 }

@@ -34,3 +34,21 @@ extra directional shadow; their larger casings still do. Existing DPR 1–1.5,
 
 `web/tests/office-perf.spec.ts` checks numeric draw calls and page errors. It was
 added but not run; use the existing office browser suite when ports are available.
+
+## Moving Play budget (bigger office world)
+
+Measured with `web/tests/office-perf-budget.spec.ts` (`/office?perf=1`, 1440 x 1000, headless Chromium,
+walk and turn from the corridor spawn after a 2.5 s warm-up). Draw calls include every pass.
+
+| Moving Play | main (before world) | world, before | world, after |
+| --- | ---: | ---: | ---: |
+| Draw calls per frame (samples) | 296–434 | 319–360 | 87–186 |
+| Frame CPU avg, steady (ms) | ~1.8–3.4 | ~2.4–3.5 | ~2.1–2.5 |
+
+Where the draws went: the contact-shadow depth pass re-rendered every floor-level mesh (~230 draws) on every
+frame, although moving the player changes none of it. `OfficeContactShadows` (ContactShadows.tsx) now bakes the
+static casters once (again only when the visible rooms, baked art or camera change) and redraws per frame only
+the shadow casters wrapped in `ContactDynamic` (avatars, door leaves, handoff walkers, the deny moment, baked
+characters). In first person an avatar whose centre and four sides are all behind walls (`sightBlocked`) is
+hidden, which drops its ~20 meshes from the main, sun-shadow and contact passes. The budget spec fails above
+300 draws.

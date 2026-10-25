@@ -3,7 +3,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { Group } from 'three';
-import { DOOR_DEPTH, DOOR_WIDTH, doorAngle, doorPosition, INTERIOR_DOORS, type DoorId } from '../../../lib/office/doors';
+import { DOOR_DEPTH, DOOR_LEAF_HEIGHT, DOOR_WIDTH, doorAngle, doorPosition, INTERIOR_DOORS, type DoorId } from '../../../lib/office/doors';
 import { interactionStore } from '../../../lib/office/interactions';
 import { OFFICE_ANCHORS, visibleRooms } from '../../../lib/office/state';
 import { useSceneTextNode } from '../props/useSceneTextNode';
@@ -28,10 +28,10 @@ function DoorLeaf({ room }: { room: DoorId }) {
     if (angle !== (open ? -Math.PI / 2 : 0)) state.invalidate();
   });
   return <group ref={pivot} rotation-y={initialAngle.current} name={`door:${room}`} position={[x - DOOR_WIDTH / 2, 0, z]}>
-    <mesh position={[DOOR_WIDTH / 2, 0.52, 0]} castShadow receiveShadow>
-      <boxGeometry args={[DOOR_WIDTH, 1.04, DOOR_DEPTH]} /><meshStandardMaterial color={OFFICE_ANCHORS[room].color} roughness={0.9} />
+    <mesh position={[DOOR_WIDTH / 2, DOOR_LEAF_HEIGHT / 2, 0]} castShadow receiveShadow>
+      <boxGeometry args={[DOOR_WIDTH, DOOR_LEAF_HEIGHT, DOOR_DEPTH]} /><meshStandardMaterial color={OFFICE_ANCHORS[room].color} roughness={0.9} />
     </mesh>
-    {[-1, 1].map(side => <mesh key={side} position={[DOOR_WIDTH - 0.12, 0.57, side * 0.085]}>
+    {[-1, 1].map(side => <mesh key={side} position={[DOOR_WIDTH - 0.12, 1.02, side * 0.085]}>
       <boxGeometry args={[0.12, 0.035, 0.05]} /><meshStandardMaterial color='#f3dfb9' />
     </mesh>)}
   </group>;

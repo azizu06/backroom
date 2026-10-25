@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FLOOR } from './play';
 import {
   CHAT_BUBBLE_MS, CHAT_MAX_LENGTH, CHAT_TTL, PROXIMITY_RADIUS, chatBubbles, createBroadcastChat, nextChatChange, onChatDraft, pruneChat,
   rateLimit, receiveChat, requestChatDraft, sanitizeChatMessage, sanitizeChatText, withinProximity, type ChatEntry, type ChatMessage,
@@ -31,7 +32,7 @@ describe('proximity chat helpers', () => {
     expect(sanitizeChatMessage(message({ at: NOW - CHAT_TTL - 1 }), NOW)).toBeNull();
     expect(sanitizeChatMessage(message({ at: NOW + 10_000 }), NOW)).toBeNull();
     expect(sanitizeChatMessage(null, NOW)).toBeNull();
-    expect(sanitizeChatMessage(message({ x: 99, color: 'red', name: 'N\u0000ame' }), NOW)).toMatchObject({ x: 8, color: '#a9bc8f', name: 'N ame' });
+    expect(sanitizeChatMessage(message({ x: 99, color: 'red', name: 'N\u0000ame' }), NOW)).toMatchObject({ x: FLOOR.maxX, color: '#a9bc8f', name: 'N ame' });
   });
   it('filters by distance, inclusive at the radius', () => {
     expect(withinProximity({ x: 0, z: 0 }, { x: PROXIMITY_RADIUS, z: 0 })).toBe(true);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeAudit, type OfficeDenial, type OfficeSnapshot } from '../state';
-import { DENY_MOMENT_MS, ECHO_OPACITY, ECHO_START, ECHO_WALK, TREASURY_DOOR_INTERACTION, createDenyPose, denyMoment, denyPose } from './treasuryDeny';
+import { DENY_MAX_STEP_MS, DENY_MOMENT_MS, ECHO_OPACITY, pacedDenyAge, ECHO_START, ECHO_WALK, TREASURY_DOOR_INTERACTION, createDenyPose, denyMoment, denyPose } from './treasuryDeny';
 import { ROLES } from '../palette';
 
 const AT = 1_000_000;
@@ -86,6 +86,33 @@ describe('denyPose', () => {
     const out = createDenyPose();
     expect(denyPose(1000, false, out)).toBe(out);
     expect(denyPose(DENY_MOMENT_MS, false, out)).toMatchObject({ pulse: 0, signOpacity: 0, echo: { opacity: 0 } });
+  });
+});
+
+describe('pacedDenyAge', () => {
+  it('starts at the wall-clock age and tracks it at full frame rate', () => {
+    expect(pacedDenyAge(null, 0, 1200)).toBe(1200);
+    expect(pacedDenyAge(null, 0, -50)).toBe(0);
+    let age = pacedDenyAge(null, 0, 0);
+    for (let real = 16; real <= 1600; real += 16) age = pacedDenyAge(age, 16, real);
+    expect(age).toBe(1600);
+  });
+
+  it('caps each slow frame, so ten frames per second play the sign in slow motion but still end', () => {
+    let age = pacedDenyAge(null, 0, 0), real = 0;
+    const atSecond = (seconds: number) => { while (real < seconds * 1000) { real += 100; age = pacedDenyAge(age, 100, real); } return age; };
+    expect(atSecond(1)).toBe(10 * DENY_MAX_STEP_MS);
+    // The sign is still fully shown (denyPose's fade-out starts at 85% of the moment) well after 4 s.
+    expect(denyPose(atSecond(5), false).signOpacity).toBe(1);
+    // Never more than DENY_MOMENT_MS behind: over by twice the moment, then it tracks the wall clock again.
+    expect(atSecond(2 * DENY_MOMENT_MS / 1000)).toBe(DENY_MOMENT_MS);
+    expect(atSecond(2 * DENY_MOMENT_MS / 1000 + 1)).toBe(DENY_MOMENT_MS + 1000);
+  });
+
+  it('never runs ahead of the wall clock, even when that clock steps back', () => {
+    expect(pacedDenyAge(500, 40, 510)).toBe(510);
+    expect(pacedDenyAge(500, -30, 470)).toBe(470);
+    expect(pacedDenyAge(500, 0, 600)).toBe(500);
   });
 });
 

@@ -1,0 +1,5 @@
+/* While the pointer is locked to Play, the view is the game: only the crosshair, the E prompt and the
+   tiny disclosure pill (mark it with data-disclosure) stay; alerts and screen-reader-only text are untouched.
+   Esc releases the lock and everything returns. */
+.office-viewport[data-pointer-locked] .play-hud > :not(.play-surface, .play-crosshair, .play-prompt, [data-disclosure], .play-disclosure, [role='alert'], .visually-hidden),
+.office-viewport[data-pointer-locked] > :not(.play-hud, [data-disclosure], .play-disclosure, [role='alert'], .visually-hidden):not(:has(canvas)) { visibility: hidden; }

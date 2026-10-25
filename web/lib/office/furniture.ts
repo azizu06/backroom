@@ -1,5 +1,6 @@
 import { MONITOR_FACE } from './props/monitors';
 import { OFFICE_ANCHORS } from './state';
+import { roomPoint } from './layout';
 import { DESKS } from './targets/desk';
 import { ROLES } from './palette';
 
@@ -37,4 +38,9 @@ export function deskScreenPiece(room: DeskRoom): FurniturePiece {
     size: [MONITOR_FACE.width + 0.01, MONITOR_FACE.height + 0.01, 0.015], color: ROLES.screenGlow, rotation: [0, 0, 0] };
 }
 
-export const PLANT_SPOTS = [[-7.1, -4.6], [7.1, -4.6], [1.7, 4.5]] as const;
+/** Corner plants: Collections' and the Vendor Desk's back corners, and Dana's front corner. */
+export const PLANT_SPOTS = [
+  roomPoint('collections', -2.1, -1.6), roomPoint('vendor_onboarding', 2.1, -1.6), roomPoint('dana', 1.7, 1.1),
+  // Meeting room's back-east corner, the break room's south-east corner and the corridor's west end.
+  [11.3, -6.8], [11.3, 6.8], [-11.3, 1.0],
+] as const;

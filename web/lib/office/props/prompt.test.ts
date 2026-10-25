@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INTERACT_RANGE, interactCandidates, pickTarget } from '../play';
 import { INBOX_TRAY, INBOX_TRAY_RADIUS, inboxTarget } from '../targets/inbox';
-import { INITIAL_OFFICE } from '../state';
+import { INITIAL_OFFICE, OFFICE_ANCHORS } from '../state';
 import { promptText, reachGap, withinReach } from './prompt';
 
 describe('interaction prompt helper', () => {
@@ -31,7 +31,7 @@ describe('inbox tray Play target', () => {
   it('is picked at the desk end facing it, but the desk wins from the aisle centre', () => {
     const candidates = interactCandidates([], [...rooms]);
     expect(pickTarget([INBOX_TRAY[0], INBOX_TRAY[1] + 0.5], 0, candidates)?.kind).toBe('inbox');
-    expect(pickTarget([0, INBOX_TRAY[1] + 0.4], 0, candidates)?.kind).toBe('desk');
+    expect(pickTarget([OFFICE_ANCHORS.payables.center[0], INBOX_TRAY[1] + 0.4], 0, candidates)?.kind).toBe('desk');
     expect(pickTarget([INBOX_TRAY[0], INBOX_TRAY[1] + 2.5], 0, candidates)).toBeNull();
   });
   it('labels with the count of items in the inbox and lists inbox receipts newest first', () => {

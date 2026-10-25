@@ -1,3 +1,5 @@
+import { LOBBY_BOARD } from './layout';
+
 /** True for `?art=baked`. Pure so it is testable without the scene. */
 export function bakedArtRequested(search: string): boolean {
   return new URLSearchParams(search).get('art') === 'baked';
@@ -26,11 +28,11 @@ export function bakedReplacesPartition(baked: boolean, overview: boolean, x: num
 }
 
 /**
- * The freestanding procedural audit board (LobbyCounter frame at x -5.9, z 3.9, 2 m wide; its deny stamp and glow
+ * The freestanding procedural audit board (LobbyCounter frame at LOBBY_BOARD, 2 m wide; its deny stamp and glow
  * ride on it). In first person under baked art it stands in front of the baked west wall and blocks the window view,
  * while the audit wall mount on that wall shows the same receipts, so it hides there; the overview keeps it.
  */
-export const LOBBY_AUDIT_BOARD = { x: -5.9, z: 3.9, width: 2, depth: 0.15 } as const;
+export const LOBBY_AUDIT_BOARD = { x: LOBBY_BOARD[0], z: LOBBY_BOARD[1], width: 2, depth: 0.15 } as const;
 
 /** True when the baked lobby replaces the procedural audit board (baked art on, first-person walls drawn). */
 export function bakedReplacesAuditBoard(baked: boolean, overview: boolean): boolean {

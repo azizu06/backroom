@@ -7,7 +7,7 @@ import { setBakedTalkingAgent } from '../../lib/office/baked-character';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
-  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
+  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, lookDelta, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { crosshairView } from '../../lib/office/playFeel';
@@ -16,10 +16,15 @@ import { interactionStore } from '../../lib/office/interactions';
 import { playTargetModule } from '../../lib/office/targets';
 import { visibleRooms } from '../../lib/office/state';
 import { InteractPrompt } from './InteractPrompt';
+import { isOverviewKey, playOwnsMoveKeys } from '../../lib/office/overview';
 import { useGamepad } from './useGamepad';
+import { anchorsToAgent, setAnchoredCard } from './hud/diegetic/cardAnchor';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
 import { useHandoffPresentation } from './handoffs/HandoffPresentation';
+import { usePlaySettings } from './immersive/usePlaySettings';
+import { requestPointerLock, usePointerLockChrome } from './immersive/usePointerLock';
+import { useImmersiveAudio } from './immersive/useImmersiveAudio';
 import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
@@ -27,8 +32,8 @@ import { agentCues, cueKeyFor } from '../../lib/office/agent-motion';
 import './play.css';
 import './playfeel.css';
 
-export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
-export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Overview to leave';
+export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · O overview · Esc exit';
+export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
   w: 'forward', arrowup: 'forward', keyw: 'forward', s: 'back', arrowdown: 'back', keys: 'back',
@@ -57,7 +62,9 @@ function releasePointer() {
  * Reuses the lobby's single ask-why entry point; never renders its own or calls /api/why.
  * A question only prefills the field: the viewer still submits it there.
  */
-function focusAskWhy(question?: string) {
+export function focusAskWhy(question?: string) {
+  // The ask-why entry lives in the office panels drawer (closed by default): open it first.
+  window.dispatchEvent(new CustomEvent('office-drawer'));
   const mount = document.querySelector<HTMLElement>("[data-office-mount='ask-why']");
   if (!mount) return;
   mount.scrollIntoView({ block: 'center' });
@@ -69,11 +76,6 @@ function focusAskWhy(question?: string) {
   }
   const field = input ?? mount.querySelector<HTMLElement>('textarea:not([disabled])') ?? mount.querySelector<HTMLElement>('button:not([disabled])');
   field?.focus({ preventScroll: true });
-}
-
-/** localStorage can be missing or throw (private windows, blocked site data). */
-function viewerStorage(): Storage | null {
-  try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
 }
 
 function PlaySettingsDialog({ settings, change, close }: { settings: PlaySettings; change: (next: PlaySettings) => void; close: () => void }) {
@@ -112,7 +114,7 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
   </section>;
 }
 
-function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: (question?: string) => void }) {
+export function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: OfficeSnapshot; target: PlayTarget; close: () => void; askWhy: (question?: string) => void }) {
   const handoffFor = useHandoffPresentation()?.handoffFor;
   const headingId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -122,7 +124,11 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
   if (!panel) return null;
   // Per-kind layout comes from the panel view registry (./panels); kinds without an entry use the defaults.
   const view = PLAY_PANEL_VIEWS[panel.kind] ?? {};
-  return <section className='play-panel' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+  // HUD variant (c): a seated agent's dialog is a speech card the scene pins over that agent (hud/diegetic).
+  const anchored = target.kind === 'agent' && anchorsToAgent(target.kind) ? target.id : null;
+  return <section className={anchored ? 'play-panel diegetic-card' : 'play-panel'} role='dialog' aria-labelledby={headingId} data-target-kind={target.kind}
+    ref={anchored ? element => { setAnchoredCard(element ? { element, agentId: anchored } : null); return () => setAnchoredCard(null); } : undefined}
+    onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <header>{view.ownHeading ? <p id={headingId}><strong>{panel.title}</strong></p> : <h2 id={headingId}>{panel.title}</h2>}<button ref={closeButton} onClick={close} aria-label={`Close ${panel.title}`}>Close</button></header>
@@ -141,16 +147,26 @@ function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot: Office
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lookOnStart = false }: {
-  snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; onHelp?: () => void; chat?: PlayChat;
+export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOverview, chat, lookOnStart = false, keyOwners = { story: false, menu: false } }: {
+  snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; onHelp?: () => void;
+  /** Toggle to the Overview camera (O or the Overview button); absent hides the button. */
+  onOverview?: () => void; chat?: PlayChat;
+  /** Story mode or an Overview menu owning the arrow keys: Play then records no movement or turn input. */
+  keyOwners?: { story: boolean; menu: boolean };
   /** Entered from an explicit Enter click: ask for pointer lock right away (that click is the user gesture). */
   lookOnStart?: boolean;
 }) {
+  const ownsMoveKeys = playOwnsMoveKeys(keyOwners);
+  const ownsMoveKeysRef = useRef(ownsMoveKeys);
+  ownsMoveKeysRef.current = ownsMoveKeys;
+  useEffect(() => { if (!ownsMoveKeys) { input.clear(); requestSceneFrame(); } }, [ownsMoveKeys, input]);
   const touch = useTouch();
   const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
   const handoffFor = useHandoffPresentation()?.handoffFor;
   const [panel, setPanel] = useState<PlayTarget | null>(null);
-  const [settings, setSettings] = useState<PlaySettings>(() => loadPlaySettings(viewerStorage()));
+  const [settings, changeSettings] = usePlaySettings();
+  usePointerLockChrome(hud);
+  useImmersiveAudio(hud, snapshot);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -227,10 +243,6 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
     setSettingsOpen(false);
     hud.current?.focus();
   }
-  function changeSettings(next: PlaySettings) {
-    setSettings(next);
-    savePlaySettings(viewerStorage(), next);
-  }
   function openChat() {
     releaseStick();
     input.clear();
@@ -263,6 +275,13 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
       if (!event.repeat) interact();
       return;
     }
+    if (onOverview && isOverviewKey(event)) {
+      // Stop here: Office's window listener would otherwise see the same O once Overview has rendered.
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) { releasePointer(); onOverview(); }
+      return;
+    }
     if (chat && (event.key === 't' || event.key === 'T')) {
       event.preventDefault();
       if (!event.repeat) openChat();
@@ -270,6 +289,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
     }
     const held = control(event);
     if (!held) return;
+    // Leave the key to its owner (story chapters, an Overview menu) and record nothing.
+    if (!ownsMoveKeysRef.current) return;
     event.preventDefault();
     // A tap (keydown then keyup before the next frame) still has to yaw. Repeats keep turning via turnIntent.
     if (!event.repeat) applyTurnTap(input, held);
@@ -284,11 +305,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
     requestSceneFrame();
   }
   function requestLook(element: HTMLDivElement) {
-    if (touch || locked(element) || typeof element.requestPointerLock !== 'function') return;
-    try {
-      const request = element.requestPointerLock() as unknown;
-      if (request instanceof Promise) request.catch(() => { /* Pointer lock is optional; keys still turn. */ });
-    } catch { /* Unavailable (e.g. sandboxed frame); keys still turn. */ }
+    if (!touch) requestPointerLock(element);
   }
   function onSurfacePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (!touch) return;
@@ -327,7 +344,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
   return <div className='play-hud'>
     <PlayMinimap snapshot={snapshot} hud={hud} />
     <div ref={hud} className='play-surface' tabIndex={0} role='application' data-touch={touch || undefined}
-      aria-label='First-person office. W A S D or arrow keys to move, left and right arrows turn, E to interact, Escape to exit Play.'
+      aria-label='First-person office. W A S D or arrow keys to move, left and right arrows turn, E to interact, O for the overview, Escape to exit Play.'
       onKeyDown={onKeyDown} onKeyUp={onKeyUp} onBlur={() => { input.clear(); requestSceneFrame(); }}
       onClick={event => requestLook(event.currentTarget)}
       onMouseMove={event => {
@@ -339,7 +356,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    <button className='play-exit' onClick={onExit}>Overview</button>
+    {onOverview && <button className='play-overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
+    <button className='play-exit' onClick={onExit}>Exit Play</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>

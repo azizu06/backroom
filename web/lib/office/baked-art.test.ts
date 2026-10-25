@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bakedArtRequested } from '../../app/office/mounts/BakedArt';
-import { bakedPieceActive, bakedPieceReady, bakedReplacesAuditBoard, bakedReplacesPartition, bakedReplacesProps, setBakedPieceReady, subscribeBakedReady, withoutHiddenAuditBoard } from './baked-art';
+import { LOBBY_AUDIT_BOARD, bakedPieceActive, bakedPieceReady, bakedReplacesAuditBoard, bakedReplacesPartition, bakedReplacesProps, setBakedPieceReady, subscribeBakedReady, withoutHiddenAuditBoard } from './baked-art';
 import { officeColliders } from './play';
 
 describe('baked art flag', () => {
@@ -30,7 +30,8 @@ describe('procedural pieces the baked lobby replaces', () => {
     expect(bakedReplacesAuditBoard(true, true)).toBe(false);
     expect(bakedReplacesAuditBoard(true, false)).toBe(true);
     const all = officeColliders(['lobby']);
-    const board = (b: { minX: number; maxZ: number }) => Math.abs(b.minX + 6.9) < 1e-6 && Math.abs(b.maxZ - 3.975) < 1e-6;
+    const { x, z, width, depth } = LOBBY_AUDIT_BOARD;
+    const board = (b: { minX: number; maxZ: number }) => Math.abs(b.minX - (x - width / 2)) < 1e-6 && Math.abs(b.maxZ - (z + depth / 2)) < 1e-6;
     expect(all.some(board)).toBe(true);
     expect(withoutHiddenAuditBoard(all, false)).toEqual(all);
     const baked = withoutHiddenAuditBoard(all, true);

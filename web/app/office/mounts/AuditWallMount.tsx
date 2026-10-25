@@ -63,7 +63,7 @@ function Wall({ snapshot }: SceneMountProps) {
     return () => { delete canvas.dataset.auditWall; canvas.removeAttribute('aria-description'); };
   }, [canvas, text, view.notice]);
   const { width, height, faceWidth, faceHeight, bottom } = AUDIT_WALL;
-  return <group name='mount:audit-wall' position={[AUDIT_WALL.x, 0, AUDIT_WALL.z]} rotation={[0, Math.PI / 2, 0]}>
+  return <group name='mount:audit-wall' position={[AUDIT_WALL.x, 0, AUDIT_WALL.z]} rotation={[0, AUDIT_WALL.rotationY, 0]}>
     <mesh position={[0, bottom + height / 2, 0]} castShadow receiveShadow>
       <boxGeometry args={[width, height, 0.06]} /><meshStandardMaterial color='#303d34' roughness={0.8} />
     </mesh>
@@ -74,7 +74,7 @@ function Wall({ snapshot }: SceneMountProps) {
   </group>;
 }
 
-/** Audit wall on the lobby's west wall: the newest receipts, with their ids, as a canvas texture. View-only. */
+/** Audit wall on the lobby's east wall: the newest receipts, with their ids, as a canvas texture. View-only. */
 export function AuditWallMount({ snapshot }: SceneMountProps) {
   return auditWallVisible(snapshot) ? <Wall snapshot={snapshot} /> : null;
 }

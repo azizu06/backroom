@@ -9,6 +9,8 @@ import { DESKS } from '../../../lib/office/targets/desk';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './StaticGeometry';
 import type { SceneMountProps } from './types';
 import { ROLES } from '../../../lib/office/palette';
+import { deskKitReplaces } from '../../../lib/office/deskkit';
+import { useDeskKitReady } from './DeskKit';
 
 const SCREEN_MATERIAL = new MeshPhysicalMaterial({ color: ROLES.wall, emissive: ROLES.wall, ...OFFICE_LIGHTING.screen });
 // three applies instance colour to the diffuse channel; the original screens also tinted their glow.
@@ -20,16 +22,20 @@ SCREEN_MATERIAL.onBeforeCompile = shader => {
 };
 SCREEN_MATERIAL.customProgramCacheKey = () => 'office-instance-screen-glow-v1';
 
-/** Agent and Dana desks: baked static boxes and one glossy face batch, with unchanged footprints. */
+/**
+ * Agent and Dana desks: baked static boxes and one glossy face batch, with unchanged footprints.
+ * Under ?art=baked with the desk kit loaded, the kit draws the desk, chair and monitor casing; the live screens stay.
+ */
 export function Desks({ snapshot }: SceneMountProps) {
+  const kit = useDeskKitReady();
   const roomsKey = DESKS.filter(room => visibleRooms(snapshot).includes(room)).join(',');
   const { boxes, screens } = useMemo(() => {
     const rooms = DESKS.filter(room => roomsKey.split(',').includes(room));
-    return { boxes: rooms.flatMap(deskPieces), screens: rooms.map(deskScreenPiece) };
-  }, [roomsKey]);
-  if (!boxes.length) return null;
+    return { boxes: rooms.filter(room => !deskKitReplaces(kit, room)).flatMap(deskPieces), screens: rooms.map(deskScreenPiece) };
+  }, [roomsKey, kit]);
+  if (!screens.length) return null;
   return <>
-    <StaticBoxes pieces={boxes} />
+    {boxes.length > 0 && <StaticBoxes pieces={boxes} />}
     <StaticInstances pieces={screens} geometry={UNIT_BOX} material={SCREEN_MATERIAL} castShadow={false} />
   </>;
 }

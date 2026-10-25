@@ -5,6 +5,7 @@ import { OfficeSoundEngine } from '../../lib/office/sound-engine';
 import { OFFICE_SOUND_EVENT, isOfficeCue } from '../../lib/office/sound-events';
 import { cooldownFor, cuesFor, soundPreference, writeSoundPreference, type CueTimes, type OneShotCue } from '../../lib/office/sound';
 import type { OfficeSnapshot } from '../../lib/office/state';
+import { immersiveChannel } from './immersive/channel';
 import './sound.css';
 
 export function SoundToggle({ snapshot }: { snapshot: OfficeSnapshot }) {
@@ -29,6 +30,8 @@ export function SoundToggle({ snapshot }: { snapshot: OfficeSnapshot }) {
     const gesture = (event: MouseEvent) => { if (event.isTrusted && wanted.current) engine.current?.enable(); };
     const cue = (event: Event) => {
       const kind: unknown = (event as CustomEvent<unknown>).detail;
+      // In Play the immersive engine voices footsteps with the floor's timbre.
+      if (kind === 'step' && immersiveChannel.footsteps) return;
       if (isOfficeCue(kind)) play(kind, performance.now());
     };
     window.addEventListener('click', gesture);
