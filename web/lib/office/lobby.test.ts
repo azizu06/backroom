@@ -32,7 +32,7 @@ function expectLobby(html: string) {
   expect(section).toContain('data-office-mount="audit-wall"');
   expect(section).toContain('data-office-mount="audit-wall-live"');
   expect(section).toContain('class="audit-wall"');
-  expect(section).toContain('<h3 id="audit-title">Audit wall</h3>');
+  expect(section).toContain('<h3 id="audit-title">Audit Wall</h3>');
   // No `recording`: the wall polls /api/audit/entries instead of showing a replay.
   expect(section).toContain('Every decision in this run');
   expect(section).toContain('Loading audit records');
@@ -107,7 +107,7 @@ describe('office lobby', () => {
     // The old Guide popover is gone; its steps live in the sidebar's Help sheet.
     expect(html).not.toContain('office-guide-trigger');
     expect(html).toContain('aria-label="Help"');
-    expect(html).toContain('Story mode');
+    expect(html).toContain('Story Mode');
     expect(html).not.toContain('office-drawer');
     expect(html).toContain('role="dialog"');
     expect(html).toContain('/office-chrome.svg#audit');
@@ -204,12 +204,12 @@ describe('office lobby', () => {
       };
       const lobby = render({ onChainChange, showAsk: false, headingLevel: 3 });
       expect(onChainChange).toHaveBeenLastCalledWith(valid);
-      expect(lobby).toContain('<h3 id="audit-title">Audit wall</h3>');
+      expect(lobby).toContain('<h3 id="audit-title">Audit Wall</h3>');
       expect(lobby).toContain('<h4 id="audit-records-title">Recorded actions</h4>');
       expect(lobby).not.toContain('audit-why');
       expect(lobby).not.toContain('Question about a decision');
       const audit = render({});
-      expect(audit).toContain('<h1 id="audit-title">Audit wall</h1>');
+      expect(audit).toContain('<h1 id="audit-title">Audit Wall</h1>');
       expect(audit).toContain('<h2 id="audit-records-title">Recorded actions</h2>');
       expect(audit).toContain('<h2 id="audit-why-title">Ask why</h2>');
       expect(audit).toContain('Question about a decision');

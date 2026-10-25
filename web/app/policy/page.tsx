@@ -56,7 +56,7 @@ export default function PolicyPage() {
     finally { setBusy(false); }
   }
   return <main className={styles.page}><div className={styles.content}>
-    <h1>Owner policy</h1>
+    <h1>Owner Policy</h1>
     <p className={styles.intro}>Set the limits each seat may accept. Requests outside a badge still go to Dana.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}

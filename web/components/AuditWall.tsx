@@ -165,7 +165,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
 
   return <section className="audit-wall" aria-labelledby="audit-title">
     <header className="audit-heading">
-      <div><Heading id="audit-title">Audit wall</Heading>
+      <div><Heading id="audit-title">Audit Wall</Heading>
         <p>{recording ? 'REPLAY · original recorded entries. No actions run.' : 'Every decision in this run: who decided, under which rule, and the outcome.'}</p></div>
       {snapshot && <div className={`audit-chain ${!snapshot.chain.valid ? 'audit-broken' : error ? 'audit-stale' : 'audit-verified'}`} role="status">
         {!snapshot.chain.valid ? `Chain broken · first broken seq ${snapshot.chain.firstBrokenSeq}` : error ? 'Chain status stale' : `${recording ? 'Recorded chain verified' : 'Chain verified'} · ${snapshot.chain.length} entries`}
@@ -206,7 +206,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
         </section>}
       </div>
       <details className="audit-advanced" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}>
-        <summary>Show all entries · {entries.length} recorded, with raw inputs and chain hashes</summary>
+        <summary>Show All Entries · {entries.length} recorded, with raw inputs and chain hashes</summary>
         <div className="audit-workspace">
           <section className="audit-panel audit-records" aria-labelledby="audit-records-title">
             <div className="audit-section-heading"><PanelHeading id="audit-records-title">Recorded actions</PanelHeading><span>{entries.length} total</span></div>
@@ -228,15 +228,15 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
             <div className="audit-section-heading"><PanelHeading id="audit-replay-title">{entry ? `Replay ${entry.id}` : 'Entry replay'}</PanelHeading><span>Read only</span></div>
             {entry ? <>
               <p className="audit-muted">Recorded inputs and evaluation. Replaying this view runs no actions.</p>
-              <dl className="audit-facts"><div><dt>Actor / seat</dt><dd>{entry.actor} / {entry.seat}</dd></div>
-                <div><dt>Action / outcome</dt><dd>{entry.action} / {entry.decision ?? 'No policy outcome recorded'}</dd></div>
-                <div><dt>Route / model</dt><dd>{entry.route} / {typeof entry.inputs?.model === 'string' ? entry.inputs.model : 'No model recorded'}</dd></div>
-                <div><dt>Latency / cost</dt><dd>{entry.latencyMs} ms / ${entry.costUsd.toFixed(6)}</dd></div></dl>
+              <dl className="audit-facts"><div><dt>Actor / Seat</dt><dd>{entry.actor} / {entry.seat}</dd></div>
+                <div><dt>Action / Outcome</dt><dd>{entry.action} / {entry.decision ?? 'No policy outcome recorded'}</dd></div>
+                <div><dt>Route / Model</dt><dd>{entry.route} / {typeof entry.inputs?.model === 'string' ? entry.inputs.model : 'No model recorded'}</dd></div>
+                <div><dt>Latency / Cost</dt><dd>{entry.latencyMs} ms / ${entry.costUsd.toFixed(6)}</dd></div></dl>
               <DetailHeading>Rule evaluation · policy v{entry.policyVersion}</DetailHeading><p className="audit-rules">{entry.ruleIds.join(', ') || 'No rules recorded'}</p>
               {quote && <blockquote>{quote.text}<cite>{quote.sentenceId}{quote.source !== entry.id && <> · recorded in {citation(quote.source, 'quote-source')}</>}</cite></blockquote>}
               <pre aria-label="Recorded rule evaluation">{pretty(entry.inputs?.decision ?? { outcome: entry.decision ?? null, ruleIds: entry.ruleIds })}</pre>
-              <details open><summary>Recorded inputs</summary><pre>{pretty(entry.inputs ?? {})}</pre></details>
-              <details><summary>Evidence and chain hashes</summary><pre>{pretty({ refs: entry.refs, seq: entry.seq, hash: entry.hash, prevHash: entry.prevHash })}</pre></details>
+              <details open><summary>Recorded Inputs</summary><pre>{pretty(entry.inputs ?? {})}</pre></details>
+              <details><summary>Evidence and Chain Hashes</summary><pre>{pretty({ refs: entry.refs, seq: entry.seq, hash: entry.hash, prevHash: entry.prevHash })}</pre></details>
             </> : <p>Select an action to inspect its inputs, rules and outcome.</p>}
           </section>
         </div>

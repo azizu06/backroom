@@ -85,7 +85,7 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
   return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
-    <header><h2 id={headingId}>Play settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
+    <header><h2 id={headingId}>Play Settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
     <label className='play-setting'><span>Look sensitivity <output>{formatMultiplier(settings.sensitivity)}</output></span>
       <input ref={first} aria-label='Look sensitivity' type='range' min={SENSITIVITY_RANGE.min} max={SENSITIVITY_RANGE.max} step={SENSITIVITY_RANGE.step} value={settings.sensitivity}
         onChange={event => change({ ...settings, sensitivity: Number(event.target.value) })} />
@@ -97,7 +97,7 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
     <label className='play-setting play-setting-check'>
       <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked })} /> Invert Y (look)
     </label>
-    <fieldset className='play-setting-group'><legend>Movement feel</legend>
+    <fieldset className='play-setting-group'><legend>Movement Feel</legend>
       <label className='play-setting play-setting-check'>
         <input type='checkbox' checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked })} /> Smooth movement
       </label>

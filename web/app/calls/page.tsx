@@ -35,7 +35,7 @@ export default function CallUnlock() {
     finally { setEmailBusy(false); }
   }
   return <main className={styles.page}><div className={styles.sheet}>
-    <h1>Office calls</h1>
+    <h1>Office Calls</h1>
     <p className={styles.intro}>Press Request call on the office desk phone to ring the approved number. The agent says it is an AI before anything else.</p>
     {/* Shows only while a call's payment link is live, so nobody needs to know /payment-link. */}
     <PaymentLinkPanel title="Payment link ready" payButton idle={false} />
@@ -46,7 +46,7 @@ export default function CallUnlock() {
         <p><button className={styles.primary} disabled={busy || !code}>{busy ? 'Unlocking…' : 'Unlock office calls'}</button></p>
       </form>}
     <section className={styles.section} aria-labelledby="email-only-clients">
-      <h2 id="email-only-clients">Email-only clients</h2>
+      <h2 id="email-only-clients">Email-Only Clients</h2>
       <p className={styles.intro}>Clients that policy never lets us phone. Pre-call checks refuse the request before any dial; the Collections planner may queue one follow-up email per invoice per day. Nothing is sent.</p>
       <div className={styles.actions}>
         {EMAIL_ONLY_CLIENTS.map(row => <button key={row.scenario} type="button" className={styles.secondary} disabled={emailBusy}

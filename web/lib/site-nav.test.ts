@@ -3,7 +3,7 @@ import { isActive, navLinks, siteNavHidden, whatsRealLink } from './site-nav';
 
 describe('site nav', () => {
   it('reaches every product page, with System Status as the small trailing link', () => {
-    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Calls', 'Inbox', 'Audit wall', 'Attack lab', 'Policy', 'Controller', 'Payment link', 'Operator']);
+    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Calls', 'Inbox', 'Audit Wall', 'Attack Lab', 'Policy', 'Controller', 'Payment Link', 'Operator']);
     expect(navLinks.map(link => link.href as string)).not.toContain('/real-vs-sim');
     expect(whatsRealLink).toEqual({ label: 'System Status', href: '/real-vs-sim' });
   });

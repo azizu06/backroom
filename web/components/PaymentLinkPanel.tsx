@@ -3,7 +3,7 @@ import { formatUsd, useActivePaymentLink } from './useActivePaymentLink';
 
 /** Read-only projection. Mount in office/lobby; no server secrets or payment authority.
  * `title` and `payButton` serve in-app pages (/calls, /payment-link); `idle={false}` renders nothing until a link is ready. */
-export default function PaymentLinkPanel({ title = 'Scan to pay', payButton = false, idle = true }: { title?: string; payButton?: boolean; idle?: boolean }) {
+export default function PaymentLinkPanel({ title = 'Scan to Pay', payButton = false, idle = true }: { title?: string; payButton?: boolean; idle?: boolean }) {
   const { link: active, error } = useActivePaymentLink();
   if (!idle && !active) return null;
   return <section aria-label="Call payment link" style={{ boxSizing: "border-box", maxWidth: 360, padding: payButton ? "20px 24px" : "4px 24px 20px", background: "var(--bubble-glass)", color: "var(--ink)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", fontFamily: "var(--font-ui)" }}>

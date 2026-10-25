@@ -66,6 +66,15 @@ const PAGE_ICONS = {
 type PageHref = keyof typeof PAGE_ICONS;
 type DetailSheetId = 'overview' | 'rooms' | 'inbox' | 'audit' | 'help' | PageHref;
 const SIDEBAR_PAGES = [...navLinks.filter(link => link.href in PAGE_ICONS), whatsRealLink] as { label: string; href: PageHref }[];
+const pageLabel = (href: PageHref) => SIDEBAR_PAGES.find(page => page.href === href)?.label ?? href;
+// Seven pages, grouped by the job a person is doing: four sidebar buttons, each a sheet with tabs.
+const SIDEBAR_GROUPS: readonly { id: string; label: string; icon: (typeof PAGE_ICONS)[PageHref]; hint: string; pages: readonly PageHref[] }[] = [
+  { id: 'calls', label: 'Calls', icon: 'collections', hint: 'Place a call and collect the payment', pages: ['/calls', '/payment-link'] },
+  { id: 'approvals', label: 'Approvals', icon: 'controller', hint: 'Dana’s decisions and the limits behind them', pages: ['/controller', '/policy'] },
+  { id: 'attack', label: 'Attack Lab', icon: 'attack', hint: 'Try to trick the agents', pages: ['/attack'] },
+  { id: 'setup', label: 'Setup', icon: 'operator', hint: 'Operator console and system status', pages: ['/operator', '/real-vs-sim'] },
+];
+const groupOf = (href: PageHref) => SIDEBAR_GROUPS.find(group => group.pages.includes(href))!;
 // The sidebar pages open as sheets over the office (same components as their routes), loaded on first open.
 const PAGE_SHEETS: Record<PageHref, ComponentType> = {
   '/calls': dynamic(() => import('../calls/page')),
@@ -378,14 +387,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       </section>}</>);
   const workdayContent = snapshot.connection !== 'replay' && <WorkdayPanel />;
   const handoffContent = (<ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>);
-  const inboxContent = (<>{inboxTray ? <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
+  const inboxContent = (<>{inboxTray ? <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby Inbox Tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section> : <div className='detail-sheet-empty'>
         <p>Receipts on the inbox page are not synced into this scene.</p>
         <a className='detail-sheet-cta' href='/inbox'>Open the inbox</a>
       </div>}</>);
   return <HandoffPresentation value={presentation}><section ref={shellRef} className='office-shell' aria-label='Backroom office' data-fullscreen={fullscreen || undefined} data-office-mode={mode === 'play' ? 'play' : touring || storyActive ? 'tour' : 'overview'} data-connection={snapshot.connection} data-theme={theme} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
-    {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
+    {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio Back Office</h1>}
     <aside className='office-sidebar' aria-label='Office navigation'>
       <a className='office-sidebar-logo' href='/office' aria-label='Backrooms office home'><img src='/icon.png' alt='' /><span>Backrooms</span></a>
       <nav className='room-navigation' aria-label='Office shortcuts'>
@@ -395,10 +404,11 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         <button type='button' aria-pressed={sheet === 'audit'} onClick={() => openSheet('audit')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='audit' /></span>Audit Wall</button>
       </nav>
       <nav className='office-sidebar-links' aria-label='Site pages'>
-        {SIDEBAR_PAGES.map(({ label, href }) => {
-          const ready = href === PAYMENT_LINK_HREF && !!paymentLink;
-          return <button key={href} type='button' aria-haspopup='dialog' aria-pressed={sheet === href} data-href={href} data-ready={ready || undefined} onClick={() => openSheet(href)}>
-            <span className='room-icon' aria-hidden='true'><OfficeChromeIcon name={PAGE_ICONS[href]} /></span>{label}{ready && <span className='office-sidebar-ready'> · ready</span>}
+        {SIDEBAR_GROUPS.map(group => {
+          const ready = group.pages.includes(PAYMENT_LINK_HREF) && !!paymentLink;
+          return <button key={group.id} type='button' aria-haspopup='dialog' aria-pressed={isPageSheet(sheet) && group.pages.includes(sheet)} data-group={group.id} data-ready={ready || undefined}
+            title={group.hint} onClick={() => openSheet(ready ? PAYMENT_LINK_HREF : group.pages[0]!)}>
+            <span className='room-icon' aria-hidden='true'><OfficeChromeIcon name={group.icon} /></span>{group.label}{ready && <span className='office-sidebar-ready'> · Pay Ready</span>}
           </button>;
         })}
       </nav>
@@ -412,14 +422,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       <div className='office-tools'>
         {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Play (First Person)</button>}
         <label htmlFor='office-view'>View {viewPicker('office-view', viewSelect)}</label>
-        <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
+        <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story Mode</button>
         {mode === 'play' && <>
           <button type='button' className='overview-toggle' aria-keyshortcuts='O' onClick={toOverview}>Rooms / Overview</button>
           <button ref={mapButton} type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => { document.exitPointerLock?.(); if (mapOpen) closeMap(); else setMapOpen(true); }}>Map</button>
         </>}
         <OfficeHelp />
         {snapshot.connection !== 'replay' && <StartWorkdayButton />}
-        <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Local state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
+        <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Local State' : snapshot.connection === 'replay' ? 'REPLAY · Recorded State' : snapshot.connection === 'live' ? 'State Connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
@@ -431,19 +441,18 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     <div ref={element => { viewportRef.current = element; viewportBox.current = element; }} className='office-viewport' data-testid='office-viewport' data-overview={overview || undefined}>
       <div className='office-view-controls'>
         <SoundToggle snapshot={snapshot} />
-        <button type='button' className='office-fullscreen-toggle' aria-pressed={fullscreen} aria-label={fullscreen ? 'Exit full screen' : 'Full screen'} title={fullscreen ? 'Exit full screen (Esc)' : 'Full screen'} onClick={toggleFullscreen}>
+        <button type='button' className='office-fullscreen-toggle' aria-pressed={fullscreen} aria-label={fullscreen ? 'Exit Full Screen' : 'Full Screen'} title={fullscreen ? 'Exit Full Screen (Esc)' : 'Full Screen'} onClick={toggleFullscreen}>
           <svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'>
             {fullscreen ? <path d='M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' /> : <path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5' />}
           </svg>
         </button>
       </div>
       {fullscreen && <div className='office-fullscreen-hud' role='group' aria-label='Full screen status'>
-        <button type='button' className='office-fullscreen-exit' onClick={toggleFullscreen}>Exit full screen <kbd>Esc</kbd></button>
         <span className='office-fullscreen-views'>
           <label htmlFor='office-view-fullscreen' className='visually-hidden'>Camera</label>{viewPicker('office-view-fullscreen')}
           {mode === 'play' ? <button type='button' onClick={() => { document.exitPointerLock?.(); chooseView('walk'); }}>Overview</button> : <button type='button' onClick={enterPlay}>Play (First Person)</button>}
         </span>
-        <span className='office-fullscreen-chip'>{snapshot.connection === 'preview' ? 'Local state' : snapshot.connection === 'replay' ? 'REPLAY' : snapshot.connection === 'live' ? 'Live' : `State ${snapshot.connection}`}</span>
+        <span className='office-fullscreen-chip'>{snapshot.connection === 'preview' ? 'Local State' : snapshot.connection === 'replay' ? 'REPLAY' : snapshot.connection === 'live' ? 'Live' : `State ${snapshot.connection}`}</span>
         <button type='button' className='office-fullscreen-chip' onClick={() => openSheet('inbox')}>Inbox · {snapshot.inboxCount}</button>
         {escalations.map(agent => <span key={agent.id} className='office-fullscreen-chip' data-tone='alert'>▱ {agent.name} → {anchorLabel(agent.targetAnchor)}</span>)}
         {paymentLink && <button type='button' className='office-fullscreen-chip' data-tone='ready' onClick={() => openSheet(PAYMENT_LINK_HREF)}>Payment link ready</button>}
@@ -496,11 +505,22 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     </DetailSheet>}
     {isPageSheet(sheet) && (() => {
       const Page = PAGE_SHEETS[sheet];
-      const title = SIDEBAR_PAGES.find(page => page.href === sheet)?.label ?? sheet;
+      const group = groupOf(sheet);
+      const title = pageLabel(sheet);
       const steps = PAGE_STEPS[sheet];
-      return <DetailSheet key={sheet} title={title} icon={PAGE_ICONS[sheet]} size='wide' page={sheet.slice(1)} onClose={closeSheet} href={sheet}>
-        {steps && <ol className='sheet-steps' aria-label='How this works'>{steps.map(step => <li key={step}>{step}</li>)}</ol>}
-        <ViewBoundary name={title} resetKey={sheet} fallback={<p role='status'>{title} could not be displayed here. <a href={sheet}>Open the full page</a>.</p>}><Page /></ViewBoundary>
+      const tabbed = group.pages.length > 1;
+      // Keyed by group: switching tabs keeps the dialog (and focus) instead of reopening it.
+      return <DetailSheet key={group.id} title={group.label} icon={group.icon} size='wide' page={sheet.slice(1)} onClose={closeSheet} href={sheet}>
+        {tabbed && <div className='sheet-tabs' role='tablist' aria-label={group.label}>
+          {group.pages.map(href => <button key={href} type='button' role='tab' id={`sheet-tab-${href.slice(1)}`} aria-selected={href === sheet} aria-controls='sheet-tab-panel'
+            data-ready={(href === PAYMENT_LINK_HREF && !!paymentLink) || undefined} onClick={() => setSheet(href)}>
+            <OfficeChromeIcon name={PAGE_ICONS[href]} />{pageLabel(href)}{href === PAYMENT_LINK_HREF && paymentLink && <span className='office-sidebar-ready'> · Ready</span>}
+          </button>)}
+        </div>}
+        <div id='sheet-tab-panel' className='sheet-tab-panel' role={tabbed ? 'tabpanel' : undefined} aria-labelledby={tabbed ? `sheet-tab-${sheet.slice(1)}` : undefined}>
+          {steps && <ol className='sheet-steps' aria-label='How this works'>{steps.map(step => <li key={step}>{step}</li>)}</ol>}
+          <ViewBoundary name={title} resetKey={sheet} fallback={<p role='status'>{title} could not be displayed here. <a href={sheet}>Open the full page</a>.</p>}><Page /></ViewBoundary>
+        </div>
       </DetailSheet>;
     })()}
     {sheet === 'help' && <DetailSheet title='Help' icon='help' size='wide' page='help' onClose={closeSheet}><HelpSheet /></DetailSheet>}
@@ -522,7 +542,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       const target = event.target as HTMLElement;
       if (isCloseKey(event.key) && !event.defaultPrevented && !target.closest('input, textarea, select, dialog, [role=dialog]')) { event.preventDefault(); closeDrawer(); }
     }}>
-      <header className='office-drawer-head'><h2>Office panels</h2><button type='button' onClick={closeDrawer} aria-label='Close office panels'>Close</button></header>
+      <header className='office-drawer-head'><h2>Office Panels</h2><button type='button' onClick={closeDrawer} aria-label='Close office panels'>Close</button></header>
       {!sheet && <>{seatStatuses}{auditContent}{previewReceipts}{inboxContent}{workdayContent}{handoffContent}</>}
     </footer>}
   </section></HandoffPresentation>;

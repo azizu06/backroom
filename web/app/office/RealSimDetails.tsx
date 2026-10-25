@@ -14,7 +14,7 @@ export function RealSimDetails() {
     <header className='real-sim-tile-head'>
       <div>
         <strong>Info</strong>
-        <span className='real-sim-tile-note'>{status ? (status.llmEnabled ? 'Models on' : 'Models off · model work paused') : 'Live status unavailable'}</span>
+        <span className='real-sim-tile-note'>{status ? (status.llmEnabled ? 'Models On' : 'Models Off · model work paused') : 'Live Status Unavailable'}</span>
       </div>
       <button type='button' className='real-sim-tile-toggle' aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(value => !value)}>
         Details<OfficeChromeIcon name='caret-up' className='real-sim-tile-caret' />
@@ -22,7 +22,7 @@ export function RealSimDetails() {
     </header>
     <div id={bodyId} className='real-sim-tile-body' hidden={!open}>
       {(['real', 'sandbox'] as const).map(kind => <section key={kind} aria-label={kind === 'real' ? 'Live services' : 'Partner services'}>
-        <h3>{kind === 'real' ? 'Live services' : 'Partner services'}</h3>
+        <h3>{kind === 'real' ? 'Live Services' : 'Partner Services'}</h3>
         <ul>{disclosureItems.filter(item => item.kind === kind).map(item => <DisclosureRow key={item.id} item={item} status={status} detailed={false} />)}</ul>
       </section>)}
       <p className='real-sim-tile-foot'><a href='/real-vs-sim'>System Status ↗</a></p>

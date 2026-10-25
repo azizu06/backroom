@@ -51,7 +51,7 @@ export default function Controller() {
   const signedOut = useCallback(() => setSignedIn(false), []);
   if (registered && signedIn) return <Inbox alert={alert.current} onSignedOut={signedOut} />;
   return <main className={styles.page}><div className={styles.sheet}>
-    <h1>Dana’s controller</h1>
+    <h1>Dana’s Controller</h1>
     <p className={styles.intro}>Keep this page open on your phone during the call. Requests from the clerk ring here, and each decision asks you to confirm on your own device.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {registered === undefined ? (error

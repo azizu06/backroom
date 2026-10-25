@@ -13,15 +13,15 @@ export type DisclosureItem = {
 };
 
 export const disclosureItems = [
-  { id: 'phone', kind: 'real', label: 'Phone call', description: 'A real voice connection through Cartesia. Verified from the latest voice webhook receipt written by the call receiver.' },
+  { id: 'phone', kind: 'real', label: 'Phone Call', description: 'A real voice connection through Cartesia. Verified from the latest voice webhook receipt written by the call receiver.' },
   { id: 'claude', kind: 'real', label: 'Claude', description: 'Cloud model for language and judgment. Code controls commitments. Verified from a committed route receipt, or from validated pre-call inference on this host; no paid call is made per page load.' },
-  { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
-  { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run on this host.' },
-  { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
+  { id: 'gx10', kind: 'real', label: 'GX10 Local Model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
+  { id: 'apify', kind: 'real', label: 'Apify Public Data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run on this host.' },
+  { id: 'policy', kind: 'real', label: 'Policy Engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
   { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live database probe; local when the server keeps state in memory.' },
-  { id: 'crs', kind: 'sandbox', label: 'CRS credit checks', description: 'Identity and fraud-risk checks through the CRS partner API.' },
-  { id: 'nessie', kind: 'sandbox', label: 'Nessie bank', description: 'Accounts, deposits and withdrawals through the Capital One Nessie API.' },
-  { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'The pay page posts a Nessie deposit; no card details are collected.' },
+  { id: 'crs', kind: 'sandbox', label: 'CRS Credit Checks', description: 'Identity and fraud-risk checks through the CRS partner API.' },
+  { id: 'nessie', kind: 'sandbox', label: 'Nessie Bank', description: 'Accounts, deposits and withdrawals through the Capital One Nessie API.' },
+  { id: 'card', kind: 'sandbox', label: 'Pay Page Card', description: 'The pay page posts a Nessie deposit; no card details are collected.' },
 ] as const satisfies readonly DisclosureItem[];
 
 /** Services /api/demo-status reports evidence for. Any id it lists in `notProbed` is shown as NOT_PROBED_LABEL. */

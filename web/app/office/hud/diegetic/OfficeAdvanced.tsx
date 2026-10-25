@@ -30,13 +30,13 @@ function Gx10Readout({ replay }: { replay: boolean }) {
     <h3><span className='office-advanced-dot' data-ok={view.connected || undefined} aria-hidden='true' />GX10 · {view.connection}</h3>
     <p className='office-advanced-models'>{view.models}</p>
     <dl>
-      <div><dt>Local share</dt><dd>{view.share}</dd></div>
-      <div><dt>Output / wall time</dt><dd>{view.speed}</dd></div>
-      <div><dt>Request latency</dt><dd>{view.latency}</dd></div>
+      <div><dt>Local Share</dt><dd>{view.share}</dd></div>
+      <div><dt>Output / Wall Time</dt><dd>{view.speed}</dd></div>
+      <div><dt>Request Latency</dt><dd>{view.latency}</dd></div>
       <div><dt>Cloud savings est.</dt><dd>{view.savings}</dd></div>
     </dl>
     <p className='office-advanced-note'>{view.calls}</p>
-    <details><summary>Measurement details</summary>
+    <details><summary>Measurement Details</summary>
       <p>{view.calls}. Last 200 HTTP attempts in this server process; includes retries. Throughput includes queue and prefill; last local response within 60 s.</p>
       <p>{view.estimate}. Estimate uses local token counts and router Anthropic rates; excludes electricity and hardware.</p>
       <p>GPU utilization unavailable: no HTTP exporter configured. Cloud fallbacks may send task input off-site.</p>
@@ -59,7 +59,7 @@ export function OfficeAdvanced({ connection, replay, llm }: { connection: string
         <p className='connection-status' role='status'>{connection}</p>
       </section>
       <section aria-label='Model control'>
-        <h3>Language models</h3>
+        <h3>Language Models</h3>
         {llm}
       </section>
       {open && <Gx10Readout replay={replay} />}

@@ -71,7 +71,7 @@ function SoundToggle({ voice, unlock }: { voice: HandoffVoice; unlock: () => voi
 }
 function HandoffLogView({ rows, reduced, sound }: { rows: readonly Handoff[]; reduced: boolean; sound?: ReactNode }) {
   return <section className='office-audit handoff-log' aria-label='Agent handoffs' data-office-mount='handoffs'>
-    <h2>Agent handoffs <span>{reduced ? 'Reduced motion · listed instead of animated' : 'Folders passed between agent desks'}</span></h2>
+    <h2>Agent Handoffs <span>{reduced ? 'Reduced motion · listed instead of animated' : 'Folders passed between agent desks'}</span></h2>
     {sound}
     {/* The log stays mounted while empty so the first handoff is announced. */}
     {!rows.length && <p>No handoffs yet.</p>}

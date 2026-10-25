@@ -26,11 +26,10 @@ describe('office layout ownership', () => {
     expect(html).not.toContain('class="site-nav"');
     expect(html.match(/class="office-sidebar-links"/g)).toHaveLength(1);
     const sidebar = html.slice(html.indexOf('<aside class="office-sidebar"'), html.indexOf('<div class="office-main"'));
-    // Page links open as sheets over the office instead of routing away.
-    for (const path of ['/calls', '/attack', '/policy', '/controller', '/payment-link', '/operator', '/real-vs-sim']) {
-      expect(sidebar).toContain(`data-href="${path}"`);
-      expect(sidebar).not.toMatch(new RegExp(` href="${path}"`));
-    }
+    // The seven pages are grouped into four task buttons that open tabbed sheets instead of routing away.
+    expect([...sidebar.matchAll(/data-group="([a-z]+)"/g)].map(match => match[1])).toEqual(['calls', 'approvals', 'attack', 'setup']);
+    for (const path of ['/calls', '/attack', '/policy', '/controller', '/payment-link', '/operator', '/real-vs-sim']) expect(sidebar).not.toMatch(new RegExp(` href="${path}"`));
+
     expect(sidebar).toMatch(/<button[^>]*>.*?Inbox · /);
     expect(sidebar).toMatch(/<button[^>]*>.*?Audit Wall<\/button>/);
     expect(sidebar).not.toContain('href="/inbox"');
@@ -43,7 +42,7 @@ describe('office layout ownership', () => {
     // #311 removed the demo disclosure pill.
     expect(html).not.toContain('aria-label="Demo disclosure"');
     expect(html.match(/id="office-view"/g)).toHaveLength(1);
-    expect(html).toContain('Story mode');
+    expect(html).toContain('Story Mode');
     expect(html).toContain('data-office-mode="overview"');
     const topbar = html.slice(html.indexOf('data-testid="office-topbar"'), html.indexOf('data-testid="office-viewport"'));
     expect(topbar).toContain('class="connection-status"');
@@ -54,7 +53,7 @@ describe('office layout ownership', () => {
     expect(html).toContain('<div class="office-topbar-row"><header class="office-toolbar"');
     expect(topbar.slice(0, topbar.indexOf('</header>'))).not.toContain('theme-toggle');
     expect(html).toMatch(/class="office-view-controls"><button[^>]*class="office-sound-toggle"[^>]*aria-label="Sound off"/);
-    expect(html).toContain('aria-label="Full screen"');
+    expect(html).toContain('aria-label="Full Screen"');
     expect(html).not.toContain('data-fullscreen');
     expect(html).toContain('>Play (First Person)</button>');
     const views = html.slice(html.indexOf('id="office-view"'), html.indexOf('</select>', html.indexOf('id="office-view"')));

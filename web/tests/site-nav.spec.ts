@@ -3,8 +3,8 @@ import { navLinks, whatsRealLink } from '../lib/site-nav';
 
 // Every page outside /pay is reached by clicking; nobody types a path.
 const titles: Record<string, string> = {
-  '/calls': 'Office calls', '/inbox': 'Inbox', '/audit': 'Audit wall', '/attack': 'Try to trick the agents', '/policy': 'Owner policy',
-  '/controller': 'Dana’s controller', '/payment-link': 'Call payment link', '/operator': 'Operator console', '/real-vs-sim': 'System status',
+  '/calls': 'Office Calls', '/inbox': 'Inbox', '/audit': 'Audit Wall', '/attack': 'Try to Trick the Agents', '/policy': 'Owner Policy',
+  '/controller': 'Dana’s Controller', '/payment-link': 'Call Payment Link', '/operator': 'Operator Console', '/real-vs-sim': 'System Status',
 };
 const navLink = (page: Page, label: string) => page.getByRole('navigation', { name: 'Site' })
   .getByRole('link', { name: new RegExp(`^${label}( · ready)?$`) });
@@ -35,7 +35,7 @@ test('a live payment link shows on the calls page with a Pay button and lights u
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: {
     code: 'ABCDEF1234', url: 'http://localhost:3031/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr } } }));
   await page.goto('/inbox');
-  await expect(navLink(page, 'Payment link')).toHaveText('Payment link · ready');
+  await expect(navLink(page, 'Payment Link')).toHaveText('Payment Link · ready');
   await navLink(page, 'Calls').click();
   const panel = page.getByRole('region', { name: 'Call payment link' });
   await expect(panel.getByRole('heading', { name: 'Payment link ready' })).toBeVisible();
@@ -48,5 +48,5 @@ test('the calls page stays quiet while no payment link is live', async ({ page }
   await page.goto('/calls');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Office calls');
   await expect(page.getByRole('region', { name: 'Call payment link' })).toHaveCount(0);
-  await expect(navLink(page, 'Payment link')).toHaveText('Payment link');
+  await expect(navLink(page, 'Payment Link')).toHaveText('Payment Link');
 });

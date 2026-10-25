@@ -14,7 +14,7 @@ export function OfficeLobby({ snapshot, focus }: { snapshot: OfficeSnapshot; foc
   return <>
     {/* HUD variant (c): the seat status row above is the one roster; the strip keeps today's counts and the feed. */}
     <div className='office-lobby-v2'><LobbyStats snapshot={snapshot} /><LobbyFeed snapshot={snapshot} /></div>
-    <h2 className='office-lobby-title'>Lobby audit wall <span>Server decision record · read only</span></h2>
+    <h2 className='office-lobby-title'>Lobby Audit Wall <span>Server decision record · read only</span></h2>
     <div className='office-lobby-grid'>
       <div className='office-lobby-wall' data-office-mount='audit-wall-live'><AuditWall onChainChange={setChainValid} showAsk={false} headingLevel={3} /></div>
       <aside className='office-lobby-ask' data-office-mount='ask-why'><AskWhyVoice label='Ask why by voice' disabled={!chainValid}

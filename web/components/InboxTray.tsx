@@ -146,7 +146,7 @@ export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets
         <dl className="inbox-facts">
           <div><dt>Seat</dt><dd>{seatName[receipt.seat]}</dd></div>
           <div><dt>Rule</dt><dd>{receipt.decision.ruleIds.join(', ') || 'None tripped'}</dd></div>
-          {fraudText && <div><dt>CRS fraud score</dt><dd>{fraudText}</dd></div>}
+          {fraudText && <div><dt>CRS Fraud Score</dt><dd>{fraudText}</dd></div>}
           <div><dt>Why</dt><dd>{why}</dd></div>
         </dl>
         <p className="inbox-links">
@@ -155,12 +155,12 @@ export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets
             ? <a href={receipt.approvalHref}>Open Dana’s approval card →</a> : <span>Controller review requested.</span>)}
         </p>
         <details className="inbox-more">
-          <summary>Full receipt</summary>
+          <summary>Full Receipt</summary>
           <dl className="inbox-facts">
-            <div><dt>Scenario source</dt><dd>Custom</dd></div>
+            <div><dt>Scenario Source</dt><dd>Custom</dd></div>
             <div><dt>Extraction</dt><dd>{receipt.extractionSource === 'seed' ? 'Frozen seed fields · code' : receipt.extractionSource === 'model' ? 'Model fields · schema validated' : 'Unrecognized · human review'}</dd></div>
-            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie' : receipt.paymentRail}</dd></div>}
-            {receipt.receiptId && <div><dt>Bank debit</dt><dd>{receipt.receiptId}</dd></div>}
+            {receipt.paymentRail && <div><dt>Payment Rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie' : receipt.paymentRail}</dd></div>}
+            {receipt.receiptId && <div><dt>Bank Debit</dt><dd>{receipt.receiptId}</dd></div>}
             {receipt.reconciliation && <div><dt>Reconciliation</dt><dd>{receipt.reconciliation.match === 'EXACT' ? 'Exact withdrawal match' : 'Mismatch · held for review'}</dd></div>}
           </dl>
           {(held || reason) && <>
@@ -179,9 +179,9 @@ export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets
             {field.kind === 'invoice' ? <>
               <div><dt>Invoice</dt><dd>#{field.invoiceId}</dd></div>
               <div><dt>Amount</dt><dd>{new Intl.NumberFormat('en-US', { style: 'currency', currency: field.currency }).format(field.amountCents / 100)}</dd></div>
-              <div><dt>Purchase order</dt><dd>{field.poId ?? 'None'}</dd></div>
+              <div><dt>Purchase Order</dt><dd>{field.poId ?? 'None'}</dd></div>
             </> : <div><dt>Domain</dt><dd>{field.domain}</dd></div>}
-            <div><dt>Requested account</dt><dd>{field.bankAccountId}</dd></div>
+            <div><dt>Requested Account</dt><dd>{field.bankAccountId}</dd></div>
           </dl> : <p>No validated fields. The input stays held.</p>}
           {receipt.attachment && <>
             <Sub className="inbox-minor">Document</Sub>
@@ -201,7 +201,7 @@ export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets
       </>}
     </section>
     <details className="inbox-advanced">
-      <summary>Advanced: try your own email</summary>
+      <summary>Advanced: Try Your Own Email</summary>
       <form onSubmit={submit} aria-label="Custom scenario">
         <fieldset disabled={busy}>
           <div className="inbox-envelope">

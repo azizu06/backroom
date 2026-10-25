@@ -87,10 +87,10 @@ export function AttackDemoPanel() {
   }
 
   return <section className='attack-panel' aria-labelledby={`${id}-title`}>
-    <header><h1 id={`${id}-title`}>Try to trick the agents</h1>
+    <header><h1 id={`${id}-title`}>Try to Trick the Agents</h1>
       <p>Choose an attack or write a malicious email or invoice. Follow what each agent observes and proposes, then read the server’s policy decision.</p></header>
     <form onSubmit={run}>
-      <fieldset disabled={running} className='attack-presets'><legend>Attack presets</legend>
+      <fieldset disabled={running} className='attack-presets'><legend>Attack Presets</legend>
         {!presets && !presetError && <p role='status'>Loading presets…</p>}
         {presets?.presets.length === 0 && <p>No presets available. Write your own attack below.</p>}
         <div className='attack-chips'>{presets?.presets.map(preset => <button type='button' key={preset.id} aria-pressed={selected === preset.id}
@@ -105,12 +105,12 @@ export function AttackDemoPanel() {
       <p id={`${id}-count`} className='attack-help'>{text.length} / 2,000 characters · Editing a preset runs your custom text.</p>
       <p id={`${id}-hint`} className='attack-help'>Tip: start from a preset and edit it. Plain prose without the invoice line is held as invalid input.</p>
       <details className='attack-format'>
-        <summary>Invoice line format</summary>
+        <summary>Invoice Line Format</summary>
         <p>The intake parser reads exactly one line in this shape (one invoice per line, any surrounding email text is treated as untrusted data):</p>
         <pre><code>{INVOICE_LINE_EXAMPLE}</code></pre>
         <button type='button' onClick={() => { setText(current => current ? `${current}\n${INVOICE_LINE_EXAMPLE}` : INVOICE_LINE_EXAMPLE); setSelected(undefined); }}>Insert example line</button>
       </details>
-      <fieldset className='attack-mode' disabled={running}><legend>Run mode</legend>
+      <fieldset className='attack-mode' disabled={running}><legend>Run Mode</legend>
         <label><input type='radio' name={`${id}-mode`} value='mock' checked={mode === 'mock'} onChange={() => setMode('mock')} /> Scripted</label>
         <label><input type='radio' name={`${id}-mode`} value='live' checked={mode === 'live'} disabled={liveBlocked !== false}
           aria-describedby={`${id}-live-help`} onChange={() => setMode('live')} /> Live</label>
@@ -127,7 +127,7 @@ export function AttackDemoPanel() {
         <p className='attack-help'>Untrusted data</p>
         <p>Sender: {result.senderDomain === 'unknown.invalid' ? 'unknown (your text)' : result.senderDomain}</p>
         {result.liveBlocked && <p>{BLOCKED_HELP}</p>}
-        <h2>Agent trace</h2>
+        <h2>Agent Trace</h2>
         <ol className='attack-trace'>{result.steps.map((step, index) => <li key={index}>
           <h3>{step.role} <span className='attack-execution'>{step.execution === 'live' ? 'live model' : modeLabel(step.execution)}</span></h3>
           <dl><dt>Observed</dt><dd>{step.observed}</dd><dt>Proposed</dt><dd>{step.proposed}</dd>
@@ -139,13 +139,13 @@ export function AttackDemoPanel() {
         </li>)}</ol>
         {result.skippedRoles.length > 0 && <p>Not reached: {result.skippedRoles.join(', ')}</p>}
         <section className='attack-decision' aria-labelledby={`${id}-decision`}>
-          <h2 id={`${id}-decision`}>Final decision: {result.decision.kind}</h2>
+          <h2 id={`${id}-decision`}>Final Decision: {result.decision.kind}</h2>
           <p className='attack-rules'>{result.decision.ruleIds.map((rule, index) => <code key={index}>{rule}</code>)}</p>
           <p>{result.decision.reason}</p><p>Policy version {result.decision.policyVersion}</p>
           {result.decision.quote !== undefined && <blockquote>{typeof result.decision.quote === 'string' ? result.decision.quote
             : <>{result.decision.quote.text}<br /><cite>{result.decision.quote.sentenceId}</cite></>}</blockquote>}
           {result.decision.toHuman !== undefined && <p>Sent to a human: {result.decision.toHuman}</p>}
-          <h3>Rules that fired</h3>
+          <h3>Rules That Fired</h3>
           {result.rules.length ? <ul>{result.rules.map((rule, index) => <li key={index}><code>{rule.id}</code> · {rule.reason}</li>)}</ul>
             : <p>No rules fired.</p>}
           <p className={`attack-money${result.moneyMoved || result.paymentAttempts > 0 ? ' attack-error' : ''}`}
@@ -154,7 +154,7 @@ export function AttackDemoPanel() {
           </p>
           {result.moneyMoved && <p role='alert' className='attack-error'>Unexpected money movement reported. Stop and notify the operator.</p>}
         </section>
-        {result.modelEvidence && <details className='attack-evidence'><summary>Model evidence</summary>
+        {result.modelEvidence && <details className='attack-evidence'><summary>Model Evidence</summary>
           <dl>{Object.entries(result.modelEvidence).map(([key, value]) => <div key={key}><dt>{key}</dt>
             <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd></div>)}</dl>
         </details>}

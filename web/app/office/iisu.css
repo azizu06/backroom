@@ -44,7 +44,7 @@ body:has(.office-shell) {
 
 /* ---------- Sidebar ---------- */
 .office-shell .office-sidebar {
-  flex: 0 0 128px;
+  flex: 0 0 140px;
   min-height: 0;
   max-height: 100%;
   display: flex;
@@ -184,7 +184,7 @@ body:has(.office-shell) {
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 24px 24px 24px 160px;
+  padding: 24px 24px 24px 172px;
   background: rgba(25, 33, 59, 0.22);
   backdrop-filter: blur(4px);
   animation: sheet-fade 0.18s ease-out;
@@ -576,9 +576,9 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 .office-shell .detail-sheet[data-page='operator'] { width: min(860px, 100%); }
 .office-shell .detail-sheet[data-page='attack'] { width: min(960px, 100%); }
 .office-shell .detail-sheet[data-size='wide'] .detail-sheet-body { display: grid; gap: 18px; }
-.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body > main { margin: 0; padding: 0; min-height: 0; max-width: none; background: transparent; }
-.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body > main > div,
-.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body > :is(.attack-panel, .real-sim-page) { width: 100%; max-width: none; margin: 0; padding: 0; }
+.office-shell .detail-sheet[data-size='wide'] :is(.detail-sheet-body, .sheet-tab-panel) > main { margin: 0; padding: 0; min-height: 0; max-width: none; background: transparent; }
+.office-shell .detail-sheet[data-size='wide'] :is(.detail-sheet-body, .sheet-tab-panel) > main > div,
+.office-shell .detail-sheet[data-size='wide'] :is(.detail-sheet-body, .sheet-tab-panel) > :is(.attack-panel, .real-sim-page) { width: 100%; max-width: none; margin: 0; padding: 0; }
 /* The sheet header already names the page; its own h1 stays for screen readers only. */
 .office-shell .detail-sheet[data-size='wide'] .detail-sheet-body h1 { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .office-shell .detail-sheet[data-size='wide'] .detail-sheet-body :is(p[class*='intro'], p[class*='lede'], .real-sim-intro, .attack-panel > header > p) { margin-top: 0; }
@@ -596,11 +596,11 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 .office-shell .detail-sheet-body button:is([class*='primary'], [class*='secondary'], [class*='deny']):not(:disabled):hover { color: #19213B; background: var(--pastel-yellow); }
 .office-shell[data-theme=dark] .detail-sheet-body button[class*='primary']:not(:disabled) { color: #19213B; background: var(--pastel-yellow); border-color: #2E3A63; }
 /* Operator and Policy: the steps strip already says the same thing as the page's intro line. */
-.office-shell .detail-sheet:is([data-page='operator'], [data-page='policy']) .detail-sheet-body > main > div > p:is([class*='lede'], [class*='intro']):first-of-type { display: none; }
+.office-shell .detail-sheet:is([data-page='operator'], [data-page='policy']) .sheet-tab-panel > main > div > p:is([class*='lede'], [class*='intro']):first-of-type { display: none; }
 .office-shell .detail-sheet[data-page='policy'] { width: min(1000px, 100%); }
 .office-shell .detail-sheet[data-page='policy'] [class*='unlockGroup'] { max-width: none; }
 /* Calls: the numbered steps already say how to place a call. */
-.office-shell .detail-sheet[data-page='calls'] .detail-sheet-body > main > div > p[class*='intro']:first-of-type { display: none; }
+.office-shell .detail-sheet[data-page='calls'] .sheet-tab-panel > main > div > p[class*='intro']:first-of-type { display: none; }
 /* How-this-works strip: three numbered bubbles in a row. */
 .office-shell .sheet-steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
 .office-shell .sheet-steps li { counter-increment: step; position: relative; padding: 10px 12px 10px 46px; color: var(--ink); background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 18px; font-size: 13px; line-height: 1.35; }
@@ -648,3 +648,25 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 .office-shell .office-sidebar-links { padding-top: 6px; }
 .office-shell .office-sidebar-help { padding-top: 6px; }
 @media (max-height: 760px) { .office-shell .office-sidebar .room-icon { width: 26px; height: 26px; font-size: 16px; } }
+
+/* ---------- Grouped page sheets: tabs under the header ---------- */
+.office-shell .detail-sheet[data-size='wide'] { transition: width 0.28s cubic-bezier(.22, 1, .36, 1); }
+.office-shell .sheet-tab-panel { display: grid; gap: 18px; }
+.office-shell .sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 5px; background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 999px; justify-self: start; }
+html body .office-shell .detail-sheet .sheet-tabs button[role='tab'] { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; color: var(--ink); background: transparent; border: 0; box-shadow: none; border-radius: 999px; font-size: 14px; font-weight: 800; transform: none; }
+html body .office-shell .detail-sheet .sheet-tabs button[role='tab']:hover { background: #FFFBDD; }
+html body .office-shell .detail-sheet .sheet-tabs button[role='tab'][aria-selected='true'] { color: #19213B; background: var(--pastel-yellow); box-shadow: 0 2px 8px rgba(25, 33, 59, 0.14); }
+.office-shell .sheet-tabs svg { font-size: 18px; }
+.office-shell[data-theme=dark] .sheet-tabs { background: #26315A; border-color: #3B4A7E; }
+@media (prefers-reduced-motion: reduce) { .office-shell .detail-sheet[data-size='wide'] { transition: none; } }
+
+/* Responsive sidebar: the three groups sit together, centred under the logo; spacing and size follow the screen height. */
+.office-shell .office-sidebar { gap: clamp(2px, 0.8vh, 8px); }
+.office-shell .office-sidebar .room-navigation { margin-top: auto; }
+.office-shell .office-sidebar .office-sidebar-links { margin-top: 0; }
+.office-shell .office-sidebar .office-sidebar-help { margin-bottom: auto; }
+.office-shell .office-sidebar :is(.office-sidebar-links, .office-sidebar-help) { padding-top: clamp(6px, 1.4vh, 14px); }
+.office-shell .office-sidebar .room-navigation { padding-bottom: clamp(2px, 0.6vh, 6px); }
+.office-shell .office-sidebar :is(.room-navigation, .office-sidebar-links, .office-sidebar-help) { gap: clamp(1px, 0.5vh, 6px); }
+.office-shell .office-sidebar :is(.room-navigation, .office-sidebar-links, .office-sidebar-help) :is(a, button) { padding: clamp(3px, 0.5vh, 6px) 4px; font-size: 12px; gap: 2px; }
+.office-shell .office-sidebar .room-icon { width: clamp(28px, 4vh, 38px); height: clamp(28px, 4vh, 38px); font-size: clamp(17px, 2.4vh, 22px); }

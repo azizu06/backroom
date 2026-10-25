@@ -30,7 +30,7 @@ export function KeyboardShortcuts({ open, onClose }: { open: boolean; onClose: (
       }
     }}
     onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-      <header><h2 id={headingId}>Keyboard shortcuts</h2><button ref={closeButton} type='button' onClick={onClose}>Close</button></header>
+      <header><h2 id={headingId}>Keyboard Shortcuts</h2><button ref={closeButton} type='button' onClick={onClose}>Close</button></header>
       <dl>{OFFICE_SHORTCUTS.map((shortcut, index) => <div key={`${shortcut.mode}-${index}`}><dt>{shortcut.keys.map((key, keyIndex) => <kbd key={`${key}-${keyIndex}`}>{key}</kbd>)}</dt><dd>{shortcut.action}</dd></div>)}</dl>
   </dialog>;
 }

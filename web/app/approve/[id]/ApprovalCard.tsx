@@ -66,7 +66,7 @@ export default function ApprovalCard({ id, embedded = false }: { id: string; emb
     : row.status === 'pending' ? `Client waiting · ${seconds}s` : `Dana ${row.status === 'counter' ? 'countered' : row.status}`;
   const body = <>
       <p className={styles.status} role="status">{busy ? 'Confirm with your passkey…' : status}</p>
-      {embedded ? <h2 className={styles.cardTitle}>Approval needed</h2> : <h1>{missing ? 'Nothing to review.' : 'Approval needed'}</h1>}
+      {embedded ? <h2 className={styles.cardTitle}>Approval Needed</h2> : <h1>{missing ? 'Nothing to review.' : 'Approval needed'}</h1>}
       {!missing && <p className={styles.intro}>The collections clerk needs your review before agreeing to these terms.</p>}
       {missing ? <section className={styles.result}>
         <h2>This approval link does not match a request.</h2>
@@ -80,21 +80,21 @@ export default function ApprovalCard({ id, embedded = false }: { id: string; emb
           {row.lateFeeCents !== undefined && <span>Includes {money(row.lateFeeCents)} late fee</span>}
         </section>
         <section className={styles.section}>
-          <h2>Requested terms</h2>
+          <h2>Requested Terms</h2>
           {row.requestedTerms ? <>
             <dl className={styles.terms}>
               <div><dt>Payments</dt><dd>{row.requestedTerms.installments}</dd></div>
-              <div><dt>First payment</dt><dd>{row.requestedTerms.firstPaymentPct}%</dd></div>
+              <div><dt>First Payment</dt><dd>{row.requestedTerms.firstPaymentPct}%</dd></div>
               <div><dt>Within</dt><dd>{row.requestedTerms.durationDays} days</dd></div>
             </dl>
             <p className={styles.note}>{row.requestedTerms.waiveFee ? 'Late fee waiver requested' : 'Late fee retained'} · {row.requestedTerms.discountPct}% discount</p>
           </> : <p>Review the evidence below before deciding.</p>}
         </section>
         <section className={styles.section}>
-          <h2>Why the clerk stopped</h2>
+          <h2>Why the Clerk Stopped</h2>
           <div className={styles.rules}>{row.ruleIds.map(rule => <code key={rule}>{rule}</code>)}</div>
           <blockquote>“{row.quote.text}”<cite>{row.quote.sentenceId} · Policy v{row.policyVersion}</cite></blockquote>
-          <details><summary>Evidence references</summary><ul>{row.evidenceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul></details>
+          <details><summary>Evidence References</summary><ul>{row.evidenceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul></details>
         </section>
         {closed ? <section className={styles.result} aria-live="polite">
           <h2>{row.status === 'pending_owner' ? 'Dana will confirm by email today.' : row.status === 'expired' ? 'This request expired.' : 'Your decision is recorded.'}</h2>
@@ -103,7 +103,7 @@ export default function ApprovalCard({ id, embedded = false }: { id: string; emb
         </section> : <section className={styles.section}>
           {!registered && <p className={styles.error}>Dana’s passkey is not set up. <a href="/controller">Set up the controller passkey</a> before reviewing requests.</p>}
           {counter ? <form onSubmit={e => { e.preventDefault(); void decide({ kind: 'Counter', terms: { ...terms, waiveFee: false, discountPct: 0 } }); }}>
-            <h2>Your counteroffer</h2>
+            <h2>Your Counteroffer</h2>
             <div className={styles.fields}>
               <label>Payments<input type="number" min="1" max="100" required value={terms.installments} onChange={e => setTerms({ ...terms, installments: Number(e.target.value) })} /></label>
               <label>First payment (%)<input type="number" min="0" max="100" required value={terms.firstPaymentPct} onChange={e => setTerms({ ...terms, firstPaymentPct: Number(e.target.value) })} /></label>

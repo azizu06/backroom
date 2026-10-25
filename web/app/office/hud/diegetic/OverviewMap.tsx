@@ -54,7 +54,7 @@ export function OverviewMap({ snapshot, motions, open, onPick, onFirstPerson, on
     if (isCloseKey(event.key) && !event.defaultPrevented && !(event.target as HTMLElement).closest('[role=menu]')) { event.preventDefault(); onClose(); }
   }}>
     <header className='overview-map-head'>
-      <div><h2 id={headingId}>Office overview</h2><p>Click a room or a person: go there in first person, or talk.</p></div>
+      <div><h2 id={headingId}>Office Overview</h2><p>Click a room or a person: go there in first person, or talk.</p></div>
       <div className='overview-map-actions'>
         <button type='button' className='overview-map-fp' aria-keyshortcuts='O' onClick={onFirstPerson}>First person <kbd>O</kbd></button>
         <button type='button' onClick={onClose} aria-label='Close overview'>Close <kbd>Esc</kbd></button>
