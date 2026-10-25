@@ -28,7 +28,8 @@ test.describe('Overview touch control', () => {
     await select.selectOption({ label: 'Play (first person)' });
     await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
     await page.getByRole('button', { name: /^Overview/ }).tap();
-    await expect(select).toHaveValue('walk');
+    // At 390px the overview keeps the fixed camera it started with (Office.tsx prefers orbit only above 760px).
+    await expect(select).toHaveValue('tween');
     await expect(page.getByRole('region', { name: 'Office overview' })).toBeVisible();
     await expect(page.getByRole('application', { name: /First-person office/ })).toHaveCount(0);
   });

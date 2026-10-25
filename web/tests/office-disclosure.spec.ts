@@ -20,7 +20,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     test('stays visible and uncovered across office views and overlays', async ({ page }) => {
       await page.goto('/office?view=overview');
       const select = page.getByLabel('Office view');
-      await expect(select).toHaveValue('walk');
+      // Narrow screens keep the fixed overview camera (tween); wide screens prefer the orbit camera (walk).
+      await expect(select).toHaveValue(viewport.width <= 760 ? 'tween' : 'walk');
       await expectDisclosureUncovered(page);
 
       // O enters first person; O again opens the 2D map over the 3D overview.
