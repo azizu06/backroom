@@ -9,7 +9,7 @@ import styles from './operator.module.css';
 type Receipt = { result?: unknown; error?: string; auditHref?: string; requestId?: string };
 type Links = { approvePath?: string; stateStore?: string; bank?: string; llmEnabled?: boolean; publicUrl?: string };
 type X402Receipt = { rail: string; note?: string; scenario: string; status: string; reason?: string; replay?: boolean; vendor?: string; invoiceId?: string; amount?: string;
-  asset?: string; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string }; transaction?: string; explorer?: string;
+  asset?: string; payer?: string; walletLabel?: string; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string }; transaction?: string; explorer?: string;
   holdId?: string; proof?: { vendorRequests: number; signatures: number }; paymentAuditHref?: string };
 const isX402 = (value: unknown): value is X402Receipt => !!value && typeof value === 'object' && 'rail' in value && typeof value.rail === 'string' && value.rail.startsWith('x402');
 // The in-process rail's server label and note predate the console's wording; show it as the offline rail.
@@ -23,6 +23,7 @@ function X402Summary({ receipt }: { receipt: X402Receipt }) {
     <dt>Status</dt><dd>{receipt.status}{receipt.replay ? ' (replay of the earlier receipt; nothing paid again)' : ''}{receipt.reason && ` · ${receipt.reason}`}</dd>
     {receipt.amount && <><dt>Amount</dt><dd>{receipt.amount} · {asset} · {receipt.vendor} invoice {receipt.invoiceId}</dd></>}
     {receipt.recipient && <><dt>Recipient</dt><dd><code>{receipt.recipient}</code> (approved vendor-master wallet)</dd></>}
+    {receipt.walletLabel && receipt.payer && <><dt>Wallet</dt><dd>{receipt.walletLabel} · <code>{receipt.payer}</code></dd></>}
     {receipt.policy && <><dt>Policy</dt><dd>{receipt.policy.decision}{receipt.policy.ruleIds.length ? ` · ${receipt.policy.ruleIds.join(', ')}` : ''}{receipt.policy.reason && ` · ${receipt.policy.reason}`}</dd></>}
     {receipt.proof && <><dt>Signing</dt><dd>{receipt.proof.signatures} signature{receipt.proof.signatures === 1 ? '' : 's'} · {receipt.proof.vendorRequests} vendor request{receipt.proof.vendorRequests === 1 ? '' : 's'}</dd></>}
     {receipt.transaction && <><dt>Transaction</dt><dd>{receipt.explorer ? <a href={receipt.explorer} target='_blank' rel='noreferrer'>View on Base Sepolia basescan</a>

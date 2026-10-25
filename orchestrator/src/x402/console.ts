@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createPublicClient, erc20Abi, http, verifyTypedData } from 'viem';
-import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import type { ClientEvmSigner } from '@x402/evm';
 import { baseSepolia } from 'viem/chains';
 import { authorizationTypes } from '@x402/evm';
 import type { FacilitatorClient } from '@x402/core/server';
@@ -8,7 +9,8 @@ import type { StateStore } from '../store';
 import { MemoryFinanceRepository, PayablesSeat } from '../payables';
 import type { InvoiceFields, SeatResult } from '../payables/types';
 import { X402_LABEL, X402_NETWORK, X402_SIMULATED_LABEL, X402_USDC, x402Payables, type Transfer, type X402Label } from './index';
-import { testnetAccount, testnetKeyPresent } from './keychain';
+import { testnetAccount, testnetKeyPresent, cdpCredentialsPresent } from './keychain';
+import { loadTestnetWallet, type WalletLabel } from './cdp';
 import { startTestnetVendor } from './vendor';
 
 export type X402ConsoleRun = 'simulated' | 'testnet' | 'blocked';
@@ -17,7 +19,7 @@ type ConsoleState = Pick<StateStore, 'appendAudit' | 'getEscalation' | 'expireEs
 export interface X402ConsoleResult {
   rail: X402Label; note?: string; scenario: X402ConsoleRun; status: SeatResult['status'] | 'unavailable'; reason?: string; failed?: true;
   replay?: boolean; vendor?: string; invoiceId?: string; amount?: string; amountCents?: number; asset?: string; network?: string;
-  payer?: string; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string };
+  payer?: string; walletLabel?: WalletLabel; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string };
   transaction?: string; explorer?: string; holdId?: string; proof?: { vendorRequests: number; signatures: number };
   paymentAuditHref?: string; auditEntryIds?: string[];
 }
@@ -26,17 +28,19 @@ const lower = (value: string) => value.toLowerCase();
 const usd = (cents: number) => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const NOTES: Record<X402Label, string> = {
   [X402_SIMULATED_LABEL]: 'Simulated money: in-process mock vendor and facilitator on loopback. No Keychain key, chain or internet.',
-  [X402_LABEL]: 'Base Sepolia testnet: worthless test USDC from the Circle faucet. Not real money.',
+  [X402_LABEL]: 'Base Sepolia testnet: worthless test USDC. Not real money.',
 };
 
 /** Testnet stays off unless the host opted in AND the macOS Keychain wallet exists. Never reads a secret. */
 export function x402TestnetAvailability(env: Record<string, string | undefined> = process.env,
-  platform: NodeJS.Platform = process.platform, keyPresent = testnetKeyPresent) {
+  platform: NodeJS.Platform = process.platform, keyPresent = testnetKeyPresent, cdpPresent = cdpCredentialsPresent) {
   if (root.backroomX402TestnetResult) return { available: false, reason: 'Already paid this session', lastResult: structuredClone(root.backroomX402TestnetResult) };
   if (env.X402_LIVE !== '1') return { available: false, reason: 'Testnet is off. Host opt-in requires X402_LIVE=1. OFFLINE is available.' };
   if (platform !== 'darwin') return { available: false, reason: `Testnet needs the macOS Keychain signer; this host is ${platform}. OFFLINE is available.` };
-  if (!keyPresent('payer') || !keyPresent('vendor')) return { available: false,
-    reason: 'No x402 testnet wallet in Keychain. Run pnpm --filter @backroom/orchestrator x402:wallet and fund the payer at faucet.circle.com.' };
+  if (!keyPresent('vendor')) return { available: false,
+    reason: 'UNAVAILABLE: no vendor wallet in Keychain. Run pnpm --filter @backroom/orchestrator x402:wallet.' };
+  if (!cdpPresent() && !(env.X402_ALLOW_DIRECT_KEY === '1' && keyPresent('payer'))) return { available: false,
+    reason: 'UNAVAILABLE: CDP needs Keychain items backroom-cdp-api-key and backroom-cdp-wallet-secret. Direct fallback requires X402_ALLOW_DIRECT_KEY=1 and x402:wallet.' };
   return { available: true as const };
 }
 
@@ -73,19 +77,24 @@ function seed(invoice: InvoiceFields, accountId: string) {
  * carries only public addresses, hashes and audit ids. `simulated`/`blocked` never load a Keychain key.
  */
 export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, options: {
-  env?: Record<string, string | undefined>; platform?: NodeJS.Platform; keyPresent?: typeof testnetKeyPresent;
+  env?: Record<string, string | undefined>; platform?: NodeJS.Platform; keyPresent?: typeof testnetKeyPresent; cdpPresent?: typeof cdpCredentialsPresent;
   /** Tests only: observe the simulated signer. */ simulatedKey?: () => `0x${string}`;
 } = {}): Promise<X402ConsoleResult> {
   if (run === 'testnet' && root.backroomX402TestnetResult) return { ...structuredClone(root.backroomX402TestnetResult), replay: true };
   const label = run === 'testnet' ? X402_LABEL : X402_SIMULATED_LABEL;
   if (run === 'testnet') {
-    const gate = x402TestnetAvailability(options.env, options.platform, options.keyPresent);
+    const gate = x402TestnetAvailability(options.env, options.platform, options.keyPresent, options.cdpPresent);
     if (!gate.available) return { rail: label, scenario: run, status: 'unavailable', reason: gate.reason, failed: true as const };
   }
   const tag = randomUUID().slice(0, 8);
   const amountCents = run === 'testnet' ? 1 : run === 'blocked' ? 245_000 : 125_000;
-  let payer: Pick<PrivateKeyAccount, 'address' | 'signTypedData'>, recipient: `0x${string}`;
-  if (run === 'testnet') { payer = testnetAccount('payer'); recipient = testnetAccount('vendor').address; }
+  let payer: ClientEvmSigner & { walletLabel?: WalletLabel }, recipient: `0x${string}`;
+  if (run === 'testnet') {
+    try { payer = await loadTestnetWallet(options.env); }
+    catch { return { rail: label, scenario: run, status: 'unavailable', failed: true,
+      reason: 'UNAVAILABLE: CDP wallet or faucet setup failed. Check Keychain credentials; no payment signed.' }; }
+    recipient = testnetAccount('vendor').address;
+  }
   else { payer = privateKeyToAccount((options.simulatedKey ?? generatePrivateKey)()); recipient = privateKeyToAccount(generatePrivateKey()).address; }
   const accountId = `x402:${X402_NETWORK}:${recipient}`;
   const invoiceId = run === 'testnet' ? 'acme-x402-inapp-1' : `acme-x402-${run}-${tag}`;
@@ -99,7 +108,7 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
     getEscalation: id => state.getEscalation(id), expireEscalations: (now, callId) => state.expireEscalations(now, callId), getPolicy: () => state.getPolicy(),
   };
   let vendorRequests = 0, signatures = 0;
-  const signer = () => ({ address: payer.address,
+  const signer = () => ({ address: payer.address, walletLabel: payer.walletLabel,
     signTypedData: ((...args: Parameters<typeof payer.signTypedData>) => { signatures++; return payer.signTypedData(...args); }) as typeof payer.signTypedData });
   const prior = await repository.getInvoice(VENDOR_ID, invoiceId);
   const replay = !!prior?.paymentAttempted;
@@ -113,10 +122,12 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
   const facilitator = run === 'testnet' ? undefined : mockFacilitator();
   // Blocked and replay runs start no vendor: zero network work is part of the proof.
   const vendor = run === 'blocked' || replay ? undefined
-    : await startTestnetVendor({ id: invoiceId, amountCents, payTo: recipient }, { port: 0, facilitator, label });
+    : await startTestnetVendor({ id: invoiceId, amountCents, payTo: recipient }, { port: 0, facilitator, label,
+      ...(run === 'testnet' ? { maxTimeoutSeconds: 600 } : {}) });
   let result: SeatResult;
   try {
     const client = x402Payables({ repository, state: recorded, label, signer,
+      ...(run === 'testnet' ? { maxAuthorizationSeconds: 600 } : {}),
       vendorOrigin: vendor?.origin ?? 'http://127.0.0.1:9', // Unused: a blocked invoice never reaches the adapter.
       fetch: (url, init) => { vendorRequests++; return fetch(url, init); },
       ...(run === 'testnet' ? {} : { confirm: async (transfer: Transfer) => {
@@ -132,7 +143,7 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
   const receipt: X402ConsoleResult = {
     rail: label, note: NOTES[label], scenario: run, status: result.status, replay,
     vendor: VENDOR, invoiceId, amount: usd(amountCents), amountCents, asset: run === 'testnet' ? 'Base Sepolia test USDC' : 'simulated USDC',
-    network: X402_NETWORK, payer: payer.address, recipient,
+    network: X402_NETWORK, payer: payer.address, walletLabel: payer.walletLabel, recipient,
     policy: { decision: result.decision.kind, ruleIds: result.decision.ruleIds,
       ...('reason' in result.decision && typeof result.decision.reason === 'string' ? { reason: result.decision.reason } : {}) },
     transaction: paid ? result.receiptId : undefined,

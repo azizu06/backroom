@@ -39,7 +39,9 @@ describe('operator console x402 runs', () => {
     expect(await runX402Console('testnet', state, { env: {}, keyPresent })).toMatchObject({ rail: 'x402 testnet', status: 'unavailable', failed: true });
     expect(await state.listAudit()).toEqual([]);
     expect(x402TestnetAvailability({ X402_LIVE: '1' }, 'darwin', () => false).reason).toContain('x402:wallet');
-    expect(x402TestnetAvailability({ X402_LIVE: '1' }, 'darwin', () => true)).toEqual({ available: true });
+    expect(x402TestnetAvailability({ X402_LIVE: '1' }, 'darwin', () => true, () => true)).toEqual({ available: true });
+    expect(x402TestnetAvailability({ X402_LIVE: '1' }, 'darwin', () => true, () => false)).toMatchObject({ available: false, reason: expect.stringContaining('UNAVAILABLE') });
+    expect(x402TestnetAvailability({ X402_LIVE: '1', X402_ALLOW_DIRECT_KEY: '1' }, 'darwin', () => true, () => false)).toEqual({ available: true });
   });
 });
 
