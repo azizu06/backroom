@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { managedConfig, provisionVoice, VOICEMAIL_MESSAGE, voiceTools, webhookTool } from './tools';
+import { APPROVAL_HOLD_MS, managedConfig, provisionVoice, TOOL_TIMEOUT_SECS, VOICEMAIL_MESSAGE, voiceTools, webhookTool } from './tools';
 
 it('provisions all nine real gateway schemas with hidden IDs and nonce assignments', async () => {
   const bodies: { path: string; method?: string; body: Record<string, any> }[] = [];
@@ -63,6 +63,21 @@ it('configures voicemail, hold requests and edge-case behavior without leaking a
     'say plainly that you are an AI assistant', 'Rudeness alone is not an opt-out or a dispute', 'No voice approval ever counts.']) {
     expect(config.instructions).toContain(line);
   }
+});
+
+it('keeps the line up while Dana reviews and lets the relay pace the approval checks', () => {
+  const config = managedConfig(['tool']);
+  // Cartesia's documented maximum; 120 s hung up a caller holding for Dana.
+  expect(config.turn).toEqual({ inactivity_end_call_secs: 240, inactivity_check_in_secs: 8 });
+  // The relay holds a pending check_approval for APPROVAL_HOLD_MS; the tool deadline must outlast it.
+  expect(webhookTool('check_approval', 'https://relay.test', 'secret').response_timeout_secs).toBeGreaterThan(APPROVAL_HOLD_MS / 1000 + 2);
+  expect(webhookTool('propose_plan', 'https://relay.test', 'secret').response_timeout_secs).toBe(TOOL_TIMEOUT_SECS);
+  for (const line of ['If check_approval returns next_step poll_again, say its speak line and call check_approval again right away',
+    'without waiting for the caller', 'While an approval is pending, never end the call for silence',
+    'If an inactivity check-in comes while an approval is pending, call check_approval instead of asking whether the caller is still there.']) {
+    expect(config.instructions).toContain(line);
+  }
+  expect(voiceTools.check_approval.description).toContain('next_step poll_again');
 });
 
 it('requires the agent to submit requested terms before verbal policy decisions', () => {
