@@ -1,8 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openMenu, openSheet } from './office-menu';
-import { createMockOfficeState } from '../lib/office/preview';
 
-// O toggles first person; Map opens the quick actions while keeping Play mounted.
+// O toggles first person; in Play, O opens the 2D overview map. Room inspector replaces the old corner quick-menu.
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
 }
@@ -22,9 +21,16 @@ test('O toggles first person and the Play button does the same', async ({ page }
   await page.keyboard.press('o');
   await expect(surface(page)).toBeFocused();
   await expect(select).toHaveValue('play');
-  // O in first person returns to the overhead view.
+  // O in first person opens the Overview map.
   await page.keyboard.press('o');
   await expect(surface(page)).toHaveCount(0);
+  await expect(select).toHaveValue('walk');
+  const map = page.getByRole('region', { name: 'Office overview' });
+  await expect(map).toBeVisible();
+  await expect(map.locator('.overview-map-room')).toHaveCount(6);
+  await expect(map.locator('.overview-map-agent')).toHaveCount(3);
+  await page.keyboard.press('Escape');
+  await expect(map).toHaveCount(0);
   await expect(select).toHaveValue('walk');
   await openMenu(page);
   await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
@@ -68,116 +74,111 @@ test('O leaves the view unchanged while keyboard shortcuts has focus', async ({ 
   await expect(select).toHaveValue('play');
 });
 
-async function startPlay(page: Page) {
-  await page.goto('/office?view=overview');
-  await openMenu(page);
-  await page.getByTestId('office-topbar').getByRole('button', { name: 'Play (First Person)', exact: true }).click();
-  const splash = page.getByTestId('play-splash');
-  if (await splash.isVisible()) await splash.getByRole('button', { name: 'Enter', exact: true }).click();
-  await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+async function dragOrbit(page: Page) {
+  const viewport = page.getByTestId('office-viewport');
+  await expect(viewport).toHaveAttribute('data-office-azimuth', /-?\d/, { timeout: 30_000 });
+  const before = Number(await viewport.getAttribute('data-office-azimuth'));
+  const box = await viewport.locator('canvas').boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width / 2;
+  const y = box!.y + box!.height * 0.65;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  // Drag right to decrease azimuth: home (~0.65) has room toward -0.7.
+  await page.mouse.move(x + 200, y, { steps: 20 });
+  await page.mouse.up();
+  await expect.poll(async () => before - Number(await viewport.getAttribute('data-office-azimuth')), { timeout: 10_000 }).toBeGreaterThanOrEqual(0.1);
+  const after = Number(await viewport.getAttribute('data-office-azimuth'));
+  expect(after).toBeGreaterThanOrEqual(-0.7);
+  expect(after).toBeLessThanOrEqual(0.9);
 }
 
-async function playerPosition(page: Page) {
-  return [Number(await surface(page).getAttribute('data-player-x')), Number(await surface(page).getAttribute('data-player-z'))];
-}
+test.describe('explicit orbit camera with reduced motion', () => {
+  test.use({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 } });
+  test.setTimeout(60_000);
 
-async function pickAgentOnMap(page: Page, id: string) {
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
-  const map = page.getByRole('region', { name: 'Office Overview', exact: true });
-  await expect(map).toBeVisible();
-  await map.locator(`.overview-map-agent[data-agent="${id}"]`).click();
-  return map;
-}
-
-test('Map Go here teleports the mounted player beside each agent with the E prompt', async ({ page }) => {
-  await startPlay(page);
-  // PlayRig increments this at mount; the HUD can survive a rig remount.
-  const canvas = page.getByTestId('office-viewport').locator('canvas');
-  await expect(canvas).toHaveAttribute('data-play-rig-mount-count', /\d/);
-  const mounts = (await canvas.getAttribute('data-play-rig-mount-count'))!;
-  const agents = createMockOfficeState().source.getSnapshot().agents;
-  for (const agent of agents) {
-    const before = await playerPosition(page);
-    const map = await pickAgentOnMap(page, agent.id);
-    await page.locator('[role=menuitem][data-action=go]').click();
-    await expect(map).toHaveCount(0);
-    await expect.poll(async () => {
-      const [x, z] = await playerPosition(page);
-      return Math.hypot(x! - agent.pos[0], z! - agent.pos[1]);
-    }, { timeout: 30_000 }).toBeLessThanOrEqual(1.5);
-    expect(await playerPosition(page)).not.toEqual(before);
-    await expect(page.locator('.play-crosshair')).toHaveAttribute('data-kind', 'agent');
-    await expect(page.locator('.play-prompt')).toContainText(`Talk to ${agent.name}`);
-    await expect(page.locator('.play-prompt')).toContainText('E');
-    await expect(page.locator('.play-prompt')).toBeVisible();
-    await expect(surface(page)).toBeFocused();
-    await expect(canvas).toHaveAttribute('data-play-rig-mount-count', mounts);
-  }
-});
-
-test('Map First person in a second Play session closes the map without restoring the old exit pose', async ({ page }) => {
-  await startPlay(page);
-  const previousExit = await playerPosition(page);
-  await surface(page).focus();
-  await page.keyboard.press('o');
-  await expect(surface(page)).toHaveCount(0);
-  await page.keyboard.press('o');
-  await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
-  expect(await playerPosition(page)).toEqual(previousExit);
-
-  const agent = createMockOfficeState().source.getSnapshot().agents[0]!;
-  await pickAgentOnMap(page, agent.id);
-  await page.locator('[role=menuitem][data-action=go]').click();
-  await expect.poll(() => playerPosition(page)).not.toEqual(previousExit);
-  await expect(page.locator('.play-prompt')).toContainText(`Talk to ${agent.name}`);
-  const before = await playerPosition(page);
-  const yaw = (await surface(page).getAttribute('data-player-yaw'))!;
-  const canvas = page.getByTestId('office-viewport').locator('canvas');
-  const mounts = (await canvas.getAttribute('data-play-rig-mount-count'))!;
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
-  const map = page.getByRole('region', { name: 'Office Overview', exact: true });
-  await map.getByRole('button', { name: /^First person/ }).click();
-  await expect(map).toHaveCount(0);
-  // Let any erroneously queued teleport reach the camera and HUD before checking the pose.
-  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-  expect(await playerPosition(page)).toEqual(before);
-  await expect(surface(page)).toHaveAttribute('data-player-yaw', yaw);
-  await expect(canvas).toHaveAttribute('data-play-rig-mount-count', mounts);
-});
-
-test('Map Talk opens the same agent conversation as E without moving the player', async ({ page }) => {
-  await startPlay(page);
-  const agent = createMockOfficeState().source.getSnapshot().agents[0]!;
-  const before = await playerPosition(page);
-  const map = await pickAgentOnMap(page, agent.id);
-  await page.locator('[role=menuitem][data-action=talk]').click();
-  await expect(map).toHaveCount(0);
-  await expect(page.getByRole('dialog', { name: `Talking with ${agent.name}`, exact: true })).toBeVisible();
-  await expect(page.locator('.play-panel[data-target-kind=agent]')).toBeVisible();
-  expect(await playerPosition(page)).toEqual(before);
-});
-
-
-test('FloorPlan uses Play quick actions after context loss and inspect outside Play', async ({ page }) => {
-  await startPlay(page);
-  await page.getByTestId('office-viewport').locator('canvas').evaluate(canvas => {
-    canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+  test('selecting Orbit Camera enables a 200 px canvas drag and keeps wheel zoom disabled', async ({ page }) => {
+    await page.goto('/office?view=overview');
+    await page.getByLabel('Office view').selectOption({ label: 'Orbit Camera' });
+    await dragOrbit(page);
+    const viewport = page.getByTestId('office-viewport');
+    const before = Number(await viewport.getAttribute('data-office-zoom'));
+    await page.mouse.wheel(0, -400);
+    await expect(viewport).toHaveAttribute('data-office-zoom', String(before));
+    await expect(page.locator('.room-inspector')).toHaveCount(0);
   });
-  const plan = page.locator('.floor-plan');
-  await expect(plan).toBeVisible();
-  const agent = createMockOfficeState().source.getSnapshot().agents[0]!;
-  await plan.getByRole('button', { name: new RegExp(agent.name) }).click();
-  await expect(page.locator('[role=menuitem][data-action=go]')).toBeVisible();
-  await page.locator('[role=menuitem][data-action=talk]').click();
-  const dialog = page.getByRole('dialog', { name: `Talking with ${agent.name}`, exact: true });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: `Close Talking with ${agent.name}` }).click();
-  await plan.locator('.plan-room').filter({ hasText: 'Collections' }).click();
-  await expect(page.locator('[role=menuitem][data-action=go]')).toBeVisible();
-  await expect(page.locator('[role=menuitem][data-action=talk]')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await page.getByLabel('Office view').selectOption('plan');
-  await plan.locator('.plan-room').filter({ hasText: 'Collections' }).click();
-  await expect(page.locator('.room-inspector')).toContainText('Collections');
-  await expect(page.getByRole('menu')).toHaveCount(0);
+
+  test('caption and selected view match, and the fixed caption focuses the picker', async ({ page }) => {
+    await page.goto('/office?view=overview');
+    const select = page.getByLabel('Office view');
+    const caption = page.locator('.office-caption');
+    await expect(select).toHaveValue('tween');
+    await expect(caption).toHaveText('Fixed camera · pick Orbit camera to look around');
+    await caption.getByRole('button').click();
+    await expect(select).toBeFocused();
+    await select.selectOption('walk');
+    await expect(caption).toHaveText('Drag to look around · choose a room to focus');
+    await select.selectOption('plan');
+    await expect(caption).toHaveText('Floor plan · same subscribed state');
+    await select.selectOption('tween');
+    await expect(caption).toHaveText('Fixed camera · pick Orbit camera to look around');
+    await page.getByRole('button', { name: 'Full Screen', exact: true }).click();
+    await caption.getByRole('button').click();
+    await expect(page.locator('#office-view-fullscreen')).toBeFocused();
+  });
+
+  test('focusing a room moves the target and leaves orbit enabled', async ({ page }) => {
+    await page.goto('/office?view=overview');
+    const select = page.getByLabel('Office view');
+    await select.selectOption('walk');
+    const viewport = page.getByTestId('office-viewport');
+    await expect(viewport).toHaveAttribute('data-office-target-x', /-?\d/, { timeout: 30_000 });
+    const before = [await viewport.getAttribute('data-office-target-x'), await viewport.getAttribute('data-office-target-z')];
+    await openSheet(page, 'rooms');
+    await page.getByRole('button', { name: /^Payables/ }).click();
+    const inspector = page.locator('.room-inspector');
+    await expect(inspector).toContainText('Payables');
+    await expect.poll(async () => [await viewport.getAttribute('data-office-target-x'), await viewport.getAttribute('data-office-target-z')], { timeout: 10_000 }).not.toEqual(before);
+    await inspector.getByRole('button', { name: /^Close .* details$/ }).click();
+    await expect(select).toHaveValue('walk');
+    await dragOrbit(page);
+  });
+});
+
+test.describe('touch orbit camera', () => {
+  test.use({ hasTouch: true, reducedMotion: 'reduce', viewport: { width: 720, height: 1000 } });
+  test.setTimeout(60_000);
+
+  test('one finger rotates and pinch zoom stays disabled after choosing orbit on a narrow screen', async ({ page, context }) => {
+    await page.goto('/office?view=overview');
+    const select = page.getByLabel('Office view');
+    await expect(select).toHaveValue('tween');
+    await select.selectOption('walk');
+    const viewport = page.getByTestId('office-viewport');
+    await expect(viewport).toHaveAttribute('data-office-azimuth', /-?\d/, { timeout: 30_000 });
+    const before = Number(await viewport.getAttribute('data-office-azimuth'));
+    const box = await viewport.locator('canvas').boundingBox();
+    expect(box).not.toBeNull();
+    const x = box!.x + box!.width / 2;
+    const y = box!.y + box!.height * 0.6;
+    const session = await context.newCDPSession(page);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+    for (let step = 1; step <= 10; step++) {
+      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + step * 20, y, id: 1 }] });
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect.poll(async () => before - Number(await viewport.getAttribute('data-office-azimuth')), { timeout: 10_000 }).toBeGreaterThanOrEqual(0.1);
+    const after = Number(await viewport.getAttribute('data-office-azimuth'));
+    expect(after).toBeGreaterThanOrEqual(-0.7);
+    expect(after).toBeLessThanOrEqual(0.9);
+    const zoom = Number(await viewport.getAttribute('data-office-zoom'));
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x - 40, y, id: 1 }, { x: x + 40, y, id: 2 }] });
+    for (let step = 1; step <= 5; step++) {
+      const spread = 40 + step * 8;
+      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - spread, y, id: 1 }, { x: x + spread, y, id: 2 }] });
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(viewport).toHaveAttribute('data-office-zoom', String(zoom));
+    await session.detach();
+  });
 });
