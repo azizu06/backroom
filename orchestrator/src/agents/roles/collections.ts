@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { DialOptions } from '../../voice';
 import { dialCollectionCall } from '../../voice';
-import { createCollectionsPlannerTools, type CallStarter, type CollectionsToolDeps } from '../tools/collections';
+import { runEmailFollowUp, type EmailFollowUpInput, type EmailFollowUpResult } from '../../collections/email';
+import { createCollectionsPlannerTools, type CallStarter, type CollectionsCase, type CollectionsToolDeps } from '../tools/collections';
 import type { ActivationResult, AgentRuntime, DomainTool, Json, Specialist, ToolContext, UsageReceipt } from '../contracts';
 
 /** Structural view of the gateway call record (web/lib/gateway/store GatewayCall satisfies it). */
@@ -91,7 +92,22 @@ async function readOutcome(deps: PostCallDeps, caseId: string) {
 
 export type PlannerRun =
   | { kind: 'started'; callId: string; sessionId: string; result: ActivationResult }
-  | { kind: 'not_started'; result: ActivationResult };
+  | { kind: 'not_started'; result: ActivationResult; email?: EmailFollowUpResult };
+
+/** Restrict the preview port to a mailbox with a DNS hostname. Invalid host data must
+ * never reach the helper, which projects the recipient hostname into its audit. */
+function emailAddressOnFile(address?: string): string | undefined {
+  const mailbox = address?.trim();
+  if (!mailbox || mailbox.length > 254) return undefined;
+  const parts = mailbox.split('@');
+  if (parts.length !== 2) return undefined;
+  const [local, hostname] = parts as [string, string];
+  if (!local || local.length > 64 || !/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/.test(local)
+    || local.startsWith('.') || local.endsWith('.') || local.includes('..')) return undefined;
+  const labels = hostname.split('.');
+  if (labels.length < 2 || labels.some(label => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) return undefined;
+  return `${local}@${hostname.toLowerCase()}`;
+}
 
 /** Runs the planner activation; the dial is confirmed from tool state, never from the model's text. */
 export async function runCollectionsPlanner(runtime: AgentRuntime, ctx: ToolContext, deps: CollectionsToolDeps, input: Json = {}): Promise<PlannerRun> {
@@ -101,7 +117,34 @@ export async function runCollectionsPlanner(runtime: AgentRuntime, ctx: ToolCont
     const call = started(ctx.activation.activationId);
     // The planner has no allowed next role; a handoff from it is a protocol violation.
     if (result.kind === 'handoff') return { kind: 'not_started', result: { kind: 'failed', reason: 'PLANNER_HANDOFF_NOT_ALLOWED', usage: result.usage } };
-    return call ? { kind: 'started', ...call, result } : { kind: 'not_started', result };
+    if (call) return { kind: 'started', ...call, result };
+    // The model cannot choose email recipients, verification, links or eligibility. After it finishes,
+    // read the trusted case again and let the same policy-checked helper decide whether a preview may queue.
+    if (result.kind !== 'done' || !deps.emailFollowUp) return { kind: 'not_started', result };
+    await ctx.assertCurrent();
+    const c = await deps.cases.load(ctx.activation.caseId);
+    await ctx.assertCurrent();
+    const outbox = deps.emailFollowUp.outbox;
+    const inputOf = (row: CollectionsCase): EmailFollowUpInput => ({ clientId: row.precall.clientId, invoiceId: row.precall.invoiceId,
+      businessName: row.dial.businessName, contactName: row.dial.contactName, callbackNumber: row.dial.callbackNumber,
+      context: row.precall.context, email: emailAddressOnFile(row.emailContact?.address),
+      identityVerified: row.emailContact?.identityVerified, payLink: row.emailContact?.payLink });
+    const snapshot = structuredClone(inputOf(c));
+    const fingerprint = JSON.stringify(snapshot);
+    const email = await runEmailFollowUp(snapshot, {
+      audit: deps.precall.audit, now: deps.now ?? deps.precall.now,
+      outbox: { async queue(message) {
+        await ctx.assertCurrent();
+        const current = await deps.cases.load(ctx.activation.caseId);
+        // Durable adapters may lack a synchronous lease fence; OFF/cancel must still stop this effect.
+        if (ctx.activation.signal.aborted) throw new Error(typeof ctx.activation.signal.reason === 'string' ? ctx.activation.signal.reason : 'CANCELLED');
+        if (JSON.stringify(inputOf(current)) !== fingerprint) throw new Error('EMAIL_CASE_CHANGED');
+        ctx.fence?.(); // no await between the ownership fence and starting the simulated queue write
+        return outbox.queue(message);
+      } },
+    });
+    await ctx.assertCurrent();
+    return { kind: 'not_started', result, email };
   } finally { release(ctx.activation.activationId); }
 }
 

@@ -33,7 +33,7 @@ function FixedDisclosure() {
   const shown = !replay && siteNavHidden(pathname, embed, 'office');
   const status = useDemoStatus(shown);
   if (replay) return <aside className="demo-pill demo-pill-fixed" aria-label="Replay disclosure">
-    <strong>REPLAY</strong> · saved synthetic run · no live call or money movement
+    <strong>REPLAY</strong> · saved run · no live call or money movement
   </aside>;
   if (!shown) return null;
   return <aside className="demo-pill demo-pill-fixed" aria-label="Demo disclosure">
