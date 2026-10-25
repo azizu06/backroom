@@ -1,23 +1,24 @@
-.real-sim { box-sizing: border-box; color-scheme: dark; color: #f2f2f7; background: #1c1c1e; font-family: system-ui, sans-serif; border: 1px solid #45454a; font-size: 13px; line-height: 1.4; }
+/* Office palette tokens (app/office/lobby.css, loaded by the root layout). */
+.real-sim { box-sizing: border-box; color-scheme: light; color: var(--office-navy); background: #fff; font-family: system-ui, sans-serif; border: 1px solid var(--office-lavender); box-shadow: var(--office-plate-shadow); font-size: 13px; line-height: 1.4; }
 .real-sim * { box-sizing: border-box; }
 .real-sim-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
 .real-sim h1, .real-sim h2, .real-sim h3, .real-sim p { margin: 0; }
 .real-sim-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-.real-sim h3 { font-size: 12px; color: #c9c9d1; font-weight: 600; margin-bottom: 4px; }
+.real-sim h3 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
 .real-sim ul { list-style: none; padding: 0; margin: 0; }
 .real-sim-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 3px 0; }
-.real-sim-status { font-size: 11px; white-space: nowrap; color: #bcbcc5; }
-.real-sim-good { color: #8bdeb0; }
-.real-sim-warning { color: #ffd082; }
-.real-sim .real-sim-detail-line { color: #a1a1aa; font-size: 11px; line-height: 1.3; margin: 0 0 2px; }
-.real-sim .real-sim-note { color: #bcbcc5; font-size: 11px; margin-top: 8px; }
-.real-sim-detail { width: min(900px, 100%); padding: 28px; border-radius: 8px; }
+.real-sim-status { font-size: 11px; white-space: nowrap; padding: 0 8px; border-radius: 999px; background: var(--office-cream); }
+.real-sim-good { background: var(--office-aqua); font-weight: 700; }
+.real-sim-warning { background: var(--office-blush); font-weight: 700; }
+.real-sim .real-sim-detail-line { font-size: 11px; line-height: 1.3; margin: 0 0 2px; }
+.real-sim .real-sim-note { font-size: 11px; margin-top: 8px; }
+.real-sim-detail { width: min(900px, 100%); padding: 28px; border-radius: 12px; }
 .real-sim-detail h1 { font-size: 26px; }
-.real-sim-detail .real-sim-intro { color: #c9c9d1; margin-bottom: 24px; font-size: 15px; }
+.real-sim-detail .real-sim-intro { margin-bottom: 24px; font-size: 15px; }
 .real-sim-detail h3 { font-size: 17px; margin-bottom: 12px; }
-.real-sim-detail li { border-top: 1px solid #45454a; padding: 10px 0; }
+.real-sim-detail li { border-top: 1px solid var(--office-lavender); padding: 10px 0; }
 .real-sim-detail .real-sim-row { font-size: 15px; }
-.real-sim-detail li p { color: #c9c9d1; margin-top: 4px; }
+.real-sim-detail li p { margin-top: 4px; }
 .real-sim-detail .real-sim-detail-line { margin-top: 2px; overflow-wrap: anywhere; }
 .real-sim-detail .real-sim-note { font-size: 13px; margin-top: 20px; }
 @media (max-width: 520px) {
