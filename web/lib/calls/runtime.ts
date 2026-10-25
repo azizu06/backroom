@@ -3,9 +3,17 @@ import { getGatewayStore } from '../gateway/runtime';
 import { voiceCallLifecycle } from './lifecycle';
 import { MAX_CALL_MS, projectVoiceCall, type CallProjectionRow } from './projection';
 import { declaredLoopbackOfficeOrigin } from './loopback-origin';
-import { createCallRequestHTTP } from './request';
+import { createCallRequestHTTP, type CallRequestAudit } from './request';
 
 const ENDED_VISIBLE_MS = 2 * 60_000;
+const POLICY_REFUSALS = new Set(['PRECALL_BLOCKED', 'CALL_DENIED', 'CLIENT_STOPPED']);
+
+/** Only policy or legal guardrail outcomes belong in the decision feed. */
+export function officeCallAuditDecision(entry: CallRequestAudit): 'ALLOW' | 'DENY' | undefined {
+  if (entry.outcome === 'accepted') return 'ALLOW';
+  if (entry.outcome === 'refused' && POLICY_REFUSALS.has(entry.code)) return 'DENY';
+}
+
 /** The desk phone's current call, or null once the last one ended a while ago. */
 export async function activeCall(now = Date.now()): Promise<CallProjectionRow | null> {
   const call = await getGatewayStore().latestVoiceCall?.();
@@ -35,9 +43,10 @@ export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = reque
   currentCall: () => activeCall(),
   audit: async entry => {
     const store = getStateStore();
+    const decision = officeCallAuditDecision(entry);
     await store.appendAudit({ ts: Date.now(), actor: 'code', seat: 'collections', action: `office_call_${entry.outcome}`, ruleIds: [],
       policyVersion: (await store.getPolicy()).policyVersion, refs: ['1042'], route: 'code',
-      ...(entry.outcome !== 'requested' && { decision: entry.outcome === 'accepted' ? 'ALLOW' as const : 'DENY' as const }),
+      ...(decision && { decision }),
       inputs: { ...entry, source: 'office_button', destination: 'server_allowlisted_demo_phone' }, latencyMs: 0, costUsd: 0 });
   },
 }))(request);
