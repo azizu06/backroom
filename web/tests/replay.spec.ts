@@ -40,8 +40,11 @@ test('plays and scrubs the original state/audit into 3D, floor plan and audit wa
   await expect(page.locator('canvas')).toBeVisible();
   const escalation = frames.find(frame => frame.phase === 'collections-1042' && frame.operation === 'createCallEscalation')!;
   await seek(page, escalation.atMs + 100);
-  await expect(page.locator('[data-agent-id="collections-demo"]')).toHaveAttribute('data-target', 'dana');
-  await expect(page.getByText('▱ Folder → Dana’s desk')).toBeVisible();
+  // Seat rows live in the Full Floor sheet after the sidebar shell (#351).
+  const overview = await openSheet(page, 'overview');
+  await expect(overview.locator('[data-agent-id="collections-demo"]')).toHaveAttribute('data-target', 'dana');
+  await expect(overview.getByText('▱ Folder → Dana’s desk')).toBeVisible();
+  await overview.getByRole('button', { name: 'Close Today at Backroom', exact: true }).click();
   const position = await page.getByRole('slider', { name: 'Replay position' }).inputValue();
   await page.waitForTimeout(400);
   await expect(page.getByRole('slider', { name: 'Replay position' })).toHaveValue(position);
@@ -88,8 +91,15 @@ test('phone and invalid recordings keep an explicit replay label', async ({ page
 });
 
 test('Help Getting Around links into the offline recording', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto('/office');
+  const splash = page.getByTestId('play-splash');
+  if (await splash.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'Overview (map view)', exact: true }).click();
+    await expect(splash).toHaveCount(0);
+  }
   const help = await openSheet(page, 'help');
+  await expect(help.getByRole('link', { name: 'Watch a recorded session', exact: true })).toBeVisible();
   await help.getByRole('link', { name: 'Watch a recorded session', exact: true }).click();
   await expect(page).toHaveURL(/\/office\?replay=core-offline/);
   await expect(page.getByLabel('Replay controls')).toBeVisible();

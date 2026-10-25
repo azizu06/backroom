@@ -353,6 +353,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       return;
     }
     setFullscreen(true);
+    // Replay keeps the REPLAY banner above the stage; browser Fullscreen would cover it.
+    if (snapshot.connection === 'replay' || shellRef.current?.closest('.replay-session')) return;
     // Browser full screen is best effort: the layout still fills the window when it is refused.
     void shellRef.current?.requestFullscreen?.().catch(() => {});
   }
