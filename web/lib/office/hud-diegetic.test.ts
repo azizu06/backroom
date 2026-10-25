@@ -16,6 +16,13 @@ describe('diegetic desk plates', () => {
     expect(PLATE_TONES[plate.tone].color).toBe(PALETTE.mint);
   });
 
+  it('shows an idle agent as Idle rather than Working', () => {
+    const snapshot = at({ state: 'Idle' });
+    expect(deskPlate(snapshot, snapshot.agents[0]!)).toMatchObject({ task: 'Idle', status: 'Idle', tone: 'idle' });
+    const away = at({ state: 'Away' });
+    expect(deskPlate(away, away.agents[0]!)).toMatchObject({ task: 'Away', status: 'Away', tone: 'away' });
+  });
+
   it('prefers held over denied, denied over away, and marks a dropped connection stale', () => {
     expect(deskPlate(at({ escalationId: 'e', targetAnchor: 'dana' }), { ...alex, escalationId: 'e', targetAnchor: 'dana' }))
       .toMatchObject({ tone: 'held', status: 'Held for a human · folder to Dana’s Desk' });

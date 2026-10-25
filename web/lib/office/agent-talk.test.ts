@@ -80,7 +80,7 @@ describe('agent talk', () => {
     expect(talkReply(talk, 'stopped')).toMatchObject({ id: 'stopped', tone: 'fail', ruleIds: ['NOT_IN_BADGE'], text: 'I was refused: Treasury entry refused · controller only.' });
     expect(talk.lines).toHaveLength(3);
     expect(talk.lines.every(line => line.ruleIds.includes('NOT_IN_BADGE') && line.tone === 'fail')).toBe(true);
-    expect(talk.askWhy).toBe('Why did Alex (collections-clerk) get DENY on “Treasury entry refused · controller only”?');
+    expect(talk.askWhy).toBe('Why did Alex get DENY on “Treasury entry refused · controller only”?');
   });
 
   it('names the case for a seated agent waiting on Dana’s passkey, matching only its own handoffs', () => {

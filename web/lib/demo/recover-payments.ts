@@ -1,5 +1,4 @@
-import { paymentMemo } from '@backroom/nessie';
-import type { PaymentRecord, PaymentService, StateStore } from '@backroom/orchestrator';
+import { paymentLinkMemo, type PaymentRecord, type PaymentService, type StateStore } from '@backroom/orchestrator';
 
 /** Link identity the demo host can see. Installment 1 matches `authorizedPaymentLink`. */
 export interface DemoRecoveryLink {
@@ -9,9 +8,9 @@ export interface DemoRecoveryLink {
 }
 
 /**
- * The bank memo and the reducer receipt are `invoice + installment`, not the pay-link id.
- * A link minted in this boot must not inherit a deposit that already existed for that memo.
- * Recover itself never deposits, writes receipts, or moves invoices; skipping is local.
+ * The bank memo names the pay link, so a deposit an older link left in the sandbox (for example before a
+ * company reset) has a different memo and is simply ignored. This guard only refuses a link minted in this
+ * boot whose own memo was already in the feed. Recover never deposits, writes receipts, or moves invoices.
  */
 export function selectRecoverableLinkIds(
   links: readonly DemoRecoveryLink[],
@@ -24,7 +23,7 @@ export function selectRecoverableLinkIds(
   const skipped: { linkId: string; reason: string }[] = [];
   for (const link of links) {
     let memo: string;
-    try { memo = paymentMemo(link); }
+    try { memo = paymentLinkMemo(link); }
     catch { skipped.push({ linkId: link.id, reason: 'UNREADABLE_LINK' }); continue; }
     if (minted.has(link.id) && priorMemos.has(memo)) {
       skipped.push({ linkId: link.id, reason: 'NEW_LINK_EXISTING_DEPOSIT' });
