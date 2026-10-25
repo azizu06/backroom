@@ -55,7 +55,9 @@ import './iisu.css';
 import './cozy-shell.css';
 
 type DetailSheetId = 'overview' | 'rooms' | 'inbox' | 'audit';
-const PAGE_ICONS = { '/attack': 'attack', '/operator': 'operator', '/controller': 'controller', '/real-vs-sim': 'info' } as const;
+const PAGE_ICONS = {
+  '/calls': 'collections', '/attack': 'attack', '/policy': 'treasury', '/controller': 'controller', '/payment-link': 'payables', '/operator': 'operator', '/real-vs-sim': 'info',
+} as const;
 const SIDEBAR_PAGES = [...navLinks.filter(link => link.href in PAGE_ICONS), whatsRealLink];
 
 function roomNote(room: AnchorId, snapshot: OfficeSnapshot) {
