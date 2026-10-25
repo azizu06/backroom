@@ -46,6 +46,9 @@ export type RoleName = keyof typeof ROLES;
 export const OUTDOOR = {
   skyTop: "#6FA8DC",
   skyHorizon: "#CFE8F3",
+  rainSkyTop: "#91A9BD",
+  rainSkyHorizon: "#D0DEE5",
+  rain: "#C5D9E8",
   sun: "#FFE9A8",
   sunHalo: "#FFF4CF",
   sunWarm: "#FFE0A0",

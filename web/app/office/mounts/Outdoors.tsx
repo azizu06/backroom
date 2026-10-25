@@ -12,6 +12,8 @@ import { BUSHES, GRASS_RADIUS, HILLS, PATH, PLAZA, SUN_DIRECTION, SUN_DISTANCE, 
 import { OUTDOOR, ROLES } from '../../../lib/office/palette';
 import { StaticBoxes, StaticInstances } from './StaticGeometry';
 import { OutdoorLife } from './OutdoorLife';
+import { OutdoorActivity } from './OutdoorActivity';
+import { useRainEnabled } from '../../../lib/office/rain-setting';
 
 // Shared for the lazy scene's lifetime (dispose={null} on every user). Instance colours tint the white materials.
 const SKY_RADIUS = 450;
@@ -25,6 +27,16 @@ const SKY = (() => {
     color.copy(horizon).lerp(top, Math.pow(height, 0.55)).toArray(colors, i * 3);
   }
   geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+  return geometry;
+})();
+const RAIN_SKY = (() => {
+  const geometry = SKY.clone();
+  const top = new Color(OUTDOOR.rainSkyTop), horizon = new Color(OUTDOOR.rainSkyHorizon), color = new Color();
+  const position = geometry.getAttribute('position'), colors = geometry.getAttribute('color');
+  for (let i = 0; i < position.count; i++) {
+    color.copy(horizon).lerp(top, Math.pow(Math.max(0, position.getY(i) / SKY_RADIUS), 0.55));
+    colors.setXYZ(i, color.r, color.g, color.b);
+  }
   return geometry;
 })();
 const SKY_MATERIAL = new MeshBasicMaterial({ vertexColors: true, side: BackSide, depthWrite: false, fog: false, toneMapped: false });
@@ -82,6 +94,7 @@ const SUN_AT: [number, number, number] = [SUN_DIRECTION[0] * SUN_DISTANCE, SUN_D
  * of distant hills. OutdoorLife animates instance transforms only while the grounds are in view.
  */
 export function Outdoors() {
+  const rain = useRainEnabled();
   const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
   const sky = useRef<Group>(null);
   const root = useRef<Group>(null);
@@ -96,8 +109,9 @@ export function Outdoors() {
     <StaticBoxes pieces={GROUND} material={GROUND_MATERIAL} castShadow={false} receiveShadow={false} />
     <StaticInstances pieces={TRUNKS} geometry={TRUNK} material={PLANT_MATERIAL} castShadow={false} receiveShadow={false} />
     <OutdoorLife plants={WIND_BATCHES} overview={overview} skyMaterial={SKY_MATERIAL} sunMaterial={SUN_MATERIAL} />
+    <OutdoorActivity overview={overview} rain={rain} />
     <group ref={sky} visible={!overview} name='outdoors:sky'>
-      <mesh geometry={SKY} material={SKY_MATERIAL} renderOrder={-10} frustumCulled={false} dispose={null} />
+      <mesh geometry={rain ? RAIN_SKY : SKY} material={SKY_MATERIAL} renderOrder={-10} frustumCulled={false} dispose={null} />
       <StaticInstances pieces={HILL_PIECES} geometry={HILL} material={HILL_MATERIAL} castShadow={false} receiveShadow={false} />
       <group position={SUN_AT} onUpdate={group => group.lookAt(0, 0, 0)}>
         <mesh geometry={SUN_HALO} material={HALO_MATERIAL} renderOrder={-9} dispose={null} />
