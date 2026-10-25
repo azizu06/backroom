@@ -16,6 +16,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     const score = page.getByTestId('pingpong-score');
     await page.keyboard.press('e');
     await expect(score).toHaveAttribute('data-active', 'true');
+    await expect(score).toHaveCSS('visibility', 'visible');
     await expect(score).toContainText('You 0 : 0 AI');
     await expect(score).toHaveAttribute('data-camera-x', /11\.450/);
     const bounds = await surface.boundingBox();
@@ -49,3 +50,18 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test('score card hides behind a wall in first person and returns in overview', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office?playSpawn=9,0');
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  const view = page.getByLabel('Office view');
+  const score = page.getByTestId('pingpong-score');
+  await expect(score).toHaveCSS('visibility', 'visible');
+  await view.selectOption({ label: 'Play (first person)' });
+  await expect(page.getByRole('application', { name: /First-person office/ })).toHaveAttribute('data-player-x', '9.000');
+  await expect(score).toHaveCSS('visibility', 'hidden');
+  await view.selectOption({ label: 'Orbit camera' });
+  await expect(score).toHaveCSS('visibility', 'visible');
+});

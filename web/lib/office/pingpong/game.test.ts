@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceAI, COURT, newMatch, paddleX, stepMatch, type Match } from './game';
+import { advanceAI, COURT, newMatch, paddleX, stepMatch, stepMatchInPlace, type GameEvent, type Match } from './game';
 
 const rally = (patch: Partial<Match> = {}): Match => ({ ...newMatch(), pause: 0, ...patch });
 
@@ -45,6 +45,39 @@ describe('ping pong physics', () => {
     expect(events).toContain('bounce');
     expect(events).toContain('hit');
     expect(events).not.toContain('point');
+  });
+  it('matches immutable steps over a scripted rally while reusing ball, score and event storage', () => {
+    const mutable = newMatch();
+    const ball = mutable.ball;
+    const score = mutable.score;
+    const events: GameEvent[] = [];
+    const seen = new Set<GameEvent>();
+    let immutable = newMatch();
+    for (let frame = 0; frame < 1800; frame++) {
+      const player = frame < 150 ? immutable.ball.x : Math.sin(frame / 20) * COURT.halfWidth;
+      const previous = structuredClone(immutable);
+      const next = stepMatch(immutable, 1 / 60, player);
+      stepMatchInPlace(mutable, 1 / 60, player, events);
+      expect(immutable).toEqual(previous);
+      expect(mutable).toEqual(next.state);
+      expect(events).toEqual(next.events);
+      expect(mutable.ball).toBe(ball);
+      expect(mutable.score).toBe(score);
+      for (const event of events) seen.add(event);
+      immutable = next.state;
+    }
+    expect(seen).toEqual(new Set(['bounce', 'hit', 'point']));
+    expect(mutable.winner).not.toBeNull();
+  });
+  it('clears the reused event buffer even when time is invalid or the match has ended', () => {
+    for (const seconds of [0, -1, NaN, Infinity, 1 / 60]) {
+      const match = rally(seconds > 0 && Number.isFinite(seconds) ? { winner: 'player' } : {});
+      const events: GameEvent[] = ['point'];
+      const expected = stepMatch(match, seconds, 0.2);
+      stepMatchInPlace(match, seconds, 0.2, events);
+      expect(match).toEqual(expected.state);
+      expect(events).toEqual([]);
+    }
   });
   it('awards a net fault to the receiver and lets a high ball clear it', () => {
     const low = rally({ ball: { x: 0, y: 0.1, z: -0.01, vx: 0, vy: 0, vz: 2.5 } });

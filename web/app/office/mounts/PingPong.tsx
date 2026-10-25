@@ -4,17 +4,19 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Html } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { Mesh } from 'three';
-import { COURT, newMatch, paddleX, stepMatch } from '../../../lib/office/pingpong/game';
+import { COURT, newMatch, paddleX, stepMatchInPlace, type GameEvent } from '../../../lib/office/pingpong/game';
 import { PINGPONG_TABLE } from '../../../lib/office/pingpong/table';
 import { pingPongSession } from '../../../lib/office/pingpong/session';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 import { playOfficeCue } from '../../../lib/office/sound-events';
 import { requestSceneFrame } from '../../../lib/office/frame';
+import { sightBlocked } from '../../../lib/office/layout';
 
 /** A local arcade game: no backend, policy, model calls or financial state. */
 export function PingPong() {
   const active = useSyncExternalStore(pingPongSession.subscribe, pingPongSession.getSnapshot, pingPongSession.getServerSnapshot);
   const game = useRef(newMatch());
+  const events = useRef<GameEvent[]>([]);
   const human = useRef(0);
   const keys = useRef(new Set<string>());
   const ball = useRef<Mesh>(null);
@@ -23,6 +25,21 @@ export function PingPong() {
   const readout = useRef<HTMLDivElement>(null);
   const [score, setScore] = useState({ player: 0, ai: 0, winner: null as 'player' | 'ai' | null });
   const invalidate = useThree(state => state.invalidate);
+  const get = useThree(state => state.get);
+
+  useEffect(() => {
+    // A low-rate check also catches camera changes after the demand-rendered scene goes idle.
+    const updateVisibility = () => {
+      if (!readout.current) return;
+      const camera = get().camera;
+      const blocked = (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true
+        && sightBlocked(camera.position.x, camera.position.z, PINGPONG_TABLE.x, PINGPONG_TABLE.z);
+      readout.current.style.visibility = blocked ? 'hidden' : 'visible';
+    };
+    updateVisibility();
+    const timer = window.setInterval(updateVisibility, 100);
+    return () => window.clearInterval(timer);
+  }, [get]);
 
   useEffect(() => {
     if (!active) return;
@@ -95,19 +112,19 @@ export function PingPong() {
     const left = keys.current.has('a') || keys.current.has('arrowleft');
     const right = keys.current.has('d') || keys.current.has('arrowright');
     human.current = paddleX(human.current + (Number(right) - Number(left)) * dt * 1.5);
-    const next = stepMatch(game.current, dt, human.current);
-    game.current = next.state;
-    for (const event of next.events) {
+    const match = game.current;
+    stepMatchInPlace(match, dt, human.current, events.current);
+    for (const event of events.current) {
       if (event === 'hit') playOfficeCue('pingHit');
       if (event === 'bounce') playOfficeCue('pingBounce');
-      if (event === 'point') setScore({ ...next.state.score, winner: next.state.winner });
+      if (event === 'point') setScore({ ...match.score, winner: match.winner });
     }
-    const b = next.state.ball;
+    const b = match.ball;
     ball.current?.position.set(b.x, COURT.height + b.y, b.z);
-    if (player.current) player.current.position.x = next.state.player;
-    if (ai.current) ai.current.position.x = next.state.ai;
+    if (player.current) player.current.position.x = match.player;
+    if (ai.current) ai.current.position.x = match.ai;
     if (readout.current) {
-      readout.current.dataset.paddleX = next.state.player.toFixed(3);
+      readout.current.dataset.paddleX = match.player.toFixed(3);
       readout.current.dataset.ballZ = b.z.toFixed(3);
     }
     // Snap both ways: no camera swoop, including with prefers-reduced-motion.

@@ -11,8 +11,14 @@ const other = (side: Side): Side => side === 'player' ? 'ai' : 'player';
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 export const paddleX = (x: number) => clamp(x, -COURT.halfWidth + COURT.paddle, COURT.halfWidth - COURT.paddle);
 
-function serve(side: Side): Ball {
-  return { x: 0, y: 0.24, z: side === 'player' ? COURT.halfLength : -COURT.halfLength, vx: 0.18, vy: 2.1, vz: side === 'player' ? -2.5 : 2.5 };
+function serve(side: Side, ball: Ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }): Ball {
+  ball.x = 0;
+  ball.y = 0.24;
+  ball.z = side === 'player' ? COURT.halfLength : -COURT.halfLength;
+  ball.vx = 0.18;
+  ball.vy = 2.1;
+  ball.vz = side === 'player' ? -2.5 : 2.5;
+  return ball;
 }
 export function newMatch(): Match {
   return { ball: serve('ai'), player: 0, ai: 0, aiTarget: 0, reaction: 0.22, score: { player: 0, ai: 0 }, lastHit: 'ai', bounces: 0, pause: 0.8, winner: null };
@@ -23,21 +29,31 @@ export function advanceAI(x: number, target: number, dt: number): number {
   return paddleX(x + clamp(target - x, -0.65 * dt, 0.65 * dt));
 }
 
-/** Substeps prevent tunnelling through the tabletop, net or paddles at normal display rates. No randomness or browser state. */
+/** Immutable convenience API for callers that retain previous frames. */
 export function stepMatch(previous: Match, seconds: number, player: number): { state: Match; events: GameEvent[] } {
-  const state: Match = { ...previous, ball: { ...previous.ball }, score: { ...previous.score }, player: paddleX(player) };
+  const state: Match = { ...previous, ball: { ...previous.ball }, score: { ...previous.score } };
   const events: GameEvent[] = [];
-  if (state.winner || !Number.isFinite(seconds) || seconds <= 0) return { state, events };
+  stepMatchInPlace(state, seconds, player, events);
+  return { state, events };
+}
+
+function point(state: Match, side: Side, events: GameEvent[]) {
+  state.score[side]++;
+  state.winner = state.score[side] >= COURT.winningScore ? side : null;
+  state.lastHit = (state.score.player + state.score.ai) % 2 ? 'player' : 'ai';
+  serve(state.lastHit, state.ball);
+  state.bounces = 0;
+  state.pause = 0.8;
+  events.push('point');
+}
+
+/** Allocation-free frame step. Clears and fills the caller's event buffer, retaining ball and score identities.
+ * Substeps prevent tunnelling through the tabletop, net or paddles at normal display rates. */
+export function stepMatchInPlace(state: Match, seconds: number, player: number, events: GameEvent[]): void {
+  events.length = 0;
+  state.player = paddleX(player);
+  if (state.winner || !Number.isFinite(seconds) || seconds <= 0) return;
   let remaining = Math.min(seconds, 0.1);
-  function point(side: Side) {
-    state.score[side]++;
-    state.winner = state.score[side] >= COURT.winningScore ? side : null;
-    state.lastHit = (state.score.player + state.score.ai) % 2 ? 'player' : 'ai';
-    state.ball = serve(state.lastHit);
-    state.bounces = 0;
-    state.pause = 0.8;
-    events.push('point');
-  }
   while (remaining > 1e-8) {
     const dt = Math.min(remaining, 1 / 240);
     remaining -= dt;
@@ -57,13 +73,13 @@ export function stepMatch(previous: Match, seconds: number, player: number): { s
     b.vy -= 7.5 * dt;
     // A low crossing hits the net; the hitter loses the rally.
     if (oldZ * b.z <= 0 && oldZ !== b.z && b.y - COURT.radius <= COURT.net && Math.abs(b.x) <= COURT.halfWidth) {
-      point(other(state.lastHit)); break;
+      point(state, other(state.lastHit), events); break;
     }
     const onTable = Math.abs(b.x) <= COURT.halfWidth && Math.abs(b.z) <= COURT.halfLength;
     if (onTable && oldY >= COURT.radius && b.y <= COURT.radius && b.vy < 0) {
       const landing: Side = b.z > 0 ? 'player' : 'ai';
-      if (landing === state.lastHit) { point(other(state.lastHit)); break; }
-      if (state.bounces > 0) { point(state.lastHit); break; }
+      if (landing === state.lastHit) { point(state, other(state.lastHit), events); break; }
+      if (state.bounces > 0) { point(state, state.lastHit, events); break; }
       state.bounces++;
       b.y = COURT.radius + (COURT.radius - b.y);
       b.vy = Math.abs(b.vy) * 0.88;
@@ -74,7 +90,7 @@ export function stepMatch(previous: Match, seconds: number, player: number): { s
     const crossing = side === 'player' ? oldZ < end && b.z >= end : oldZ > end && b.z <= end;
     const paddle = side === 'player' ? state.player : state.ai;
     if (crossing && Math.abs(b.x - paddle) <= COURT.paddle + COURT.radius && b.y >= COURT.radius && b.y <= 0.65) {
-      if (state.bounces !== 1) { point(other(side)); break; }
+      if (state.bounces !== 1) { point(state, other(side), events); break; }
       const angle = clamp((b.x - paddle) / COURT.paddle, -1, 1);
       b.vx = angle * 1.25;
       b.vz = side === 'player' ? -2.6 : 2.6;
@@ -85,8 +101,7 @@ export function stepMatch(previous: Match, seconds: number, player: number): { s
       events.push('hit');
     }
     if (Math.abs(b.z) > COURT.halfLength + 0.25 || b.y < -0.25) {
-      point(state.bounces ? state.lastHit : other(state.lastHit)); break;
+      point(state, state.bounces ? state.lastHit : other(state.lastHit), events); break;
     }
   }
-  return { state, events };
 }
