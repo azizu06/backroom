@@ -60,30 +60,48 @@ const theme = (name: "light" | "dark") => {
   return values;
 };
 
-// [text, plate] pairs the office chrome uses, in both themes.
-const CHROME_PAIRS: Array<[string, string]> = [
+// [text, plate] pairs the office chrome uses. Dark panels carry --ink on --paper in both themes;
+// pastel plates (yellow, aqua, blush) always carry dark navy ink (the light --ink).
+const PANEL_PAIRS: Array<[string, string]> = [
   ["ink", "paper"],
   ["ink-soft", "paper"],
   ["office-navy", "office-cream"],
   ["office-slate", "office-cream"],
-  ["office-navy", "office-blush"],
-  ["office-navy", "office-peach"],
-  ["office-navy", "office-aqua"],
-  ["office-cream", "office-navy"],
+  ["office-cream", "office-navy"], // Play interact button, pressed agent-talk chips
 ];
+const PASTEL_PLATES = ["office-peach", "office-aqua", "office-blush", "pastel-aqua", "pastel-yellow"];
+const PASTEL_TEXT_SELECTORS = [".play-chat-off button", ".coworker-bubble", ".office-disconnected", ".room-inspector button", ".play-panel button", ".story-mode button",
+  ".office-sound-toggle[aria-pressed='true']", ".agent-talk-line", ".agent-talk-recent li[data-tone='fail']", ".agent-talk-recent li[data-tone='correction']"];
 
 describe.each(["light", "dark"] as const)("office chrome tokens (%s)", name => {
   const values = theme(name);
   it("use AJ's token names with the palette's values", () => {
     for (const [key, value] of Object.entries(CHROME[name])) expect(values.get(key), key).toBe(value);
   });
-  it.each(CHROME_PAIRS)("%s text on %s is at least 4.5:1", (fg, bg) => {
+  it("keep the pastel accents on peach and aqua plates", () => {
+    expect(values.get("office-peach")).toBe(CHROME[name]["pastel-yellow"]);
+    expect(values.get("office-aqua")).toBe(CHROME[name]["pastel-aqua"]);
+  });
+  it.each(PANEL_PAIRS)("%s text on %s is at least 4.5:1", (fg, bg) => {
     expect(ratio(values.get(fg)!, values.get(bg)!)).toBeGreaterThanOrEqual(4.5);
   });
-  it("keeps navy ink on the pastel accent chips", () => {
-    for (const accent of ["pastel-aqua", "pastel-yellow"]) expect(ratio(CHROME.light.ink, values.get(accent)!)).toBeGreaterThanOrEqual(4.5);
+  it.each(PASTEL_PLATES)("dark navy ink on %s is at least 4.5:1", plate => {
+    expect(ratio(CHROME.light.ink, values.get(plate)!)).toBeGreaterThanOrEqual(4.5);
   });
   it("has a focus ring visible against paper", () => {
     expect(ratio(values.get("focus")!, values.get("paper")!)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("office chrome dark theme", () => {
+  const dark = css("office-tokens.css").slice(css("office-tokens.css").indexOf(".office-shell[data-theme=dark] {"));
+  it("uses AJ's deep lavender and no invented plate overrides", () => {
+    expect(theme("dark").get("office-lavender")).toBe("#34406A");
+    expect(dark).not.toMatch(/--office-(peach|aqua|blush|plate-shadow):/);
+  });
+  it("gives every pastel plate dark navy ink", () => {
+    const rule = dark.slice(dark.indexOf(":is("), dark.indexOf("{ color: #19213B; }"));
+    expect(rule.length).toBeGreaterThan(0);
+    for (const selector of PASTEL_TEXT_SELECTORS) expect(rule, selector).toContain(selector);
   });
 });
