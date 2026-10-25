@@ -80,12 +80,29 @@ export function focusAskWhy(question?: string) {
 
 function PlaySettingsDialog({ settings, change, close }: { settings: PlaySettings; change: (next: PlaySettings) => void; close: () => void }) {
   const headingId = useId();
+  const [groups, setGroups] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('backroom.office.play-settings-groups.v1') ?? '{}');
+      return { controls: saved?.controls !== false, feel: saved?.feel === true };
+    } catch { return { controls: true, feel: false }; }
+  });
+  const rememberGroup = (group: 'controls' | 'feel', open: boolean) => {
+    setGroups(previous => previous[group] === open ? previous : { ...previous, [group]: open });
+  };
+  useEffect(() => {
+    try { localStorage.setItem('backroom.office.play-settings-groups.v1', JSON.stringify(groups)); } catch { /* Storage is optional. */ }
+  }, [groups]);
   const first = useRef<HTMLInputElement>(null);
-  useEffect(() => { first.current?.focus(); }, []);
+  const controlsSummary = useRef<HTMLElement>(null);
+  useEffect(() => {
+    (first.current?.getClientRects().length ? first.current : controlsSummary.current)?.focus();
+  }, []);
   return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <header><h2 id={headingId}>Play Settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
+    <details className='play-setting-group' open={groups.controls} onToggle={event => rememberGroup('controls', event.currentTarget.open)}>
+      <summary ref={controlsSummary}>Controls</summary>
     <label className='play-setting'><span>Look sensitivity <output>{formatMultiplier(settings.sensitivity)}</output></span>
       <input ref={first} aria-label='Look sensitivity' type='range' min={SENSITIVITY_RANGE.min} max={SENSITIVITY_RANGE.max} step={SENSITIVITY_RANGE.step} value={settings.sensitivity}
         onChange={event => change({ ...settings, sensitivity: Number(event.target.value) })} />
@@ -97,7 +114,12 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
     <label className='play-setting play-setting-check'>
       <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked })} /> Invert Y (look)
     </label>
-    <fieldset className='play-setting-group'><legend>Movement Feel</legend>
+    </details>
+    <details className='play-setting-group' open={groups.feel} onToggle={event => rememberGroup('feel', event.currentTarget.open)}>
+      <summary aria-labelledby={`${headingId}-feel`} aria-describedby={`${headingId}-motion-note`}>
+        <span id={`${headingId}-feel`}>Movement Feel</span>
+        <span id={`${headingId}-motion-note`} className='play-settings-note'>All three stay off while your system asks to reduce motion.</span>
+      </summary>
       <label className='play-setting play-setting-check'>
         <input type='checkbox' checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked })} /> Smooth movement
       </label>
@@ -107,8 +129,7 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
       <label className='play-setting play-setting-check'>
         <input type='checkbox' checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked })} /> Field-of-view kick
       </label>
-      <p className='play-settings-note'>All three stay off while your system asks to reduce motion.</p>
-    </fieldset>
+    </details>
     <p className='play-settings-note'>Saved in this browser only.</p>
     <button className='play-settings-reset' onClick={() => change(DEFAULT_PLAY_SETTINGS)}>Reset to defaults</button>
   </section>;
