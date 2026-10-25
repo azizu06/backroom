@@ -121,3 +121,14 @@ describe('dialogue follows the handoff choreography', () => {
     expect(out).toEqual([]);
   });
 });
+
+it('projects short live chat captions without echoing invoice payloads', () => {
+  const payload = row({ fromRole: 'extractor', toRole: 'vendor', caseDisplayId: 'INV-4481',
+    reason: 'bankAccountId bank-master:harbor amount 85000 cents USD', summary: 'SECRET', line: 'SECRET' });
+  const cues = agentChatTimeline(planHandoffs([payload]), 'Live handoff');
+  expect(cues.length).toBeGreaterThan(0);
+  for (const cue of cues) {
+    expect(cue.text).toBe('Extractor → Vendor · INV-4481 · verifying vendor bank details');
+    expect(cue.text).not.toMatch(/SECRET|85000|cents|bank-master/);
+  }
+});

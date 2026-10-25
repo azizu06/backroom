@@ -21,6 +21,11 @@ it('creates a short-lived code only from the ALLOW plan and binds resolution to 
   const active = await activePaymentDelivery(store);
   expect(active).toMatchObject({ code: sent.short_code, amountCents: 247500, expiresAt: sent.expires_at });
   expect(active).not.toHaveProperty('path');
+  const linkId = (await store.findPaymentCode(sent.short_code))!.links[0]!.id;
+  expect(await activePaymentDelivery(store, Date.now(), id => id === linkId)).toBeUndefined();
+  expect(await activePaymentDelivery(store, Date.now(), id => id === 'another-link')).toEqual(active);
+  // The paid page still resolves, so the payer can read the matched receipt.
+  expect(await resolvePaymentCode(store, sent.short_code)).toMatchObject({ path: sent.link_path });
   expect(resolved).toMatchObject({ amountCents: 247500, path: sent.link_path });
   expect(await resolvePaymentCode(store, sent.short_code, sent.expires_at)).toBeUndefined();
   expect(await resolvePaymentCode(store, 'UNKNOWN')).toBeUndefined();

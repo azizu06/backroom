@@ -1,4 +1,8 @@
 import { afterEach, expect, it } from 'vitest';
+import { NessieClient } from '@backroom/nessie';
+import { PaymentService } from '@backroom/orchestrator';
+import { authorizedPaymentLink } from './authorization';
+import { installPaymentService } from './runtime';
 import { MemoryStateStore } from '@backroom/orchestrator';
 import { GET as activePayment } from '../../app/api/pay/active/route';
 import { GET as paymentCode } from '../../app/p/[code]/route';
@@ -76,4 +80,26 @@ it('keeps a public HTTPS link unmarked and refuses a remote name that only looks
   expect(await refused.json()).toEqual({ error: 'PAYMENT_DELIVERY_UNAVAILABLE' });
   const redirect = await paymentCode(new Request('http://localhost.example.com/p/' + sent.short_code), { params: Promise.resolve({ code: sent.short_code }) });
   expect(redirect.status).toBe(503);
+});
+
+it('clears toast and nav readiness after payment is recorded while keeping the receipt page resolvable', async () => {
+  const sent = await authorizeLink();
+  process.env.DEMO_TUNNEL = '0';
+  process.env.DEMO_PUBLIC_URL = 'http://127.0.0.1:3300';
+  const call = (await getGatewayStore().findPaymentCode!(sent.short_code))!;
+  const link = call.links[0]!;
+  const root = globalThis as typeof globalThis & { backroomPaymentService?: PaymentService };
+  const previousService = root.backroomPaymentService;
+  const bank = new NessieClient({ apiKey: 'test', claims: { claim: async () => true },
+    fetch: async (_url, init) => init?.method === 'POST' ? Response.json({ objectCreated: { _id: 'deposit-1', ...JSON.parse(String(init.body)) } }) : Response.json(String(_url).includes('/deposits') ? [] : { balance: 0 }) });
+  const service = new PaymentService({ bank, accountId: 'test-account', lookup: async id => authorizedPaymentLink(call, id) });
+  installPaymentService(service);
+  try {
+    expect((await (await activePayment()).json()).active.code).toBe(sent.short_code);
+    await service.pay(link.id);
+    // Both the office toast and nav poll this same projection.
+    expect(await (await activePayment()).json()).toEqual({ active: null });
+    const redirect = await paymentCode(new Request(`http://127.0.0.1:3300/p/${sent.short_code}`), { params: Promise.resolve({ code: sent.short_code }) });
+    expect(redirect.status).toBe(303);
+  } finally { root.backroomPaymentService = previousService; }
 });

@@ -21,7 +21,7 @@ export interface X402ConsoleResult {
   transaction?: string; explorer?: string; holdId?: string; proof?: { vendorRequests: number; signatures: number };
   paymentAuditHref?: string; auditEntryIds?: string[];
 }
-const VENDOR = 'Acme Supply (demo)', VENDOR_ID = 'acme-x402', DOMAIN = 'acme.example';
+const VENDOR = 'Acme Supply', VENDOR_ID = 'acme-x402', DOMAIN = 'acme.example';
 const lower = (value: string) => value.toLowerCase();
 const usd = (cents: number) => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const NOTES: Record<X402Label, string> = {
@@ -32,8 +32,9 @@ const NOTES: Record<X402Label, string> = {
 /** Testnet stays off unless the host opted in AND the macOS Keychain wallet exists. Never reads a secret. */
 export function x402TestnetAvailability(env: Record<string, string | undefined> = process.env,
   platform: NodeJS.Platform = process.platform, keyPresent = testnetKeyPresent) {
-  if (env.X402_LIVE !== '1') return { available: false, reason: 'Testnet is off. Restart the demo host with X402_LIVE=1 to opt in. Simulated is available.' };
-  if (platform !== 'darwin') return { available: false, reason: `Testnet needs the macOS Keychain signer; this host is ${platform}. Simulated is available.` };
+  if (root.backroomX402TestnetResult) return { available: false, reason: 'Already paid this session', lastResult: structuredClone(root.backroomX402TestnetResult) };
+  if (env.X402_LIVE !== '1') return { available: false, reason: 'Testnet is off. Host opt-in requires X402_LIVE=1. OFFLINE is available.' };
+  if (platform !== 'darwin') return { available: false, reason: `Testnet needs the macOS Keychain signer; this host is ${platform}. OFFLINE is available.` };
   if (!keyPresent('payer') || !keyPresent('vendor')) return { available: false,
     reason: 'No x402 testnet wallet in Keychain. Run pnpm --filter @backroom/orchestrator x402:wallet and fund the payer at faucet.circle.com.' };
   return { available: true as const };
@@ -61,7 +62,7 @@ function mockFacilitator(): FacilitatorClient {
 }
 
 // Testnet keeps one repository per host process: a second click replays the receipt instead of paying again.
-const root = globalThis as typeof globalThis & { backroomX402Testnet?: MemoryFinanceRepository };
+const root = globalThis as typeof globalThis & { backroomX402Testnet?: MemoryFinanceRepository; backroomX402TestnetResult?: X402ConsoleResult };
 function seed(invoice: InvoiceFields, accountId: string) {
   return new MemoryFinanceRepository({ vendors: [{ id: VENDOR_ID, domain: DOMAIN, accountId, approved: true, revision: 1 }],
     purchaseOrders: invoice.poId ? [{ id: invoice.poId, vendorId: VENDOR_ID, amountCents: invoice.amountCents, lineItems: invoice.lineItems }] : [] });
@@ -75,6 +76,7 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
   env?: Record<string, string | undefined>; platform?: NodeJS.Platform; keyPresent?: typeof testnetKeyPresent;
   /** Tests only: observe the simulated signer. */ simulatedKey?: () => `0x${string}`;
 } = {}): Promise<X402ConsoleResult> {
+  if (run === 'testnet' && root.backroomX402TestnetResult) return { ...structuredClone(root.backroomX402TestnetResult), replay: true };
   const label = run === 'testnet' ? X402_LABEL : X402_SIMULATED_LABEL;
   if (run === 'testnet') {
     const gate = x402TestnetAvailability(options.env, options.platform, options.keyPresent);
@@ -87,7 +89,7 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
   else { payer = privateKeyToAccount((options.simulatedKey ?? generatePrivateKey)()); recipient = privateKeyToAccount(generatePrivateKey()).address; }
   const accountId = `x402:${X402_NETWORK}:${recipient}`;
   const invoiceId = run === 'testnet' ? 'acme-x402-inapp-1' : `acme-x402-${run}-${tag}`;
-  const lineItems = [{ description: run === 'blocked' ? 'Acme standing desks (over limit)' : 'Acme demo office supplies', quantity: 1, unitPriceCents: amountCents }];
+  const lineItems = [{ description: run === 'blocked' ? 'Acme standing desks (over limit)' : 'Acme office supplies', quantity: 1, unitPriceCents: amountCents }];
   const invoice: InvoiceFields = { kind: 'invoice', invoiceId, vendorId: VENDOR_ID, poId: `po-${invoiceId}`, amountCents, currency: 'USD', bankAccountId: accountId, lineItems };
   const repository = run === 'testnet' ? root.backroomX402Testnet ??= seed(invoice, accountId) : seed(invoice, accountId);
 
@@ -127,7 +129,7 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
   } finally { await vendor?.close(); }
   const proof = audits.find(row => row.action.endsWith('_completed')) ?? audits.find(row => row.action === 'pay_invoice') ?? audits.at(-1);
   const paid = result.status === 'paid';
-  return {
+  const receipt: X402ConsoleResult = {
     rail: label, note: NOTES[label], scenario: run, status: result.status, replay,
     vendor: VENDOR, invoiceId, amount: usd(amountCents), amountCents, asset: run === 'testnet' ? 'Base Sepolia test USDC' : 'simulated USDC',
     network: X402_NETWORK, payer: payer.address, recipient,
@@ -140,4 +142,6 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
     // An allow run that did not settle is a failure to show, not a silent hold.
     ...(run !== 'blocked' && !paid ? { failed: true as const, reason: 'Payment held; open the payment audit and reconcile before retrying.' } : {}),
   };
+  if (run === 'testnet' && paid) root.backroomX402TestnetResult = structuredClone(receipt);
+  return receipt;
 }
