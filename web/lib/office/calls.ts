@@ -1,3 +1,4 @@
+import { isReplayPage } from '../replay/mode';
 import { createMockCallFeed } from './calls-mock';
 import type { PrecallCard } from '../calls/precall';
 
@@ -70,6 +71,7 @@ const CALL_FEED_ENDPOINT = '/api/calls/active';
 export const CALL_UNLOCK_PATH = '/calls';
 export type CallRequestResult = { ok: boolean; reason?: 'unavailable' | 'failed' | 'locked'; message: string };
 export async function requestCall(_input?: unknown): Promise<CallRequestResult> {
+  if (isReplayPage()) return { ok: false, reason: 'unavailable', message: 'Replay: no call placed' };
   if (!CALL_REQUEST_ENDPOINT) return { ok: false, reason: 'unavailable', message: 'Call requests not available yet' };
   // The scripted preview never reaches the real dial route.
   if (typeof window !== 'undefined' && isMockCalls(window.location.search)) return { ok: false, reason: 'unavailable', message: 'Scripted call: no call placed' };
@@ -88,11 +90,12 @@ const FEED_IDLE_AFTER_FAILURES = 3;
 const FEED_BACKOFF_CAP = 8;
 /** Polls the host's read-only call projection. Pauses while the tab is hidden, the same way office ambience does. A failed poll backs off and drops the phone to idle after a few failures. */
 export function pollCallFeed(apply: (state: CallState) => void, intervalMs = 1500): () => void {
+  if (isReplayPage()) return () => {};
   let stopped = false, failures = 0, timer: ReturnType<typeof setTimeout> | undefined;
   const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
   const schedule = (delay: number) => { if (!stopped && !hidden()) timer = setTimeout(tick, delay); };
   const tick = async () => {
-    if (stopped || hidden()) return;
+    if (stopped || hidden() || isReplayPage()) return;
     try {
       const response = await fetch(CALL_FEED_ENDPOINT, { cache: 'no-store' });
       if (!response.ok) throw new Error(String(response.status));
@@ -125,11 +128,11 @@ function notify() { listeners.forEach(listener => listener()); }
 export const callStore = {
   subscribe(listener: () => void) {
     listeners.add(listener);
-    if (listeners.size === 1 && typeof window !== 'undefined' && isMockCalls(window.location.search)) {
+    if (listeners.size === 1 && typeof window !== 'undefined' && !isReplayPage() && isMockCalls(window.location.search)) {
       const params = new URLSearchParams(window.location.search);
       const speed = params.get('callsSpeed') === 'fast' ? 10 : params.get('callsSpeed') === 'slow' ? 0.25 : 1;
       stopFeed = createMockCallFeed(event => { snapshot = callReducer(snapshot, event); notify(); }, speed);
-    } else if (listeners.size === 1 && typeof window !== 'undefined') {
+    } else if (listeners.size === 1 && typeof window !== 'undefined' && !isReplayPage()) {
       stopFeed = pollCallFeed(state => { if (JSON.stringify(state) !== JSON.stringify(snapshot)) { snapshot = state; notify(); } });
     }
     return () => { listeners.delete(listener); if (!listeners.size) { stopFeed?.(); stopFeed = undefined; snapshot = IDLE_CALL; } };
@@ -148,7 +151,7 @@ export const precallStore = {
   getSnapshot: () => precall,
   getServerSnapshot: (): PrecallCard | null => null,
   async load(): Promise<void> {
-    if (typeof window === 'undefined' || isMockCalls(window.location.search)) return;
+    if (typeof window === 'undefined' || isReplayPage() || isMockCalls(window.location.search)) return;
     try {
       const response = await fetch(PRECALL_ENDPOINT, { cache: 'no-store' });
       if (!response.ok) throw new Error(String(response.status));

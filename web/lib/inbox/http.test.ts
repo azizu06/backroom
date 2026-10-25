@@ -52,6 +52,19 @@ describe('judge inbox HTTP boundary', () => {
     });
   });
 
+  it('the trusted workday hold mode cannot debit even with a configured live sandbox', async () => {
+    const state = new MemoryStateStore(), fetcher = vi.fn<typeof fetch>();
+    const preset = inboxPresets.find(row => row.id === '4401')!;
+    const handler = createInboxHTTP({ store: () => state, paymentMode: 'hold', fetch: fetcher,
+      agents: async () => {}, env: { DEMO_LIVE: '1', NESSIE_API_KEY: 'test', NESSIE_ACCOUNT_ID: 'test' } });
+    const response = await handler(submission({ ...preset, presetId: preset.id }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'held', notice: expect.stringContaining('Payment execution is unavailable') });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect((await state.listAudit()).some(row => row.action === 'workday_invoice_hold')).toBe(true);
+    expect((await state.listAudit()).some(row => ['pay_invoice', 'nessie_completed'].includes(row.action))).toBe(false);
+  });
+
   it('a narration failure cannot replace the recorded inbox response', async () => {
     const state = new MemoryStateStore();
     const agents = vi.fn().mockRejectedValue(new Error('SDK unavailable'));

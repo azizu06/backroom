@@ -37,6 +37,20 @@ describe('anonymous office projection', () => {
     data.seats = [];
     expect(projectOfficeRows(data)).toMatchObject({ agents: [], badges: [] });
   });
+  it('uses friendly names and keeps the newest presence per seat', () => {
+    const data = rows();
+    data.agents = [
+      { ...data.agents[0]!, id: 'payables-1', state: 'offline' },
+      { ...data.agents[0]!, id: 'demo:payables', state: 'offline', heartbeatAt: new Timestamp(2000000n) },
+      { ...data.agents[0]!, id: 'demo:worker:payables', state: 'idle', heartbeatAt: new Timestamp(3000000n) },
+    ];
+    expect(projectOfficeRows(data).agents).toMatchObject([
+      { id: 'demo:worker:payables', name: 'Sam', state: 'Idle', rowAt: 3000 },
+    ]);
+    expect(projectOfficeRows(data).agents).toHaveLength(1);
+    data.agents = [{ ...data.agents[0]!, state: 'offline' }];
+    expect(projectOfficeRows(data).agents[0]).toMatchObject({ name: 'Sam', state: 'Away' });
+  });
   it('does not invent a folder, target, badge or room for incomplete rows', () => {
     const data = rows();
     data.escalations[0]!.status = 'approved';

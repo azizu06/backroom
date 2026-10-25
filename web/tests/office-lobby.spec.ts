@@ -112,6 +112,7 @@ test('office shows the lobby summary and agent roster without page errors', asyn
 });
 
 test('office ask-why pauses on a broken chain and resumes when verified', async ({ page }) => {
+  await page.route('**/api/audit/session', route => route.fulfill({ json: { signedIn: true } }));
   let valid = false;
   await page.route('**/api/audit/entries', route => route.fulfill({ json: {
     entries: [], chain: { valid, length: 0, ...(valid ? {} : { firstBrokenSeq: 1, reason: 'hash mismatch' }) },

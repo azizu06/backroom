@@ -6,9 +6,10 @@ import { OFFICE_ANCHORS, anchorLabel, isAnchorId, type OfficeAgent, type OfficeA
  * HUD variant (c), diegetic: the facts the bottom dashboard strip used to show, shaped for in-world
  * signs. Pure view data only; the scene paints it and never decides anything from it.
  */
-export type PlateTone = 'working' | 'held' | 'denied' | 'away' | 'stale';
+export type PlateTone = 'working' | 'idle' | 'held' | 'denied' | 'away' | 'stale';
 
 export const PLATE_TONES: Record<PlateTone, { label: string; color: string }> = {
+  idle: { label: 'Idle', color: PALETTE.mint },
   working: { label: 'Working', color: PALETTE.mint },
   held: { label: 'Held for a human', color: PALETTE.butter },
   denied: { label: 'Denied', color: ROLES.deny },
@@ -41,8 +42,8 @@ export function deskPlate(snapshot: OfficeSnapshot, agent: OfficeAgent): DeskPla
   const tone: PlateTone = snapshot.connection === 'disconnected' ? 'stale'
     : agent.escalationId ? 'held'
     : last?.decision === 'DENY' ? 'denied'
-    : away ? 'away' : 'working';
-  const status = tone === 'away' ? `Away · at ${anchorLabel(agent.targetAnchor)}`
+    : away || agent.state === 'Away' ? 'away' : /^(idle|inactive)$/i.test(agent.state) ? 'idle' : 'working';
+  const status = tone === 'away' ? agent.state === 'Away' ? 'Away' : `Away · at ${anchorLabel(agent.targetAnchor)}`
     : tone === 'held' ? `${PLATE_TONES.held.label} · folder to ${anchorLabel(agent.targetAnchor)}`
     : tone === 'denied' ? `${PLATE_TONES.denied.label} · ${last?.ruleIds[0] ?? 'policy'}`
     : PLATE_TONES[tone].label;
