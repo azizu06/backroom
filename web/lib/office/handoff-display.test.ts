@@ -82,7 +82,8 @@ describe('public handoff display', () => {
     expect(panel.handoff!.status).toBe('done · Vendor verifier finished its turn');
     expect(panel.entries[0]!.decision).toBe('DONE');
     const plan = planHandoffs([done]);
-    expect(plan.bubbles.every(bubble => bubble.tone === 'info' && bubble.text.includes('done · Vendor verifier finished its turn'))).toBe(true);
+    expect(plan.bubbles.length).toBeGreaterThan(0);
+    expect(plan.bubbles.every(bubble => bubble.tone === 'info' && bubble.text === 'Extractor → Vendor · INV-42 · finished the handoff')).toBe(true);
     expect(handoffLine(done)).not.toMatch(/success|✓|✔/i);
   });
   it('renders rejected history separately from neutral completed handoffs in the registered panel', () => {
