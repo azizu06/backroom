@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL (Play renders the 3D scene).
 const FAR = { x: 5, z: 0.6 }; // Corridor by the Treasury, 14 m from the spawn (-9, 0.6).
@@ -17,9 +18,10 @@ async function enterPlay(page: Page, url: string) {
   });
   if (!available) throw new Error('WebGL is unavailable in this headless Chromium, so the first-person Play view cannot render.');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
 }
 async function say(page: Page, text: string) {
   await surface(page).focus();

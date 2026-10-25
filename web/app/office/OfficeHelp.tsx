@@ -85,7 +85,7 @@ export function OfficeHelp() {
   function closeGuide() { setGuideOpen(false); guideOpener.current?.focus(); }
   function closeShortcuts() { setShortcutsOpen(false); }
   return <>
-    <button ref={guideOpener} type="button" className="office-guide-trigger" onClick={() => setGuideOpen(true)}>Demo guide</button>
+    <button ref={guideOpener} type="button" className="office-guide-trigger" onClick={() => setGuideOpen(true)}>Guide</button>
     <DemoGuide open={guideOpen} onClose={closeGuide} />
     <KeyboardShortcuts open={shortcutsOpen} onClose={closeShortcuts} />
   </>;
