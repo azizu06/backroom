@@ -11,6 +11,8 @@ export { createApifyRunner, createPreCallHealthCheck, APIFY_DEMO_COMPANY } from 
 export { fakeCreditCheck, fakeHealthCheck } from './fakes';
 export { recordSignals, signalsFromCrs, signalsFromHealth } from './signals';
 export type { SignalRow, SignalSink } from './signals';
+export { runEmailFollowUp, composeFollowUp, MemoryEmailOutbox, EMAIL_ONLY_RULES, EMAIL_LABEL } from './email';
+export type { EmailFollowUpInput, EmailFollowUpResult, EmailOutbox, SimulatedEmail } from './email';
 
 /** Prepares a plan only. The dial boundary must re-read state and evaluate call_client again. */
 export async function runPreCall(input: PreCallInput, deps: PreCallDependencies): Promise<PreCallResult> {
