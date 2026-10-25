@@ -3,8 +3,9 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { isActive, navLinks, siteNavHidden, whatsRealLink, type SiteNavPlacement } from '../lib/site-nav';
+import { isActive, navLinks, PAYMENT_LINK_HREF, siteNavHidden, whatsRealLink, type SiteNavPlacement } from '../lib/site-nav';
 import { applyTheme, readTheme, type Theme } from '../lib/theme';
+import { useActivePaymentLink } from './useActivePaymentLink';
 import './SiteNav.css';
 
 export function SiteNav({ placement = 'layout' }: { placement?: SiteNavPlacement }) {
@@ -13,13 +14,19 @@ export function SiteNav({ placement = 'layout' }: { placement?: SiteNavPlacement
 
 function SiteNavContent({ placement }: { placement: SiteNavPlacement }) {
   const pathname = usePathname() ?? '';
-  const embed = useSearchParams()?.get('embed') ?? null;
-  if (siteNavHidden(pathname, embed, placement)) return null;
+  const params = useSearchParams();
+  const hidden = siteNavHidden(pathname, params?.get('embed') ?? null, placement);
+  // A live payment link lights up its nav item. The office kiosk and replays show their own state, so only live pages poll.
+  const { link } = useActivePaymentLink({ enabled: !hidden && placement === 'layout' && !params?.has('replay'), intervalMs: 5000 });
+  if (hidden) return null;
   const current = (href: string) => isActive(pathname, href) ? 'page' as const : undefined;
   return <nav className='site-nav' aria-label='Site' data-placement={placement}>
     <Link className='site-nav-brand' href='/office'>Backroom</Link>
     <ul>
-      {navLinks.map(({ label, href }) => <li key={href}><Link href={href} aria-current={current(href)}>{label}</Link></li>)}
+      {navLinks.map(({ label, href }) => {
+        const ready = href === PAYMENT_LINK_HREF && !!link;
+        return <li key={href}><Link href={href} aria-current={current(href)} data-ready={ready || undefined}>{label}{ready && <span className='site-nav-ready'> · ready</span>}</Link></li>;
+      })}
     </ul>
     <Link className='site-nav-real' href={whatsRealLink.href} aria-current={current(whatsRealLink.href)}>{whatsRealLink.label}</Link>
     {/* The office has its own theme toggle. */}

@@ -5,6 +5,6 @@ export default function PaymentLinkDisplay() {
   return <main className='page-frame'>
     <h1 className='page-title'>Call payment link</h1>
     <p className='page-lede'>The link Dana authorized on the current call. Checks for a new link every two seconds.</p>
-    <PaymentLinkPanel />
+    <PaymentLinkPanel payButton />
   </main>;
 }

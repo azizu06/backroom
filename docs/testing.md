@@ -14,7 +14,7 @@ Each config starts its own server (`reuseExistingServer: false`) on a unique por
 |---|---|---|---|
 | `test:approvals:browser` | `playwright.approvals.config.ts` | 3020 | `/controller` passkey approval card |
 | `test:controller:browser` | `playwright.controller.config.ts` | 3036 | `/controller` live inbox: escalation rings in without a link, forged decision rejected |
-| `test:audit:browser` | `playwright.audit.config.ts` | 3031 | `/audit` audit wall |
+| `test:audit:browser` | `playwright.audit.config.ts` | 3031 | `/audit` audit wall, route states, site nav walk from home to every page |
 | `test:payments:browser` | `playwright.payments.config.ts` | 3032 | `/pay` page (`next dev`, `BACKROOM_PAYMENT_DEMO=1`) |
 | `test:inbox:browser` | `playwright.inbox.config.ts` | 3033 | `/inbox` tray |
 | `test:policy:browser` | `playwright.policy.config.ts` | 3034 | `/policy` editor |

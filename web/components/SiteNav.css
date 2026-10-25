@@ -8,6 +8,8 @@
 .site-nav .site-nav-real { flex-shrink: 0; margin-left: auto; color: var(--ink-soft); font-weight: 700; }
 .site-nav a:hover { color: var(--on-pastel); background: var(--pastel-aqua); }
 .site-nav a[aria-current='page'] { color: var(--on-pastel); background: var(--pastel-yellow); }
+.site-nav a[data-ready] { color: var(--on-pastel); background: var(--pastel-aqua); }
+.site-nav-ready { margin-left: 4px; font-weight: 900; }
 .site-nav a:focus-visible, .site-nav-theme:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
 .site-nav-theme { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; color: var(--on-pastel); background: var(--pastel-yellow); border: 0; border-radius: 50%; font: 18px/1 system-ui, sans-serif; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .site-nav a { transition: none; } }
