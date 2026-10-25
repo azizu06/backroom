@@ -12,6 +12,7 @@ import { MemoryGatewayStore, type GatewayCall } from '../gateway/store';
 import { createApprovalBridge } from '../approvals/gateway';
 import { authorizedPaymentLink } from '../payments/authorization';
 import { installPaymentService } from '../payments/runtime';
+import { recoverDemoPayments, selectRecoverableLinkIds } from './recover-payments';
 import type { DemoStatus } from '../../../tools/demo/health';
 
 export async function createDemoRuntime() {
@@ -119,6 +120,18 @@ export async function createDemoRuntime() {
         await state.completeTask(lease, 'done', Date.now());
       }) });
     installPaymentService(service);
+    // Recover before the 5s sweep so a deposit with no receipt is already pending.
+    // Link ids were minted above. A memo deposit that already existed belongs to an older id.
+    try {
+      const prior = await services.bank.listDeposits(services.accountId);
+      const call = await gatewayStore.activePaymentCall();
+      const links = call ? call.links.map(row => ({ id: row.id, invoiceId: call.invoiceId, installment: 1 })) : [];
+      const decision = selectRecoverableLinkIds(links, prior, links.map(row => row.id));
+      for (const skipped of decision.skipped) console.error('demo payment recovery skipped', skipped);
+      await recoverDemoPayments(service, decision.ids, state);
+    } catch (error) {
+      console.error('demo payment recovery failed', error);
+    }
     armRetry(service);
     const effects = new FakeEffects(await createNorthfieldRepository());
     const seats: Seat[] = ['collections', 'payables', 'vendor_onboarding'];
