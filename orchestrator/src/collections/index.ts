@@ -4,6 +4,7 @@ import { boundedHealthCheck, boundedCreditCheck } from './checks';
 import { CallPlannerUnavailableError, sanitizeCallPlannerFailure } from './planner';
 import type { AuditInput } from '../store';
 import type { PreCallInput, PreCallDependencies, PreCallResult } from './types';
+const CRS_SANDBOX_OFAC_WARNING = 'Sanctions check not available in CRS sandbox';
 export type * from './types';
 export { createPreCallCreditCheck, createCrsPublicRecordsCheck } from './crs';
 export { createCallPlanner, CallPlannerUnavailableError } from './planner';
@@ -71,14 +72,21 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   const checked = evaluate('collections', { type: 'call_client' }, context);
   await audit('pre_call_permit', { decision: checked.kind, ruleIds: checked.ruleIds, inputs: { decision: checked } });
   if (checked.kind !== 'ALLOW') return stop(checked);
-  if (!credit || credit.ofacStatus !== 'clear') {
+  const demoOverride = input.context.demoOverride?.visible === true && input.context.demoOverride.logged === true;
+  const unavailableOfacOverride = demoOverride && credit?.ofacStatus === 'unknown'
+    && credit.ofacAvailability === 'not available in sandbox';
+  if (!credit || (credit.ofacStatus !== 'clear' && !unavailableOfacOverride)) {
     await audit('pre_call_blocked', { decision: 'DENY', inputs: { reason: 'Credit/OFAC check unavailable' } });
     return { status: 'blocked', reason: 'Credit/OFAC check unavailable' };
   }
+  if (unavailableOfacOverride) await audit('demo_ofac_unavailable_override', { decision: 'ALLOW', ruleIds: ['DEMO_OVERRIDE'],
+    inputs: { warning: CRS_SANDBOX_OFAC_WARNING, ofacAvailability: credit.ofacAvailability } });
   // C17: the call may proceed, but Dana sees a warning and identity comes before any invoice detail.
   // Recorded only once the call can still go ahead, so a blocked call never leaves an ALLOW row.
-  const warnings = context.signals?.active?.includes('phone_mismatch') ? ['PHONE_MISMATCH_WARN'] : [];
-  if (warnings.length) await audit('phone_mismatch_warn', { decision: 'ALLOW', ruleIds: warnings,
+  const phoneMismatch = context.signals?.active?.includes('phone_mismatch') === true;
+  const warnings = [...(phoneMismatch ? ['PHONE_MISMATCH_WARN'] : []),
+    ...(unavailableOfacOverride ? [CRS_SANDBOX_OFAC_WARNING] : [])];
+  if (phoneMismatch) await audit('phone_mismatch_warn', { decision: 'ALLOW', ruleIds: ['PHONE_MISMATCH_WARN'],
     inputs: { identityCaution: true, ownerWarning: 'The number on file differs from the public listing; confirm identity before any invoice detail.' } });
   const envelope = computeEnvelope(policy, context.signals?.active);
   await audit('envelope', { inputs: { envelope } });
