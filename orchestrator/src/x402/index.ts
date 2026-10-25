@@ -25,6 +25,8 @@ export interface X402Options {
   /** Trusted bootstrap config, never a field extracted from an invoice. */
   vendorOrigin?: string; fetch?: typeof fetch; signer?: () => Signer | Promise<Signer>;
   confirm?: (transfer: Transfer) => Promise<void>;
+  /** Trusted console/CLI opt-in only; defaults retain the existing 120s cap. */
+  maxAuthorizationSeconds?: 120 | 600;
   /** Simulated runs must also inject signer and confirm; the label never selects a network. */
   label?: X402Label;
 }
@@ -114,7 +116,7 @@ export function x402Payables(options: X402Options): PayablesClient {
         const amount = String(BigInt(input.amountCents) * 10_000n);
         const valid = (req: PaymentRequirements) => req.scheme === 'exact' && req.network === X402_NETWORK &&
           lower(req.asset) === lower(X402_USDC) && lower(req.payTo) === lower(payTo) && req.amount === amount &&
-          req.maxTimeoutSeconds > 0 && req.maxTimeoutSeconds <= 120 &&
+          req.maxTimeoutSeconds > 0 && req.maxTimeoutSeconds <= (options.maxAuthorizationSeconds ?? 120) &&
           req.extra?.name === 'USDC' && req.extra?.version === '2' &&
           (!req.extra.assetTransferMethod || req.extra.assetTransferMethod === 'eip3009') &&
           (!req.extra.paymentFlow || req.extra.paymentFlow === 'authorization');

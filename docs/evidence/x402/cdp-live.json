@@ -1,0 +1,334 @@
+{
+  "label": "x402 testnet",
+  "network": "eip155:84532",
+  "tool": "mcp__backroom__coinbase_x402_pay",
+  "walletLabel": "Coinbase CDP server wallet",
+  "settlementMethod": "public x402 facilitator",
+  "facilitatorBypassed": false,
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "recipient": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+  "invoiceId": "acme-x402-inapp-1",
+  "amountCents": 1,
+  "status": "paid",
+  "verdict": "ALLOW",
+  "ruleIds": [
+    "IN_BADGE"
+  ],
+  "policyVersion": 1,
+  "policySentence": "Collections may read accounts receivable and manage client collections, Payables may read invoices and purchase orders and pay eligible invoices, and Vendor onboarding may run CRS and Apify checks and propose vendors or bank changes.",
+  "rail": "x402 testnet",
+  "receiptId": "0xff9d026523db51c01609f70c9a59fa4668a5bf42162c2b8a108f46f1f5dc62c4",
+  "evidenceRefs": [
+    "invoice:cdp-testnet",
+    "acme-x402-inapp-1"
+  ],
+  "facilitatorDiagnostics": [
+    {
+      "stage": "verify",
+      "success": true
+    },
+    {
+      "stage": "settle",
+      "success": true
+    }
+  ],
+  "explorer": "https://sepolia.basescan.org/tx/0xff9d026523db51c01609f70c9a59fa4668a5bf42162c2b8a108f46f1f5dc62c4",
+  "auditChain": {
+    "length": 9,
+    "headHash": "e1aaf1a291ef5b877f045b5b632dcac1c4723bde728e781bc4602ddbc5f8271b",
+    "valid": true,
+    "firstBrokenSeq": null
+  },
+  "audit": [
+    {
+      "action": "pay_invoice",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:1",
+      "inputs": {
+        "bankChanged": false,
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "fence": "not_applicable",
+        "invoiceId": "acme-x402-inapp-1",
+        "paymentRail": "x402 testnet",
+        "scenario_source": "seed",
+        "senderDomain": "acme.example",
+        "vendorDomain": "acme.example",
+        "vendorId": "acme-x402"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "refs": [
+        "invoice:cdp-testnet",
+        "acme-x402-inapp-1"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 1,
+      "ts": 1792938861790,
+      "hash": "e5301f13b1bc00c30fe75596d1c354b4d3335e3ff8501d080f4d435050e51842"
+    },
+    {
+      "action": "x402_testnet_policy",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:2",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "e5301f13b1bc00c30fe75596d1c354b4d3335e3ff8501d080f4d435050e51842",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 2,
+      "ts": 1792938861791,
+      "hash": "35b8d619941a04337204209ab6cc30bc4a2ae84b22ece6e214e7c0f2ca9d527c"
+    },
+    {
+      "action": "x402_testnet_attempt",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:3",
+      "inputs": {
+        "amountCents": 1,
+        "network": "eip155:84532",
+        "payTo": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "35b8d619941a04337204209ab6cc30bc4a2ae84b22ece6e214e7c0f2ca9d527c",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 3,
+      "ts": 1792938861792,
+      "hash": "04ace2b1bd5f0f690ac93f7b470bf80724c99e20ea6f3e0d31a32fea056eb689"
+    },
+    {
+      "action": "x402_testnet_policy",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:4",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "04ace2b1bd5f0f690ac93f7b470bf80724c99e20ea6f3e0d31a32fea056eb689",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 4,
+      "ts": 1792938861794,
+      "hash": "3141602c76a8585ed3bf5e92c2d617b29b066752942905449ed7a9287c8a48a0"
+    },
+    {
+      "action": "x402_testnet_policy",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:5",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "3141602c76a8585ed3bf5e92c2d617b29b066752942905449ed7a9287c8a48a0",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 5,
+      "ts": 1792938861794,
+      "hash": "815e1534f1873fd2648d76adadecec12515a5bae8cd70297fef62eab5eebc8e6"
+    },
+    {
+      "action": "x402_testnet_wallet",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:6",
+      "inputs": {
+        "network": "eip155:84532",
+        "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+        "paymentRail": "x402 testnet",
+        "walletLabel": "Coinbase CDP server wallet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "815e1534f1873fd2648d76adadecec12515a5bae8cd70297fef62eab5eebc8e6",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 6,
+      "ts": 1792938861794,
+      "hash": "ac3dfe0c10375be8d1b3a85f92e0f38fa4bfdc3ab383a3633dc75b766f3a3d3d"
+    },
+    {
+      "action": "x402_testnet_authorization",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:7",
+      "inputs": {
+        "amount": "10000",
+        "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        "domain": {
+          "chainId": 84532,
+          "name": "USDC",
+          "version": "2"
+        },
+        "network": "eip155:84532",
+        "payTo": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+        "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+        "paymentRail": "x402 testnet",
+        "validAfter": "0",
+        "validBefore": "1792939461"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "ac3dfe0c10375be8d1b3a85f92e0f38fa4bfdc3ab383a3633dc75b766f3a3d3d",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 7,
+      "ts": 1792938862092,
+      "hash": "c93a3a4557474482565bb365d8d98561f0fedeb34af3d905ec18af7596eefa36"
+    },
+    {
+      "action": "x402_testnet_settlement",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:8",
+      "inputs": {
+        "authorizationNonce": "0xd86778dd511c09238ac431ad18afd50e38cdd89e35fcd2562c7c9d889a61353b",
+        "network": "eip155:84532",
+        "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+        "paymentRail": "x402 testnet",
+        "settlementNetwork": "eip155:84532",
+        "success": true,
+        "transaction": "0xff9d026523db51c01609f70c9a59fa4668a5bf42162c2b8a108f46f1f5dc62c4",
+        "walletLabel": "Coinbase CDP server wallet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "c93a3a4557474482565bb365d8d98561f0fedeb34af3d905ec18af7596eefa36",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 8,
+      "ts": 1792938862848,
+      "hash": "b6148791b12fbf2f60d78e9abe0d62e1b92d1548ce016c6882ec0cf499c6eab2"
+    },
+    {
+      "action": "x402_testnet_completed",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:9",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "paymentRail": "x402 testnet",
+        "receiptId": "0xff9d026523db51c01609f70c9a59fa4668a5bf42162c2b8a108f46f1f5dc62c4",
+        "scenario_source": "seed"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "b6148791b12fbf2f60d78e9abe0d62e1b92d1548ce016c6882ec0cf499c6eab2",
+      "refs": [
+        "invoice:cdp-testnet",
+        "acme-x402-inapp-1"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 9,
+      "ts": 1792938863034,
+      "hash": "e1aaf1a291ef5b877f045b5b632dcac1c4723bde728e781bc4602ddbc5f8271b"
+    }
+  ],
+  "at": "2026-10-25T14:34:23.035Z"
+}

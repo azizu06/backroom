@@ -122,10 +122,12 @@ export async function runX402Console(run: X402ConsoleRun, state: ConsoleState, o
   const facilitator = run === 'testnet' ? undefined : mockFacilitator();
   // Blocked and replay runs start no vendor: zero network work is part of the proof.
   const vendor = run === 'blocked' || replay ? undefined
-    : await startTestnetVendor({ id: invoiceId, amountCents, payTo: recipient }, { port: 0, facilitator, label });
+    : await startTestnetVendor({ id: invoiceId, amountCents, payTo: recipient }, { port: 0, facilitator, label,
+      ...(run === 'testnet' ? { maxTimeoutSeconds: 600 } : {}) });
   let result: SeatResult;
   try {
     const client = x402Payables({ repository, state: recorded, label, signer,
+      ...(run === 'testnet' ? { maxAuthorizationSeconds: 600 } : {}),
       vendorOrigin: vendor?.origin ?? 'http://127.0.0.1:9', // Unused: a blocked invoice never reaches the adapter.
       fetch: (url, init) => { vendorRequests++; return fetch(url, init); },
       ...(run === 'testnet' ? {} : { confirm: async (transfer: Transfer) => {

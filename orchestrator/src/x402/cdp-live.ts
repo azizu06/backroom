@@ -23,6 +23,7 @@ async function main() {
   await writeFile(evidencePath, JSON.stringify({ status: 'reserved', network: X402_NETWORK, amountCents: 1 }) + '\n', { flag: 'wx' });
   const state = new MemoryStateStore();
   const facilitatorDiagnostics: FacilitatorDiagnostic[] = [];
+  const longWindow = process.env.X402_AUTHORIZATION_SECONDS === '600';
   let vendor: Awaited<ReturnType<typeof startTestnetVendor>> | undefined;
   try {
     const wallet = await loadTestnetWallet();
@@ -35,10 +36,12 @@ async function main() {
     const repository = new MemoryFinanceRepository({ vendors: [{ id: fields.vendorId, accountId: fields.bankAccountId, domain: source.senderDomain, approved: true, revision: 1 }],
       purchaseOrders: [{ id: fields.poId, vendorId: fields.vendorId, amountCents: 1, lineItems: fields.lineItems }] });
     vendor = await startTestnetVendor({ id: fields.invoiceId, amountCents: 1, payTo: recipient }, { port: 0,
+      ...(longWindow ? { maxTimeoutSeconds: 600 } : {}),
       onFacilitatorResult: event => { facilitatorDiagnostics.push(event); console.log(JSON.stringify({ facilitatorDiagnostic: event })); } });
     const controller = { request: async () => 'cdp-testnet-held' };
     const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'x402',
-      x402: x402Payables({ repository, state, vendorOrigin: vendor.origin, signer: () => wallet }) });
+      x402: x402Payables({ repository, state, vendorOrigin: vendor.origin, signer: () => wallet,
+        ...(longWindow ? { maxAuthorizationSeconds: 600 } : {}) }) });
     const ctx: ToolContext = { activation: { caseId: 'cdp-testnet', taskId: 'cdp-testnet', activationId: 'cdp-testnet', role: 'payables',
       leaseOwner: 'local-testnet-proof', leaseToken: 1, llmGeneration: 1, artifactRefs: [source.id], credentialOwnerId: 'local', signal: new AbortController().signal },
       assertCurrent: async () => {} };
@@ -47,14 +50,16 @@ async function main() {
     const block = (await mcp.definitions.find(tool => tool.name === 'coinbase_x402_pay')!.handler({}, {})).content[0];
     if (block?.type !== 'text') throw new Error('UNAVAILABLE: invalid MCP response');
     const result = JSON.parse(block.text) as { status?: string; receiptId?: string };
+    const audit = await state.listAudit();
     const evidence = { label: 'x402 testnet', network: X402_NETWORK, tool: 'mcp__backroom__coinbase_x402_pay', walletLabel: wallet.walletLabel,
+      settlementMethod: 'public x402 facilitator', facilitatorBypassed: false,
       payer: wallet.address, recipient, invoiceId: fields.invoiceId, amountCents: 1, ...result,
       facilitatorDiagnostics,
       explorer: result.receiptId ? `https://sepolia.basescan.org/tx/${result.receiptId}` : undefined,
-      auditChain: await state.verifyAuditChain(), audit: await state.listAudit(), at: new Date().toISOString() };
+      auditChain: await state.verifyAuditChain(), audit, at: new Date().toISOString() };
     await writeFile(evidencePath, JSON.stringify(evidence, null, 2) + '\n');
     console.log(JSON.stringify({ label: evidence.label, status: result.status, walletLabel: wallet.walletLabel,
-      payer: wallet.address, transaction: result.receiptId, explorer: evidence.explorer, evidencePath }));
+      payer: wallet.address, transaction: result.receiptId, explorer: evidence.explorer, settlementMethod: evidence.settlementMethod, evidencePath }));
     if (result.status !== 'paid' || !evidence.auditChain.valid) process.exitCode = 1;
   } catch {
     await writeFile(`${evidencePath}.failure.json`, JSON.stringify({ status: 'UNAVAILABLE', audit: await state.listAudit() }, null, 2) + '\n');

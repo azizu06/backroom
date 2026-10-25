@@ -1,0 +1,21 @@
+{
+  "network": "eip155:84532",
+  "chainId": 84532,
+  "transaction": "0xff9d026523db51c01609f70c9a59fa4668a5bf42162c2b8a108f46f1f5dc62c4",
+  "explorer": "https://sepolia.basescan.org/tx/0xff9d026523db51c01609f70c9a59fa4668a5bf42162c2b8a108f46f1f5dc62c4",
+  "status": "success",
+  "blockNumber": "50084970",
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "recipient": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+  "asset": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+  "amountAtomic": "10000",
+  "authorizationNonce": "0xd86778dd511c09238ac431ad18afd50e38cdd89e35fcd2562c7c9d889a61353b",
+  "transferMatches": true,
+  "authorizationMatches": true,
+  "verified": true,
+  "settlementMethod": "public x402 facilitator",
+  "facilitatorBypassed": false,
+  "at": "2026-10-25T14:36:11.101Z",
+  "settlementSender": "0xd407e409e34e0b9afb99ecceb609bdbcd5e7f1bf",
+  "payerPaidGas": false
+}

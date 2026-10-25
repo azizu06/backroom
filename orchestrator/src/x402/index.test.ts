@@ -5,14 +5,14 @@ import type { PaymentRequired, PaymentRequirements } from '@x402/core/types';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStateStore } from '../store';
 import { MemoryFinanceRepository, PayablesSeat } from '../payables';
-import { x402Payables } from './index';
+import { x402Payables, type X402Options } from './index';
 
 const address = '0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180';
 const accountId = `x402:eip155:84532:${address}`;
 const lines = [{ description: 'Acme demo supplies', quantity: 1, unitPriceCents: 1 }];
 const fields = { kind: 'invoice' as const, invoiceId: 'x402-1', vendorId: 'acme-x402', poId: 'po-x402', amountCents: 1, currency: 'USD' as const, bankAccountId: accountId, lineItems: lines };
 const source = { id: 'inbox-x402', source: 'seed' as const, senderDomain: 'acme.example' };
-function setup(realConfirmation = false) {
+function setup(realConfirmation = false, extra: Pick<X402Options, 'maxAuthorizationSeconds'> = {}) {
   const repository = new MemoryFinanceRepository({ vendors: [{ id: fields.vendorId, domain: 'acme.example', accountId, approved: true, revision: 1 }], purchaseOrders: [{ id: 'po-x402', vendorId: fields.vendorId, amountCents: 1, lineItems: lines }] });
   const state = new MemoryStateStore();
   const network = vi.fn<typeof fetch>();
@@ -20,7 +20,7 @@ function setup(realConfirmation = false) {
   const account = { ...original, signTypedData: vi.fn(original.signTypedData) };
   const signer = vi.fn(() => account);
   const confirm = vi.fn(async () => {});
-  const client = x402Payables({ repository, state, fetch: network, signer, ...(realConfirmation ? {} : { confirm }) });
+  const client = x402Payables({ repository, state, fetch: network, signer, ...extra, ...(realConfirmation ? {} : { confirm }) });
   const seat = new PayablesSeat({ repository, state, controller: { request: async () => 'controller-review' }, x402: client, paymentRail: 'x402' });
   return { repository, state, network, signer, confirm, seat, account };
 }
@@ -76,6 +76,24 @@ function paidNetwork(context: ReturnType<typeof setup>) {
     return new Response('{}', { headers: { 'PAYMENT-RESPONSE': encodePaymentResponseHeader({ success: true, transaction: tx, network: 'eip155:84532' }) } });
   });
 }
+
+it('retains the default authorization cap and only permits the trusted CLI 600-second opt-in', async () => {
+  const normal = setup(); normal.network.mockResolvedValue(challenge({ maxTimeoutSeconds: 600 }));
+  expect((await normal.seat.process(fields, source)).status).toBe('held');
+  expect(normal.account.signTypedData).not.toHaveBeenCalled();
+});
+
+it('pays once through the facilitator with the trusted 600-second opt-in and confirms the same nonce', async () => {
+  const job = setup(false, { maxAuthorizationSeconds: 600 });
+  job.network.mockImplementation(async (_url, init) => {
+    if (!new Headers(init?.headers).has('PAYMENT-SIGNATURE')) return challenge({ maxTimeoutSeconds: 600 });
+    return new Response('{}', { headers: { 'PAYMENT-RESPONSE': encodePaymentResponseHeader({ success: true, transaction: tx, network: 'eip155:84532' }) } });
+  });
+  expect((await job.seat.process(fields, source)).status).toBe('paid');
+  expect(job.account.signTypedData).toHaveBeenCalledTimes(1);
+  expect(job.confirm).toHaveBeenCalledWith(expect.objectContaining({ transaction: tx, amount: 10000n, authorizationNonce: expect.stringMatching(/^0x[\da-f]{64}$/) }));
+  expect((await job.state.listAudit()).some(a => a.action.includes('self_relay'))).toBe(false);
+});
 it('settles an approved invoice, confirms its transfer, audits the hash, and never repays a replay', async () => {
   const context = setup(); paidNetwork(context);
   const result = await context.seat.process(fields, source);

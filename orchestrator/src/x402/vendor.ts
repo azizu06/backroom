@@ -9,7 +9,7 @@ import { facilitatorReason, type FacilitatorDiagnostic } from './diagnostics';
 export interface VendorInvoice { id: string; amountCents: number; payTo: `0x${string}` }
 /** Demo vendor, separate from the office/UI. Catalog and recipient are bootstrap-owned. */
 export async function startTestnetVendor(invoice: VendorInvoice, options: { port?: number; facilitator?: FacilitatorClient; label?: X402Label;
-  onFacilitatorResult?: (event: FacilitatorDiagnostic) => void } = {}) {
+  onFacilitatorResult?: (event: FacilitatorDiagnostic) => void; maxTimeoutSeconds?: 60 | 600 } = {}) {
   // A simulated label is only honest with an injected in-process facilitator.
   if (options.label && options.label !== X402_LABEL && !options.facilitator) throw new Error('X402_SIMULATION_NEEDS_MOCKS');
   const label = options.label ?? X402_LABEL;
@@ -34,7 +34,7 @@ export async function startTestnetVendor(invoice: VendorInvoice, options: { port
   await protocol.initialize();
   const requirements = (await protocol.buildPaymentRequirements({ scheme: 'exact', network: X402_NETWORK,
     payTo: invoice.payTo, price: { asset: X402_USDC, amount: String(BigInt(invoice.amountCents) * 10_000n),
-      extra: { name: 'USDC', version: '2' } }, maxTimeoutSeconds: 60 }))[0]!;
+      extra: { name: 'USDC', version: '2' } }, maxTimeoutSeconds: options.maxTimeoutSeconds ?? 60 }))[0]!;
   let attempted = false;
   let active = false;
   const server = createServer(async (req, res) => {
