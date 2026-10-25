@@ -19,7 +19,7 @@ it('keeps client stops and lifecycle deduplication after restarting the local ad
     await expect(store.transact('session', call => { call.status = 'active'; throw Error('rollback'); })).rejects.toThrow('rollback');
     expect(await store.clientStopped('client')).toBe(true);
     let journal = new VoiceJournal(`${dir}/journal.json`);
-    await journal.register({ id: 'session', contactName: 'Jordan', welcome: 'disclosure', nonce: 'nonce', providerCallId: 'ac', disclosureComplete: false, userReply: '', stopped: false, deliveries: {} });
+    await journal.register({ id: 'session', contactName: 'Jordan', welcome: 'disclosure', nonce: 'nonce', providerCallId: 'ac', disclosureComplete: false, stopped: false, deliveries: {} });
     const event = () => new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event' },
       body: JSON.stringify({ type: 'call_turn', call_id: 'ac', webhook_request_id: 'delivery-1', turn: { role: 'assistant', text: 'disclosure', was_interrupted: false } }) });
     const options = { eventSecret: 'event', toolSecret: 'tool', gatewaySecret: 'gateway', gateway: async () => Response.json({}) };
