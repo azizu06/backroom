@@ -1,46 +1,48 @@
-.attack-page { min-height: 100vh; box-sizing: border-box; padding: 28px 20px 100px; background: #202620; color: #d0d6c6; font: 15px/1.6 system-ui, sans-serif; }
+/* Office palette tokens (app/office/lobby.css, loaded by the root layout). */
+.attack-page { min-height: 100vh; box-sizing: border-box; padding: 28px 20px 100px; background: var(--office-cream); color: var(--office-navy); font: 15px/1.6 system-ui, sans-serif; }
 .attack-panel { max-width: 900px; margin: 0 auto; }
-.attack-page a { color: #f3dfb9; }
-.attack-panel { margin-top: 20px; padding: 28px; box-sizing: border-box; background: #272f25; border: 1px solid #8b987b; overflow-wrap: anywhere; }
-.attack-panel h1 { margin: 0; color: #f3dfb9; font-size: clamp(25px, 5vw, 36px); line-height: 1.25; }
-.attack-panel h2 { font-size: 21px; color: #f3dfb9; }
-.attack-panel h3 { margin: 0 0 8px; font-size: 17px; color: #f3dfb9; }
+.attack-page a { color: var(--office-navy); }
+.attack-panel { margin-top: 20px; padding: 28px; box-sizing: border-box; background: #fff; border: 1px solid var(--office-lavender); border-radius: 12px; box-shadow: var(--office-plate-shadow); overflow-wrap: anywhere; }
+.attack-panel h1 { margin: 0; color: var(--office-navy); font-size: clamp(25px, 5vw, 36px); line-height: 1.25; }
+.attack-panel h2 { font-size: 21px; color: var(--office-navy); }
+.attack-panel h3 { margin: 0 0 8px; font-size: 17px; color: var(--office-navy); }
 .attack-panel p { margin: 10px 0 16px; }
 .attack-eyebrow, .attack-help { font-size: 13px; }
-.attack-eyebrow { color: #f3dfb9; }
+.attack-eyebrow { font-weight: 600; }
 .attack-panel fieldset { min-width: 0; margin: 20px 0; padding: 0; border: 0; }
 .attack-panel legend, .attack-panel form > label { margin-bottom: 8px; font-weight: 600; }
-.attack-panel button, .attack-panel textarea { font: inherit; color: #d0d6c6; background: #30382d; border: 1px solid #8b987b; border-radius: 4px; }
+.attack-panel button, .attack-panel textarea { font: inherit; color: var(--office-navy); background: var(--office-peach); border: 1px solid var(--office-navy); border-radius: 10px; }
+.attack-panel textarea { background: #fff; }
 .attack-panel button { min-height: 44px; padding: 8px 14px; cursor: pointer; }
 .attack-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .attack-chips small { display: block; font-size: 12px; }
-.attack-chips button[aria-pressed='true'] { color: #202620; background: #f3dfb9; border-color: #f3dfb9; }
+.attack-chips button[aria-pressed='true'] { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
 .attack-panel form > label { display: block; }
 .attack-panel textarea { display: block; box-sizing: border-box; width: 100%; resize: vertical; padding: 12px; }
-.attack-panel textarea::placeholder { color: #b0baa4; }
+.attack-panel textarea::placeholder { color: var(--office-slate); }
 .attack-mode label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-right: 20px; }
-.attack-mode input { accent-color: #f3dfb9; }
-.attack-panel button.attack-run { color: #202620; background: #f3dfb9; font-weight: 700; }
+.attack-mode input { accent-color: var(--office-navy); }
+.attack-panel button.attack-run { color: var(--office-cream); background: var(--office-navy); font-weight: 700; }
 .attack-panel :disabled { opacity: .6; cursor: not-allowed; }
-.attack-panel :focus-visible, .attack-page a:focus-visible { outline: 2px solid #f3dfb9; outline-offset: 3px; }
+.attack-panel :focus-visible, .attack-page a:focus-visible { outline: 2px solid var(--office-navy); outline-offset: 3px; }
 .attack-results { margin-top: 24px; }
-.attack-trace { list-style: none; padding-left: 14px; border-left: 2px solid #8b987b; }
-.attack-trace li { margin: 16px 0; padding: 16px; border: 1px solid #8b987b; }
+.attack-trace { list-style: none; padding-left: 14px; border-left: 2px solid var(--office-lavender); }
+.attack-trace li { margin: 16px 0; padding: 16px; border: 1px solid var(--office-lavender); border-radius: 8px; }
 .attack-trace dl { margin: 0; }
 .attack-trace dt { font-size: 13px; font-weight: 700; }
 .attack-trace dd { margin: 0 0 12px; white-space: pre-wrap; }
-.attack-execution { display: inline-block; padding: 1px 6px; border: 1px solid #8b987b; border-radius: 4px; color: #d0d6c6; font-size: 12px; font-weight: 400; }
-.attack-decision { padding: 20px; border: 2px solid #f3dfb9; background: #30382d; }
+.attack-execution { display: inline-block; padding: 1px 6px; border: 1px solid var(--office-navy); border-radius: 4px; color: var(--office-navy); font-size: 12px; font-weight: 400; }
+.attack-decision { padding: 20px; border: 2px solid var(--office-navy); border-radius: 8px; background: var(--office-cream); }
 .attack-decision h2 { margin-top: 0; }
 .attack-rules { display: flex; flex-wrap: wrap; gap: 8px; }
-.attack-decision blockquote { margin: 12px 0; padding-left: 14px; border-left: 2px solid #8b987b; white-space: pre-wrap; }
+.attack-decision blockquote { margin: 12px 0; padding-left: 14px; border-left: 2px solid var(--office-lavender); white-space: pre-wrap; }
 .attack-evidence { margin-top: 16px; font-size: 13px; }
 .attack-evidence summary { cursor: pointer; min-height: 44px; align-content: center; }
 .attack-evidence dt { font-weight: 600; }
 .attack-evidence dd { margin: 0 0 8px; white-space: pre-wrap; }
-.attack-panel code { padding: 2px 5px; color: #f3dfb9; background: #202620; font-size: 13px; }
+.attack-panel code { padding: 2px 5px; color: var(--office-navy); background: var(--office-peach); border-radius: 4px; font-size: 13px; }
 .attack-panel .attack-money { font-size: clamp(19px, 3vw, 25px); font-weight: 700; }
-.attack-panel .attack-error { padding: 12px; border: 1px solid #f6a49b; background: #542d2a; color: #ffcbc5; }
+.attack-panel .attack-error { padding: 12px; border-left: 4px solid var(--office-coral); border-radius: 6px; background: var(--office-blush); color: var(--office-navy); }
 @media (max-width: 760px) {
   .attack-page { padding: 16px 10px 100px; }
   .attack-panel { padding: 16px; }
@@ -48,6 +50,6 @@
   .attack-run { width: 100%; }
 }
 
-.attack-format { margin: 6px 0 10px; color: #d0d6c6; }
-.attack-format summary { cursor: pointer; color: #f3dfb9; }
-.attack-format pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #20261e; border: 1px solid #46513f; border-radius: 4px; padding: 8px; font-size: 12px; }
+.attack-format { margin: 6px 0 10px; }
+.attack-format summary { cursor: pointer; font-weight: 600; }
+.attack-format pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 4px; padding: 8px; font-size: 12px; }
