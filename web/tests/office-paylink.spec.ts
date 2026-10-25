@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { openPanels } from './office-menu';
 
 // Run via test:office:browser after building the web app.
 const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
@@ -11,6 +12,7 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
     bankLine: 'Offline bank · no card charged',
   } } }));
   await page.goto('/office?view=overview');
+  await openPanels(page);
   const kiosk = page.locator("[data-office-mount='payment-link']");
   await expect(kiosk).toHaveAttribute('aria-label', 'Payment link kiosk');
   await expect(kiosk.getByRole('heading', { name: 'Scan to pay' })).toBeVisible();
@@ -34,6 +36,7 @@ test('office lobby kiosk labels a loopback rehearsal link', async ({ page }) => 
     code: 'ABCDEF1234', url: 'http://127.0.0.1:3300/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr: PIXEL, localOnly: true,
   } } }));
   await page.goto('/office?view=overview');
+  await openPanels(page);
   const kiosk = page.locator("[data-office-mount='payment-link']");
   await expect(kiosk.getByText('Local link only; a phone cannot open it.')).toBeVisible();
   await expect(kiosk.getByRole('link', { name: 'http://127.0.0.1:3300/p/ABCDEF1234' })).toBeVisible();
@@ -42,6 +45,7 @@ test('office lobby kiosk labels a loopback rehearsal link', async ({ page }) => 
 test('office lobby kiosk waits when no payment is authorized', async ({ page }) => {
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
   await page.goto('/office?view=overview');
+  await openPanels(page);
   const kiosk = page.locator("[data-office-mount='payment-link']");
   await expect(kiosk.getByRole('heading', { name: 'Scan to pay' })).toBeVisible();
   await expect(kiosk.getByRole('status')).toHaveText('Waiting for an authorized payment plan…');

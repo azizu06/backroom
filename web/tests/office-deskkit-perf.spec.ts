@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Keep browser verification local, including stylesheets that reference hosted fonts.
 test.beforeEach(async ({ page }) => {
@@ -44,9 +45,10 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   else await expect.poll(() => warnings.some(text => text.startsWith(KIT_WARNING))).toBe(true);
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   await expect(page.getByTestId('office-perf-calls')).toHaveText(/^\d+$/);
   await page.keyboard.down('ArrowRight');
   let sample: Sample;

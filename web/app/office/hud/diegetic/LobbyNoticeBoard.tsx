@@ -7,6 +7,7 @@ import { NOTICE_DECISION_COLORS, NOTICE_DECISION_LABELS, noticeBoard, noticeBoar
 import { canvasTextLines } from '../../../../lib/office/props/readability';
 import { PALETTE, ROLES } from '../../../../lib/office/palette';
 import { visibleRooms } from '../../../../lib/office/state';
+import { LOBBY_BOARD } from '../../../../lib/office/layout';
 import { PROP_FONT, useCanvasTexture } from '../../props/useCanvasTexture';
 import type { SceneMountProps } from '../../mounts/types';
 import { usePlayCamera } from './usePlayCamera';

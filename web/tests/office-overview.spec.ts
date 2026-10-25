@@ -1,11 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
+import { OFFICE_ANCHORS } from '../lib/office/state';
+import { openMenu } from './office-menu';
 
 // HUD variant (c) Overview: O toggles the overhead 3D camera and first person; agents and desks open quick actions.
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
 }
 async function pose(page: Page) {
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return surface(page).evaluate(element => {
     const { playerX, playerZ, playerYaw } = (element as HTMLElement).dataset;
     return { x: Number(playerX), z: Number(playerZ), yaw: Number(playerYaw) };
@@ -13,12 +15,12 @@ async function pose(page: Page) {
 }
 async function openOverview(page: Page, errors: string[]) {
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: /First person/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Backroom menu' })).toBeVisible();
 }
 /** Alex's seat (OFFICE_ANCHORS.collections.position), where the preview keeps him. */
-const ALEX = { x: -5, z: -1.8 };
+const ALEX = { x: OFFICE_ANCHORS.collections.position[0], z: OFFICE_ANCHORS.collections.position[1] };
 
 test('O toggles Overview and first person, and the buttons do the same', async ({ page }) => {
   const errors: string[] = [];
@@ -50,13 +52,15 @@ test('O toggles Overview and first person, and the buttons do the same', async (
   await page.keyboard.press('Escape');
   await expect(map).toHaveCount(0);
   await expect(select).toHaveValue('walk');
-  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeFocused();
-  // The corner's First person button enters first person too.
-  await page.getByRole('button', { name: /First person/ }).click();
+  await expect(page.getByRole('button', { name: 'Backroom menu' })).toBeFocused();
+  // The corner menu's Enter first person button enters first person too.
+  await openMenu(page);
+  await page.getByRole('button', { name: /first person/i }).click();
   await expect(surface(page)).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(surface(page)).toHaveCount(0);
   // Typing O into a field never toggles.
+  await openMenu(page);
   await select.focus();
   await page.keyboard.press('o');
   await expect(surface(page)).toHaveCount(0);
@@ -94,6 +98,7 @@ test('Overview quick menu: Go here lands in first person beside the agent, facin
 test('Overview map: an agent tile offers Go here, which lands in first person next to them', async ({ page }) => {
   const errors: string[] = [];
   await openOverview(page, errors);
+  await openMenu(page);
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   const map = page.getByRole('region', { name: 'Office overview' });
   await map.getByRole('button', { name: /^Alex,/ }).click();
@@ -141,6 +146,9 @@ test('O leaves the view unchanged while keyboard shortcuts has focus', async ({ 
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
+  // O is the Overview key only once the 3D overview is showing (the scene loads lazily).
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('office-viewport').getByText('Loading 3D office…')).toHaveCount(0);
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(help.getByRole('button', { name: 'Close', exact: true })).toBeFocused();

@@ -12,7 +12,7 @@ export function DeskPhonePanel() {
   const [precallNote, setPrecallNote] = useState('Checking pre-call evidence');
   const [mock, setMock] = useState(false);
   useEffect(() => {
-    if (isMockCalls(window.location.search)) { setMock(true); setPrecallNote('Mock preview: no pre-call evidence'); return; }
+    if (isMockCalls(window.location.search)) { setMock(true); setPrecallNote('Scripted call: no pre-call evidence'); return; }
     void precallStore.load().then(() => setPrecallNote('Pre-call evidence unavailable'));
   }, []);
   const gate = precallGate(card, mock);

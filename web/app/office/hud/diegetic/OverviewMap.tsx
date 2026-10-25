@@ -4,10 +4,15 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { isCloseKey } from '../../../../lib/office/a11y';
 import type { MotionRegistry } from '../../../../lib/office/motion';
 import { roomRect, seatedAgent, type OverviewPick } from '../../../../lib/office/overview';
-import { FLOOR, SERVER_ROOM } from '../../../../lib/office/play';
+import { FLOOR } from '../../../../lib/office/play';
+import { CORRIDOR, SPACES, SPACE_IDS } from '../../../../lib/office/layout';
 import { OFFICE_ANCHORS, anchorLabel, visibleRooms, type AnchorId, type OfficeSnapshot } from '../../../../lib/office/state';
 
 const SPAN_X = FLOOR.maxX - FLOOR.minX, SPAN_Z = FLOOR.maxZ - FLOOR.minZ;
+/** The board keeps the floor's proportions. */
+const BOARD_STYLE = { aspectRatio: `${SPAN_X} / ${SPAN_Z}`, width: `min(100%, calc((100dvh - 230px) * ${(SPAN_X / SPAN_Z).toFixed(3)}))` };
+/** Rooms with no desk (meeting, break room): drawn for orientation, not pickable. */
+const SHARED_SPACES = SPACE_IDS.filter(id => SPACES[id].kind === 'room' && id !== 'server_room' && !(id in OFFICE_ANCHORS));
 /** World floor (x, z) to a percentage of the map board; z runs down the board like the overhead view. */
 function pct([x, z]: readonly [number, number]) {
   return { left: `${((x - FLOOR.minX) / SPAN_X) * 100}%`, top: `${((z - FLOOR.minZ) / SPAN_Z) * 100}%` };
@@ -45,7 +50,6 @@ export function OverviewMap({ snapshot, motions, open, onPick, onFirstPerson, on
   useEffect(() => { if (open) root.current?.querySelector<HTMLButtonElement>('.overview-map-room')?.focus(); }, [open]);
   if (!open) return null;
   const rooms = visibleRooms(snapshot);
-  const server = { minX: SERVER_ROOM.position[0] - SERVER_ROOM.size.width / 2, maxX: SERVER_ROOM.position[0] + SERVER_ROOM.size.width / 2, minZ: SERVER_ROOM.position[1] - SERVER_ROOM.size.depth / 2, maxZ: SERVER_ROOM.position[1] + SERVER_ROOM.size.depth / 2 };
   return <section ref={root} className='overview-map' role='region' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key) && !event.defaultPrevented && !(event.target as HTMLElement).closest('[role=menu]')) { event.preventDefault(); onClose(); }
   }}>
@@ -56,14 +60,15 @@ export function OverviewMap({ snapshot, motions, open, onPick, onFirstPerson, on
         <button type='button' onClick={onClose} aria-label='Close overview'>Close <kbd>Esc</kbd></button>
       </div>
     </header>
-    <div className='overview-map-board'>
-      <div className='overview-map-hall' style={rectStyle({ minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: -0.65, maxZ: 1.15 })} aria-hidden='true'><span>Hallway</span></div>
+    <div className='overview-map-board' style={BOARD_STYLE}>
+      <div className='overview-map-hall' style={rectStyle(CORRIDOR)} aria-hidden='true'><span>Hallway</span></div>
+      {SHARED_SPACES.map(id => <div key={id} className='overview-map-hall overview-map-shared' style={rectStyle(SPACES[id].rect)} aria-hidden='true'><span>{SPACES[id].name}</span></div>)}
       {rooms.map(room => <button key={room} type='button' className='overview-map-room' data-room={room} data-locked={room === 'treasury' || undefined}
         style={{ ...rectStyle(roomRect(room)), ['--room-color' as string]: OFFICE_ANCHORS[room].color }} aria-haspopup='menu'
         onClick={event => onPick({ kind: 'room', room }, event.currentTarget)}>
         <strong>{OFFICE_ANCHORS[room].name}</strong><span>{roomStatus(snapshot, room)}</span>
       </button>)}
-      <div className='overview-map-server' style={rectStyle(server)} aria-hidden='true'>GX10</div>
+      <div className='overview-map-server' style={rectStyle(SPACES.server_room.rect)} aria-hidden='true'>GX10</div>
       {snapshot.agents.map(agent => {
         const position = motions.get(agent).position;
         return <button key={agent.id} type='button' className='overview-map-agent' data-agent={agent.id} data-escalating={agent.escalationId ? true : undefined}

@@ -17,11 +17,11 @@ import { Plants } from './Plants';
 import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
-import { Outdoors } from './Outdoors';
-import { WorldShell } from './WorldShell';
 import { AgentCardAnchor } from '../hud/diegetic/AgentCardAnchor';
 import { DeskStatusPlates } from '../hud/diegetic/DeskStatusPlates';
 import { LobbyNoticeBoard } from '../hud/diegetic/LobbyNoticeBoard';
+import { Outdoors } from './Outdoors';
+import { WorldShell } from './WorldShell';
 import type { SceneMount } from './types';
 
 export type { SceneMount, SceneMountProps } from './types';
