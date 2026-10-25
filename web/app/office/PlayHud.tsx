@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
+import { setBakedTalkingAgent } from '../../lib/office/baked-character';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
@@ -171,6 +172,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: 
   useEffect(() => {
     if (panel && !playPanel(snapshot, panel, handoffFor)) { setPanel(null); hud.current?.focus(); }
   }, [panel, snapshot, hud, handoffFor]);
+  // View-only signal for the baked characters' talk clip (?art=baked); a no-op for the blocky figures.
+  useEffect(() => {
+    setBakedTalkingAgent(panel?.kind === 'agent' ? panel.id : null);
+    return () => setBakedTalkingAgent(null);
+  }, [panel]);
 
   function interact() {
     if (panel || settingsOpen || chatOpen) return;
