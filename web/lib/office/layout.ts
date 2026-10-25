@@ -9,94 +9,133 @@
  */
 import type { FurniturePiece } from './furniture';
 import { OUTDOOR, ROLES } from './palette';
+import { CAMERA_CLEARANCE, CHAIR_FOOTPRINT, DESK_SIZE, STATION_OFFSET } from './metrics';
 
 export type Vec2 = readonly [x: number, z: number];
 export interface Rect { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 
 /** One contiguous office; departments are logical destinations, never partitions. */
-export const MAIN_BUILDING: Rect = { minX: -12, maxX: 12, minZ: -7.5, maxZ: 7.5 };
+export const MAIN_BUILDING: Rect = { minX: -12, maxX: 12, minZ: -12, maxZ: 12 };
 export const BUILDING: Rect = MAIN_BUILDING;
 export const ATRIUM_HEIGHT = 7;
-export const WALL_HEIGHT = 3;
+export const WALL_HEIGHT = 3.6;
 export const WALL_THICKNESS = 0.16;
 /** Top of every doorway; the wall above it is a header. */
 export const DOOR_OPENING_HEIGHT = 2.25;
 export const WINDOW_SILL = 0.9;
 export const WINDOW_HEAD = 2.5;
-/** Centre line of the corridor; agents and painted routes walk along it. */
-export const CORRIDOR_Z = 0;
-export const CORRIDOR: Rect = { minX: MAIN_BUILDING.minX, maxX: 9.5, minZ: -1.5, maxZ: 1.5 };
+/** Cross-aisle reference for the floor plan and minimap. */
+export const CORRIDOR_Z = -1.2;
 
 export const ANCHOR_IDS = ['lobby', 'collections', 'payables', 'vendor_onboarding', 'dana', 'treasury'] as const;
 export type LayoutAnchorId = typeof ANCHOR_IDS[number];
 export type SpaceId = LayoutAnchorId | 'meeting' | 'break_room' | 'server_room' | 'corridor' | 'work_room' | 'atrium';
-export interface Space { readonly id: SpaceId; readonly name: string; readonly rect: Rect; readonly kind: 'room' | 'corridor' }
+/** Six four-seat pods: three columns, two rows; furniture remains at human scale. */
+export const POD_COLUMNS = [-7.09, 0, 7.09] as const;
+export const POD_ROWS = [-6, 3.6] as const;
+const DESK_PITCH_X = DESK_SIZE.width + 0.15;
+const DESK_PITCH_Z = DESK_SIZE.depth + 0.15;
+export const WORKSTATIONS = POD_ROWS.flatMap((podZ, row) => POD_COLUMNS.flatMap((podX, column) =>
+  [-1, 1].flatMap((side, seatColumn) => [-1, 1].map((flip, seatRow) => ({
+    id: `pod-${row * POD_COLUMNS.length + column}:${seatColumn}:${seatRow}`,
+    pod: row * POD_COLUMNS.length + column,
+    center: [podX + side * DESK_PITCH_X / 2, podZ + flip * DESK_PITCH_Z / 2] as Vec2,
+    flip: flip as 1 | -1,
+  })))));
 
-const NORTH = { minZ: BUILDING.minZ, maxZ: CORRIDOR.minZ } as const;
-const SOUTH = { minZ: CORRIDOR.maxZ, maxZ: BUILDING.maxZ } as const;
-const COLUMNS = [[-12, -6], [-6, 0], [0, 6], [6, 12]] as const;
-const column = (i: 0 | 1 | 2 | 3) => ({ minX: COLUMNS[i][0], maxX: COLUMNS[i][1] });
-const room = (id: SpaceId, name: string, rect: Rect): Space => ({ id, name, rect, kind: 'room' });
+export function workstationApproach(index: number): Vec2 {
+  const { center: [x, z], flip } = WORKSTATIONS[index]!;
+  return [x, z + flip * STATION_OFFSET];
+}
+export const POD_BOUNDS: readonly Rect[] = POD_ROWS.flatMap(z => POD_COLUMNS.map(x => ({
+  minX: x - DESK_PITCH_X / 2 - DESK_SIZE.width / 2, maxX: x + DESK_PITCH_X / 2 + DESK_SIZE.width / 2,
+  minZ: z - DESK_PITCH_Z / 2 - CHAIR_FOOTPRINT.z - CHAIR_FOOTPRINT.depth / 2,
+  maxZ: z + DESK_PITCH_Z / 2 + CHAIR_FOOTPRINT.z + CHAIR_FOOTPRINT.depth / 2,
+})));
+export const WORKSTATION_COLLIDERS: readonly Rect[] = WORKSTATIONS.flatMap(({ center: [x, z], flip }) => [
+  fixtureBounds({ x, z, width: DESK_SIZE.width, depth: DESK_SIZE.depth }),
+  fixtureBounds({ x: x + flip * CHAIR_FOOTPRINT.x, z: z + flip * CHAIR_FOOTPRINT.z,
+    width: CHAIR_FOOTPRINT.width, depth: CHAIR_FOOTPRINT.depth }),
+]);
 
-export const SPACES: Readonly<Record<SpaceId, Space>> = {
-  atrium: room('atrium', 'Entry aisle', { minX: -12, maxX: -6, minZ: 1.5, maxZ: 7.5 }),
-  work_room: room('work_room', 'Shared workspace', MAIN_BUILDING),
-  collections: room('collections', 'Collections', { minX: -12, maxX: -4, ...NORTH }),
-  payables: room('payables', 'Payables', { minX: -4, maxX: 4, minZ: -3.1, maxZ: -1.5 }),
-  vendor_onboarding: room('vendor_onboarding', 'Vendor Desk', { minX: 4, maxX: 12, ...NORTH }),
-  meeting: room('meeting', 'Work aisle', { ...column(3), ...NORTH }),
-  lobby: room('lobby', 'Lobby', { ...column(0), ...SOUTH }),
-  dana: room('dana', 'Dana’s desk', { minX: -3, maxX: 3.5, minZ: -7.5, maxZ: -3.1 }),
-  treasury: room('treasury', 'Treasury', { ...column(2), ...SOUTH }),
-  break_room: room('break_room', 'Open floor', { ...column(3), ...SOUTH }),
-  corridor: { id: 'corridor', name: 'Corridor', rect: CORRIDOR, kind: 'corridor' },
-  server_room: room('server_room', 'Compute station', { minX: CORRIDOR.maxX, maxX: BUILDING.maxX, minZ: CORRIDOR.minZ, maxZ: CORRIDOR.maxZ }),
+/** All floor-standing perimeter props share footprints with navigation and collision. */
+export const FLOOR_FIXTURES = {
+  kiosk: { x: -11.3, z: 8.8, width: 0.8, depth: 1 },
+  vault: { x: 8.5, z: 11.1, width: 1.84, depth: 1.42, offsetZ: -0.065 },
+  server: { x: 11.3, z: -1.2, width: 1.2, depth: 1.05 },
+  plantNW: { x: -11.3, z: -11.3, width: 1, depth: 1 },
+  plantSE: { x: 11.3, z: 11.3, width: 1, depth: 1 },
+  lampWest: { x: -11.4, z: 10.8, width: 0.6, depth: 0.6 },
+  lampEast: { x: 11.4, z: 8.5, width: 0.6, depth: 0.6 },
+} as const;
+export function fixtureBounds(fixture: { x: number; z: number; width: number; depth: number; offsetZ?: number }): Rect {
+  const z = fixture.z + (fixture.offsetZ ?? 0);
+  return { minX: fixture.x - fixture.width / 2, maxX: fixture.x + fixture.width / 2,
+    minZ: z - fixture.depth / 2, maxZ: z + fixture.depth / 2 };
+}
+export const GRID_AISLES = {
+  x: [BUILDING.minX + 1.8, ...POD_COLUMNS.slice(1).map((x, i) => (x + POD_COLUMNS[i]!) / 2), BUILDING.maxX - 1.8],
+  z: [BUILDING.minZ + 2.2, (POD_ROWS[0] + POD_ROWS[1]) / 2, BUILDING.maxZ - 3.4],
 };
-// Legacy destination ids remain available to consumers, without mounting extra rooms.
-export const SPACE_IDS: readonly SpaceId[] = [...ANCHOR_IDS, 'corridor', 'server_room'];
 
-/** Three back-to-back 2 × 2 pods. Facing +z seats are on the south side. */
-export const WORKSTATIONS = [-8, 0, 8].flatMap((podX, pod) =>
-  [-1.2, 1.2].flatMap((dx, column) => [-3.7, -2.5].map((z, row) => ({
-    id: `pod-${pod}:${column}:${row}`, pod, center: [podX + dx, z] as Vec2, flip: (row === 0 ? -1 : 1) as 1 | -1,
-  }))));
-
-/** Routes between workstation approaches via the open cross-pod aisles. */
+/** Rectilinear visibility graph: perimeter and cross-pod aisles, with clear endpoint approaches.
+ * Inflated furniture footprints keep the camera 0.4 m clear, including on interrupted walks.
+ * No diagonal shortcuts, so the player's axis sweeps can follow every segment exactly.
+ */
 export function workspaceRoute(from: Vec2, to: Vec2): Vec2[] {
-  if (from[1] < -3 && to[1] < -3) return [from, [from[0], -6], [to[0], -6], to];
-  const exit = (point: Vec2): Vec2[] => {
-    if (point[1] > -3) return [[point[0], CORRIDOR_Z]];
-    const pod = Math.round(point[0] / 8) * 8;
-    // The compute rack occupies the east end; route the east pod through its west aisle.
-    const side = pod === 8 ? 5 : pod + (point[0] < pod ? -3 : 3);
-    return [[point[0], -6], [side, -6], [side, CORRIDOR_Z]];
-  };
-  return [from, ...exit(from), ...exit(to).reverse(), to].filter((point, i, all) =>
-    i === 0 || Math.hypot(point[0] - all[i - 1]![0], point[1] - all[i - 1]![1]) > 1e-6);
+  const obstacles = [...WORKSTATION_COLLIDERS, ...Object.values(FLOOR_FIXTURES).map(fixtureBounds)];
+  const clear = (a: Vec2, b: Vec2) => !obstacles.some(rect =>
+    Math.max(a[0], b[0]) > rect.minX - CAMERA_CLEARANCE && Math.min(a[0], b[0]) < rect.maxX + CAMERA_CLEARANCE &&
+    Math.max(a[1], b[1]) > rect.minZ - CAMERA_CLEARANCE && Math.min(a[1], b[1]) < rect.maxZ + CAMERA_CLEARANCE);
+  if (from[0] === to[0] && from[1] === to[1]) return [from];
+  const xs = [...new Set([...GRID_AISLES.x, from[0], to[0]])].sort((a, b) => a - b);
+  const zs = [...new Set([...GRID_AISLES.z, from[1], to[1]])].sort((a, b) => a - b);
+  const nodes = xs.flatMap(x => zs.map(z => [x, z] as Vec2));
+  const start = nodes.findIndex(p => p[0] === from[0] && p[1] === from[1]);
+  const end = nodes.findIndex(p => p[0] === to[0] && p[1] === to[1]);
+  const distance = nodes.map(() => Infinity), previous = nodes.map(() => -1), visited = new Set<number>();
+  distance[start] = 0;
+  while (visited.size < nodes.length) {
+    let current = -1;
+    for (let i = 0; i < nodes.length; i++) if (!visited.has(i) && (current < 0 || distance[i]! < distance[current]!)) current = i;
+    if (current < 0 || !Number.isFinite(distance[current])) break;
+    if (current === end) {
+      const route: Vec2[] = [];
+      for (let i = end; i !== -1; i = previous[i]!) route.unshift(nodes[i]!);
+      return route.filter((point, i) => i === 0 || i === route.length - 1 ||
+        !((route[i - 1]![0] === point[0] && point[0] === route[i + 1]![0]) ||
+          (route[i - 1]![1] === point[1] && point[1] === route[i + 1]![1])));
+    }
+    visited.add(current);
+    for (let next = 0; next < nodes.length; next++) {
+      const a = nodes[current]!, b = nodes[next]!;
+      if (visited.has(next) || (a[0] !== b[0] && a[1] !== b[1]) || !clear(a, b)) continue;
+      const cost = distance[current]! + Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+      if (cost < distance[next]!) { distance[next] = cost; previous[next] = current; }
+    }
+  }
+  // An invalid/occupied destination cannot make an avatar or camera cross furniture.
+  return [from];
 }
 
-/**
- * Logical business destinations and their clear agent approaches in the shared workspace.
- */
+// Conservative chair footprints end at z=5.425: 6.495 m to the inner south wall.
+const ENTRY_POSITION: Vec2 = [0, 10.8];
+const deskAnchor = (index: number) => ({ center: WORKSTATIONS[index]!.center, position: workstationApproach(index) });
 export const ANCHOR_LAYOUT: Readonly<Record<LayoutAnchorId, { center: Vec2; position: Vec2 }>> = {
-  lobby: { center: [-9, 4.4], position: [-9, 4.5] },
-  collections: { center: [-9.2, -2.5], position: [-9.2, -0.9] },
-  payables: { center: [-1.2, -2.5], position: [-1.2, -0.9] },
-  vendor_onboarding: { center: [6.8, -2.5], position: [6.8, -0.9] },
-  dana: { center: [1.2, -3.7], position: [1.2, -5.3] },
-  treasury: { center: [2.5, 4.9], position: [2.5, 3.6] },
+  lobby: { center: [FLOOR_FIXTURES.kiosk.x, FLOOR_FIXTURES.kiosk.z], position: [FLOOR_FIXTURES.kiosk.x + 1.5, FLOOR_FIXTURES.kiosk.z] },
+  collections: deskAnchor(1),
+  payables: deskAnchor(17),
+  vendor_onboarding: deskAnchor(9),
+  dana: deskAnchor(6),
+  treasury: { center: [FLOOR_FIXTURES.vault.x, FLOOR_FIXTURES.vault.z - 0.6], position: [8.5, 9.5] },
 };
 
-/**
- * Pay kiosk, inbox and printer counter, east of the clear entrance route.
- */
-export const LOBBY_KIOSK: Vec2 = [-5.8, 4.6];
-/** Decision board and deny stamp, supported by the solid north wall. */
-export const LOBBY_BOARD_MOUNT = { x: -5.2, y: 1.25, z: BUILDING.minZ + WALL_THICKNESS / 2 + 0.03,
+/** Counter, notice board and live audit wall remain mounted on the perimeter. */
+export const LOBBY_KIOSK: Vec2 = [FLOOR_FIXTURES.kiosk.x, FLOOR_FIXTURES.kiosk.z];
+export const LOBBY_BOARD_MOUNT = { x: -10.7, y: 2.4, z: BUILDING.minZ + WALL_THICKNESS / 2 + 0.03,
   width: 2, height: 1.45, depth: 0.06, faceOffset: 0.038 } as const;
 export const LOBBY_BOARD: Vec2 = [LOBBY_BOARD_MOUNT.x, LOBBY_BOARD_MOUNT.z];
-/** Live audit wall on the solid west perimeter, facing into the office. */
-export const LOBBY_AUDIT_WALL = { x: BUILDING.minX + WALL_THICKNESS / 2 + 0.03, z: 5.3, rotationY: Math.PI / 2 } as const;
+export const LOBBY_AUDIT_WALL = { x: BUILDING.minX + WALL_THICKNESS / 2 + 0.03, z: 6.9, rotationY: Math.PI / 2 } as const;
 
 /** A point given relative to an anchor room's furniture centre. */
 export function roomPoint(room: LayoutAnchorId, dx: number, dz: number): [number, number] {
@@ -117,16 +156,12 @@ export interface Doorway {
 /** Leaf doorways leave room for the frame posts at centre ± 0.72 (see officeColliders). */
 export const LEAF_OPENING = 1.44;
 export const DOORWAYS: readonly Doorway[] = [
-  { id: 'collections', kind: 'leaf', axis: 'x', at: [-9, CORRIDOR.minZ], width: LEAF_OPENING, joins: ['collections', 'corridor'] },
-  { id: 'payables', kind: 'leaf', axis: 'x', at: [-3.5, CORRIDOR.minZ], width: LEAF_OPENING, joins: ['payables', 'corridor'] },
-  { id: 'vendor_onboarding', kind: 'leaf', axis: 'x', at: [2.5, CORRIDOR.minZ], width: LEAF_OPENING, joins: ['vendor_onboarding', 'corridor'] },
-  { id: 'meeting', kind: 'open', axis: 'x', at: [8, CORRIDOR.minZ], width: 1.6, joins: ['meeting', 'corridor'] },
-  { id: 'lobby', kind: 'open', axis: 'x', at: [-9, CORRIDOR.maxZ], width: 2, joins: ['lobby', 'corridor'] },
-  { id: 'dana', kind: 'open', axis: 'x', at: [-3.5, CORRIDOR.maxZ], width: 1.6, joins: ['dana', 'corridor'] },
-  { id: 'treasury', kind: 'open', axis: 'x', at: [2.5, 4.8], width: LEAF_OPENING, joins: ['treasury', 'corridor'] },
-  { id: 'break_room', kind: 'open', axis: 'x', at: [8, CORRIDOR.maxZ], width: 1.6, joins: ['break_room', 'corridor'] },
-  { id: 'server_room', kind: 'open', axis: 'z', at: [CORRIDOR.maxX, 0], width: LEAF_OPENING, joins: ['server_room', 'corridor'] },
-  { id: 'entrance', kind: 'entrance', axis: 'x', at: [-7.2, BUILDING.maxZ], width: 1.6, joins: ['lobby', 'outside'] },
+  // Compatibility interaction destinations; only the entrance cuts an exterior wall.
+  ...ANCHOR_IDS.map(id => ({ id, kind: 'open' as const, axis: 'x' as const,
+    at: id === 'treasury' ? [FLOOR_FIXTURES.vault.x, FLOOR_FIXTURES.vault.z - 0.65] as Vec2 : ANCHOR_LAYOUT[id].position,
+    width: LEAF_OPENING, joins: [id, 'corridor'] as const })),
+  { id: 'server_room', kind: 'open', axis: 'z', at: [9.8, FLOOR_FIXTURES.server.z], width: LEAF_OPENING, joins: ['server_room', 'corridor'] },
+  { id: 'entrance', kind: 'entrance', axis: 'x', at: [0, BUILDING.maxZ], width: 1.6, joins: ['lobby', 'outside'] },
 ];
 export function doorway(id: string): Doorway {
   const found = DOORWAYS.find(door => door.id === id);
@@ -157,20 +192,12 @@ export const WALLS: readonly WallRun[] = [
 /** A framed window in an exterior wall or the original west glazed partition, centred `at` along the wall. Placed clear of wall-mounted props. */
 export interface WindowSpec { readonly wall: string; readonly at: number; readonly width: number; readonly space: SpaceId }
 export const WINDOWS: readonly WindowSpec[] = [
-  { wall: 'west', at: -6, width: 1.6, space: 'collections' },
-  { wall: 'west', at: -3, width: 1.6, space: 'collections' },
-  { wall: 'north', at: -0.8, width: 1.2, space: 'payables' },
-  { wall: 'north', at: 4.9, width: 1.6, space: 'vendor_onboarding' },
-  { wall: 'north', at: 7.2, width: 1.4, space: 'meeting' },
-  { wall: 'north', at: 10.8, width: 1.4, space: 'meeting' },
-  { wall: 'east', at: -6, width: 1.6, space: 'meeting' },
-  { wall: 'east', at: -3, width: 1.6, space: 'meeting' },
-  { wall: 'east', at: 3, width: 1.6, space: 'break_room' },
-  { wall: 'east', at: 6, width: 1.6, space: 'break_room' },
-  { wall: 'south', at: 8, width: 1.6, space: 'break_room' },
-  { wall: 'south', at: 10.6, width: 1.6, space: 'break_room' },
-  { wall: 'south', at: -1.5, width: 1.6, space: 'dana' },
-  { wall: 'south', at: -10.4, width: 1.6, space: 'lobby' },
+  // Symmetric, evenly spaced bays; the central six metres stay solid for the ticket board.
+  ...[-7.5, -4.5, 4.5, 7.5].map(at => ({ wall: 'north', at, width: 1.6, space: 'work_room' as const })),
+  ...[-9, -5, -1, 3].map(at => ({ wall: 'west', at, width: 1.6, space: 'work_room' as const })),
+  ...[-9, -5, 3, 7].map(at => ({ wall: 'east', at, width: 1.6, space: 'work_room' as const })),
+  // Two equal bays either side of the entrance, clear of the vault at the southeast wall.
+  ...[-6, -3, 3, 6].map(at => ({ wall: 'south', at, width: 1.6, space: 'lobby' as const })),
 ];
 
 interface Opening { from: number; to: number; bottom: number; top: number }
@@ -312,17 +339,22 @@ export function sightBlocked(ax: number, az: number, bx: number, bz: number): bo
   return false;
 }
 
-/** Floor pad inset from a room's walls (the cream pad scene.tsx draws, tinted when the room is focused). */
-export const PAD_INSET = 0.25;
-export function roomPad(rect: Rect): Rect {
-  return { minX: rect.minX + PAD_INSET, maxX: rect.maxX - PAD_INSET, minZ: rect.minZ + PAD_INSET, maxZ: rect.maxZ - PAD_INSET };
+/** Logical map cells stay square even at a perimeter destination; they are not room walls. */
+export function destinationRect(id: LayoutAnchorId): Rect {
+  const half = 2.4, inset = WALL_THICKNESS / 2;
+  const [x, z] = ANCHOR_LAYOUT[id].center;
+  const cx = Math.max(BUILDING.minX + inset + half, Math.min(BUILDING.maxX - inset - half, x));
+  const cz = Math.max(BUILDING.minZ + inset + half, Math.min(BUILDING.maxZ - inset - half, z));
+  return { minX: cx - half, maxX: cx + half, minZ: cz - half, maxZ: cz + half };
 }
-
-/** Which space a floor point is in (rooms first, so a doorway's sill counts as the room), or null outside. */
+/** Semantic destinations within one shared hall. */
 export function spaceAt([x, z]: Vec2): SpaceId | null {
   const inside = (r: Rect) => x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ;
-  return SPACE_IDS.find(id => SPACES[id].kind === 'room' && inside(SPACES[id].rect))
-    ?? (inside(CORRIDOR) ? 'corridor' : null);
+  if (!inside(BUILDING)) return null;
+  if (inside(fixtureBounds(FLOOR_FIXTURES.server))) return 'server_room';
+  return ANCHOR_IDS.filter(id => inside(destinationRect(id))).sort((a, b) =>
+    Math.hypot(x - ANCHOR_LAYOUT[a].center[0], z - ANCHOR_LAYOUT[a].center[1]) -
+    Math.hypot(x - ANCHOR_LAYOUT[b].center[0], z - ANCHOR_LAYOUT[b].center[1]))[0] ?? 'corridor';
 }
 
 /** Where a teleport lands: floor position and yaw (yaw 0 looks toward -z). `space` is where that point is. */
@@ -330,17 +362,15 @@ export interface RoomSpawn { readonly position: Vec2; readonly yaw: number; read
 /**
  * Clear approaches to logical destinations. Legacy wing destinations return to the open office.
  */
+const ENTRY_SPAWN: RoomSpawn = { position: ENTRY_POSITION, yaw: 0, space: 'lobby' };
 export const ROOM_SPAWNS: Readonly<Record<SpaceId, RoomSpawn>> = {
-  atrium: { position: [-7.2, 6.7], yaw: 0, space: 'lobby' },
-  work_room: { position: [0, 0.6], yaw: 0, space: 'corridor' },
-  corridor: { position: [-9, 0.6], yaw: 0, space: 'corridor' },
-  lobby: { position: [-7.2, 6.7], yaw: 0, space: 'lobby' },
-  collections: { position: [-9.2, -0.5], yaw: 0, space: 'corridor' },
-  payables: { position: [-1.2, -0.5], yaw: 0, space: 'corridor' },
-  vendor_onboarding: { position: [6.8, -0.5], yaw: 0, space: 'corridor' },
-  meeting: { position: [8, 0.6], yaw: 0, space: 'corridor' },
-  dana: { position: [1.2, -5.5], yaw: Math.PI, space: 'dana' },
-  treasury: { position: [2.5, 3.6], yaw: Math.PI, space: 'treasury' },
-  break_room: { position: [8, 2.3], yaw: Math.PI, space: 'break_room' },
-  server_room: { position: [10.2, 0.5], yaw: -Math.PI / 2, space: 'server_room' },
+  atrium: ENTRY_SPAWN, work_room: ENTRY_SPAWN, corridor: ENTRY_SPAWN, lobby: ENTRY_SPAWN,
+  collections: { position: ANCHOR_LAYOUT.collections.position, yaw: 0, space: 'collections' },
+  payables: { position: ANCHOR_LAYOUT.payables.position, yaw: 0, space: 'payables' },
+  vendor_onboarding: { position: ANCHOR_LAYOUT.vendor_onboarding.position, yaw: 0, space: 'vendor_onboarding' },
+  dana: { position: ANCHOR_LAYOUT.dana.position, yaw: Math.PI, space: 'dana' },
+  treasury: { position: ANCHOR_LAYOUT.treasury.position, yaw: Math.PI, space: 'treasury' },
+  meeting: { position: [0, 0], yaw: 0, space: 'work_room' },
+  break_room: ENTRY_SPAWN,
+  server_room: { position: [9.8, FLOOR_FIXTURES.server.z], yaw: -Math.PI / 2, space: 'server_room' },
 };

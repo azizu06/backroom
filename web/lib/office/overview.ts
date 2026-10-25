@@ -3,8 +3,8 @@
  * Pure view math only: it moves a camera, never writes state, evaluates policy or calls a model.
  */
 import { FLOOR, INTERACT_RANGE, PLAYER_RADIUS, SPAWN, insideAny, interactCandidates, pickTarget, type Box, type PlayEntry, type Vec2 } from './play';
+import { destinationRect } from './layout';
 import { AGENT_RADIUS } from './targets/agent';
-import { SPACES } from './layout';
 import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type OfficeSnapshot } from './state';
 
 export type { PlayEntry };
@@ -14,11 +14,7 @@ export type OverviewPick = { readonly kind: 'agent'; readonly id: string } | { r
 
 export interface FloorRect { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 /** Logical station bounds follow the canonical layout, independent of physical walls. */
-export function roomRect(room: AnchorId): FloorRect {
-  const [x, z] = OFFICE_ANCHORS[room].center;
-  return { minX: Math.max(FLOOR.minX, x - 2.4), maxX: Math.min(FLOOR.maxX, x + 2.4),
-    minZ: Math.max(FLOOR.minZ, z - 2.4), maxZ: Math.min(FLOOR.maxZ, z + 2.4) };
-}
+export function roomRect(room: AnchorId): FloorRect { return destinationRect(room); }
 export function roomAtPoint([x, z]: Vec2, rooms: readonly AnchorId[] = Object.keys(OFFICE_ANCHORS) as AnchorId[]): AnchorId | null {
   return [...rooms].filter(room => { const r = roomRect(room); return x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ; })
     .sort((a, b) => Math.hypot(x - OFFICE_ANCHORS[a].center[0], z - OFFICE_ANCHORS[a].center[1]) - Math.hypot(x - OFFICE_ANCHORS[b].center[0], z - OFFICE_ANCHORS[b].center[1]))[0] ?? null;
