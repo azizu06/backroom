@@ -80,12 +80,16 @@ const deny = (rule: string, speak: string): ToolResult => ({
   speak,
   rule_ids: [rule],
 });
-/** One open escalation per call. After one expires, the same terms may be sent once more. */
+/** One open escalation per call. After one expires, the same terms may be sent once more.
+ * A pending request whose terms the saved policy now allows on its own no longer waits on Dana, so it does not block. */
 function repeatEscalation(
   call: GatewayCall,
   plan: PlanTerms,
+  decide: DecidePlan,
 ): { rule: string; speak: string } | undefined {
-  if (call.escalations.some((escalation) => escalation.status === "pending")) {
+  const awaitsDana = (escalation: Escalation) =>
+    escalation.status === "pending" && (!escalation.plan || decide(call, escalation.plan).kind !== "ALLOW");
+  if (call.escalations.some(awaitsDana)) {
     return {
       rule: "ESCALATION_OPEN",
       speak: "Dana is already reviewing a request on this call. I will keep waiting.",
@@ -275,7 +279,7 @@ export function executeTool(
     const decision = decide(call, plan, plan.firstPaymentCents);
     if (decision.kind !== "ALLOW") {
       if (decision.kind === "ESCALATE") {
-        const blocked = repeatEscalation(call, plan);
+        const blocked = repeatEscalation(call, plan, policyDecide);
         if (blocked) {
           const checked = audit(call, input, "DENY", [blocked.rule], plan, decision);
           return { ...deny(blocked.rule, blocked.speak), audit_id: checked.id };
@@ -345,7 +349,7 @@ export function executeTool(
   if (input.tool === "propose_plan") {
     const decision = decide(call, input.plan);
     if (decision.kind === "ESCALATE") {
-      const blocked = repeatEscalation(call, input.plan);
+      const blocked = repeatEscalation(call, input.plan, policyDecide);
       if (blocked) {
         const refused = audit(call, input, "DENY", [blocked.rule], input.plan, decision);
         return { ...deny(blocked.rule, blocked.speak), audit_id: refused.id };
