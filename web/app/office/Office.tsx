@@ -34,6 +34,7 @@ import '../office.css';
 import './a11y.css';
 import './lobby.css';
 import './tags.css';
+import './office-tokens.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
