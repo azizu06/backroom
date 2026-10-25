@@ -257,6 +257,7 @@ const metrics = score(observations);
 const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
 const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
+gaps.push({ id: 'C09:scope', detail: 'The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway\'s code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed.' });
 gaps.push({ id: 'C08:scope', detail: 'The wrong-person line is code-owned and graded on the production relay, with a scripted stand-in for the Haiku answer reader. Cartesia speaking it on a real call and the provider end-call are not executed.' });
 gaps.push({ id: 'P01:scope', detail: 'The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.' });
 const rates = {
