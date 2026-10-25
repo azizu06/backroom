@@ -30,6 +30,9 @@ describe('office layout ownership', () => {
     expect([...sidebar.matchAll(/data-group="([a-z]+)"/g)].map(match => match[1])).toEqual(['calls', 'approvals', 'attack', 'setup']);
     for (const path of ['/calls', '/attack', '/policy', '/controller', '/payment-link', '/operator', '/real-vs-sim']) expect(sidebar).not.toMatch(new RegExp(` href="${path}"`));
 
+    expect(sidebar).toContain('<span>Backroom</span>');
+    expect(html).not.toContain('Backrooms');
+    expect(html).toContain('3D office view. Click a room');
     expect(sidebar).toMatch(/<button[^>]*>.*?Inbox · /);
     expect(sidebar).toMatch(/<button[^>]*>.*?Audit Wall<\/button>/);
     expect(sidebar).not.toContain('href="/inbox"');
