@@ -37,11 +37,11 @@ export default function OperatorPage() {
   const [error, setError] = useState(''), [receipt, setReceipt] = useState<Receipt>();
   const [links, setLinks] = useState<Links>({}), [confirm, setConfirm] = useState<OperatorAction>();
   const [resetDone, setResetDone] = useState(false);
-  const [testnet, setTestnet] = useState<{ available: boolean; reason?: string }>();
+  const [testnet, setTestnet] = useState<{ available: boolean; reason?: string; lastResult?: X402Receipt }>();
   async function session() {
     const response = await fetch('/api/operator/session', { cache: 'no-store' }).catch(() => undefined);
     setAuthorized(!!response?.ok);
-    if (response?.ok) setTestnet((await response.json() as { x402Testnet?: { available: boolean; reason?: string } }).x402Testnet);
+    if (response?.ok) setTestnet((await response.json() as { x402Testnet?: { available: boolean; reason?: string; lastResult?: X402Receipt } }).x402Testnet);
     return !!response?.ok;
   }
   useEffect(() => { void session(); }, []);
@@ -70,6 +70,7 @@ export default function OperatorPage() {
       const response = await fetch(`/api/operator/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const data = await response.json() as Receipt;
       setReceipt(data);
+      if (action === 'x402_testnet') await session();
       if (response.status === 401) setAuthorized(false);
       if (!response.ok) throw new Error(data.error || 'Action unavailable.');
       if (action === 'status' || action === 'reset') setLinks(data.result as Links);
@@ -81,7 +82,7 @@ export default function OperatorPage() {
   function trigger(action: OperatorAction, label: string = operatorActions[action][0], primary = false) {
     return <button key={action} className={primary ? styles.primary : undefined} disabled={action === 'llm_off' ? offBusy : !!busy || offBusy || !!unavailable(action)}
       onClick={() => action === 'reset' || action === 'llm_on' || action === 'warm' || action === 'burst' || action === 'x402_testnet' ? setConfirm(action) : void run(action)}>
-      {busy === action || action === 'llm_off' && offBusy ? 'Running…' : label}</button>;
+      {busy === action || action === 'llm_off' && offBusy ? 'Running…' : action === 'x402_testnet' && testnet?.lastResult ? 'Already paid this session' : label}</button>;
   }
   function unavailable(action: OperatorAction) {
     return action === 'x402_testnet' && testnet && !testnet.available ? testnet.reason || 'Testnet is off on this host.' : undefined;
@@ -117,7 +118,7 @@ export default function OperatorPage() {
           <p>Northfield pays an approved vendor invoice over x402. Policy must allow it; the over-limit invoice is held with zero signatures.</p>
           <div className={styles.row}>{(['x402_simulated', 'x402_blocked', 'x402_testnet'] as const).map(action => trigger(action))}</div>
           {unavailable('x402_testnet') && <p role='note' className={styles.muted}>Unavailable: {unavailable('x402_testnet')}</p>}
-          {isX402(receipt?.result) && <X402Summary receipt={receipt.result} />}</div></li>
+          {isX402(receipt?.result) ? <X402Summary receipt={receipt.result} /> : testnet?.lastResult && <X402Summary receipt={testnet.lastResult} />}</div></li>
         <li className={styles.card}><h2>Show the guardrails</h2>
           <nav aria-label='Guardrail views' className={styles.row}><a href='/inbox'>Inbox</a><a href='/audit'>Audit wall</a><a href='/attack'>Attack lab</a></nav></li>
       </ol>

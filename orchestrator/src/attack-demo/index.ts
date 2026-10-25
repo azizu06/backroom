@@ -102,7 +102,7 @@ export async function runAttackDemo(unchecked: AttackInput, options: { analyst?:
   const decision = decisions.find(decision => decision.kind !== 'ALLOW') ?? decisions[0]!;
   const ruleIds = [...new Set(decisions.flatMap(decision => decision.ruleIds).filter(id => id !== 'IN_BADGE'))];
   steps.push({ role: 'auditor', execution: 'code', observed: JSON.stringify({ decisions, paymentAdapter: 'absent' }),
-    proposed: 'Record rule evidence. Payment execution and approval are unavailable in this isolated demo.', decision });
+    proposed: 'Record rule evidence. Payment execution and approval are unavailable in Attack lab.', decision });
   return { mode: input.mode, source: 'judge', caseId, trust: 'untrusted_data', environment: 'isolated_synthetic_company', senderDomain,
     steps, skippedRoles: ROLES.filter(role => !steps.some(step => step.role === role)), decision: { ...decision, ruleIds: ruleIds.length ? ruleIds : decision.ruleIds,
       reason: decision.kind === 'ALLOW' ? 'Policy permits this proposal; this assessment-only demo never executes payments.' : decision.reason },
