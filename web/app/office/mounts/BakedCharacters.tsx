@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
-  AnimationMixer, Euler, LoopRepeat, Vector3, type AnimationAction, type AnimationClip, type Group, type Mesh, type Object3D,
+  AnimationMixer, Euler, LoopRepeat, Quaternion, Vector3, type AnimationAction, type AnimationClip, type Group, type Mesh, type Object3D,
 } from 'three';
 import { bakedArtRequested } from '../../../lib/office/baked-art';
 import {
@@ -11,14 +11,21 @@ import {
   characterClip, characterVariant, characterYaw, disposeClonedBody, recolorBody, setBakedCharacterReady, subscribeBakedTalking,
   type CharacterClip,
 } from '../../../lib/office/baked-character';
-import type { OfficeAgent } from '../../../lib/office/state';
+import {
+  SIT_HIP_RAD, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, isSeatDesk, seatPieces, stepSeatBlend, turnToward,
+} from '../../../lib/office/baked-seat';
+import { visibleRooms, type OfficeAgent } from '../../../lib/office/state';
 import { useReducedMotion } from './shared';
+import { StaticBoxes } from './StaticGeometry';
 import type { SceneMountProps } from './types';
 
 const scratchPosition = new Vector3();
 const scratchEuler = new Euler();
 /** Below this per-frame travel (m) the avatar counts as standing. */
 const STILL_EPSILON = 0.0005;
+/** Below this heading error (rad) a turn counts as done and stops requesting frames. */
+const TURN_EPSILON = 0.002;
+const X_AXIS = new Vector3(1, 0, 0);
 
 interface CharacterTemplate {
   readonly scene: Group;
@@ -36,6 +43,49 @@ interface Puppet {
   current: CharacterClip | null;
   fadeLeft: number;
   last: [number, number] | null;
+  /** Thigh and shin bones with their seated local rotations; null when the rig lacks them (never sits). */
+  readonly legs: SeatedLegs | null;
+  /** 0 standing at the anchor, 1 seated on the stool. */
+  seat: number;
+  /** Drawn heading (avatar convention), smoothed toward the desk, the player or the avatar's own heading. */
+  heading: number | null;
+}
+
+interface SeatedLegs {
+  readonly bones: readonly Object3D[];
+  readonly seated: readonly Quaternion[];
+}
+
+/** Rotation of `node` relative to `root` (product of local rotations below the root). */
+function rootRelative(node: Object3D, root: Object3D, out: Quaternion): Quaternion {
+  out.identity();
+  for (let current: Object3D | null = node; current && current !== root; current = current.parent) out.premultiply(current.quaternion);
+  return out;
+}
+
+/**
+ * Seated local rotations from the clone's rest pose: each thigh swings forward SIT_HIP_RAD about the model's x axis
+ * (the GLB faces -Z, so +x rotation lifts a hanging limb forward) and each shin swings back by the same angle so it
+ * hangs straight down again. Computed once per clone; the frame loop only slerps toward them.
+ */
+function seatedLegs(object: Group): SeatedLegs | null {
+  const hip = new Quaternion().setFromAxisAngle(X_AXIS, SIT_HIP_RAD);
+  const bones: Object3D[] = [];
+  const seated: Quaternion[] = [];
+  for (const side of ['L', 'R']) {
+    const thigh = object.getObjectByName(`thigh_${side}`);
+    const shin = object.getObjectByName(`shin_${side}`);
+    if (!thigh?.parent || !shin) return null;
+    const parent = rootRelative(thigh.parent, object, new Quaternion());
+    // thigh' = P^-1 * R * P * thigh (R applied in model space).
+    const thighSeated = parent.clone().invert().multiply(hip).multiply(parent).multiply(thigh.quaternion);
+    // shin' = T^-1 * R^-1 * T * shin, T = the thigh's rest model rotation: undoes the hip swing for the shin.
+    const model = parent.clone().multiply(thigh.quaternion);
+    const shinSeated = model.clone().invert().multiply(hip.clone().invert()).multiply(model).multiply(shin.quaternion);
+    bones.push(thigh, shin);
+    seated.push(thighSeated, shinSeated);
+  }
+  return { bones, seated };
 }
 
 let loading: Promise<CharacterTemplate | null> | null = null;
@@ -96,7 +146,9 @@ function seatOf(object: Group): string | undefined {
 /**
  * Opt-in stylized agents (`/office?art=baked`). Loads `character.glb` once, clones it per agent, shows the
  * accessories of the agent's role variant and tints the shirt. Clips follow the drawn avatar (view only):
- * walk while it moves, talk while the Play talk panel is open on it, type at its desk, idle otherwise.
+ * walk while it moves, talk while the Play talk panel is open on it, type at its desk, idle otherwise. At its desk the
+ * clone slides onto a stool at the keyboard (baked-seat.ts) and sits; while talking it turns to face the player. The
+ * avatar group and its anchor never move.
  * The blocky figure stays until each clone is ready, and stays if the GLB fails; a GLB without clips stands still.
  */
 export function BakedCharacters({ snapshot }: SceneMountProps) {
@@ -157,25 +209,44 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
   // Priority 0 keeps Fiber's automatic render (a positive priority would take it over); this mount
   // subscribes after the avatars, so it still runs after their pose writes. Idle and typing advance only on
   // frames something else asked for; frames are requested here only while a fade runs or the talk clip plays.
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     if (clonesRef.current.size === 0) return;
-    const step = reduced ? 0 : Math.min(Math.max(delta, 0), 0.1);
+    const dt = Math.min(Math.max(delta, 0), 0.1);
+    const step = reduced ? 0 : dt;
     const talking = bakedTalkingAgent();
-    const seats = new Map(agentsRef.current.map(agent => [agent.id, agent.seatId] as const));
     let again = false;
     for (const [id, puppet] of clonesRef.current) {
       const clone = puppet.object;
       const body = scene.getObjectByName(`agent:${id}`);
       if (!body) { clone.visible = false; continue; }
-      placeCharacter(clone, body);
       clone.visible = true;
+      // The avatar group (anchor and Bear) is read, never moved; only the clone slides onto the stool.
+      body.updateWorldMatrix(true, false);
+      scratchPosition.setFromMatrixPosition(body.matrixWorld);
+      scratchEuler.setFromRotationMatrix(body.matrixWorld, 'YXZ');
+      const bx = scratchPosition.x, bz = scratchPosition.z, bodyHeading = scratchEuler.y;
+      const moving = !!puppet.last && Math.hypot(bx - puppet.last[0], bz - puppet.last[1]) > STILL_EPSILON;
+      if (puppet.last) { puppet.last[0] = bx; puppet.last[1] = bz; } else puppet.last = [bx, bz];
+      const seatId = seatOf(clone) ?? '';
+      const atDesk = atOwnDesk(seatId, bx, bz);
+      const seat = puppet.legs && puppet.mixer ? deskSeat(seatId) : null;
+      const settle = puppet.seat;
+      puppet.seat = seat ? stepSeatBlend(puppet.seat, atDesk && !moving, dt, reduced) : 0;
+      const sit = easeSeat(puppet.seat);
+      clone.position.set(seat ? bx + (seat.x - bx) * sit : bx, SIT_LIFT_M * sit, seat ? bz + (seat.z - bz) * sit : bz);
+      const isTalking = talking === id;
+      const target = isTalking ? headingToward(clone.position.x, clone.position.z, camera.position.x, camera.position.z)
+        : seat && atDesk && !moving ? seat.heading : bodyHeading;
+      puppet.heading = puppet.heading === null ? target : turnToward(puppet.heading, target, dt, reduced);
+      clone.rotation.set(0, characterYaw(puppet.heading), 0);
+      if (!reduced && (Math.abs(angleDelta(puppet.heading, target)) > TURN_EPSILON || puppet.seat !== settle)) again = true;
       if (!puppet.mixer) continue;
-      const x = clone.position.x, z = clone.position.z;
-      const moving = !!puppet.last && Math.hypot(x - puppet.last[0], z - puppet.last[1]) > STILL_EPSILON;
-      puppet.last = [x, z];
-      const activity = { moving, talking: talking === id, atDesk: atOwnDesk(seats.get(id) ?? '', x, z) };
-      play(puppet, characterClip(activity, puppet.available), reduced);
+      play(puppet, characterClip({ moving, talking: isTalking, atDesk }, puppet.available), reduced);
       puppet.mixer.update(step);
+      // The clip leaves the legs at rest (type, talk, idle); fold them onto the stool on top of it.
+      if (puppet.legs && sit > 0) {
+        puppet.legs.bones.forEach((bone, index) => { bone.quaternion.slerp(puppet.legs!.seated[index]!, sit); });
+      }
       puppet.fadeLeft = Math.max(0, puppet.fadeLeft - step);
       // A walk that just stopped needs one more frame to notice and fade out.
       if (!reduced && (moving || puppet.fadeLeft > 0 || puppet.current === 'talk')) again = true;
@@ -183,7 +254,16 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
     if (again) invalidate();
   });
 
-  return <>{models.map(model => <primitive key={model.id} object={model.object} dispose={null} />)}</>;
+  // A stool and keyboard at each occupied, visible desk, once the GLB clones exist (the Bear never sits).
+  const visible = visibleRooms(snapshot);
+  const seatRooms = models.length === 0 ? '' : [...new Set(snapshot.agents.map(agent => agent.seatId))]
+    .filter(room => isSeatDesk(room) && visible.includes(room)).sort().join(',');
+  const stools = useMemo(() => seatRooms ? seatRooms.split(',').filter(isSeatDesk).flatMap(seatPieces) : [], [seatRooms]);
+
+  return <>
+    {models.map(model => <primitive key={model.id} object={model.object} dispose={null} />)}
+    {stools.length > 0 && <StaticBoxes pieces={stools} />}
+  </>;
 }
 
 function disposePuppet(puppet: Puppet) {
@@ -227,5 +307,8 @@ function syncClone(template: CharacterTemplate, agent: OfficeAgent, map: Map<str
     placeCharacter(object, body);
     object.visible = true;
   }
-  map.set(agent.id, { object, mixer: actions.size > 0 ? mixer : null, actions, available: new Set(actions.keys()), current: null, fadeLeft: 0, last: null });
+  map.set(agent.id, {
+    object, mixer: actions.size > 0 ? mixer : null, actions, available: new Set(actions.keys()), current: null, fadeLeft: 0, last: null,
+    legs: seatedLegs(object), seat: 0, heading: null,
+  });
 }
