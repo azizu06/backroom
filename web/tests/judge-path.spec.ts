@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { judgeGateway, localJudgeOrigin, virtualDana } from './judge-path.helpers';
+import { judgeGateway, judgeVoice, localJudgeOrigin, virtualDana } from './judge-path.helpers';
 
 test('judge invoice, attack, passkey exception and exact payment finish the agent chains', async ({ page, request }, info) => {
   test.setTimeout(120_000);
@@ -87,6 +87,85 @@ test('judge invoice, attack, passkey exception and exact payment finish the agen
         .toEqual(expect.arrayContaining(['collections>reconciler', 'reconciler>auditor']));
     }).toPass({ timeout: 15_000 });
     await info.attach('audit-chain', { body: JSON.stringify(evidence), contentType: 'application/json' });
+  });
+  const stoppedTerms = { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 };
+  async function stoppedState(id: string) {
+    const response = await request.post(`${origin}/__judge/state`, {
+      headers: { authorization: 'Bearer judge-local-tool' }, data: { callId: id },
+    });
+    expect(response.ok()).toBe(true);
+    const state = await response.json();
+    expect(state.session.stopped).toBe(true);
+    expect(state.call.plans).toEqual([]);
+    expect(state.call.links).toEqual([]);
+    expect(state.call.outbox.some((item: any) => item.type === 'send_payment_link')).toBe(false);
+    await info.attach(`stopped-call-${id}`, { body: JSON.stringify(state), contentType: 'application/json' });
+    return state;
+  }
+  await test.step('Human request creates Dana callback on controller without money', async () => {
+    const id = randomUUID();
+    const relay = await judgeVoice(request, origin, id);
+    await relay.turn('user', 'Yes, this is Jordan.');
+    expect(await relay.tool('verify_identity_result', { result: 'confirmed' })).toMatchObject({ identity: 'confirmed' });
+    await relay.turn('user', 'I want to talk to a human.');
+    expect(await relay.tool('propose_plan', stoppedTerms)).toMatchObject({ kind: 'DENY', rule_ids: ['CALL_STOPPED'] });
+    await page.goto(`${origin}/controller`);
+    await expect(page.getByRole('heading', { name: 'Approval needed' })).toBeVisible();
+    await expect(page.getByText('REQUEST_HUMAN', { exact: true })).toBeVisible();
+    const inbox = await (await page.request.get(`${origin}/api/controller/inbox`)).json();
+    const callback = inbox.escalations.find((row: any) => row.id === `callback:${id}`);
+    expect(callback).toMatchObject({ callId: id, toHuman: 'Dana', status: 'pending', ruleIds: ['REQUEST_HUMAN'] });
+    expect(callback).not.toHaveProperty('amountCents');
+    expect(callback).not.toHaveProperty('requestedTerms');
+    await relay.complete();
+    expect((await stoppedState(id)).call.status).toBe('human_requested');
+  });
+  await test.step('Hostility after one scripted calm reply records HOSTILE_ESCALATE', async () => {
+    const id = randomUUID();
+    const relay = await judgeVoice(request, origin, id);
+    await relay.turn('user', 'Yes, this is Jordan.');
+    await relay.tool('verify_identity_result', { result: 'confirmed' });
+    await relay.turn('user', 'You people are thieves.');
+    await relay.turn('assistant', 'I understand this is frustrating. We can pause and have a person help.');
+    await relay.turn('user', 'I am done talking to a robot.');
+    await relay.tool('request_human', { reason: 'hostile' });
+    expect(await relay.tool('propose_plan', stoppedTerms)).toMatchObject({ kind: 'DENY', rule_ids: ['CALL_STOPPED'] });
+    const audit = await (await page.request.get(`${origin}/api/audit/entries`)).json();
+    expect(audit.entries.some((row: any) => row.refs.includes(id) && row.action === 'request_human'
+      && row.ruleIds.includes('HOSTILE_ESCALATE'))).toBe(true);
+    await relay.complete();
+    expect((await stoppedState(id)).call.status).toBe('human_requested');
+  });
+  await test.step('Wrong person receives code-owned closing line without invoice or amount', async () => {
+    const id = randomUUID();
+    const relay = await judgeVoice(request, origin, id);
+    await relay.turn('user', 'No, wrong number.');
+    const result = await relay.tool('verify_identity_result', { result: 'confirmed' });
+    expect(result).toMatchObject({ identity: 'wrong_person', next_step: 'say_and_end', can_confirm: false });
+    expect(result.speak).toContain('Northfield Studio');
+    expect(result.speak).toContain('202-555-0100');
+    for (const detail of ['Jordan', '1042', '4,950', '495000', '$']) expect(result.speak).not.toContain(detail);
+    expect(result).not.toHaveProperty('amount_cents');
+    expect(result).not.toHaveProperty('invoice_id');
+    expect(await relay.tool('get_invoice_context')).toMatchObject({ kind: 'DENY', rule_ids: ['CALL_STOPPED'] });
+    await relay.turn('assistant', result.speak);
+    await relay.complete();
+    const state = await stoppedState(id);
+    expect(state.call.identityConfirmed).toBe(false);
+    expect(state.call.status).toBe('human_requested');
+  });
+  await test.step('Dispute stops collection and refuses any offer', async () => {
+    const id = randomUUID();
+    const relay = await judgeVoice(request, origin, id);
+    await relay.turn('user', 'Yes, this is Jordan.');
+    await relay.tool('verify_identity_result', { result: 'confirmed' });
+    await relay.turn('user', 'I dispute this invoice.');
+    expect(await relay.tool('mark_dispute')).toMatchObject({ kind: 'RECORDED', can_confirm: false });
+    expect(await relay.tool('propose_plan', stoppedTerms)).toMatchObject({ kind: 'DENY', rule_ids: ['CALL_STOPPED'] });
+    await relay.complete();
+    const state = await stoppedState(id);
+    expect(state.call.status).toBe('disputed');
+    expect(state.call.audits.some((row: any) => row.action === 'mark_dispute' && row.ruleIds.includes('MARK_DISPUTE'))).toBe(true);
   });
   await dana.detach();
 });
