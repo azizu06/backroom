@@ -52,11 +52,6 @@ import { bakedArtRequested } from '../../lib/office/baked-art';
 import { interactionStore } from '../../lib/office/interactions';
 import './office-tokens.css';
 
-/** Screens the shared site nav leaves out, so every page is one click from the corner menu. */
-const OFFICE_MORE_SCREENS = [
-  { label: 'Calls', href: '/calls' }, { label: 'Policy', href: '/policy' }, { label: 'Payment link', href: '/payment-link' },
-] as const;
-
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
   if (error) throw error;
@@ -302,7 +297,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             </button>
           </div>
           <SiteNav placement='office' />
-          <nav className='office-more-screens' aria-label='More screens'><ul>{OFFICE_MORE_SCREENS.map(({ label, href }) => <li key={href}><a href={href}>{label}</a></li>)}</ul></nav>
           <div className='office-tools'>
             <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>{storyActive ? 'Skip tour' : 'Take the tour'}</button>
             <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Camera tour</button>
