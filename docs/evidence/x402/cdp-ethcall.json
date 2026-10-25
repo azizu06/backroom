@@ -1,0 +1,40 @@
+{
+  "network": "eip155:84532",
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "payerHasCode": false,
+  "walletLabel": "Coinbase CDP server wallet",
+  "facilitatorUrl": "https://www.x402.org/facilitator",
+  "baselineFacilitatorUrl": "https://www.x402.org/facilitator",
+  "domain": {
+    "name": "USDC",
+    "version": "2",
+    "chainId": 84532,
+    "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "amountAtomic": "10000",
+  "payTo": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+  "validAfter": "0",
+  "validBefore": "1792938524",
+  "nonce": "0x1b3b4376d9e0aaf01a9e3988e3a9c603beee42d9e5de54470f27d9abe47548bc",
+  "signatureBytes": 65,
+  "erc6492Wrapped": false,
+  "rawV": 27,
+  "normalizedV": 27,
+  "original": {
+    "success": true
+  },
+  "normalized": {
+    "success": true
+  },
+  "submitted": false,
+  "at": "2026-10-25T14:26:44.941Z",
+  "lastAttempt": {
+    "validAfter": "0",
+    "validBefore": "1792938135",
+    "settlementTimestampSeconds": 1792938076,
+    "secondsRemainingAtSettlement": 59,
+    "authorizationUsedAtReconciliation": false,
+    "reconciliationBlock": "50081532",
+    "facilitatorErrorReason": "invalid_exact_evm_transaction_failed"
+  }
+}
