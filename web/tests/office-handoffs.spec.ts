@@ -198,7 +198,7 @@ function silentWav(ms = 200) {
 }
 const VOICE_ROLES = ['intake_sorter', 'extractor', 'vendor_verifier', 'payables', 'collections_caller', 'reconciler', 'auditor'];
 
-test('voices stay off until enabled, then speak handoff lines through the proxy', async ({ page }) => {
+test('voices default on and speak handoff lines after an office gesture', async ({ page }) => {
   const lines: { role: string; text: string }[] = [];
   await page.route('**/api/handoff', async route => {
     lines.push(route.request().postDataJSON());
@@ -208,11 +208,6 @@ test('voices stay off until enabled, then speak handoff lines through the proxy'
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
   await openOverviewSheet(page);
-  const toggle = page.getByRole('button', { name: 'Voices off' });
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await page.waitForTimeout(1500);
-  expect(lines).toEqual([]);
-  await toggle.click();
   await expect(page.getByRole('button', { name: 'Voices on' })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => lines.length, { timeout: 20_000 }).toBeGreaterThan(0);
   for (const line of lines) {
@@ -224,18 +219,17 @@ test('voices stay off until enabled, then speak handoff lines through the proxy'
   expect(errors).toEqual([]);
 });
 
-test('a failing voice proxy falls back to silent visuals', async ({ page }) => {
+test('a failing voice proxy drops lines without switching voices off', async ({ page }) => {
   let calls = 0;
   await page.route('**/api/handoff', route => { calls++; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"VOICE_NOT_CONFIGURED"}' }); });
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
   await openOverviewSheet(page);
-  await page.getByRole('button', { name: 'Voices off' }).click();
-  await expect(page.getByText('Voices unavailable · visuals only')).toBeVisible({ timeout: 20_000 });
-  const after = calls;
+  await expect.poll(() => calls, { timeout: 20_000 }).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: 'Voices on' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.handoff-bubble:not([hidden])').first()).toBeVisible({ timeout: 20_000 });
   await page.waitForTimeout(2000);
-  expect(calls).toBe(after);
+  await expect(page.getByRole('button', { name: 'Voices on' })).toHaveAttribute('aria-pressed', 'true');
   expect(errors).toEqual([]);
 });

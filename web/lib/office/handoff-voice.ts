@@ -1,7 +1,7 @@
 /**
  * Optional handoff voices (#133). Browser-safe: only the HandoffRole *type* comes from the orchestrator;
  * audio is fetched through the same-origin `/api/handoff` proxy, which adds the gateway secret server-side.
- * Sound defaults on after the first user gesture; any failure falls back to silent visuals.
+ * Sound defaults on after the first user gesture; a failed line never disables later voices.
  */
 import type { HandoffLine } from '@backroom/orchestrator/handoff-client';
 
@@ -50,23 +50,13 @@ export function liveVoiceCues(rows: readonly Handoff[], since: number): VoiceCue
 export type FetchAudio = (line: HandoffLine) => Promise<Blob>;
 /** Plays a clip; must settle when `signal` aborts (sound turned off or the office unmounted). */
 export type PlayAudio = (audio: Blob, signal: AbortSignal) => Promise<void>;
-/**
- * Statuses that mean the voice service is unusable for this visit (not configured, rejected, too large).
- * 429 (busy) and 502/504 (slow or unreachable synthesis) only drop that line.
- */
-const FATAL = /HANDOFF_AUDIO_HTTP_(400|401|403|404|405|413|415|500|503)$/;
-
-/**
- * Plays cues one at a time while enabled. Errors never surface: a fatal status
- * silences voices for the visit; autoplay refusal or a transient one just drops the line.
- */
+/** Plays cues one at a time while enabled. Every failure drops only that line. */
 export class HandoffVoice {
   private readonly spoken = new Set<string>();
   private queue: VoiceCue[] = [];
   private playing = false;
   private current: AbortController | null = null;
   enabled = true;
-  failed = false;
   constructor(private readonly fetchAudio: FetchAudio, private readonly play: PlayAudio, private readonly onChange: () => void = () => {}) {}
 
   setEnabled(enabled: boolean) {
@@ -79,7 +69,7 @@ export class HandoffVoice {
   /** Marks a cue as already handled (e.g. it started before sound was turned on). */
   skip(key: string) { this.spoken.add(key); }
   say(cue: VoiceCue) {
-    if (!this.enabled || this.failed || this.spoken.has(cue.key)) return;
+    if (!this.enabled || this.spoken.has(cue.key)) return;
     this.spoken.add(cue.key);
     // Keep the queue short so voices never trail far behind the visuals.
     this.queue = [...this.queue, cue].slice(-2);
@@ -89,7 +79,7 @@ export class HandoffVoice {
     if (this.playing) return;
     this.playing = true;
     try {
-      while (this.queue.length && this.enabled && !this.failed) {
+      while (this.queue.length && this.enabled) {
         const cue = this.queue.shift()!;
         const controller = new AbortController();
         this.current = controller;
@@ -98,12 +88,9 @@ export class HandoffVoice {
           // Sound may have been turned off while the line was synthesizing.
           if (!this.enabled || controller.signal.aborted) continue;
           await this.play(audio, controller.signal);
-        } catch (error) {
-          if (controller.signal.aborted) continue;
-          const message = error instanceof Error ? error.message : String(error);
-          const transient = /HANDOFF_AUDIO_HTTP_\d+$/.test(message) && !FATAL.test(message);
-          const autoplayBlocked = error instanceof Error && error.name === 'NotAllowedError';
-          if (!transient && !autoplayBlocked) { this.failed = true; this.queue = []; this.onChange(); }
+        } catch {
+          // HTTP failures, timeouts and playback refusals apply only to this cue.
+          // The next gesture can re-arm the player; later cues remain eligible.
         } finally {
           if (this.current === controller) this.current = null;
         }
@@ -114,15 +101,15 @@ export class HandoffVoice {
   }
 }
 
-/** Arm both gesture types, then remove both after whichever happens first. */
-export function unlockOnFirstGesture(target: EventTarget, unlock: () => void) {
+/** Keep gestures armed so a playback refusal can recover on the next click or key. */
+export function unlockOnGesture(target: EventTarget, unlock: () => void) {
   const cleanup = () => {
-    target.removeEventListener('pointerdown', firstGesture, { capture: true });
-    target.removeEventListener('keydown', firstGesture, { capture: true });
+    target.removeEventListener('pointerdown', gesture, { capture: true });
+    target.removeEventListener('keydown', gesture, { capture: true });
   };
-  const firstGesture = () => { cleanup(); unlock(); };
-  target.addEventListener('pointerdown', firstGesture, { capture: true });
-  target.addEventListener('keydown', firstGesture, { capture: true });
+  const gesture = () => { unlock(); };
+  target.addEventListener('pointerdown', gesture, { capture: true });
+  target.addEventListener('keydown', gesture, { capture: true });
   return cleanup;
 }
 
@@ -142,7 +129,10 @@ export function createAudioPlayer() {
       unlocked = true;
       const audio = get();
       audio.src = SILENT_WAV;
-      audio.play().catch(() => { /* Unlock is best effort; a refused clip later falls back to silence. */ });
+      audio.play().catch(() => {
+        // An interrupted primer must not re-lock a real clip that replaced it.
+        if (audio.src === SILENT_WAV) unlocked = false;
+      });
     },
     play(clip: Blob, signal: AbortSignal): Promise<void> {
       if (!unlocked || signal.aborted) return Promise.resolve();
@@ -162,7 +152,10 @@ export function createAudioPlayer() {
         audio.addEventListener('error', failed);
         signal.addEventListener('abort', aborted);
         audio.src = url;
-        audio.play().catch(error => { cleanup(); reject(error); });
+        audio.play().catch(error => {
+          if (error instanceof Error && error.name === 'NotAllowedError') unlocked = false;
+          cleanup(); reject(error);
+        });
       });
     },
   };

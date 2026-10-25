@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { createHandoffProxy, HANDOFF_UPSTREAM } from './handoff-proxy';
-import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, handoffVoiceLine, liveVoiceCues, voiceCues, type VoiceCue } from './handoff-voice';
+import { HandoffVoice, createAudioPlayer, unlockOnGesture, handoffVoiceLine, liveVoiceCues, voiceCues, type VoiceCue } from './handoff-voice';
 import { planHandoffs } from './handoff-plan';
 
 const ORIGIN = 'http://localhost:3035';
@@ -103,21 +103,18 @@ describe('HandoffVoice', () => {
     expect(fetchAudio).toHaveBeenCalledTimes(1);
     expect(play).toHaveBeenCalledTimes(1);
   });
-  it('falls back to silence on a fatal error and only drops the line when busy', async () => {
-    let status = 429;
-    const fetchAudio = vi.fn(async () => { throw new Error(`HANDOFF_AUDIO_HTTP_${status}`); });
-    const voice = new HandoffVoice(fetchAudio, vi.fn(async () => {}));
-    voice.setEnabled(true);
-    voice.say(cue('a'));
+  it.each([400, 401, 403, 404, 405, 413, 415, 429, 500, 502, 503, 504, 'timeout', 'playback'])('drops only the failed line (%s) and keeps voices on', async status => {
+    const fetchAudio = vi.fn().mockResolvedValue(new Blob(['x']));
+    const play = vi.fn().mockResolvedValue(undefined);
+    if (status === 'playback') play.mockRejectedValueOnce(new Error('HANDOFF_AUDIO_PLAYBACK'));
+    else fetchAudio.mockRejectedValueOnce(status === 'timeout' ? new DOMException('Timed out', 'TimeoutError') : new Error(`HANDOFF_AUDIO_HTTP_${status}`));
+    const voice = new HandoffVoice(fetchAudio, play);
+    voice.say(cue('failed'));
+    voice.say(cue('next'));
     await flush();
-    expect(voice.failed).toBe(false);
-    status = 503;
-    voice.say(cue('b'));
-    await flush();
-    expect(voice.failed).toBe(true);
-    voice.say(cue('c'));
-    await flush();
+    expect(voice.enabled).toBe(true);
     expect(fetchAudio).toHaveBeenCalledTimes(2);
+    expect(play).toHaveBeenCalledTimes(status === 'playback' ? 2 : 1);
   });
   it('drops an autoplay-blocked line and plays the next line after a gesture', async () => {
     const play = vi.fn().mockRejectedValueOnce(new DOMException('User gesture required', 'NotAllowedError')).mockResolvedValue(undefined);
@@ -125,7 +122,7 @@ describe('HandoffVoice', () => {
     voice.setEnabled(true);
     voice.say(cue('a'));
     await flush(); await flush();
-    expect(voice.failed).toBe(false);
+    expect(voice.enabled).toBe(true);
     voice.say(cue('after-gesture'));
     await flush();
     expect(play).toHaveBeenCalledTimes(2);
@@ -146,7 +143,7 @@ describe('HandoffVoice review fixes', () => {
     release(new Blob(['x']));
     await flush(); await flush();
     expect(play).not.toHaveBeenCalled();
-    expect(voice.failed).toBe(false);
+    expect(voice.enabled).toBe(false);
   });
   it('aborts the clip that is playing when sound is turned off', async () => {
     let signal!: AbortSignal;
@@ -162,7 +159,7 @@ describe('HandoffVoice review fixes', () => {
     voice.setEnabled(true);
     voice.say(cue('a'));
     await flush(); await flush();
-    expect(voice.failed).toBe(false);
+    expect(voice.enabled).toBe(true);
   });
 });
 
@@ -179,20 +176,20 @@ describe('handoff proxy body cap', () => {
 
 
 describe('office voice gesture unlock', () => {
-  it.each(['pointerdown', 'keydown'])('unlocks on the first %s anywhere and removes both listeners', event => {
+  it.each(['pointerdown', 'keydown'])('keeps %s and both gesture types armed until cleanup', event => {
     const target = new EventTarget();
     const unlock = vi.fn();
-    const cleanup = unlockOnFirstGesture(target, unlock);
+    const cleanup = unlockOnGesture(target, unlock);
     target.dispatchEvent(new Event(event));
     target.dispatchEvent(new Event('pointerdown'));
     target.dispatchEvent(new Event('keydown'));
-    expect(unlock).toHaveBeenCalledTimes(1);
+    expect(unlock).toHaveBeenCalledTimes(3);
     cleanup();
   });
   it('removes listeners when the office unmounts before a gesture', () => {
     const target = new EventTarget();
     const unlock = vi.fn();
-    unlockOnFirstGesture(target, unlock)();
+    unlockOnGesture(target, unlock)();
     target.dispatchEvent(new Event('keydown'));
     expect(unlock).not.toHaveBeenCalled();
   });
@@ -202,7 +199,7 @@ describe('office voice gesture unlock', () => {
     try {
       const target = new EventTarget();
       const player = createAudioPlayer();
-      unlockOnFirstGesture(target, player.unlock);
+      unlockOnGesture(target, player.unlock);
       expect(audio.play).not.toHaveBeenCalled();
       target.dispatchEvent(new Event('pointerdown'));
       expect(audio.play).toHaveBeenCalledTimes(1);
@@ -213,6 +210,26 @@ describe('office voice gesture unlock', () => {
       await played;
     } finally { vi.unstubAllGlobals(); }
   });
+  it('re-unlocks after blocked playback on the next gesture without replacing active audio', async () => {
+    const audio = Object.assign(new EventTarget(), { src: '', play: vi.fn().mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new DOMException('Blocked', 'NotAllowedError')).mockResolvedValue(undefined), pause: vi.fn() });
+    vi.stubGlobal('Audio', function () { return audio; });
+    try {
+      const target = new EventTarget();
+      const player = createAudioPlayer();
+      const cleanup = unlockOnGesture(target, player.unlock);
+      target.dispatchEvent(new Event('pointerdown'));
+      await expect(player.play(new Blob(['x']), new AbortController().signal)).rejects.toMatchObject({ name: 'NotAllowedError' });
+      target.dispatchEvent(new Event('keydown'));
+      expect(audio.play).toHaveBeenCalledTimes(3);
+      const played = player.play(new Blob(['next']), new AbortController().signal);
+      target.dispatchEvent(new Event('pointerdown'));
+      expect(audio.play).toHaveBeenCalledTimes(4);
+      audio.dispatchEvent(new Event('ended'));
+      await played;
+      cleanup();
+    } finally { vi.unstubAllGlobals(); }
+  });
   it('cleanup stops playback without turning the default off', () => {
     const voice = new HandoffVoice(vi.fn(), vi.fn());
     voice.stop();
@@ -220,6 +237,7 @@ describe('office voice gesture unlock', () => {
     voice.setEnabled(false);
     voice.stop();
     expect(voice.enabled).toBe(false);
+    expect(new HandoffVoice(vi.fn(), vi.fn()).enabled).toBe(true); // Remounts never persist OFF.
   });
   it('skips playback before unlock without creating audio or throwing', async () => {
     const player = createAudioPlayer();

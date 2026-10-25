@@ -7,7 +7,7 @@ import { requestSceneFrame } from '../../../lib/office/frame';
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, type Handoff, type HandoffAgentId } from '../../../lib/office/handoffs';
 import { createMockHandoffFeed, type HandoffFeed } from '../../../lib/office/handoff-mock';
 import { HandoffStage } from '../../../lib/office/handoff-plan';
-import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, liveVoiceCues } from '../../../lib/office/handoff-voice';
+import { HandoffVoice, createAudioPlayer, unlockOnGesture, liveVoiceCues } from '../../../lib/office/handoff-voice';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { HandoffEntries } from './HandoffLog';
 import './handoffs.css';
@@ -45,7 +45,7 @@ function useHandoffs(snapshot: OfficeSnapshot) {
 }
 /**
  * Voices for the handoff bubbles (#133). On by default after the first office gesture;
- * fatal proxy or playback errors silence them and the visuals carry on.
+ * failed lines are dropped and the next gesture can recover blocked playback.
  */
 function useHandoffVoice(rows: readonly Handoff[]) {
   const [since] = useState(Date.now);
@@ -54,19 +54,18 @@ function useHandoffVoice(rows: readonly Handoff[]) {
   const [player] = useState(createAudioPlayer);
   const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), player.play, rerender));
   const unlock = useCallback(() => { player.unlock(); setUnlocked(true); }, [player]);
-  useEffect(() => unlockOnFirstGesture(window, unlock), [unlock]);
+  useEffect(() => unlockOnGesture(window, unlock), [unlock]);
   useEffect(() => () => voice.stop(), [voice]);
   useEffect(() => {
-    if (!unlocked || voice.failed) return;
+    if (!unlocked) return;
     for (const cue of liveVoiceCues(rows, since)) {
       if (voice.enabled) voice.say(cue);
       else voice.skip(cue.key);
     }
-  }, [rows, since, unlocked, voice, voice.enabled, voice.failed]);
+  }, [rows, since, unlocked, voice, voice.enabled]);
   return { voice, unlock };
 }
 function SoundToggle({ voice, unlock }: { voice: HandoffVoice; unlock: () => void }) {
-  if (voice.failed) return <p className='handoff-sound' role='status'>Voices unavailable · visuals only</p>;
   return <button type='button' className='handoff-sound' aria-pressed={voice.enabled} onClick={() => { if (!voice.enabled) unlock(); voice.setEnabled(!voice.enabled); }}>
     {voice.enabled ? 'Voices on' : 'Voices off'}
   </button>;
