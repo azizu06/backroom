@@ -8,11 +8,6 @@ import { visibleRooms, type AnchorId, type OfficeSnapshot } from '../../../lib/o
 import { ImmersiveAudioEngine } from './audio-engine';
 import { immersiveChannel } from './channel';
 
-function hasUserActivation(): boolean {
-  const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
-  return !!activation?.hasBeenActive;
-}
-
 /**
  * Room-aware procedural ambience and floor-aware footsteps while Play is mounted. Silent until the viewer
  * has clicked on the page and only while the existing Sound toggle is on: every trusted click re-reads the
@@ -55,8 +50,7 @@ export function useImmersiveAudio(hud: RefObject<HTMLElement | null>, snapshot: 
     };
 
     readPose();
-    // Restoring an "on" toggle needs a click first; one earlier on this page counts.
-    if (hasUserActivation()) sync();
+    // Restoring an "on" toggle waits for a click in Play: keyboard activation must not start audio.
     const observer = new MutationObserver(readPose);
     observer.observe(surface, { attributes: true, attributeFilter: ['data-player-x', 'data-player-z'] });
     window.addEventListener('click', click);
