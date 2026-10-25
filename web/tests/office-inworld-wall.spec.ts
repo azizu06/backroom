@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+import { TICKET_BOARD, TICKET_BOARD_POSITION } from '../lib/office/props/ticketBoard';
+import { BUILDING } from '../lib/office/layout';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 function surface(page: Page) {
@@ -140,4 +142,35 @@ test('the inbox tray sits on the Payables desk: walk up, see E: open, open the i
   await dialog.getByRole('link', { name: 'Open the full inbox tray' }).click();
   await expect(page).toHaveURL(/\/inbox$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+});
+
+test('tickets are mounted at spawn and the nearby E prompt opens the existing inbox panel', async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office?view=play');
+  await requireWebGL(page);
+  const gate = page.getByRole('dialog', { name: 'Backroom', exact: true });
+  await expect(gate).toBeVisible();
+  await gate.getByRole('button', { name: 'Enter', exact: true }).click();
+  await expect(surface(page)).toBeFocused();
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  // The same model paints the texture and its accessible scene text, before taking a step.
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute('data-ticket-board', /Queued · \d+[\s\S]*In progress · \d+[\s\S]*Needs you · \d+[\s\S]*Done · \d+/);
+  await expect(page.getByTestId('ticket-board')).toHaveAttribute('aria-label', /Preview · sample tickets/);
+  await expect(page.locator('.play-minimap title').filter({ hasText: /^Tickets$/ })).toHaveCount(1);
+  await expect(page.locator('.play-prompt')).not.toContainText('Open tickets');
+  // Use the west pod's clear side aisle, then the clear strip along the north wall.
+  await walkTo(page, -5, 0.6);
+  await walkTo(page, -5, BUILDING.minZ + 1.5);
+  await walkTo(page, TICKET_BOARD.x, TICKET_BOARD_POSITION[1] + 0.8);
+  await face(page, ...TICKET_BOARD_POSITION);
+  await expect(page.getByText('E · Open tickets', { exact: true })).toBeVisible();
+  await page.keyboard.press('e');
+  const dialog = page.getByRole('dialog', { name: 'Inbox tray' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Open the full inbox tray' })).toHaveAttribute('href', '/inbox');
+  expect(errors).toEqual([]);
 });

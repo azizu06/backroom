@@ -1,11 +1,12 @@
 import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type FloorPosition, type OfficeSnapshot } from './state';
 import { FLOOR, PAYLINK_KIOSK, SERVER_ROOM, TREASURY_DOOR, type Vec2 } from './play';
+import { TICKET_BOARD_POSITION } from './props/ticketBoard';
 
 export interface MapPoint { readonly x: number; readonly y: number }
 export interface MapTransform { readonly scale: number; readonly offsetX: number; readonly offsetY: number; readonly size: number }
 export type MapItem =
   | { readonly kind: 'room'; readonly id: AnchorId; readonly name: string; readonly position: FloorPosition }
-  | { readonly kind: 'door' | 'server' | 'kiosk'; readonly name: string; readonly position: FloorPosition }
+  | { readonly kind: 'door' | 'server' | 'kiosk' | 'board'; readonly name: string; readonly position: FloorPosition }
   | { readonly kind: 'agent'; readonly id: string; readonly name: string; readonly position: FloorPosition; readonly color: string; readonly alert: boolean };
 
 export function mapTransform(size: number, padding = 8): MapTransform {
@@ -30,6 +31,7 @@ export function minimapItems(snapshot: OfficeSnapshot, rooms: readonly AnchorId[
   const has = (id: AnchorId) => rooms.includes(id);
   if (has('treasury')) items.push({ kind: 'door', name: 'Treasury door', position: TREASURY_DOOR });
   items.push({ kind: 'server', name: 'Server room', position: SERVER_ROOM.position });
+  items.push({ kind: 'board', name: 'Tickets', position: TICKET_BOARD_POSITION });
   if (has('lobby')) items.push({ kind: 'kiosk', name: 'Pay kiosk', position: PAYLINK_KIOSK });
   for (const agent of snapshot.agents) items.push({
     kind: 'agent', id: agent.id, name: agent.name, position: agent.pos, color: OFFICE_ANCHORS[agent.targetAnchor]?.color ?? '#d0d6c6',

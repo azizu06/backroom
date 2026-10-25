@@ -274,14 +274,14 @@ describe("targets", () => {
   it("offers the Treasury door only when the room is visible", () => {
     const visible = interactCandidates([], ALL);
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
-    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "folder"]);
+    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "folder", "ticket-board"]);
     expect(pickTarget([TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.55], Math.PI, visible)).toEqual({ kind: "treasury" });
   });
 
   it("picks the GX10 server when standing in front of it facing it", () => {
     const candidates = interactCandidates([], ALL);
     expect(candidates).toContainEqual({ target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 });
-    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server"]);
+    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server", "ticket-board"]);
     const front: Vec2 = [SERVER_ROOM.position[0], SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS + 0.1];
     expect(pickTarget(front, 0, candidates)).toEqual({ kind: "server" });
     expect(pickTarget(front, Math.PI, candidates)).not.toEqual({ kind: "server" });

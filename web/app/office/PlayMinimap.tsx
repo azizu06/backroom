@@ -60,9 +60,9 @@ export function PlayMinimap({ snapshot, hud }: { snapshot: OfficeSnapshot; hud: 
           <text x={point.x} y={point.y + 3}>{item.name}</text>
         </g>;
       })}
-      {items.filter(item => item.kind === 'door' || item.kind === 'server' || item.kind === 'kiosk').map(item => {
+      {items.filter(item => item.kind === 'door' || item.kind === 'server' || item.kind === 'kiosk' || item.kind === 'board').map(item => {
         const point = worldToMap(item.position, transform);
-        return <g key={item.kind} className={`minimap-${item.kind}`}><circle cx={point.x} cy={point.y} r='3.5' /><title>{item.name}</title></g>;
+        return <g key={item.kind} className={`minimap-${item.kind === 'board' ? 'kiosk' : item.kind}`}><circle cx={point.x} cy={point.y} r='3.5' /><title>{item.name}</title></g>;
       })}
       {items.filter(item => item.kind === 'agent').map(item => {
         const point = worldToMap(item.position, transform);

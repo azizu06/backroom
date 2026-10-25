@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type OfficeSnapshot } from './state';
 import { headingRotation, mapTransform, minimapItems, worldToMap } from './minimap';
+import { TICKET_BOARD_POSITION } from './props/ticketBoard';
 
 describe('play minimap geometry', () => {
+  it('marks the always-mounted ticket board at its actual wall position', () => {
+    expect(minimapItems(INITIAL_OFFICE, []).filter(item => item.kind === 'board')).toEqual([
+      { kind: 'board', name: 'Tickets', position: TICKET_BOARD_POSITION },
+    ]);
+    const point = worldToMap(TICKET_BOARD_POSITION, mapTransform(200, 10));
+    expect(point.x).toBeGreaterThanOrEqual(10);
+    expect(point.y).toBeGreaterThanOrEqual(10);
+    expect(point.x).toBeLessThanOrEqual(190);
+    expect(point.y).toBeLessThanOrEqual(190);
+  });
   it('fits both floor corners with equal world scale and padding', () => {
     const transform = mapTransform(200, 10);
     const a = worldToMap([-8, -5.5], transform);

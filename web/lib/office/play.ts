@@ -7,6 +7,7 @@ import { OPEN_DOORS, type DoorState } from './doors';
 import { CHAIR_FOOTPRINT, PLANT_SPOTS } from './furniture';
 import { TREASURY_VAULT } from './deskkit';
 import { AUDIT_WALL } from './props/auditWall';
+import { extraColliders } from './props/extraColliders';
 import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
@@ -88,6 +89,7 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
     boxes.push(box(WHITEBOARD_INTERACTION.position[0], wallFace + WHITEBOARD.depth / 2 + 0.07, 1.1, 0.14));
   }
   for (const [x, z] of PLANT_SPOTS) boxes.push(box(x, z, 1, 1));
+  boxes.push(...extraColliders);
   return boxes;
 }
 
