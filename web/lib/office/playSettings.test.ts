@@ -16,6 +16,27 @@ function memory() {
 }
 
 describe("play settings", () => {
+  it("persists each new preference independently and resets both to defaults", () => {
+    for (const patch of [{ useMotionAnyway: true }, { motionIntensity: 1.5 }, { useMotionAnyway: true, motionIntensity: 0.5 }]) {
+      const storage = memory();
+      const settings = { ...DEFAULT_PLAY_SETTINGS, ...patch };
+      expect(savePlaySettings(storage, settings)).toBe(true);
+      expect(storage.data.has(PLAY_SETTINGS_KEY)).toBe(true);
+      expect(loadPlaySettings(storage)).toEqual(settings);
+      savePlaySettings(storage, DEFAULT_PLAY_SETTINGS);
+      expect(storage.data.has(PLAY_SETTINGS_KEY)).toBe(false);
+      expect(loadPlaySettings(storage)).toMatchObject({ useMotionAnyway: false, motionIntensity: 1 });
+    }
+  });
+
+  it("migrates old settings and validates the override and intensity", () => {
+    expect(parsePlaySettings('{"headBob":false}')).toMatchObject({ headBob: false, useMotionAnyway: false, motionIntensity: 1 });
+    expect(parsePlaySettings('{"useMotionAnyway":"yes","motionIntensity":null}')).toEqual(DEFAULT_PLAY_SETTINGS);
+    expect(parsePlaySettings('{"motionIntensity":99}').motionIntensity).toBe(1.5);
+    expect(parsePlaySettings('{"motionIntensity":-99}').motionIntensity).toBe(0.5);
+    expect(parsePlaySettings('{"motionIntensity":1.24}').motionIntensity).toBe(1.2);
+  });
+
   it("stores the movement-feel switches and falls back per field", () => {
     const off = { smoothMove: false, headBob: false, fovKick: false };
     expect(parsePlaySettings(JSON.stringify(off))).toEqual({ ...DEFAULT_PLAY_SETTINGS, ...off });

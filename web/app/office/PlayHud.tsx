@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
-import { isCloseKey } from '../../lib/office/a11y';
+import { isCloseKey, REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { setBakedTalkingAgent } from '../../lib/office/baked-character';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
-  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, lookDelta, type PlaySettings,
+  DEFAULT_PLAY_SETTINGS, MOTION_INTENSITY_RANGE, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, lookDelta, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { crosshairView } from '../../lib/office/playFeel';
@@ -78,9 +78,21 @@ export function focusAskWhy(question?: string) {
   field?.focus({ preventScroll: true });
 }
 
-function PlaySettingsDialog({ settings, change, close }: { settings: PlaySettings; change: (next: PlaySettings) => void; close: () => void }) {
+function PlaySettingsDialog({ settings, change, close, tryWalking }: {
+  settings: PlaySettings; change: (next: PlaySettings, feedback?: string) => void; close: () => void; tryWalking: () => void;
+}) {
   const headingId = useId();
+  const motionNoteId = useId();
   const first = useRef<HTMLInputElement>(null);
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia(REDUCED_MOTION_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(REDUCED_MOTION_QUERY);
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const motionBlocked = reducedMotion && !settings.useMotionAnyway;
   useEffect(() => { first.current?.focus(); }, []);
   return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
@@ -95,20 +107,32 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
         onChange={event => change({ ...settings, speed: Number(event.target.value) })} />
     </label>
     <label className='play-setting play-setting-check'>
-      <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked })} /> Invert Y (look)
+      <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked }, `Invert Y ${event.target.checked ? 'on' : 'off'}`)} /> Invert Y (look)
     </label>
     <fieldset className='play-setting-group'><legend>Movement Feel</legend>
+      <p id={motionNoteId} className='play-settings-note' aria-live='polite'>{motionBlocked
+        ? 'Reduced motion is on in your system, so these are off'
+        : reducedMotion ? 'Reduced motion is on in your system. Motion is enabled for this office only.' : 'Motion applies while walking.'}</p>
       <label className='play-setting play-setting-check'>
-        <input type='checkbox' checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked })} /> Smooth movement
+        <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked }, `Smooth movement ${event.target.checked ? 'on' : 'off'}`)} /> Smooth movement
       </label>
       <label className='play-setting play-setting-check'>
-        <input type='checkbox' checked={settings.headBob} onChange={event => change({ ...settings, headBob: event.target.checked })} /> Head bob
+        <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.headBob} onChange={event => change({ ...settings, headBob: event.target.checked }, `Head bob ${event.target.checked ? 'on' : 'off'}`)} /> Head bob
       </label>
       <label className='play-setting play-setting-check'>
-        <input type='checkbox' checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked })} /> Field-of-view kick
+        <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked }, `Field-of-view kick ${event.target.checked ? 'on' : 'off'}`)} /> Field-of-view kick
       </label>
-      <p className='play-settings-note'>All three stay off while your system asks to reduce motion.</p>
+      <label className='play-setting'><span>Motion intensity <output>{formatMultiplier(settings.motionIntensity)}</output></span>
+        <input aria-label='Motion intensity' type='range' disabled={motionBlocked} min={MOTION_INTENSITY_RANGE.min} max={MOTION_INTENSITY_RANGE.max} step={MOTION_INTENSITY_RANGE.step} value={settings.motionIntensity}
+          onChange={event => change({ ...settings, motionIntensity: Number(event.target.value) })} />
+      </label>
+      <label className='play-setting play-setting-check'>
+        <input type='checkbox' role='switch' checked={settings.useMotionAnyway} onChange={event => change({ ...settings, useMotionAnyway: event.target.checked }, `Use motion anyway ${event.target.checked ? 'on' : 'off'}`)} /> Use motion anyway
+      </label>
+      <p className='play-settings-note'>Overrides your system preference for this office only.</p>
     </fieldset>
+    <button onClick={tryWalking}>Try walking</button>
+    <p className='play-settings-note'>Use W A S D to feel your changes with this panel open.</p>
     <p className='play-settings-note'>Saved in this browser only.</p>
     <button className='play-settings-reset' onClick={() => change(DEFAULT_PLAY_SETTINGS)}>Reset to defaults</button>
   </section>;
@@ -165,6 +189,19 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   const handoffFor = useHandoffPresentation()?.handoffFor;
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, changeSettings] = usePlaySettings();
+  const [settingsToast, setSettingsToast] = useState<{ text: string } | null>(null);
+  useEffect(() => {
+    if (!settingsToast) return;
+    const timer = window.setTimeout(() => setSettingsToast(null), 1_000);
+    return () => window.clearTimeout(timer);
+  }, [settingsToast]);
+  function applySettings(next: PlaySettings, feedback?: string) {
+    input.feel = feelFlags(next);
+    input.speed = next.speed;
+    changeSettings(next);
+    if (feedback) setSettingsToast({ text: feedback });
+    requestSceneFrame();
+  }
   usePointerLockChrome(hud);
   // One frame once the surface exists, so the rig reports its pose even before the first key.
   useEffect(() => { requestSceneFrame(); }, []);
@@ -191,7 +228,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     };
   }, [hud, input]);
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
-  useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
+  useEffect(() => { input.feel = feelFlags(settings); requestSceneFrame(); }, [input, settings]);
   // The agent being talked to faces the player and listens until the dialog closes (view only).
   useEffect(() => {
     agentCues.setTalking(panel ? cueKeyFor(panel) : null);
@@ -369,7 +406,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
       </div>
       {aim === 'target' && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
-    {settingsOpen && <PlaySettingsDialog settings={settings} change={changeSettings} close={closeSettings} />}
+    {settingsOpen && <PlaySettingsDialog settings={settings} change={applySettings} close={closeSettings} tryWalking={() => hud.current?.focus()} />}
+    <div className='play-settings-toast' role='status' aria-live='polite'>{settingsToast?.text}</div>
     {chat && <ProximityChat chat={chat} open={chatOpen} onOpen={openChat} onClose={() => setChatOpen(false)} hud={hud} />}
     {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} />}
   </div>;
