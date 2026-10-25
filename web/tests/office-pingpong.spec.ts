@@ -10,7 +10,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     await page.goto('/office?playSpawn=9.5,4&view=overview');
     await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
     await openMenu(page);
-    await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+    await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
     const surface = page.getByRole('application', { name: /First-person office/ });
     await expect(surface).toBeFocused();
     await expect(page.locator('.play-prompt')).toHaveText('E · Play ping pong', { timeout: 15_000 });
@@ -62,7 +62,7 @@ test('score card hides behind a wall in first person and returns in overview', a
   const score = page.getByTestId('pingpong-score');
   await expect(score).toHaveCSS('visibility', 'visible');
   await openMenu(page);
-  await view.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(page.getByRole('application', { name: /First-person office/ })).toHaveAttribute('data-player-x', '9.000');
   await expect(score).toHaveCSS('visibility', 'hidden');
   // First person hides the corner menu; O returns to the overview camera.

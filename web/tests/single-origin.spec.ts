@@ -15,7 +15,7 @@ async function hold(page: Page, key: string, until: (p: Awaited<ReturnType<typeo
 }
 /** The desk-phone walk from office-phone.spec.ts, kept coarse: approach the Collections desk, then turn toward the phone. */
 async function openDeskPhone(page: Page) {
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeVisible();
   await hold(page, 'w', p => p.z < -1.0);
   for (let i = 0; i < 20; i++) {

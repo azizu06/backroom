@@ -8,8 +8,7 @@ test('viewers in the same browser context see each other and expire', async ({ b
   first.on('pageerror', error => errors.push(error.message));
   second.on('pageerror', error => errors.push(error.message));
   await Promise.all([first.goto('/office?presence=1&presenceTtl=1500&view=overview'), second.goto('/office?presence=1&presenceTtl=1500&view=overview')]);
-  // The viewer count sits in the corner menu (closed by default).
-  for (const page of [first, second]) await page.getByRole('button', { name: 'Backroom menu' }).click();
+  // The viewer count sits in the always-visible topbar.
   await expect(first.getByText('2 viewing')).toBeVisible({ timeout: 8000 });
   await expect(second.getByText('2 viewing')).toBeVisible({ timeout: 8000 });
   await second.close();

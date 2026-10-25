@@ -86,13 +86,12 @@ test('agent cards show Ready until the preview emits an escalation, with pills i
   await expect.poll(alexTag).toBe('READY');
   await expect(page.locator('html')).toHaveAttribute('data-painted-ready', 'true');
   await expect(canvas).toHaveAttribute('data-agent-card-view', 'pill');
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(canvas).toHaveAttribute('data-agent-card-view', 'full');
   await expect.poll(alexTag).toBe('READY');
-  await page.getByLabel('Office view').selectOption({ label: 'Orbit camera' });
-  const menu = page.getByRole('button', { name: 'Backroom menu' });
-  await menu.click();
-  await page.getByRole('button', { name: 'Preview escalation', exact: true }).click();
+  await page.getByLabel('Office view').selectOption({ label: 'Orbit Camera' });
+  await (await import('./office-menu')).openOverviewSheet(page);
+  await page.getByRole('button', { name: 'Show escalation', exact: true }).click();
   await expect.poll(alexTag).toBe('NEEDS YOU');
   await expect(page.locator('html')).toHaveAttribute('data-painted-needs-you', 'true');
   const cards = JSON.parse(await canvas.getAttribute('data-agent-cards') ?? '[]') as { agentId: string; tag: string }[];

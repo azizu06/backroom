@@ -9,7 +9,7 @@ test('Play keeps the corner map out of view and offers the Overview instead, wit
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await openMenu(page);
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
   const minimap = page.getByRole('img', { name: /Office map/ });
   await expect(minimap).toBeHidden();
@@ -28,7 +28,7 @@ test.describe('Overview touch control', () => {
     await page.goto('/office?view=overview');
     const select = page.getByLabel('Office view');
     await openMenu(page);
-    await select.selectOption({ label: 'Play (first person)' });
+    await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
     await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
     await page.getByRole('button', { name: /^Overview/ }).tap();
     // At 390px the overview keeps the fixed camera it started with (Office.tsx prefers orbit only above 760px).

@@ -38,7 +38,7 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await openMenu(page);
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   await expect(page.getByTestId('office-perf-calls')).toHaveText(/^\d+$/);
