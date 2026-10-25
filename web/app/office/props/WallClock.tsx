@@ -1,13 +1,12 @@
 'use client';
 
-import { BUILDING } from '../../../lib/office/layout';
 import { useEffect, useState } from 'react';
 import type { OfficeSnapshot } from '../../../lib/office/state';
-import { CLOCK_INTERACTION, clockFace, msUntilNextMinute } from '../../../lib/office/props/clock';
+import { CLOCK_INTERACTION, CLOCK_MOUNT, clockFace, msUntilNextMinute } from '../../../lib/office/props/clock';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { ROLES } from '../../../lib/office/palette';
 
-const RADIUS = 0.65, FACE = RADIUS - 0.04, TEX = 512;
+const RADIUS = CLOCK_MOUNT.radius, FACE = RADIUS - 0.04, TEX = 512;
 const FACE_UNITS = 256;
 const HAND_BACK = 0.03;
 const MINUTE_LENGTH = FACE * 0.74, HOUR_LENGTH = MINUTE_LENGTH * 0.68;
@@ -55,12 +54,12 @@ function Clock() {
   const face = clockFace(now);
   // Redrawing the face invalidates once, which also renders the new hand angles.
   const texture = useCanvasTexture(TEX, TEX, drawFace, [face.text]);
-  return <group name='prop:clock' position={[BUILDING.minX + 0.1, 1.75, CLOCK_INTERACTION.position[1]]}>
-    <mesh position={[0.26, 0, 0]} receiveShadow>
-      <boxGeometry args={[0.52, 0.08, 0.08]} /><meshStandardMaterial color={ROLES.shadow} />
+  return <group name='prop:clock' position={CLOCK_MOUNT.position}>
+    <mesh position={[0, 0, CLOCK_MOUNT.bracketLength / 2]} receiveShadow>
+      <boxGeometry args={[0.08, 0.08, CLOCK_MOUNT.bracketLength]} /><meshStandardMaterial color={ROLES.shadow} />
     </mesh>
     {/* Fixed wall bracket with a tilted face; its normal follows the overview's (13, 15, 17) direction. */}
-    <group position={[0.52, 0, 0]} rotation={[-Math.atan2(15, Math.hypot(13, 17)), Math.atan2(13, 17), 0, 'YXZ']}>
+    <group position={[0, 0, CLOCK_MOUNT.bracketLength]} rotation={[-Math.atan2(15, Math.hypot(13, 17)), Math.atan2(13, 17), 0, 'YXZ']}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[RADIUS, RADIUS, 0.08, 32]} /><meshStandardMaterial color={ROLES.partition} roughness={0.7} />
       </mesh>
@@ -74,7 +73,7 @@ function Clock() {
   </group>;
 }
 
-/** Corridor west-wall clock on a fixed bracket, angled toward overview. Exact time and receipts remain in its panel. */
+/** Corridor north-wall clock on a fixed bracket, angled toward overview. Exact time and receipts remain in its panel. */
 export function WallClock({ snapshot }: { snapshot: OfficeSnapshot }) {
   return CLOCK_INTERACTION.visible(snapshot) ? <Clock /> : null;
 }

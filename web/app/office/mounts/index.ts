@@ -26,6 +26,8 @@ import { DeskStatusPlates } from '../hud/diegetic/DeskStatusPlates';
 import { LobbyNoticeBoard } from '../hud/diegetic/LobbyNoticeBoard';
 import { Outdoors } from './Outdoors';
 import { SharedRooms } from './SharedRooms';
+import { WorkRoom } from './WorkRoom';
+import { Atrium } from './Atrium';
 import { WorldShell } from './WorldShell';
 import type { SceneMount } from './types';
 
@@ -33,6 +35,8 @@ export type { SceneMount, SceneMountProps } from './types';
 export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'outdoors', instanced: false, Component: Outdoors },
   { id: 'world-shell', instanced: false, Component: WorldShell },
+  { id: 'work-room', instanced: false, Component: WorkRoom },
+  { id: 'atrium', instanced: false, Component: Atrium },
   { id: 'shared-rooms', instanced: false, Component: SharedRooms },
   { id: 'doors', instanced: true, Component: Doors },
   { id: 'interactive-doors', instanced: false, moving: true, Component: InteractiveDoors },
