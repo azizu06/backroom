@@ -1,7 +1,7 @@
 import { OFFICE_ANCHORS, type AnchorId } from './state';
 import { EYE_HEIGHT } from './play';
 import { interpolateIntroPose, type IntroPose } from './play-intro';
-import { workspaceRoute } from './layout';
+import { ROOM_SPAWNS, workspaceRoute } from './layout';
 
 export type StoryChapter = { readonly id: string; readonly anchor: AnchorId; readonly title: string; readonly caption: string; readonly dwellMs: number; readonly preview?: 'escalation' | 'denial'; readonly handoff?: readonly [from: AnchorId, to: AnchorId] };
 export const STORY_CHAPTERS: readonly StoryChapter[] = [
@@ -13,14 +13,16 @@ export const STORY_CHAPTERS: readonly StoryChapter[] = [
   { id: 'dana', anchor: 'dana', title: 'A human decides', caption: 'An escalation goes to Dana; only a human can approve, using a passkey.', dwellMs: 5200, preview: 'escalation' },
   { id: 'treasury', anchor: 'treasury', title: 'Treasury: DENY', caption: 'Treasury refuses entry · NOT_IN_BADGE. Illustration only; receipts appear below when this session has recorded them.', dwellMs: 5200, preview: 'denial' },
 ];
-/** Resolve named walking anchors at use time, including after a room layout changes. */
+// The lobby interaction still approaches the kiosk; the story opens with a north-facing survey.
+const STORY_ANCHORS = { ...OFFICE_ANCHORS, lobby: { ...OFFICE_ANCHORS.lobby, position: ROOM_SPAWNS.lobby.position } };
+/** Resolve named walking anchors, including after a room layout changes. */
 export function storyCameraPose(anchor: AnchorId, anchors: Readonly<Record<AnchorId, {
   readonly position: readonly [number, number]; readonly center: readonly [number, number];
-}>> = OFFICE_ANCHORS): IntroPose {
+}>> = STORY_ANCHORS): IntroPose {
   const { position, center } = anchors[anchor];
-  // Stand in front of the lobby props rather than inside its inbox footprint.
-  const x = position[0], z = position[1] - (anchor === 'lobby' ? 1.5 : 0);
-  const yaw = Math.atan2(x - center[0], z - center[1]);
+  const [x, z] = position;
+  // Entry surveys the pods and north board bay; later stops face their destination.
+  const yaw = anchor === 'lobby' ? 0 : Math.atan2(x - center[0], z - center[1]);
   return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)] };
 }
 /** Follow the same clear pod aisles as handoffs instead of flying through desks and screens. */

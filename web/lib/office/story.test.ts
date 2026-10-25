@@ -36,6 +36,11 @@ describe('judge story timing', () => {
       expect(height).toBe(EYE_HEIGHT);
       expect(insideAny([x, z], colliders, PLAYER_RADIUS)).toBe(false);
       const yaw = 2 * Math.atan2(pose.quaternion[1], pose.quaternion[3]);
+      if (anchor === 'lobby') {
+        expect([x, z]).toEqual(SPAWN.position);
+        expect(yaw).toBe(0);
+        continue;
+      }
       const [cx, cz] = OFFICE_ANCHORS[anchor].center;
       expect(-Math.sin(yaw)).toBeCloseTo((cx - x) / Math.hypot(cx - x, cz - z));
       expect(-Math.cos(yaw)).toBeCloseTo((cz - z) / Math.hypot(cx - x, cz - z));
@@ -43,7 +48,7 @@ describe('judge story timing', () => {
   });
   it('follows relocated room anchors rather than storing layout coordinates in stops', () => {
     const anchors = Object.fromEntries(Object.entries(OFFICE_ANCHORS).map(([id, room]) => [id, {
-      position: [room.position[0] + 20, room.position[1] + 10] as const,
+      position: [storyCameraPose(id as AnchorId).position[0] + 20, storyCameraPose(id as AnchorId).position[2] + 10] as const,
       center: [room.center[0] + 20, room.center[1] + 10] as const,
     }])) as Record<AnchorId, { position: readonly [number, number]; center: readonly [number, number] }>;
     for (const { anchor } of STORY_CHAPTERS) {

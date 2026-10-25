@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HANDOFF_AGENTS, handoffSpot, type Handoff, type HandoffRole } from './handoffs';
 import { HandoffStage, PASS_MS, actorAt, nextChange, planHandoffs, sampleHandoffs } from './handoff-plan';
-import { MOCK_HANDOFF_SCRIPT, createMockHandoffFeed, mockCycleRows } from './handoff-mock';
+import { MOCK_HANDOFF_SCRIPT, MOCK_CYCLE_MS, createMockHandoffFeed, mockCycleRows } from './handoff-mock';
 
 function row(id: string, from: HandoffRole, to: HandoffRole, createdAt = 0, extra: Partial<Handoff> = {}): Handoff {
   return { handoffId: id, sequence: BigInt(createdAt), caseDisplayId: `INV-${id}`, fromAgentId: `${from}-agent`, toAgentId: `${to}-agent`,
@@ -234,7 +234,7 @@ describe('mock handoff feed', () => {
     expect(final.find(r => r.correction)).toMatchObject({ fromRole: 'payables', toRole: 'vendor' });
     const plan = planHandoffs(final);
     expect(plan.skipped).toEqual([]); expect(sampleHandoffs(plan, 43_000).human).toBe(true);
-    expect(Math.max(...plan.trips.map(t => t.end))).toBeLessThan(64_000);
+    expect(Math.max(...plan.trips.map(t => t.end))).toBeLessThan(MOCK_CYCLE_MS);
   });
   it('emits immutable rows, scales timestamps and loops with distinct ids and increasing sequences', () => {
     vi.useFakeTimers({ now: 0 });
@@ -244,9 +244,9 @@ describe('mock handoff feed', () => {
     vi.advanceTimersByTime(650);
     expect(first.status).toBe('offered');
     expect(feed.getRows()[0]).toMatchObject({ handoffId: first.handoffId, status: 'accepted', acceptedAt: 625 });
-    vi.advanceTimersByTime(16_000);
+    vi.advanceTimersByTime(MOCK_CYCLE_MS / 4);
     const next = feed.getRows().find(r => r.handoffId === 'mock-1-1')!;
-    expect(next.sequence > first.sequence).toBe(true); expect(next.createdAt).toBe(16_000);
+    expect(next.sequence > first.sequence).toBe(true); expect(next.createdAt).toBe(MOCK_CYCLE_MS / 4);
     feed.stop(); const calls = listener.mock.calls.length;
     vi.advanceTimersByTime(1000); expect(listener).toHaveBeenCalledTimes(calls);
   });

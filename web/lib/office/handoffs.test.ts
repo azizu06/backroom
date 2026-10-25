@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { AgentHandoffPublic } from '@backroom/orchestrator/spacetime-client/types';
-import { AISLE_Z, HANDOFF_AGENTS, HANDOFF_ROLES, FLOOR_AGENTS, compareHandoffs, handoffFlag, handoffFromRow, handoffGroups, handoffLine, handoffRoute, handoffSpot, needsHandoffHuman, upsertHandoffs } from './handoffs';
+import { HANDOFF_AGENTS, HANDOFF_ROLES, FLOOR_AGENTS, compareHandoffs, handoffFlag, handoffFromRow, handoffGroups, handoffLine, handoffRoute, handoffSpot, needsHandoffHuman, upsertHandoffs } from './handoffs';
 import { insideAny, officeColliders } from './play';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
 import { projectOfficeRows } from './spacetime';
@@ -94,7 +94,7 @@ describe('handoff floor and flags', () => {
       expect(insideAny(HANDOFF_AGENTS[id].station, colliders, .2), id).toBe(false);
       expect(insideAny(handoffSpot(id), colliders, .2), id).toBe(false);
     }
-    expect(handoffRoute('intake', 'payables').some(([, z]) => z === AISLE_Z)).toBe(true);
+    expect(handoffRoute('intake', 'payables').at(-1)).toEqual(handoffSpot('payables'));
   });
   it('reads the opt-in mock and bounded speed', () => {
     expect(handoffFlag('')).toEqual({ mock: false, speed: 1 });
