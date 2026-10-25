@@ -123,7 +123,6 @@ export default function ApprovalCard({ id, embedded = false }: { id: string; emb
   </>;
   return embedded ? <article className={styles.card} aria-label="Approval request">{body}</article> : <main className={styles.page}>
     <div className={styles.sheet}>
-      <header className={styles.header}><a href="/">Backroom</a><span>Dana’s desk</span></header>
       {body}
       <footer className={styles.footer}>Northfield Studio · Controller review</footer>
     </div>
