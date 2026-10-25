@@ -4,10 +4,10 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "895e1806cc67f9a5d6bdc175e41c12742af43270",
+    "baseCommit": "ad465bf25b5e44a12cc685fba7f1c45218f49009",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
-      "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
+      "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
       "orchestrator/src/agents/eval/conversation.ts": "da9c07828c6c2e9d120dcf5b427928e5a2422a3720d982aeba9a6f3b9cf9d86c",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
@@ -23,7 +23,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "af1680adb8da40bfcb4271749141c810b1d28daa13fe5a0ae3f8f5ffa389e4d4"
+      "orchestrator/src/agents/eval/scoreboard.ts": "243739f54ee78a321025fd160cc577d1a079b371a51c46a3911502d1821b8cbf"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -12870,6 +12870,153 @@
       ]
     }
   ],
+  "p01DebitProbe": {
+    "id": "4401",
+    "caseId": "P01:no-debit-adapter",
+    "historical": false,
+    "actual": "HOLD",
+    "routing": {
+      "audits": [],
+      "cloudRequests": 0,
+      "cloudTextOnly": true
+    },
+    "assessment": {
+      "invoice": {
+        "invoiceId": "4401",
+        "vendorId": "papertrail",
+        "poId": "PO-4401",
+        "amountCents": 64000,
+        "currency": "USD",
+        "lineItems": [
+          {
+            "description": "Papertrail Print Co - 09/2026 service delivery",
+            "quantity": 1,
+            "unitPriceCents": 64000
+          }
+        ]
+      },
+      "verdict": "ALLOW",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "policyVersion": 1,
+      "policySentence": "Collections may read accounts receivable and manage client collections, Payables may read invoices and purchase orders and pay eligible invoices, and Vendor onboarding may run CRS and Apify checks and propose vendors or bank changes.",
+      "bankDetailsChanged": false,
+      "poMatched": true,
+      "senderDomain": "papertrail.example",
+      "duplicateOfInvoiceIds": []
+    },
+    "vendor": {
+      "decision": "ALLOW",
+      "verdictRef": "vendor-evidence:P01:no-debit-adapter:P01:no-debit-adapter:a3:verdict",
+      "outcome": "proceed",
+      "next": "payables",
+      "pending": [
+        "contact_page"
+      ],
+      "flags": [],
+      "ruleIds": [],
+      "evidenceRuleIds": []
+    },
+    "result": {
+      "status": "held",
+      "verdict": "ESCALATE",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "policyVersion": 1,
+      "policySentence": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+      "rail": "nessie",
+      "escalationId": "mock-escalation:P01:no-debit-adapter",
+      "evidenceRefs": [
+        "seed-inbox:4401",
+        "4401"
+      ]
+    },
+    "mockDebits": 0,
+    "destinations": [],
+    "runtime": {
+      "status": "done",
+      "activations": [
+        {
+          "role": "intake",
+          "kind": "handoff",
+          "model": "claude-haiku-5-5"
+        },
+        {
+          "role": "extractor",
+          "kind": "handoff",
+          "model": "claude-haiku-5-5"
+        },
+        {
+          "role": "vendor",
+          "kind": "handoff",
+          "model": "claude-haiku-5-5"
+        },
+        {
+          "role": "payables",
+          "kind": "handoff",
+          "model": "claude-haiku-5-5"
+        },
+        {
+          "role": "auditor",
+          "kind": "done",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "handoffs": [
+        {
+          "from": "intake",
+          "to": "extractor",
+          "status": "offered"
+        },
+        {
+          "from": "extractor",
+          "to": "vendor",
+          "status": "offered"
+        },
+        {
+          "from": "vendor",
+          "to": "payables",
+          "status": "offered"
+        },
+        {
+          "from": "payables",
+          "to": "auditor",
+          "status": "offered"
+        }
+      ],
+      "syntheticCostUsd": 0.0000049999999999999996,
+      "syntheticLedger": {
+        "spentUsd": 0.0000049999999999999996,
+        "reservedUsd": 0,
+        "unknownSettlements": 0,
+        "warn": false
+      }
+    },
+    "unavailableAdapterHeld": true,
+    "tools": [
+      "intake.read_inbox_item",
+      "intake.handoff",
+      "extractor.read_document",
+      "extractor.local_extract",
+      "extractor.validate_extraction",
+      "extractor.handoff",
+      "vendor.get_vendor_master",
+      "vendor.check_domain",
+      "vendor.check_business",
+      "vendor.apify_site_check",
+      "vendor.conclude_verification",
+      "vendor.handoff",
+      "payables.evaluate_invoice",
+      "payables.request_payment",
+      "payables.handoff",
+      "auditor.read_audit",
+      "auditor.verify_chain",
+      "auditor.record_case_summary"
+    ],
+    "scope": "Production Dispatcher + ClaudeAgentRuntime and all five AP roles, with the AP debit port explicitly absent. Fixture extraction and vendor checks, no network. This measures the unavailable-adapter hold, not a Nessie payment or debit reconciliation."
+  },
   "recovery": [
     {
       "id": "P11",
@@ -15541,7 +15688,7 @@
     },
     {
       "id": "P01",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Frozen integrationOutcome: pay_and_reconcile; requires Nessie debit ID, matched bank transaction, IN_BADGE. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ALLOW but request_payment returns held/ESCALATE [INVALID_INPUT], with 0 debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open."
     },
     {
       "id": "P07",
