@@ -10,6 +10,7 @@ import { demoBindHost, externalState } from './host';
 import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
 import { probeAttackDemo, probeDependencies, type DemoStatus, type HealthRow } from './health';
+import { demoPublicTarget } from './public-url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
@@ -133,8 +134,10 @@ async function supervise() {
     if (env.DEMO_PREBUILT !== '1') await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
     env.STATE_STORE = stateMode;
     // WebAuthn allows a non-HTTPS origin only for hostname localhost. The listen socket stays on the bind address.
-    publicUrl = env.DEMO_TUNNEL === '0' ? `http://localhost:${port}` : base;
-    if (env.DEMO_TUNNEL !== '0') {
+    // A preset HTTPS origin (Tailscale Funnel) is the public URL. demo:up has no other external-URL flag, so this skips cloudflared.
+    const target = demoPublicTarget(env, port, base);
+    publicUrl = target.publicUrl;
+    if (target.startCloudflared) {
       const log = join(dir, 'tunnel.log'); writeFileSync(log, '', { mode: 0o600 });
       children.start('cloudflared', ['tunnel', '--url', base, '--no-autoupdate'], log);
       await waitFor(async () => {
