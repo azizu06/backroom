@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 import { HALL_NODES } from '../lib/office/baked-art';
 import { wallColliders } from '../lib/office/layout';
 
