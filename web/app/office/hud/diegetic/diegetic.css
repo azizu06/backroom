@@ -34,12 +34,9 @@ body:has(.office-shell[data-hud='diegetic']) { overflow: hidden; }
 }
 .office-shell[data-hud='diegetic'] :is(.play-exit, .play-overview, .play-settings-toggle, .office-sound-toggle):is(:hover, :focus-visible),
 .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator']:is(:hover, :focus-visible) { opacity: 1; }
-.office-shell[data-hud='diegetic'] .play-exit { right: 12px !important; }
-.office-shell[data-hud='diegetic'] .play-overview { right: 100px !important; z-index: 4; }
-.office-shell[data-hud='diegetic'] .play-settings-toggle { right: 205px !important; }
+.office-shell[data-hud='diegetic'] .play-controls > button { position: static; }
 .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { right: 285px !important; }
 .office-shell[data-hud='diegetic'] .office-sound-toggle { right: 367px !important; z-index: 4; }
-.office-shell[data-hud='diegetic'] .play-panel.play-settings { top: 46px; }
 
 /* Controls hint: top left, clear of the disclosure line; fades once the player has had a look. */
 .office-shell[data-hud='diegetic'] .office-caption {
