@@ -47,8 +47,13 @@ repeat it when interrupted, and deny identity/invoice tools until a complete,
 uninterrupted matching assistant `call_turn` is received. Real speech/disclosure
 delivery remains a live-eval check; do not claim the prompt alone proves it.
 
-Caller opt-out/bankruptcy terms in actual user turns trigger a gateway stop in
-code, even before disclosure. The stopped relay refuses subsequent finance tools.
+Caller opt-out/bankruptcy terms and explicit requests for a person in actual user
+turns (`callerStop`) trigger a gateway stop in code, even before disclosure. The
+stopped relay refuses subsequent finance tools. The same refused request three
+times in a row is treated as a loop: the relay stops the call and returns
+`next_step: offer_callback_and_end`. The agent also enables Cartesia `skip_turn`
+(30 s hold) and a conservative `voicemail_detection` whose message names no
+contact, invoice or amount; the fixed disclosure still plays first.
 The local adapter persists these client stops across calls/restarts. Gateway
 disputes/already-paid/human requests also stop collection. Approvals remain in
 the existing gateway's trusted passkey path; no voice approval tool exists.

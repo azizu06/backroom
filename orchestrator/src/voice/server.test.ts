@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createVoiceHandler, VoiceJournal } from './server';
+import { callerStop, createVoiceHandler, VoiceJournal } from './server';
 import { renderWelcome, type VoiceSession } from './index';
 import type { InterpretAnswer } from './answer';
 import { createGateway } from '../../../web/lib/gateway/http';
@@ -220,6 +220,66 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     await new Promise(resolve => setTimeout(resolve, 150));
     await f.event('late', { role: 'user', text: 'Yep', was_interrupted: true });
     expect((await pending).body.identity).toBe('confirmed');
+  });
+  it.each([['Stop calling me.', 'record_opt_out'], ["Don't ever call this number again", 'record_opt_out'], ['Take me off your list', 'record_opt_out'],
+    ['Leave me alone!', 'record_opt_out'], ['unsubscribe', 'record_opt_out'], ['No more calls please', 'record_opt_out'], ['I want to opt-out', 'record_opt_out'],
+    ['We filed chapter 11', 'request_human'], ['Can I talk to a real person?', 'request_human'], ['Let me speak to your manager', 'request_human'],
+    ['Put me through to Dana', 'request_human'], ['transfer me to a human', 'request_human'],
+    ['Are you a real person?', undefined], ['I need to talk to my partner first', undefined], ['Stop, say that again?', undefined], ['Yes.', undefined],
+    ['This is the worst damn call ever', undefined]] as const)('reads %s as a code-side stop: %s', (text, expected) => {
+    expect(callerStop(text)).toBe(expected);
+  });
+  it('pauses collection in code when the caller asks for a person, before any later tool', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('yes', { role: 'user', text: 'Yes.', was_interrupted: false });
+    await f.event('human', { role: 'user', text: 'Actually, can I talk to a real person?', was_interrupted: false });
+    expect(f.gateway.mock.calls.map(c => c[0])).toEqual(['request_human']);
+    const blocked = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    expect(blocked.body.rule_ids).toEqual(['CALL_STOPPED']);
+  });
+  it('ends a loop of the same refused request with a callback offer', async () => {
+    const f = await fixture();
+    let nonce = 'nonce-1';
+    const results = [];
+    for (let i = 0; i < 3; i++) {
+      const r = await f.tool('get_invoice_context', nonce);
+      results.push(r.body); nonce = r.body.next_delivery_nonce;
+    }
+    expect(results.map(r => r.rule_ids)).toEqual([['DISCLOSURE_REQUIRED'], ['DISCLOSURE_REQUIRED'], ['DISCLOSURE_REQUIRED']]);
+    expect(results[1]).not.toHaveProperty('next_step');
+    expect(results[2]).toMatchObject({ next_step: 'offer_callback_and_end', can_confirm: false });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('yes', { role: 'user', text: 'Yes.', was_interrupted: false });
+    expect((await f.tool('verify_identity_result', nonce, { result: 'confirmed' })).body.rule_ids).toEqual(['CALL_STOPPED']);
+  });
+  it('does not treat alternating or successful requests as a loop', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    let nonce = 'nonce-1';
+    for (const name of ['get_invoice_context', 'get_invoice_context', 'verify_identity_result', 'get_invoice_context', 'get_invoice_context']) {
+      const r = await f.tool(name, nonce, name === 'verify_identity_result' ? { result: 'uncertain' } : {});
+      expect(r.body).not.toMatchObject({ next_step: 'offer_callback_and_end' });
+      nonce = r.body.next_delivery_nonce;
+    }
+    await f.event('yes', { role: 'user', text: 'Yes, that is me.', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', nonce, { result: 'confirmed' });
+    nonce = verified.body.next_delivery_nonce;
+    for (let i = 0; i < 3; i++) {
+      const context = await f.tool('get_invoice_context', nonce);
+      expect(context.body.amount_cents).toBe(495000); nonce = context.body.next_delivery_nonce;
+    }
+  });
+  it('refuses every finance tool once the call drops mid-flow', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('yes', { role: 'user', text: 'Yes.', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    await f.handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
+      body: JSON.stringify({ type: 'call_failed', call_id: 'ac-1', webhook_request_id: 'dropped' }) }));
+    const after = await f.tool('get_invoice_context', verified.body.next_delivery_nonce);
+    expect(after.body.rule_ids).toEqual(['CALL_STOPPED']);
+    expect(after.body).not.toHaveProperty('amount_cents');
   });
   it('deduplicates concurrent call_turn deliveries and tool retries without replaying ALLOW', async () => {
     const f = await fixture();
