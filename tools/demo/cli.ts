@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { demoBindHost, externalState } from './host';
 import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
+import { createAttackDemoProcess, resetCompany } from './attack';
 import { probeAttackDemo, probeDependencies, type DemoStatus, type HealthRow } from './health';
 import { demoPublicTarget } from './public-url';
 import { demoEnvironmentChecks, formatEnvironmentCheck, markDemoEnvironmentDefaulted, type DemoEnvironmentCheck } from './env';
@@ -61,6 +62,8 @@ async function supervise() {
     env.PRECALL_CRS = env.CRS_USERNAME?.trim() && env.CRS_PASSWORD ? 'live' : 'fake'; env.VENDOR_CRS = env.PRECALL_CRS; env.LLM_CLOUD_PROVIDER = 'anthropic'; env.GX10_ENABLED = 'true';
   }
   const children = new OwnedProcesses(root, env);
+  const attack = createAttackDemoProcess({ children, env, loader, log: join(dir, 'attack.log'),
+    ready: () => waitFor(async () => (await probeAttackDemo(env)).ok, 20000) });
   let stopping = false;
   let base = '', publicUrl = '';
   const database = localSpacetime(root, env, children);
@@ -87,12 +90,13 @@ async function supervise() {
           if (remote) { res.writeHead(409).end(); return; }
           if (resetting) { res.writeHead(409).end(); return; }
           resetting = true;
-          try { if (env.STATE_STORE === 'spacetime') stateConfig = await database.publish(); }
-          catch { resetting = false; throw new Error('DEMO_PUBLISH_FAILED'); }
         }
         if (req.url === '/health') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(await queryWeb('health'))); return; }
         let status: DemoStatus;
-        try { status = await queryWeb(req.url === '/reset' ? 'reset' : 'status'); }
+        try { status = req.url === '/reset' ? await resetCompany({ attack,
+          publish: async () => env.STATE_STORE === 'spacetime' ? database.publish() : undefined,
+          resetWeb: async config => { stateConfig = config; return queryWeb('reset'); },
+        }) : await queryWeb('status'); }
         finally { if (req.url === '/reset') resetting = false; }
         const attackDemo = await probeAttackDemo(env);
         res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, attackDemo, envChecks, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
@@ -159,12 +163,7 @@ async function supervise() {
     const existing = { ...process.env }; process.loadEnvFile(privateEnv);
     for (const name of ['TOOL_GATEWAY_SECRET', 'CONTROLLER_ENROLLMENT_SECRET', 'POLICY_DEMO_PIN']) env[name] = existing[name] || process.env[name];
     // Same private bearer as the web proxy. Live analysis remains explicitly opt-in.
-    // Mock imports must not open a second writer on a database that reset rotates.
-    const attackStateMode = env.STATE_STORE;
-    if (env.ATTACK_DEMO_LIVE !== '1') env.STATE_STORE = 'memory';
-    children.start(process.execPath, ['--import', loader, 'orchestrator/src/attack-demo/server.ts'], join(dir, 'attack.log'));
-    env.STATE_STORE = attackStateMode;
-    await waitFor(async () => (await probeAttackDemo(env)).ok, 20000);
+    await attack.start(stateConfig);
     if (env.DEMO_VOICE === '1') {
       const voicePrivate = join(dir, 'voice-private.env');
       const names = ['VOICE_TOOL_SECRET', 'VOICE_ADMIN_SECRET', 'CARTESIA_WEBHOOK_SECRET'];

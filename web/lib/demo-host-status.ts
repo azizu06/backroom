@@ -25,7 +25,7 @@ function nessieProbe(nessie: HostServices['nessie'], now: number): ServiceProbe 
     const ref = typeof proof.depositId === 'string' && SAFE_ID.test(proof.depositId) ? `Deposit ${proof.depositId}` : 'Sandbox deposit';
     return probe('verified', 'receipt', `${ref} reconciled · EXACT_PAYMENT_MATCH`, since);
   }
-  return proof.kind === 'sandbox_read' ? probe('verified', 'receipt', 'Sandbox account read (read only)', since)
+  return proof.kind === 'sandbox_read' ? probe('verified', 'receipt', 'Test bank account read (read only)', since)
     : probe('unverified', 'receipt', 'Unrecognized bank evidence');
 }
 
@@ -56,7 +56,7 @@ export function mapHostServices(host: HostServices, now: number, hostStartedAt: 
 
   const { crs: c } = host;
   const crs = c.mode !== 'sandbox' ? probe('simulated', 'config', 'FAKE fixture client')
-    : c.status === 'complete' ? verified('Sandbox public records + fraud risk')
+    : c.status === 'complete' ? verified('Partner test records + fraud risk')
     : c.status === 'unavailable' ? probe('unreachable', 'receipt', 'Sandbox check unavailable')
     : probe('unverified', 'receipt', 'No sandbox check in this host yet');
 
