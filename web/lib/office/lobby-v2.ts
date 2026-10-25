@@ -22,8 +22,11 @@ export function lobbyStats(snapshot: OfficeSnapshot): LobbyStats {
 function finiteCount(value: number): number { return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0; }
 
 export function latestLobbyDecisions(snapshot: OfficeSnapshot) {
-  const known = new Set(['ALLOW', 'DENY', 'ESCALATE', 'RECORDED']);
-  return snapshot.audit.filter(row => known.has(row.decision)).slice(-5).reverse();
+  // Drop empty RECORDED noise ("RECORDED · No rule recorded"); keep allows/denies/holds and ruled records.
+  return snapshot.audit
+    .filter(row => row.decision === 'ALLOW' || row.decision === 'DENY' || row.decision === 'ESCALATE'
+      || (row.decision === 'RECORDED' && row.ruleIds.length > 0))
+    .slice(-5).reverse();
 }
 
 export function lobbyRoster(snapshot: OfficeSnapshot) {
