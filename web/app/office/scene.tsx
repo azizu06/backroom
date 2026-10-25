@@ -140,7 +140,7 @@ const FOLDER_PAPER_MATERIAL = new MeshStandardMaterial({ color: '#f3dfb9', rough
 interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number; route: Vec2[] }
 function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: boolean; tour: boolean }) {
   const reduced = useReducedMotion();
-  const { camera, size, invalidate } = useThree();
+  const { camera, size, invalidate, gl } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const moving = useRef(true);
   const orbiting = useRef(false);
@@ -192,8 +192,18 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
     controls.current.update();
     if (camera.position.distanceTo(destination.current) < 0.005 && Math.abs(camera.zoom - zoom) < 0.01) moving.current = false;
   });
-  return <OrbitControls ref={controls} onStart={() => { orbiting.current = true; invalidate(); }} onEnd={() => { orbiting.current = false; invalidate(); }} enablePan={false} enableZoom={false} enableRotate={!fixed}
-    minPolarAngle={0.45} maxPolarAngle={1.1} minAzimuthAngle={-0.7} maxAzimuthAngle={0.9} />;
+  return <OrbitControls ref={controls} onStart={() => { moving.current = false; orbiting.current = true; invalidate(); }} onEnd={() => { orbiting.current = false; invalidate(); }}
+    onChange={() => {
+      const viewport = gl.domElement.closest<HTMLElement>('[data-testid="office-viewport"]');
+      if (!viewport || !controls.current) return;
+      viewport.dataset.officeAzimuth = String(controls.current.getAzimuthalAngle());
+      viewport.dataset.officeZoom = String(camera.zoom);
+      viewport.dataset.officeTargetX = String(controls.current.target.x);
+      viewport.dataset.officeTargetZ = String(controls.current.target.z);
+    }}
+    enablePan={false} enableZoom={!fixed} enableRotate={!fixed} enableDamping dampingFactor={0.1}
+    minZoom={Math.min(size.width / 33, size.height / 25)} maxZoom={Math.min(size.width / 10, size.height / 8)}
+    minPolarAngle={0.3} maxPolarAngle={1.3} minAzimuthAngle={Math.atan2(13, 17) - 1.2} maxAzimuthAngle={Math.atan2(13, 17) + 1.2} />;
 }
 function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
