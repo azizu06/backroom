@@ -13,7 +13,7 @@ export function RouteState({ status, title, children, reference, actions, standa
   return <main className="route-state">
     {standalone && <header className="route-state-bar">
       <a href="/office">Backroom</a>
-      <a href="/audit">Audit wall</a>
+      <a href="/audit">Audit Wall</a>
     </header>}
     <div className="route-state-content">
       <p className="route-state-status">{status}</p>

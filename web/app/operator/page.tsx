@@ -119,7 +119,7 @@ export default function OperatorPage() {
           {unavailable('x402_testnet') && <p role='note' className={styles.muted}>Unavailable: {unavailable('x402_testnet')}</p>}
           {isX402(receipt?.result) && <X402Summary receipt={receipt.result} />}</div></li>
         <li className={styles.card}><h2>Show the guardrails</h2>
-          <nav aria-label='Demo views' className={styles.row}><a href='/inbox'>Inbox</a><a href='/audit'>Audit wall</a><a href='/attack'>Attack demo</a></nav></li>
+          <nav aria-label='Demo views' className={styles.row}><a href='/inbox'>Inbox</a><a href='/audit'>Audit Wall</a><a href='/attack'>Attack Demo</a></nav></li>
       </ol>
       <details className={styles.advanced}><summary>Advanced</summary>
         <section><h2>Host and company</h2>{(['status', 'health', 'preflight'] as const).map(button)}

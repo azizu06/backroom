@@ -18,7 +18,7 @@ function drawWall(ctx: CanvasRenderingContext2D, view: AuditWallView) {
   ctx.textAlign = 'left';
   ctx.fillStyle = '#d8e5d0';
   ctx.font = `600 30px ${PROP_FONT}`;
-  ctx.fillText('Audit wall', 22, 42);
+  ctx.fillText('Audit Wall', 22, 42);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#9fae9a';
   ctx.font = `500 20px ${PROP_FONT}`;

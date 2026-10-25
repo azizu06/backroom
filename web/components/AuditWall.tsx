@@ -163,7 +163,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
 
   return <section className="audit-wall" aria-labelledby="audit-title">
     <header className="audit-heading">
-      <div><Heading id="audit-title">Audit wall</Heading>
+      <div><Heading id="audit-title">Audit Wall</Heading>
         <p>{recording ? 'REPLAY · original recorded entries. No actions run.' : 'Every decision in this demo run: who decided, under which rule, and the outcome.'}</p></div>
       {snapshot && <div className={`audit-chain ${!snapshot.chain.valid ? 'audit-broken' : error ? 'audit-stale' : 'audit-verified'}`} role="status">
         {!snapshot.chain.valid ? `Chain broken · first broken seq ${snapshot.chain.firstBrokenSeq}` : error ? 'Chain status stale' : `${recording ? 'Recorded chain verified' : 'Chain verified'} · ${snapshot.chain.length} entries`}

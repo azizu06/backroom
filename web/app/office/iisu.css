@@ -52,8 +52,6 @@
   box-shadow: var(--bubble-shadow);
   backdrop-filter: blur(10px);
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pastel-aqua) transparent;
 }
 .office-shell .office-sidebar-logo {
   display: flex;
@@ -127,11 +125,11 @@
   backdrop-filter: blur(10px);
 }
 /* The header scrolls on its own when it has more than fits; the page never does. */
-.office-shell .office-toolbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--pastel-aqua) transparent; }
+.office-shell .office-toolbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
 .office-shell .office-toolbar > div:first-child { flex: none; white-space: nowrap; }
 .office-shell .office-tools { flex: 1 0 auto; flex-wrap: nowrap; justify-content: flex-end; }
 .office-shell .office-tools > * { flex: none; white-space: nowrap; }
-.office-shell .theme-toggle { position: sticky; right: 0; z-index: 1; box-shadow: -10px 0 12px -4px var(--bubble-glass), 0 3px 8px rgba(25, 33, 59, 0.15); flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 22px; background: var(--pastel-yellow); border-color: #ffffff; }
+.office-shell .theme-toggle { margin-left: auto; box-shadow: 0 3px 8px rgba(25, 33, 59, 0.15); flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 22px; background: var(--pastel-yellow); border-color: #ffffff; }
 .office-shell .office-toolbar strong { font-weight: 900; font-size: 22px; }
 .office-shell .toolbar-divider { color: var(--ink-soft); }
 .office-shell .office-tools a { color: var(--ink); font-weight: 800; }
@@ -340,8 +338,8 @@ body:has(.office-shell) .real-sim-overlay.real-sim-docked {
     linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%);
 }
 .office-shell[data-theme=dark] :is(.room-icon, select, button, .seat-statuses > div, .lobby-v2-panel, .office-lobby .audit-wall, .detail-sheet :is(input, textarea)) { background-color: #2B3660; border-color: #3B4A7E; }
-.office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) :is(a, button) { background: transparent; border-color: transparent; }
-.office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) :is(a, button):hover { background: rgba(169, 246, 255, 0.12); }
+.office-shell[data-theme=dark] .office-sidebar :is(.room-navigation, .office-sidebar-links) :is(a, button) { background: transparent; border-color: transparent; }
+.office-shell[data-theme=dark] .office-sidebar :is(.room-navigation, .office-sidebar-links) :is(a, button):hover { background: rgba(169, 246, 255, 0.12); }
 /* Yellow and aqua surfaces keep dark ink in both modes. */
 .office-shell[data-theme=dark] :is(.connection-status, .theme-toggle, .detail-sheet-header, .detail-sheet-backdrop .room-inspector header, .detail-sheet-cta,
   .room-navigation button[aria-pressed=true], .office-sidebar-links button[aria-pressed=true]) { color: #19213B; }
@@ -367,7 +365,6 @@ body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !impo
 @media (max-width: 900px) {
   .office-shell { flex-direction: column; padding: 10px; gap: 10px; }
   .office-shell .office-toolbar { padding: 8px 12px; gap: 8px; }
-  .office-shell .office-sidebar { scrollbar-width: thin; }
   .office-shell .office-sidebar { position: static; max-height: none; flex: none; flex-direction: row; align-items: center; overflow-x: auto; padding: 8px; border-radius: 999px; }
   .office-shell .office-sidebar-logo { flex-direction: row; padding: 0 8px; border: 0; }
   .office-shell .office-sidebar-logo span { display: none; }
@@ -442,8 +439,6 @@ body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !impo
   gap: 12px;
   padding: 6px 16px;
   overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pastel-aqua) transparent;
   white-space: nowrap;
   color: var(--ink);
   background: var(--bubble-glass);
@@ -455,3 +450,60 @@ body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !impo
 .office-shell .site-nav a { padding: 4px 10px; color: var(--ink); font-weight: 800; text-decoration: none; border-radius: 999px; }
 .office-shell .site-nav a:hover, .office-shell .site-nav a[aria-current=page] { background: var(--pastel-yellow); color: #19213B; }
 .office-shell .site-nav .demo-pill { color: #19213B; background: var(--pastel-aqua); border-color: #ffffff; }
+
+/* ---------- One top bar + Rooms picker ---------- */
+.office-shell .office-toolbar > .site-nav-note { flex: none; display: flex; align-items: center; }
+.office-shell .office-toolbar .demo-pill { color: #19213B; background: var(--pastel-aqua); border-color: #ffffff; }
+.office-shell .office-tools { justify-content: flex-start; }
+.office-shell .office-sidebar-links a[aria-current=page] { background: var(--pastel-yellow); border-color: #ffffff; }
+.office-shell .room-picker-intro { margin: 0 0 14px; font-size: 15px; color: var(--ink-soft); }
+.office-shell .room-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.office-shell .room-picker button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--ink);
+  text-align: left;
+  background: #ffffff;
+  border: 3px solid var(--pastel-aqua);
+  border-radius: 22px;
+  box-shadow: 0 4px 12px rgba(25, 33, 59, 0.1);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.office-shell .room-picker button:hover { background: var(--pastel-yellow); transform: translateY(-2px); }
+.office-shell .room-picker button[aria-pressed=true] { background: var(--pastel-yellow); border-color: #ffffff; }
+.office-shell .room-picker-text { flex: 1; display: grid; gap: 2px; }
+.office-shell .room-picker-text strong { font-size: 16px; font-weight: 900; }
+.office-shell .room-picker-text small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.office-shell .room-picker-caret { flex: none; font-size: 16px; color: var(--ink-soft); }
+.office-shell[data-theme=dark] .room-picker button { background: #2B3660; border-color: #3B4A7E; }
+.office-shell[data-theme=dark] .room-picker button:hover,
+.office-shell[data-theme=dark] .room-picker button[aria-pressed=true] { background: #3B4A7E; }
+
+/* Slim scrollbars that stay inside the rounded bubbles: a 4px pill, inset from the curved ends. */
+.office-shell ::-webkit-scrollbar { width: 4px; height: 4px; }
+.office-shell ::-webkit-scrollbar-track { background: transparent; margin: 22px; }
+.office-shell ::-webkit-scrollbar-thumb { background: var(--pastel-aqua); border-radius: 999px; }
+.office-shell ::-webkit-scrollbar-corner { background: transparent; }
+.office-shell[data-theme=dark] ::-webkit-scrollbar-thumb { background: #3B4A7E; }
+
+/* The office background lives on the page root, so the shared bubbles (components/Bubbles.css) float between it and the chrome. */
+html:has(.office-shell) {
+  background:
+    radial-gradient(circle at 12% 8%, #ffffffcc 0 6%, transparent 28%),
+    radial-gradient(circle at 92% 4%, #FFF3A6 0, transparent 38%),
+    radial-gradient(circle at 70% 100%, #ffffffaa 0, transparent 40%),
+    linear-gradient(165deg, #A9F6FF 0%, #d8fbff 50%, #FFF3A6 100%) fixed;
+}
+html:has(.office-shell[data-theme=dark]) {
+  background:
+    radial-gradient(circle at 14% 10%, rgba(169, 246, 255, 0.16) 0 6%, transparent 30%),
+    radial-gradient(circle at 90% 6%, rgba(255, 243, 166, 0.14) 0, transparent 36%),
+    linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%) fixed;
+}
+.office-shell, .office-shell[data-theme=dark] { background: transparent; }
+.office-shell[data-theme=dark] .office-sidebar :is(.room-navigation, .office-sidebar-links) button[aria-pressed=true] { background: var(--pastel-yellow); border-color: #ffffff; color: var(--on-pastel); }
+.office-shell[data-theme=dark] .office-tools .office-enter-play { background: var(--pastel-yellow); border-color: #ffffff; color: var(--on-pastel); }

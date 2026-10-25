@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
-import { SiteNav } from '../../components/SiteNav';
+import { NavDisclosure } from '../../components/DemoPill';
+import { navLinks, whatsRealLink } from '../../lib/site-nav';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, useTouch } from './PlayHud';
 import { roomLabel, seatLabel } from '../../lib/office/a11y';
@@ -31,7 +32,7 @@ import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
 import { ViewBoundary } from './ViewBoundary';
 import { PlaySplash } from './PlaySplash';
-import { COMPACT_QUERY, readStartView, saveStartView, startView } from '../../lib/office/start-mode';
+import { COMPACT_QUERY, markSplashSeen, readStartView, saveStartView, splashSeen, startView } from '../../lib/office/start-mode';
 import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
@@ -41,15 +42,27 @@ import './tags.css';
 import './office-tokens.css';
 import './iisu.css';
 import type { IconType } from 'react-icons';
-import { PiArmchairDuotone, PiHeartDuotone, PiHouseDuotone, PiMoonStarsDuotone, PiPhoneCallDuotone, PiReceiptDuotone, PiScrollDuotone,
-  PiSlidersHorizontalDuotone, PiSunDuotone, PiTagDuotone, PiTrayDuotone, PiVaultDuotone, PiXBold } from 'react-icons/pi';
+import { PiArmchairDuotone, PiCaretRightBold, PiDoorOpenDuotone, PiGameControllerDuotone, PiHeartDuotone, PiHouseDuotone, PiInfoDuotone, PiMoonStarsDuotone,
+  PiPhoneCallDuotone, PiReceiptDuotone, PiScrollDuotone, PiShieldWarningDuotone, PiSlidersHorizontalDuotone, PiSunDuotone, PiTagDuotone, PiTrayDuotone,
+  PiVaultDuotone, PiXBold } from 'react-icons/pi';
 
 /** Sidebar icons only; aria-hidden, so room buttons keep their exact accessible names. */
 const ROOM_ICONS: Partial<Record<AnchorId, IconType>> = {
   lobby: PiArmchairDuotone, collections: PiPhoneCallDuotone, payables: PiReceiptDuotone,
   vendor_onboarding: PiTagDuotone, dana: PiHeartDuotone, treasury: PiVaultDuotone,
 };
-type DetailSheetId = 'overview' | 'inbox' | 'audit';
+type DetailSheetId = 'overview' | 'rooms' | 'inbox' | 'audit';
+
+/** Site pages for the sidebar. Office, Inbox and Audit Wall open as sheets here, so each destination appears once. */
+const PAGE_ICONS: Record<string, IconType> = {
+  '/attack': PiShieldWarningDuotone, '/operator': PiSlidersHorizontalDuotone, '/controller': PiGameControllerDuotone, [whatsRealLink.href]: PiInfoDuotone,
+};
+const SIDEBAR_PAGES = [...navLinks.filter(link => link.href in PAGE_ICONS), whatsRealLink];
+
+function roomNote(room: AnchorId, snapshot: OfficeSnapshot) {
+  const badge = snapshot.badges.find(row => row.seatId === room);
+  return badge ? `Badge · v${badge.policyVersion}` : room === 'treasury' ? 'Locked · Dana only' : room === 'lobby' ? 'Audit Wall + inbox' : 'Human approval';
+}
 
 /** Big rounded modal for sidebar details. Escape, the close button or the backdrop closes it. */
 function DetailSheet({ title, icon: Icon, onClose, children }: { title: string; icon: IconType; onClose: () => void; children: ReactNode }) {
@@ -193,10 +206,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
     if (storyStart || source.getSnapshot().connection === 'replay') return;
-    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') setSplash(true);
+    if (splashSeen()) return;
+    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') { markSplashSeen(); setSplash(true); }
   // Decided once on mount; later prop changes never reopen the splash.
   }, []);
   const inspectorOpener = useRef<HTMLElement | null>(null);
+  const roomsButton = useRef<HTMLButtonElement>(null);
   const closeInspector = useCallback(() => {
     setInspecting(null);
     inspectorOpener.current?.focus();
@@ -211,35 +226,34 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <aside className='office-sidebar'>
       <a className='office-sidebar-logo' href='/office' aria-label='Backrooms office home'><img src='/icon.png' alt='' /><span>Backrooms</span></a>
-      <nav className='room-navigation' aria-label='Room camera presets'>
-        <button aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); setSheet('overview'); }}><span className='room-icon' aria-hidden='true'><PiHouseDuotone /></span>Full Floor</button>
-        {visibleRooms(snapshot).map(room => {
-          const Icon = ROOM_ICONS[room] ?? PiHouseDuotone;
-          return <button key={room} aria-pressed={focus === room} onClick={event => { setSheet(null); inspect(room, event.currentTarget); }}><span className='room-icon' aria-hidden='true'><Icon /></span>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>;
-        })}
-      </nav>
-      <nav className='office-sidebar-links' aria-label='Office shortcuts'>
+      <nav className='room-navigation' aria-label='Office shortcuts'>
+        <button type='button' aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); setSheet('overview'); }}><span className='room-icon' aria-hidden='true'><PiHouseDuotone /></span>Full Floor</button>
+        <button ref={roomsButton} type='button' aria-haspopup='dialog' aria-pressed={focus !== null} data-focus={focus ?? undefined} onClick={() => { setInspecting(null); setSheet('rooms'); }}><span className='room-icon' aria-hidden='true'><PiDoorOpenDuotone /></span>Rooms</button>
         <button type='button' aria-pressed={sheet === 'inbox'} onClick={() => { setInspecting(null); setSheet('inbox'); }}><span className='room-icon' aria-hidden='true'><PiTrayDuotone /></span>Inbox · {snapshot.inboxCount}</button>
-        <button type='button' aria-pressed={sheet === 'audit'} onClick={() => { setInspecting(null); setSheet('audit'); }}><span className='room-icon' aria-hidden='true'><PiScrollDuotone /></span>Audit wall</button>
-        <a href='/operator'><span className='room-icon' aria-hidden='true'><PiSlidersHorizontalDuotone /></span>Operator</a>
+        <button type='button' aria-pressed={sheet === 'audit'} onClick={() => { setInspecting(null); setSheet('audit'); }}><span className='room-icon' aria-hidden='true'><PiScrollDuotone /></span>Audit Wall</button>
+      </nav>
+      <nav className='office-sidebar-links' aria-label='Site pages'>
+        {SIDEBAR_PAGES.map(({ label, href }) => {
+          const Icon = PAGE_ICONS[href] ?? PiInfoDuotone;
+          return <a key={href} href={href}><span className='room-icon' aria-hidden='true'><Icon /></span>{label}</a>;
+        })}
       </nav>
     </aside>
     <div className='office-main'>
-    <SiteNav placement='office' />
     <header className='office-toolbar'>
-      <div><strong>Backroom</strong><span className='toolbar-divider'>/</span><span>Northfield Studio</span></div>
+      <Suspense fallback={null}><NavDisclosure /></Suspense>
       <div className='office-tools'>
         {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Enter first person</button>}
+        <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
+          {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
+        </select></label>
+        <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
         <OfficeHelp />
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}</span>
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
         <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
         </fieldset>
-        <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
-        <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
-          {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
-        </select></label>
       </div>
       <button type='button' className='theme-toggle' onClick={toggleTheme} aria-pressed={theme === 'dark'}
         aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
@@ -264,10 +278,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           </div>)}</div>}
           {!layers.floorPlan && <HandoffTags />}
           {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
-            const badge = snapshot.badges.find(row => row.seatId === room);
             return <div key={room} ref={labels[room]} className='scene-label'>
               <button className='desk-label' onClick={event => inspect(room, event.currentTarget)} aria-label={roomLabel(room, snapshot)}>
-                {OFFICE_ANCHORS[room].name}<span>{badge ? `Badge · v${badge.policyVersion}` : room === 'treasury' ? 'Locked · Dana only' : room === 'lobby' ? 'Audit wall + inbox' : 'Human approval'}</span>
+                {OFFICE_ANCHORS[room].name}<span>{roomNote(room, snapshot)}</span>
               </button>
             </div>;
           })}
@@ -299,7 +312,21 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       </section>}
       {controls}
     </DetailSheet>}
-    {sheet === 'audit' && <DetailSheet title='Audit wall' icon={PiScrollDuotone} onClose={closeSheet}>
+    {sheet === 'rooms' && <DetailSheet title='Rooms' icon={PiDoorOpenDuotone} onClose={closeSheet}>
+      <p className='room-picker-intro'>Pick a room to fly the camera there and see its badge, limits and who is working.</p>
+      <nav className='room-picker' aria-label='Room camera presets'>
+        {visibleRooms(snapshot).map(room => {
+          const Icon = ROOM_ICONS[room] ?? PiHouseDuotone;
+          return <button key={room} type='button' data-room={room} aria-pressed={focus === room} aria-label={`${OFFICE_ANCHORS[room].name}${room === 'treasury' ? ' · Locked' : ''}`}
+            onClick={() => { setSheet(null); if (roomsButton.current) inspect(room, roomsButton.current); }}>
+            <span className='room-icon' aria-hidden='true'><Icon /></span>
+            <span className='room-picker-text'><strong>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</strong><small>{roomNote(room, snapshot)}</small></span>
+            <PiCaretRightBold className='room-picker-caret' aria-hidden='true' />
+          </button>;
+        })}
+      </nav>
+    </DetailSheet>}
+    {sheet === 'audit' && <DetailSheet title='Audit Wall' icon={PiScrollDuotone} onClose={closeSheet}>
       <section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
         <ViewBoundary name='Audit wall' resetKey={snapshot} fallback={<p role='status'>Audit wall unavailable · open the full audit page for receipts.</p>}>
         {typeof auditWall === 'function' ? auditWall(snapshot, anchor => { setSheet(null); setFocus(anchor); }) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}

@@ -41,8 +41,8 @@ test.describe('at 1440x1000', () => {
     });
     expect(hit).toEqual({ onTop: true, inSplash: false, opacity: '1', visibility: 'visible' });
     // The rest of the nav is still inert behind the splash; the disclosure itself holds no controls.
-    await expect(page.locator('.site-nav > ul')).toHaveAttribute('inert', '');
-    await expect(page.locator('.site-nav .site-nav-note')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('.office-sidebar')).toHaveAttribute('inert', '');
+    await expect(page.locator('.office-toolbar .site-nav-note')).not.toHaveAttribute('inert', '');
   });
 });
 

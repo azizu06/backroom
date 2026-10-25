@@ -13,7 +13,7 @@ export function RealSimDetails() {
   return <aside className='real-sim-tile' data-open={open} aria-label='Real versus simulated disclosure'>
     <header className='real-sim-tile-head'>
       <div>
-        <strong>Real vs. simulated</strong>
+        <strong>Info</strong>
         <span className='real-sim-tile-note'>{demoPillText(status)}</span>
       </div>
       <button type='button' className='real-sim-tile-toggle' aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(value => !value)}>

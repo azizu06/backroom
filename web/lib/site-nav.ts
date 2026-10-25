@@ -1,8 +1,8 @@
 export const navLinks = [
   { label: 'Office', href: '/office' },
   { label: 'Inbox', href: '/inbox' },
-  { label: 'Audit wall', href: '/audit' },
-  { label: 'Attack demo', href: '/attack' },
+  { label: 'Audit Wall', href: '/audit' },
+  { label: 'Attack Demo', href: '/attack' },
   { label: 'Operator', href: '/operator' },
   { label: 'Controller', href: '/controller' },
 ] as const;

@@ -101,7 +101,7 @@ describe('office modal wiring', () => {
     expect(office).toContain('useOfficeHandoffs');
     expect(office).toContain('Enter first person');
     expect(office).toContain('<OfficeHelp />');
-    expect(office).toContain("<SiteNav placement='office' />");
+    expect(office).toContain('<NavDisclosure />');
     expect(office).toContain('lookOnStart={lookOnEnter}');
   });
 });

@@ -6,6 +6,13 @@ import { ROLES } from '../lib/office/palette';
 const code = process.env.OFFICE_LOBBY_OPERATOR_CODE ?? 'local-audit-test-only';
 if (process.env.OFFICE_LOBBY_URL) test.use({ baseURL: process.env.OFFICE_LOBBY_URL });
 
+/** Rooms live in one sidebar picker: open it, then pick a room to focus the camera. */
+const roomsButton = (page: Page) => page.getByRole('navigation', { name: 'Office shortcuts' }).getByRole('button', { name: 'Rooms', exact: true });
+async function openRoom(page: Page, name: string | RegExp) {
+  await roomsButton(page).click();
+  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name, exact: typeof name === 'string' }).click();
+}
+
 test('office lobby mounts the live audit wall and ask-why without breaking the office layout', async ({ page }) => {
   const errors: string[] = [], audit: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -21,7 +28,7 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   await lobby.getByRole('button', { name: 'Open audit wall' }).click();
   await expect(lobby.getByText(/^Chain verified · \d+ entries$/)).toBeVisible();
   expect(audit).toContain('/api/audit/entries');
-  await expect(lobby.getByRole('heading', { name: 'Audit wall', exact: true, level: 3 })).toBeVisible();
+  await expect(lobby.getByRole('heading', { name: 'Audit Wall', exact: true, level: 3 })).toBeVisible();
   await expect(lobby.locator('.audit-why')).toHaveCount(0);
   const ask = lobby.getByRole('region', { name: 'Ask why by voice' });
   await expect(ask.getByRole('button', { name: 'Hold to ask why' })).toBeVisible();
@@ -234,7 +241,7 @@ test('office props render in the 3D scene', async ({ page }) => {
   const canvas = viewport.locator('canvas');
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
-  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
+  await openRoom(page, 'Payables');
   // The blank board turns bright once the focus camera settles; just above it is the cream scene background.
   await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
   expect(offBackground(await patchColor(page, canvas, ABOVE_PAYABLES_BOARD))).toBeLessThan(6);
@@ -256,7 +263,7 @@ test('office desk monitors survive the Collections escalation preview', async ({
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await page.getByRole('button', { name: 'Preview escalation' }).click();
   await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
-  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Collections', exact: true }).click();
+  await openRoom(page, 'Collections');
   // Once the focus camera settles, the empty right strip of the Collections screen shows the aqua panel (blue above red),
   // while the lit peach desk top beside it stays bright and warm (red above blue).
   await expect.poll(() => patchBrightness(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
@@ -279,7 +286,7 @@ test('office ambience renders a still scene under reduced motion', async ({ page
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   // With the ambient ticker off, the static pose still has to reach the screen: the focused Payables board draws.
-  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
+  await openRoom(page, 'Payables');
   await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
@@ -299,7 +306,7 @@ test('office judge tour visits the rooms with agent tags and stops on any key', 
   await view.selectOption('tour');
   await expect(caption).toContainText('Tour');
   await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Lobby', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(roomsButton(page)).toHaveAttribute('data-focus', 'lobby');
   await page.keyboard.press('Shift');
   await expect(view).toHaveValue('tween');
   await expect(caption).not.toContainText('Tour');
@@ -347,6 +354,8 @@ test('office judge tour started with the native select arrow keys', async ({ pag
   // A closed <select> changes value on ArrowDown/ArrowUp in Linux/Windows Chromium; macOS opens the popup instead.
   test.skip(process.platform === 'darwin' || browserName !== 'chromium', 'native select arrow-key navigation is platform-specific');
   await page.goto('/office?view=overview');
+  // Customizable selects (appearance: base-select, theme.css) open their picker on arrow keys, like macOS.
+  test.skip(await page.evaluate(() => CSS.supports('appearance', 'base-select')), 'base-select opens the picker on arrow keys');
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
@@ -375,9 +384,8 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const canvas = viewport.locator('canvas');
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
-  const treasury = page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: /^Treasury/ });
-  await treasury.click();
-  await expect(treasury).toHaveAttribute('aria-pressed', 'true');
+  await openRoom(page, /^Treasury/);
+  await expect(roomsButton(page)).toHaveAttribute('data-focus', 'treasury');
   // The margin points must fit the focus view for both the lobby's canvas (1440 x 580) and a taller one (1440 x 1000).
   for (const [width, height] of [[1440, 580], [1440, 1000]] as const) {
     for (const point of SIGN_MARGINS) {

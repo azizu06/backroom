@@ -73,7 +73,7 @@ describe('route states', () => {
     expect(html).not.toContain('no payment');
     expect(html).not.toContain('Nothing was changed');
     expect(html).toContain('<a href="/office">Backroom</a>');
-    expect(html).toContain('<a href="/audit">Audit wall</a>');
+    expect(html).toContain('<a href="/audit">Audit Wall</a>');
     expect(html).not.toContain('<nav');
     expect(html).not.toContain('Back to the office');
     expect(html).toContain('<code>def456</code>');

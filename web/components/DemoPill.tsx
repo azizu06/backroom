@@ -9,7 +9,7 @@ import './DemoPill.css';
 
 function useReplay() {
   const pathname = usePathname() ?? '';
-  return useSearchParams().has('replay') && (pathname === '/office' || pathname === '/audit');
+  return !!useSearchParams()?.has('replay') && (pathname === '/office' || pathname === '/audit');
 }
 
 /** Inline disclosure for the site nav: never presents simulated as live. Replays show their own label instead. */

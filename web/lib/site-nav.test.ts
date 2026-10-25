@@ -3,7 +3,7 @@ import { isActive, navLinks, siteNavHidden, whatsRealLink } from './site-nav';
 
 describe('site nav', () => {
   it('lists only the demo pages, with What’s real as the small trailing link', () => {
-    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Inbox', 'Audit wall', 'Attack demo', 'Operator', 'Controller']);
+    expect(navLinks.map(link => link.label)).toEqual(['Office', 'Inbox', 'Audit Wall', 'Attack Demo', 'Operator', 'Controller']);
     expect(navLinks.map(link => link.href as string)).not.toContain('/real-vs-sim');
     expect(whatsRealLink).toEqual({ label: 'What’s real', href: '/real-vs-sim' });
   });

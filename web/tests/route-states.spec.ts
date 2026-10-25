@@ -27,7 +27,7 @@ for (const viewport of [{ width: 1440, height: 953 }, { width: 390, height: 844 
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.getByRole('navigation')).toHaveCount(1);
     const nav = page.getByRole('navigation', { name: 'Site' });
-    await expect(nav.getByRole('link', { name: 'Audit wall' })).toHaveAttribute('href', '/audit');
+    await expect(nav.getByRole('link', { name: 'Audit Wall' })).toHaveAttribute('href', '/audit');
     await expect(nav.getByRole('link', { name: 'Back to the office' })).toHaveCount(0);
     const back = page.getByRole('link', { name: 'Back to the office' });
     await expect(back).toHaveAttribute('href', '/office');
@@ -43,7 +43,7 @@ for (const viewport of [{ width: 1440, height: 953 }, { width: 390, height: 844 
     expect(footer).toBeTruthy();
     expect(backBox!.y + backBox!.height).toBeLessThanOrEqual(viewport.height + 1);
     expect(footer!.y + footer!.height).toBeLessThanOrEqual(viewport.height + 1);
-    await nav.getByRole('link', { name: 'Audit wall' }).click();
+    await nav.getByRole('link', { name: 'Audit Wall' }).click();
     await expect(page).toHaveURL(/\/audit$/);
     expect(errors).toEqual([]);
   });

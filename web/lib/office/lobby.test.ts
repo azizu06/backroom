@@ -6,6 +6,8 @@ import { AskWhyVoice, askWhyErrorMessage } from '../../components/AskWhyVoice';
 import { AuditWall, type AuditSnapshot } from '../../components/AuditWall';
 import { LiveOffice } from '../../app/office/LiveOffice';
 import { MockOffice, Office } from '../../app/office/Office';
+import { OfficeLobby } from '../../app/office/OfficeLobby';
+import { ReceiptList } from '../../app/office/ReceiptList';
 import { RoomInspector } from '../../app/office/RoomInspector';
 import { createMockOfficeState } from './preview';
 
@@ -19,17 +21,25 @@ const { renderToStaticMarkup } = createRequire(import.meta.url)('react-dom/serve
 // web/ compiles TSX with the classic runtime under vitest; Next uses its own transform.
 Object.assign(globalThis, { React });
 
-function lobby(html: string) {
-  const start = html.indexOf("id=\"office-audit-wall\"");
-  expect(start).toBeGreaterThan(-1);
-  return html.slice(start);
+function expectOfficeShell(html: string) {
+  expect(html).toContain('class="office-toolbar"');
+  expect(html).toContain('data-testid="office-viewport"');
+  expect(html).toContain('class="office-sidebar"');
+  expect(html).toContain('aria-label="Site pages"');
+  expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>[\s\S]*?<\/span>Rooms<\/button>/);
+  expect(html).not.toContain('aria-label="Room camera presets"');
+  expect(html).toContain('aria-label="Office shortcuts"');
+  expect(html).toMatch(/<button[^>]*aria-pressed="false"[^>]*>[\s\S]*?<\/span>Inbox · \d+<\/button>/);
+  expect(html).toMatch(/<button[^>]*aria-pressed="false"[^>]*>[\s\S]*?<\/span>Audit Wall<\/button>/);
+  expect(html).not.toContain('class="office-footer"');
+  expect(html).not.toContain('role="dialog"');
+  expect(html).not.toContain('id="office-audit-wall"');
+  expect(html).not.toContain('id="office-inbox-tray"');
 }
-function expectLobby(html: string) {
-  const section = lobby(html);
-  expect(section).toContain('data-office-mount="audit-wall"');
+function expectLobby(section: string) {
   expect(section).toContain('data-office-mount="audit-wall-live"');
   expect(section).toContain('class="audit-wall"');
-  expect(section).toContain('<h3 id="audit-title">Audit wall</h3>');
+  expect(section).toContain('<h3 id="audit-title">Audit Wall</h3>');
   // No `recording`: the wall polls /api/audit/entries instead of showing a replay.
   expect(section).toContain('Every decision in this demo run');
   expect(section).toContain('Loading audit records');
@@ -44,17 +54,20 @@ function expectLobby(html: string) {
 }
 
 describe('office lobby', () => {
-  it('mounts the live audit wall and ask-why in the preview office', () => {
+  it('renders preview sidebar shortcuts with detail sheets initially closed', () => {
     const html = renderToStaticMarkup(createElement(MockOffice));
-    expect(html).toContain('class="office-toolbar"');
-    expect(html).toContain('data-testid="office-viewport"');
-    expect(html).toContain('class="office-footer"');
-    expect(html).toContain('class="seat-statuses"');
-    expect(html).toContain('class="mock-controls"');
+    expectOfficeShell(html);
+    expect(html).not.toContain('class="seat-statuses"');
+    expect(html).not.toContain('class="mock-controls"');
     // Operator is reached through the shared site nav (lib/site-nav.ts), not an office toolbar link.
     expect(html).not.toContain('<a href="/operator">Operator</a>');
-    expect(html).toContain('href="/inbox"');
-    expect(html).toContain('Receipts there are not synced into this static scene.');
+    expect(html).not.toContain('data-office-mount="audit-wall-live"');
+    expect(html).not.toContain('data-office-mount="ask-why"');
+  });
+
+  it('keeps the audit detail content live, with cited ask-why rather than preview receipts', () => {
+    const snapshot = createMockOfficeState().source.getSnapshot();
+    const html = renderToStaticMarkup(createElement(OfficeLobby, { snapshot, focus: () => {} }));
     expectLobby(html);
   });
 
@@ -67,18 +80,24 @@ describe('office lobby', () => {
     expect(html).not.toContain('href="#office-inbox-tray"');
   });
 
-  it('mounts the live audit wall and ask-why in the live office, beside the inbox tray', () => {
+  it('renders live sidebar shortcuts without mounting the audit wall or inbox until opened', () => {
     const html = renderToStaticMarkup(createElement(LiveOffice, { config: { uri: 'ws://127.0.0.1:1', database: 'lobby-test' }, presets: [] }));
-    expectLobby(html);
-    expect(html).toContain('data-office-mount="inbox"');
-    expect(html.indexOf('id="office-audit-wall"')).toBeLessThan(html.indexOf('id="office-inbox-tray"'));
+    expectOfficeShell(html);
+    expect(html).not.toContain('data-office-mount="audit-wall-live"');
+    expect(html).not.toContain('data-office-mount="inbox"');
   });
 
   it('keeps the receipt fallback for callers without a wall (replay)', () => {
     const html = renderToStaticMarkup(createElement(Office, { source: createMockOfficeState().source }));
-    expect(lobby(html)).toContain('Lobby audit wall');
+    expectOfficeShell(html);
     expect(html).not.toContain('class="audit-wall"');
     expect(html).not.toContain('data-office-mount="ask-why"');
+    const snapshot = { ...createMockOfficeState().source.getSnapshot(), connection: 'replay' as const };
+    const receipts = renderToStaticMarkup(createElement(ReceiptList, { snapshot, title: 'Lobby audit wall' }));
+    expect(receipts).toContain('Lobby audit wall');
+    expect(receipts).toContain('REPLAY receipts');
+    expect(receipts).not.toContain('class="audit-wall"');
+    expect(receipts).not.toContain('data-office-mount="ask-why"');
   });
 
   it('disables voice and text questions with a visible broken-chain reason', () => {
@@ -117,12 +136,12 @@ describe('office lobby', () => {
       };
       const lobby = render({ onChainChange, showAsk: false, headingLevel: 3 });
       expect(onChainChange).toHaveBeenLastCalledWith(valid);
-      expect(lobby).toContain('<h3 id="audit-title">Audit wall</h3>');
+      expect(lobby).toContain('<h3 id="audit-title">Audit Wall</h3>');
       expect(lobby).toContain('<h4 id="audit-records-title">Recorded actions</h4>');
       expect(lobby).not.toContain('audit-why');
       expect(lobby).not.toContain('Question about a decision');
       const audit = render({});
-      expect(audit).toContain('<h1 id="audit-title">Audit wall</h1>');
+      expect(audit).toContain('<h1 id="audit-title">Audit Wall</h1>');
       expect(audit).toContain('<h2 id="audit-records-title">Recorded actions</h2>');
       expect(audit).toContain('<h2 id="audit-why-title">Ask why</h2>');
       expect(audit).toContain('Question about a decision');
