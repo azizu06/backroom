@@ -8,7 +8,7 @@ async function start(page: Page, spawn: string) {
   await page.goto(`/office?view=overview&playSpawn=${spawn}`);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await openMenu(page);
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-yaw', /\d/);
 }

@@ -1,53 +1,26 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { openMenu, openSheet } from './office-menu';
 
-async function expectDisclosureUncovered(page: Page) {
-  const pill = page.locator('.office-disclosure .demo-pill');
-  await expect(pill).toBeVisible();
-  await expect(pill).toHaveAttribute('aria-label', 'Demo disclosure');
-  await expect.poll(() => pill.evaluate(element => {
-    const box = element.getBoundingClientRect();
-    const x = box.left + box.width / 2;
-    const y = box.top + box.height / 2;
-    const hit = document.elementFromPoint(x, y);
-    return x >= 0 && x < innerWidth && y >= 0 && y < innerHeight && !!hit && element.contains(hit);
-  })).toBe(true);
-}
-
+// #311 removed the floating demo disclosure pill from the office shell.
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-  test.describe(`Demo disclosure at ${viewport.width}x${viewport.height}`, () => {
+  test.describe(`office disclosure at ${viewport.width}x${viewport.height}`, () => {
     test.use({ viewport });
 
-    test('stays visible and uncovered across office views and overlays', async ({ page }) => {
+    test('keeps the demo disclosure pill out of the sidebar shell', async ({ page }) => {
       await page.goto('/office?view=overview');
-      const select = page.getByLabel('Office view');
-      // Narrow screens keep the fixed overview camera (tween); wide screens prefer the orbit camera (walk).
-      await expect(select).toHaveValue(viewport.width <= 760 ? 'tween' : 'walk');
-      await expectDisclosureUncovered(page);
+      await openMenu(page);
+      await expect(page.locator('.office-disclosure .demo-pill')).toHaveCount(0);
+      await expect(page.getByLabel('Demo disclosure')).toHaveCount(0);
 
-      // O enters first person; O again opens the 2D map over the 3D overview.
       await page.keyboard.press('o');
-      await expect(select).toHaveValue('play');
-      await page.keyboard.press('o');
-      const map = page.getByRole('region', { name: 'Office overview' });
-      await expect(map).toBeVisible();
-      await expectDisclosureUncovered(page);
-      await page.keyboard.press('Escape');
-      await expect(map).toHaveCount(0);
+      await expect(page.getByLabel('Office view')).toHaveValue('play');
+      await expect(page.getByLabel('Demo disclosure')).toHaveCount(0);
 
-      const corner = page.getByRole('button', { name: 'Backroom menu' });
-      await corner.click();
-      await expect(corner).toHaveAttribute('aria-expanded', 'true');
-      await expectDisclosureUncovered(page);
-      await corner.click();
+      await openSheet(page, 'help');
+      await expect(page.getByLabel('Demo disclosure')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Close Help' }).click();
 
-      await page.getByRole('button', { name: /^Office panels/ }).click();
-      await expect(page.locator('#office-drawer')).toBeVisible();
-      await expectDisclosureUncovered(page);
-      await page.getByRole('button', { name: 'Close office panels' }).click();
-
-      await select.selectOption({ label: 'Play (first person)' });
-      await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
-      await expectDisclosureUncovered(page);
+      await expect(page.getByRole('button', { name: 'Play (First Person)', exact: true })).toBeVisible();
     });
   });
 }

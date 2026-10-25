@@ -26,7 +26,7 @@ test('office sound is opt-in and remembers its label without starting audio on r
   expect(await contexts()).toBe(1);
 
   await page.reload();
-  // The toggle sits in the closed corner menu: read it without a click, which would be the gesture that starts audio.
+  // The toggle stays visible in the viewport controls; read it without a click, which would be the gesture that starts audio.
   const toggle = page.locator('.office-sound-toggle');
   await expect(toggle).toBeEnabled();
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
