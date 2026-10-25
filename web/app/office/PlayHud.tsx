@@ -64,7 +64,7 @@ function releasePointer() {
  */
 export function focusAskWhy(question?: string) {
   // The ask-why entry lives in the office panels drawer (closed by default): open it first.
-  window.dispatchEvent(new CustomEvent('office-drawer'));
+  window.dispatchEvent(new CustomEvent('office-drawer', { detail: 'ask-why' }));
   const mount = document.querySelector<HTMLElement>("[data-office-mount='ask-why']");
   if (!mount) return;
   mount.scrollIntoView({ block: 'center' });
@@ -306,6 +306,10 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     input.clear();
     releasePointer();
     requestSceneFrame();
+    if (current.kind === 'ticket-board') {
+      window.dispatchEvent(new CustomEvent('office-drawer', { detail: 'inbox' }));
+      return;
+    }
     const cue = cueKeyFor(current);
     if (cue) agentCues.greet(cue);
     setPanel(current);
@@ -338,7 +342,6 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   function askWhy(question?: string) {
     setPanel(null);
     releasePointer();
-    onExit();
     focusAskWhy(question);
   }
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
