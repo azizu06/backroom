@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { route, signalsFromCrs, signalsFromHealth } from '@backroom/orchestrator';
+import { precallCard } from '../calls/precall';
 import { createDemoServices } from './services';
 
 mkdirSync('.demo', { recursive: true });
@@ -167,4 +168,27 @@ it('records FAKE CRS and fixture health signals, replays as a no-op, and still r
   expect(await failing.listSignals()).toEqual([]);
   expect(logged).toHaveBeenCalledWith('demo signal recording failed', { failed: expected.length });
   logged.mockRestore();
+});
+
+it('records the live website signal for invoice 1042 and the card reads that same row', async () => {
+  const runId = '7LJbWDdDqZkk5iRJh';
+  const observedAt = '2026-10-24T23:54:18.992Z';
+  const http = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ data: { id: runId, status: 'SUCCEEDED', defaultDatasetId: 'dataset123' } }))
+    .mockResolvedValueOnce(Response.json([{ signals: [{ type: 'website_reachable', value: true, sourceUrl: 'http://kimsislandsi.com/', observedAt }] }]));
+  const plan = { tone: 'neutral' as const, offerOrder: ['pay_in_full' as const], plan: { installments: 1, firstPaymentPct: 100, totalDays: 0, waiveFees: false, discountPct: 0 } };
+  const modelRoute = (async () => ({ output: plan, route: 'cloud' as const, model: 'test', latencyMs: 1, costUsd: 0 })) as typeof route;
+  const services = await createDemoServices({ env: { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private', NESSIE_ACCOUNT_ID: 'sandbox-account',
+    NESSIE_CLAIMS_DIR: claimsDir, APIFY_TOKEN: 'private-token', PRECALL_APIFY: 'live' }, fetch: http, modelRoute });
+  const { MemoryStateStore } = await import('@backroom/orchestrator');
+  const state = new MemoryStateStore();
+  await services.prepare(state);
+  expect(services.status().services.apify).toEqual({ mode: 'live', status: 'complete', runId });
+  const recorded = (await state.listSignals()).filter(row => row.source === 'apify');
+  expect(recorded).toEqual(services.precall().signals);
+  expect(recorded).toMatchObject([{ subjectRef: '1042', type: 'apify_website_reachable', value: true, label: `Apify: live run ${runId}`, evidenceRef: runId }]);
+  expect(precallCard(services.precall())).toMatchObject({ business: 'unknown', businessDetail: 'Not checked', source: `Apify: live run ${runId}`,
+    sourceHost: 'kimsislandsi.com', checkedAt: '23:54 UTC', phoneMatch: 'unknown', status: 'ready' });
+  expect(http).toHaveBeenCalledTimes(2);
+  expect(JSON.stringify(services.status())).not.toContain('private');
 });

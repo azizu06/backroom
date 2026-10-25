@@ -44,7 +44,9 @@ export function precallCard(evidence: PrecallEvidence | null | undefined): Preca
   const rows = (evidence?.signals ?? []).filter(row => row.source === 'apify');
   const maps = rows.find(row => row.type === 'apify_maps_status');
   const phone = rows.find(row => row.type === 'apify_phone_match');
-  const shown = maps ?? phone;
+  // Maps and phone decide open/closed and the match. A website-only live run still has a row:
+  // its label, host and time are the evidence. Missing maps or phone stay unknown.
+  const shown = maps ?? phone ?? rows[0];
   const [business, businessDetail] = (maps && typeof maps.value === 'string' && Object.hasOwn(MAPS, maps.value) && MAPS[maps.value]) || MAPS.unknown!;
   const pre = evidence?.preCall;
   const status = pre?.status === 'ready' || pre?.status === 'blocked' || pre?.status === 'paused' ? pre.status : 'not prepared';
