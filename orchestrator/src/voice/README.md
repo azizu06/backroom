@@ -36,11 +36,14 @@ and stops the call. `answer-eval.ts` is the opt-in live matrix
 (`VOICE_ANSWER_EVAL=yes`). Webhook tools use an 8 s deadline: 2 s dropped both
 identity deliveries on the 2026-10-25 venue call before they reached the relay.
 `check_approval` uses 20 s: while Dana's decision is pending, the relay re-reads it
-for up to 12 s (`APPROVAL_HOLD_MS`) and answers as soon as she decides, the caller
+for up to 6 s (`APPROVAL_HOLD_MS`) and answers as soon as she decides, the caller
 speaks or the call ends. A still-pending answer carries `next_step: poll_again` and a
-short holding line, so the agent re-checks about every 15 s without a caller turn;
-an approval carries `next_step: confirm_plan`. Inactivity hang-up is 240 s, the
-Cartesia maximum.
+short holding line, so the agent re-checks about every 6 s without a caller turn;
+an approval carries `next_step: confirm_plan`. A gateway failure during the check
+reads as `approval_status: unknown` with `poll_again`, never as an error, and a
+retried check returns the current status instead of `duplicate`. The web host's
+relay proxy waits 25 s (`web/lib/demo/voice-proxy.ts`), above every tool deadline.
+Inactivity hang-up is 240 s, the Cartesia maximum.
 
 ## Disclosure, stops, and retries
 
@@ -73,7 +76,8 @@ gateway `call_id`, plus a hidden server-issued nonce as `webhook_request_id`.
 `delivery_nonce` from the relay's `next_delivery_nonce` on success. This avoids
 inventing an undocumented provider request-ID field or letting the model pick IDs.
 Use one tool at a time. Changed/reused nonces fail; duplicate retries return
-`can_confirm:false` with no replay of financial context or an old ALLOW.
+`can_confirm:false` with no replay of financial context or an old ALLOW, except
+`check_approval`, which re-reads the escalation's current status.
 
 ## Local setup and live retest
 

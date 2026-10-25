@@ -80,6 +80,19 @@ it('keeps the line up while Dana reviews and lets the relay pace the approval ch
   expect(voiceTools.check_approval.description).toContain('next_step poll_again');
 });
 
+it('never lets a failed approval check end the call while Dana is reviewing', () => {
+  // A held check must answer well inside the 20 s tool deadline and the web relay proxy.
+  expect(APPROVAL_HOLD_MS).toBeLessThanOrEqual(6_000);
+  const { instructions } = managedConfig(['tool']);
+  for (const line of ['end the call politely, unless an approval is pending.',
+    'While an approval is pending, a check_approval error, timeout, duplicate or unknown status never ends the call, even if the error says not to repeat the tool',
+    'call check_approval again with the same escalation_id',
+    'While an approval is pending, end the call only if the caller asks to end it, the approval expires, Dana does not approve and you have offered the callback number, or the caller opts out.']) {
+    expect(instructions).toContain(line);
+  }
+  expect(voiceTools.check_approval.description).toContain('An error or timeout from this tool never ends the call');
+});
+
 it('requires the agent to submit requested terms before verbal policy decisions', () => {
   const instructions = managedConfig(['proposal-tool']).instructions;
   expect(instructions).toContain('Before offering, refusing, or negotiating any payment terms, call propose_plan and wait for its result.');

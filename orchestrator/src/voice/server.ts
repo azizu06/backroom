@@ -85,6 +85,11 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
     if (!r.ok) throw new HTTPError(r.status, 'GATEWAY_REJECTED');
     return await r.json() as Record<string, unknown>;
   };
+  /** A check that cannot reach the gateway keeps the caller holding; it never reads as a closed request. */
+  const readApproval = (payload: Record<string, unknown>) => forward('check_approval', payload)
+    .catch((): Record<string, unknown> => ({ kind: 'UNKNOWN', can_confirm: false, approval_status: 'unknown' }));
+  const approvalStep = (result: Record<string, unknown>) => result.can_confirm === true ? { ...result, next_step: 'confirm_plan' }
+    : result.kind === 'PENDING' || result.kind === 'UNKNOWN' ? { ...result, next_step: 'poll_again', speak: HOLDING_LINE } : result;
   const wait = options.answerWaitMs ?? 1200;
   /** Runs outside the journal lock so a slow model never blocks call events. Any failure leaves code's reading. */
   const interpretIdentity = async (sessionId: string) => {
@@ -120,7 +125,9 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
       // A pending approval is re-read outside the journal lock until Dana decides, the caller speaks,
       // the call ends or the hold runs out, so the agent hears the decision without a caller turn.
       const hold = tool === 'check_approval' ? options.approvalHoldMs ?? APPROVAL_HOLD_MS : 0, poll = options.approvalPollMs ?? 1500;
-      const started = Date.now();
+      const started = Date.now(), reads = randomUUID();
+      // A check is a read: each one gets its own gateway delivery, so a concurrent retry never hears the gateway's duplicate.
+      const readId = (nonce: string, attempt: number) => `${nonce}.${reads}.${attempt}`;
       let heardAtStart: number | undefined;
       const deliver = (attempt: number) => options.journal.transact(async (data): Promise<Response | undefined> => {
         if (event) {
@@ -177,6 +184,10 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
         const existing = Object.hasOwn(session.deliveries, nonce) ? session.deliveries[nonce] : undefined;
         if (existing) {
           if (existing.fingerprint !== fingerprint) throw new HTTPError(409, 'NONCE_REUSED');
+          // A retry of a held check (after a proxy or provider timeout) hears Dana's current answer, not a bare duplicate.
+          if (tool === 'check_approval' && session.disclosureComplete && !session.stopped) {
+            return response({ ...approvalStep(await readApproval({ ...body, webhook_request_id: readId(nonce, attempt) })), next_delivery_nonce: session.nonce });
+          }
           return response({ duplicate: true, can_confirm: false, next_delivery_nonce: session.nonce });
         }
         if (nonce !== session.nonce) throw new HTTPError(409, 'INVALID_NONCE');
@@ -193,14 +204,16 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
             payload.result = identityFromAnswer(answer, identity?.replies ?? [], session.contactName);
           }
           // Each re-read is its own gateway delivery; only the final answer advances the relay nonce.
-          result = await forward(tool, attempt ? { ...payload, webhook_request_id: `${nonce}.${attempt}` } : payload);
-          if (tool === 'check_approval' && result.kind === 'PENDING') {
-            const heard = identity?.turns ?? 0;
-            heardAtStart ??= heard;
-            if (heard === heardAtStart && Date.now() - started + poll < hold) return undefined;
-            result = { ...result, next_step: 'poll_again', speak: HOLDING_LINE };
+          result = tool === 'check_approval' ? await readApproval({ ...payload, webhook_request_id: readId(nonce, attempt) })
+            : await forward(tool, attempt ? { ...payload, webhook_request_id: `${nonce}.${attempt}` } : payload);
+          if (tool === 'check_approval') {
+            if (result.kind === 'PENDING' || result.kind === 'UNKNOWN') {
+              const heard = identity?.turns ?? 0;
+              heardAtStart ??= heard;
+              if (heard === heardAtStart && Date.now() - started + poll < hold) return undefined;
+            }
+            result = approvalStep(result);
           }
-          if (tool === 'check_approval' && result.can_confirm === true) result = { ...result, next_step: 'confirm_plan' };
           if (safeStops.includes(tool) || payload.result === 'wrong_person') session.stopped = true;
           if (tool === 'verify_identity_result') {
             result = { ...result, identity: payload.result };
