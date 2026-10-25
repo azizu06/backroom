@@ -13,6 +13,7 @@ import {
 } from '../../../lib/office/baked-character';
 import {
   SIT_HIP_RAD, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, isSeatDesk, seatPieces, stepSeatBlend, turnToward,
+  type DeskSeat,
 } from '../../../lib/office/baked-seat';
 import { visibleRooms, type OfficeAgent } from '../../../lib/office/state';
 import { useReducedMotion } from './shared';
@@ -21,6 +22,7 @@ import type { SceneMountProps } from './types';
 
 const scratchPosition = new Vector3();
 const scratchEuler = new Euler();
+const scratchActivity = { moving: false, talking: false, atDesk: false };
 /** Below this per-frame travel (m) the avatar counts as standing. */
 const STILL_EPSILON = 0.0005;
 /** Below this heading error (rad) a turn counts as done and stops requesting frames. */
@@ -37,6 +39,10 @@ interface CharacterTemplate {
 /** One clone's playback. `mixer` is null when the GLB has no clips: the clone keeps its rest pose. */
 interface Puppet {
   readonly object: Group;
+  /** Refreshed when the agent set changes, alongside clone synchronization. */
+  body: Object3D | undefined;
+  /** Fixed for this clone's seat id; a seat change replaces the clone. */
+  readonly deskSeat: DeskSeat | null;
   readonly mixer: AnimationMixer | null;
   readonly actions: Map<CharacterClip, AnimationAction>;
   readonly available: ReadonlySet<string>;
@@ -217,7 +223,7 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
     let again = false;
     for (const [id, puppet] of clonesRef.current) {
       const clone = puppet.object;
-      const body = scene.getObjectByName(`agent:${id}`);
+      const body = puppet.body;
       if (!body) { clone.visible = false; continue; }
       clone.visible = true;
       // The avatar group (anchor and Bear) is read, never moved; only the clone slides onto the stool.
@@ -229,7 +235,7 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
       if (puppet.last) { puppet.last[0] = bx; puppet.last[1] = bz; } else puppet.last = [bx, bz];
       const seatId = seatOf(clone) ?? '';
       const atDesk = atOwnDesk(seatId, bx, bz);
-      const seat = puppet.legs && puppet.mixer ? deskSeat(seatId) : null;
+      const seat = puppet.legs && puppet.mixer ? puppet.deskSeat : null;
       const settle = puppet.seat;
       puppet.seat = seat ? stepSeatBlend(puppet.seat, atDesk && !moving, dt, reduced) : 0;
       const sit = easeSeat(puppet.seat);
@@ -241,11 +247,16 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
       clone.rotation.set(0, characterYaw(puppet.heading), 0);
       if (!reduced && (Math.abs(angleDelta(puppet.heading, target)) > TURN_EPSILON || puppet.seat !== settle)) again = true;
       if (!puppet.mixer) continue;
-      play(puppet, characterClip({ moving, talking: isTalking, atDesk }, puppet.available), reduced);
+      scratchActivity.moving = moving;
+      scratchActivity.talking = isTalking;
+      scratchActivity.atDesk = atDesk;
+      play(puppet, characterClip(scratchActivity, puppet.available), reduced);
       puppet.mixer.update(step);
       // The clip leaves the legs at rest (type, talk, idle); fold them onto the stool on top of it.
       if (puppet.legs && sit > 0) {
-        puppet.legs.bones.forEach((bone, index) => { bone.quaternion.slerp(puppet.legs!.seated[index]!, sit); });
+        for (let index = 0; index < puppet.legs.bones.length; index++) {
+          puppet.legs.bones[index]!.quaternion.slerp(puppet.legs.seated[index]!, sit);
+        }
       }
       puppet.fadeLeft = Math.max(0, puppet.fadeLeft - step);
       // A walk that just stopped needs one more frame to notice and fade out.
@@ -276,6 +287,7 @@ function syncClone(template: CharacterTemplate, agent: OfficeAgent, map: Map<str
   const current = map.get(agent.id);
   if (current && seatOf(current.object) === agent.seatId) {
     const body = scene.getObjectByName(`agent:${agent.id}`);
+    current.body = body;
     if (body) placeCharacter(current.object, body);
     return;
   }
@@ -308,7 +320,8 @@ function syncClone(template: CharacterTemplate, agent: OfficeAgent, map: Map<str
     object.visible = true;
   }
   map.set(agent.id, {
-    object, mixer: actions.size > 0 ? mixer : null, actions, available: new Set(actions.keys()), current: null, fadeLeft: 0, last: null,
+    object, body, deskSeat: deskSeat(agent.seatId), mixer: actions.size > 0 ? mixer : null,
+    actions, available: new Set(actions.keys()), current: null, fadeLeft: 0, last: null,
     legs: seatedLegs(object), seat: 0, heading: null,
   });
 }
