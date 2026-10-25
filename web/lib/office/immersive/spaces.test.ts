@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FLOOR } from '../play';
 import { OFFICE_ANCHORS, type AnchorId } from '../state';
+import { ROOM_ENTER_RADIUS, ROOM_LEAVE_RADIUS } from '../room-entry';
 import {
   AMBIENCE_LAYERS, ROOM_SPACES, SPACE_AMBIENCE, WINDOW_BIRDS, WINDOW_Z, ambienceLevel, floorFor, spaceAt, spaceForRoom, windowNearness, type Space,
 } from './spaces';
@@ -46,8 +47,9 @@ describe('space to ambience map', () => {
     expect(spaceAt(OFFICE_ANCHORS.lobby.center, null, ROOMS)).toEqual({ room: 'lobby', space: 'lobby' });
     expect(spaceAt(OFFICE_ANCHORS.payables.center, null, ROOMS)).toEqual({ room: 'payables', space: 'work' });
     expect(spaceAt([-2.5, 0.6], null, ROOMS)).toEqual({ room: null, space: 'aisle' });
-    // 2.5 m from the lobby centre: outside the enter radius but inside the leave radius.
-    const edge = [OFFICE_ANCHORS.lobby.center[0], OFFICE_ANCHORS.lobby.center[1] - 2.5] as const;
+    // Between the enter and leave radii of the lobby centre: kept while inside, not entered from outside.
+    const gap = (ROOM_ENTER_RADIUS + ROOM_LEAVE_RADIUS) / 2;
+    const edge = [OFFICE_ANCHORS.lobby.center[0], OFFICE_ANCHORS.lobby.center[1] - gap] as const;
     expect(spaceAt(edge, 'lobby', ROOMS).space).toBe('lobby');
     expect(spaceAt(edge, null, ROOMS).space).toBe('aisle');
     expect(spaceAt([FLOOR.maxX + 2, 0], null, ROOMS)).toEqual({ room: null, space: 'outdoor' });
