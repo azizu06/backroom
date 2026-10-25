@@ -31,7 +31,8 @@ test.describe('at 1440x1000', () => {
     const gate = splash(page);
     await expect(gate).toBeVisible();
     expect(await gate.evaluate(element => element.tagName)).not.toBe('DIALOG');
-    await expect(page.locator('.site-nav > ul')).toHaveAttribute('inert', '');
+    // With nothing in the nav kept live, the inert boundary may sit on the nav itself or an ancestor.
+    expect(await page.locator('.site-nav > ul').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
   });
 });
 
