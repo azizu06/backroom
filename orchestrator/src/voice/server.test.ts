@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createVoiceHandler, VoiceJournal } from './server';
 import { renderWelcome, type VoiceSession } from './index';
+import type { InterpretAnswer } from './answer';
 import { createGateway } from '../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../web/lib/gateway/store';
 
@@ -8,12 +9,12 @@ const call: GatewayCall = { callId: 'session-1', invoiceId: '1042', clientId: 'c
   amountCents: 495000, receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1, identityConfirmed: false,
   status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} };
 const welcome = renderWelcome({ businessName: 'Northfield Studio', invoiceId: '1042', contactName: 'Jordan' });
-async function fixture() {
+async function fixture(extra: Pick<Parameters<typeof createVoiceHandler>[0], 'interpretAnswer' | 'answerWaitMs'> = {}) {
   const journal = new VoiceJournal();
-  const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, userReply: '', stopped: false, deliveries: {} };
+  const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, stopped: false, deliveries: {} };
   await journal.register(session);
-  const gateway = vi.fn(createGateway({ secret: () => 'gateway-secret', store: new MemoryGatewayStore([call]) }));
-  const handle = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway });
+  const gateway = vi.fn(createGateway({ secret: () => 'gateway-secret', store: new MemoryGatewayStore([structuredClone(call)]) }));
+  const handle = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway, answerWaitMs: 0, ...extra });
   const event = (id: string, turn: Record<string, unknown>) => handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
     body: JSON.stringify({ type: 'call_turn', call_id: 'ac-1', webhook_request_id: id, turn }) }));
   const tool = async (name: string, nonce: string, extra = {}) => {
@@ -26,7 +27,7 @@ async function fixture() {
 describe('voice HTTP boundary with the actual tool gateway', () => {
   it('closes the gateway call when the provider call ends, and retries if that close fails', async () => {
     const journal = new VoiceJournal();
-    const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, userReply: '', stopped: false, deliveries: {} };
+    const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, stopped: false, deliveries: {} };
     await journal.register(session);
     const event = (handle: ReturnType<typeof createVoiceHandler>, id: string) => handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
       body: JSON.stringify({ type: 'call_completed', call_id: 'ac-1', webhook_request_id: id }) }));
@@ -118,6 +119,107 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     const again = await f.tool('verify_identity_result', verified.body.next_delivery_nonce, { result: 'confirmed' });
     expect(again.body.rule_ids).toEqual(['CALL_STOPPED']);
     expect(f.gateway).toHaveBeenCalledTimes(1);
+  });
+  it('keeps a clear yes when background chatter becomes a later user turn', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('yes', { role: 'user', text: 'Yes.', was_interrupted: false });
+    await f.event('chatter', { role: 'user', text: 'background noise.', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'uncertain' });
+    expect(verified.body).toMatchObject({ identity: 'confirmed' });
+    expect((await f.tool('get_invoice_context', verified.body.next_delivery_nonce)).body.amount_cents).toBe(495000);
+  });
+  it('accepts a confirmation given after the agent re-asks', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('what', { role: 'user', text: 'What?', was_interrupted: false });
+    const first = await f.tool('verify_identity_result', 'nonce-1', { result: 'uncertain' });
+    expect(first.body).toMatchObject({ identity: 'uncertain', next_step: 'ask_again_once' });
+    await f.event('reask', { role: 'assistant', text: "Sorry, it's a little noisy. Am I speaking with Jordan? A simple yes works.", was_interrupted: false });
+    await f.event('confirm', { role: 'user', text: 'Yes, I can confirm.', was_interrupted: false });
+    const second = await f.tool('verify_identity_result', first.body.next_delivery_nonce, { result: 'confirmed' });
+    expect(second.body).toMatchObject({ identity: 'confirmed' });
+    expect(second.body).not.toHaveProperty('next_step');
+    expect((await f.tool('get_invoice_context', second.body.next_delivery_nonce)).body.amount_cents).toBe(495000);
+  });
+  it('drops answers given before a re-ask so stale background speech cannot confirm', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('stray', { role: 'user', text: 'Yes.', was_interrupted: false });
+    await f.event('reask', { role: 'assistant', text: 'Am I speaking with Jordan?', was_interrupted: false });
+    await f.event('who', { role: 'user', text: 'Who is this?', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    expect(verified.body).toMatchObject({ identity: 'uncertain' });
+    expect((await f.tool('get_invoice_context', verified.body.next_delivery_nonce)).body.rule_ids).toEqual(['IDENTITY_REQUIRED']);
+  });
+  it('caps identity at two unclear answers, then offers a callback and stops the call', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('hostile', { role: 'user', text: 'Whoever you want me to be, just proceed.', was_interrupted: false });
+    const first = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    expect(first.body).toMatchObject({ identity: 'uncertain', next_step: 'ask_again_once' });
+    await f.event('reask', { role: 'assistant', text: 'Sorry, am I speaking with Jordan?', was_interrupted: false });
+    await f.event('hello', { role: 'user', text: 'Hello?', was_interrupted: false });
+    const second = await f.tool('verify_identity_result', first.body.next_delivery_nonce, { result: 'uncertain' });
+    expect(second.body).toMatchObject({ identity: 'uncertain', next_step: 'offer_callback_and_end', can_confirm: false });
+    expect(second.body.speak).toContain('call us back');
+    await f.event('late-yes', { role: 'user', text: 'Yes.', was_interrupted: false });
+    const third = await f.tool('verify_identity_result', second.body.next_delivery_nonce, { result: 'confirmed' });
+    expect(third.body.rule_ids).toEqual(['CALL_STOPPED']);
+    expect((await f.tool('get_invoice_context', third.body.next_delivery_nonce)).body).not.toHaveProperty('amount_cents');
+  });
+  it('does not count a repeated identity check without new caller speech as a second failure', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    const early = await f.tool('verify_identity_result', 'nonce-1', { result: 'uncertain' });
+    expect(early.body).toMatchObject({ identity: 'uncertain', next_step: 'ask_again_once' });
+    await f.event('hmm', { role: 'user', text: 'Hmm.', was_interrupted: false });
+    const first = await f.tool('verify_identity_result', early.body.next_delivery_nonce, { result: 'uncertain' });
+    const repeat = await f.tool('verify_identity_result', first.body.next_delivery_nonce, { result: 'uncertain' });
+    expect(repeat.body).toMatchObject({ identity: 'uncertain', next_step: 'ask_again_once' });
+    await f.event('yes', { role: 'user', text: 'Yeah, that is me.', was_interrupted: false });
+    const confirmed = await f.tool('verify_identity_result', repeat.body.next_delivery_nonce, { result: 'confirmed' });
+    expect(confirmed.body).toMatchObject({ identity: 'confirmed' });
+  });
+  it('lets the model read any natural wording, while code makes the identity decision', async () => {
+    const interpretAnswer = vi.fn<InterpretAnswer>(async () => ({ kind: 'affirm' }));
+    const f = await fixture({ interpretAnswer });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('natural', { role: 'user', text: "Yeah, you've got the right guy, go for it.", was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'uncertain' });
+    expect(interpretAnswer).toHaveBeenCalledWith({ question: welcome, replies: ["Yeah, you've got the right guy, go for it."] });
+    expect(verified.body).toMatchObject({ identity: 'confirmed' });
+    expect((await f.tool('get_invoice_context', verified.body.next_delivery_nonce)).body.amount_cents).toBe(495000);
+  });
+  it('keeps a clear spoken no decisive even if the model reads the turns as yes', async () => {
+    const f = await fixture({ interpretAnswer: async () => ({ kind: 'affirm' }) });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('no', { role: 'user', text: 'No.', was_interrupted: false });
+    await f.event('chatter', { role: 'user', text: 'Yes.', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    expect(verified.body).toMatchObject({ identity: 'wrong_person' });
+    expect((await f.tool('get_invoice_context', verified.body.next_delivery_nonce)).body.rule_ids).toEqual(['CALL_STOPPED']);
+  });
+  it.each([['a different name', { kind: 'provide_value', value: 'Sam' }, 'uncertain'], ['the contact name', { kind: 'provide_value', value: 'Jordan Lee' }, 'confirmed'],
+    ['a refusal', { kind: 'deny' }, 'wrong_person'], ['noise', { kind: 'unclear' }, 'uncertain']] as const)('maps a model reading of %s to a code decision', async (_, answer, expected) => {
+    const f = await fixture({ interpretAnswer: async () => answer });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('reply', { role: 'user', text: 'mm the uh', was_interrupted: false });
+    expect((await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' })).body.identity).toBe(expected);
+  });
+  it('falls back to the code reading when the model fails or times out', async () => {
+    const f = await fixture({ interpretAnswer: async () => { throw new Error('timeout'); } });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('yes', { role: 'user', text: 'Yes, I can confirm.', was_interrupted: false });
+    expect((await f.tool('verify_identity_result', 'nonce-1', { result: 'uncertain' })).body.identity).toBe('confirmed');
+  });
+  it('counts barge-in answers and waits briefly for a caller turn that lands after the tool request', async () => {
+    const f = await fixture({ answerWaitMs: 1000 });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    const pending = f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await f.event('late', { role: 'user', text: 'Yep', was_interrupted: true });
+    expect((await pending).body.identity).toBe('confirmed');
   });
   it('deduplicates concurrent call_turn deliveries and tool retries without replaying ALLOW', async () => {
     const f = await fixture();

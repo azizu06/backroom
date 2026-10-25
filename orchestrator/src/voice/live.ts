@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createAdminDial } from './admin-dial';
+import { createAnswerInterpreter } from './answer';
 import { createDemoVoiceBridge, type VoiceCallEvent } from './demo-bridge';
 import { dialCollectionCall, type DialInput, type VoiceSession } from './index';
 import { provisionVoice, type VoiceTool } from './tools';
@@ -33,8 +34,12 @@ if (command === 'setup') {
     controlSecret: required('DEMO_CONTROL_SECRET'), publicOrigin: required('DEMO_PUBLIC_URL') });
   const gatewaySecret = required('TOOL_GATEWAY_SECRET');
   const gateway = bridge.gateway;
+  // Server-side only; without a key the relay keeps its code-only reading of caller answers.
+  const answerKey = process.env.ANTHROPIC_API_KEY;
+  const interpretAnswer = answerKey ? createAnswerInterpreter({ apiKey: answerKey, model: process.env.VOICE_ANSWER_MODEL || undefined }) : undefined;
+  console.log(`Caller answers: ${interpretAnswer ? 'model interpretation with code fallback' : 'code-only reading (no ANTHROPIC_API_KEY)'}.`);
   const handler = createVoiceHandler({ journal, gateway, gatewaySecret, toolSecret: required('VOICE_TOOL_SECRET'), eventSecret: required('CARTESIA_WEBHOOK_SECRET'), agentId: resources.agentId,
-    onCallEnded: sessionId => bridge.endCall(sessionId) });
+    interpretAnswer, onCallEnded: sessionId => bridge.endCall(sessionId) });
   const adminDigest = createHash('sha256').update(`Bearer ${required('VOICE_ADMIN_SECRET')}`).digest();
   const audit = async (entry: object) => { appendFileSync(`${root}/audit.jsonl`, JSON.stringify(entry) + '\n', { mode: 0o600 }); };
   // Reads go through the serialized journal; an unknown session holds nothing.
