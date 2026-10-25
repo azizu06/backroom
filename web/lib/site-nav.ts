@@ -1,11 +1,16 @@
+/** Every page is one click away; nobody types a path. Customer /pay pages are reached from the payment link. */
 export const navLinks = [
   { label: 'Office', href: '/office' },
+  { label: 'Calls', href: '/calls' },
   { label: 'Inbox', href: '/inbox' },
   { label: 'Audit wall', href: '/audit' },
   { label: 'Attack lab', href: '/attack' },
-  { label: 'Operator', href: '/operator' },
+  { label: 'Policy', href: '/policy' },
   { label: 'Controller', href: '/controller' },
+  { label: 'Payment link', href: '/payment-link' },
+  { label: 'Operator', href: '/operator' },
 ] as const;
+export const PAYMENT_LINK_HREF = '/payment-link';
 
 /** Small trailing link to the integration status page. */
 export const whatsRealLink = { label: 'System Status', href: '/real-vs-sim' } as const;

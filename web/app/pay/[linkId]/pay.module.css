@@ -9,12 +9,12 @@
 .details dd { margin: 0; }
 .amount { font-size: 26px; font-variant-numeric: tabular-nums; margin: 12px 0; }
 .card button { width: 100%; min-height: 48px; padding: 12px 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--paper); font: inherit; font-weight: 800; cursor: pointer; }
-.card button:disabled { opacity: .65; cursor: default; }
+.card button:disabled, :root[data-theme='dark'] .card button:disabled { color: var(--ink-soft); background: var(--line); border-color: var(--line); cursor: default; }
 .card button:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
 :root[data-theme='dark'] .card button { background: var(--pastel-yellow); color: var(--on-pastel); border-color: var(--pastel-yellow); }
 .card .refresh { margin-top: 20px; background: var(--pastel-aqua); color: var(--on-pastel); border-color: var(--pastel-aqua); }
-.status { border-left: 3px solid var(--ink); padding-left: 12px; }
+.status { padding: 12px 16px; border: 2px solid var(--pastel-aqua); border-radius: 20px; background: var(--paper); }
 .reference { overflow-wrap: anywhere; font-size: 13px; }
 .balance { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; }
 .balance h2 { font-size: 16px; font-weight: 600; }
-.error { padding: 12px 16px; border-left: 5px solid var(--danger); border-radius: 20px; background: var(--danger-soft); }
+.error { padding: 12px 16px; border: 2px solid var(--danger); border-radius: 20px; background: var(--danger-soft); color: var(--ink); }

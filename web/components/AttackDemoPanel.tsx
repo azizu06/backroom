@@ -97,8 +97,8 @@ export function AttackDemoPanel() {
           onClick={() => { setSelected(preset.id); setText(preset.text); }}>
           {preset.title}<small>{preset.senderDomain}</small>
         </button>)}</div>
+        {presetError && <p role='alert' className='attack-error'>{presetError} You can still write your own attack and retry.</p>}
       </fieldset>
-      {presetError && <p role='alert' className='attack-error'>{presetError} You can still write your own attack and retry.</p>}
       <label htmlFor={`${id}-text`}>Your malicious email or invoice</label>
       <textarea id={`${id}-text`} rows={8} maxLength={2000} value={text} disabled={running} aria-describedby={`${id}-count ${id}-hint`}
         placeholder='Paste instructions that try to override the agents’ rules…' onChange={event => { setText(event.target.value); setSelected(undefined); }} />

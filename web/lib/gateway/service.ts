@@ -7,7 +7,11 @@ import {
   type DecidePlan,
   type GatewayPolicyDecision,
 } from "./policy-adapter";
+import { firstPaymentCents } from "../../../policy/src/index";
 import type { AuditEntry, Escalation, GatewayCall, PlanTerms, ToolResult } from "./store";
+
+const dollars = (cents: number) =>
+  (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 const sameTerms = (a: PlanTerms, b: PlanTerms) =>
   a.installments === b.installments &&
@@ -54,16 +58,16 @@ function authorizePlan(
     id: randomUUID(),
     auditId: entry.id,
     totalCents,
-    firstPaymentCents:
-      terms.installments === 1 ? totalCents : Math.round((totalCents * terms.firstPaymentPct) / 100),
+    firstPaymentCents: firstPaymentCents(totalCents, terms.firstPaymentPct, terms.installments),
   };
+  const first = `The first payment is ${dollars(plan.firstPaymentCents)}.`;
   call.plans.push(plan);
   return {
     kind: "ALLOW",
     can_confirm: true,
     speak: danaApproved(decision)
-      ? "Dana approved these exact terms. Confirm this plan with the caller now and offer to send the payment link."
-      : "Those terms are authorized. You may confirm this exact plan.",
+      ? `Dana approved these exact terms. ${first} Confirm this plan with the caller now and offer to send the payment link.`
+      : `Those terms are authorized. ${first} You may confirm this exact plan.`,
     rule_ids: decision.ruleIds,
     audit_id: entry.id,
     plan_id: plan.id,
@@ -191,7 +195,10 @@ export function executeTool(
     else if (call.status !== "opted_out" && call.status !== "human_requested") call.status = status;
     call.outbox.push({ type: input.tool });
     // Asking for a human is how the voice agent handles anything it does not recognize: escalate.
-    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED", [input.tool.toUpperCase()]);
+    // C05: a hostile caller is a dedicated escalation reason; the stop and spoken line are the same.
+    const hostile = input.tool === "request_human" && input.reason === "hostile";
+    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED",
+      [input.tool.toUpperCase(), ...(hostile ? ["HOSTILE_ESCALATE"] : [])]);
     return { kind: "RECORDED", can_confirm: false, speak };
   }
   if (!call.identityConfirmed)
@@ -328,7 +335,7 @@ export function executeTool(
     return {
       kind: "RECORDED",
       can_confirm: false,
-      speak: "The payment link is queued for delivery.",
+      speak: `The payment link for ${dollars(link.amountCents)} is queued for delivery.`,
       link_path: link.path,
       amount_cents: link.amountCents,
       short_code: link.shortCode,
