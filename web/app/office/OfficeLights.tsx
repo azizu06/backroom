@@ -8,6 +8,8 @@ import { ROLES } from '../../lib/office/palette';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 import type { FurniturePiece } from '../../lib/office/furniture';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './mounts/StaticGeometry';
+import { useBakedLobbyReady } from './mounts/BakedArt';
+import { bakedReplacesProps } from '../../lib/office/baked-art';
 
 export const OFFICE_RENDERER = { antialias: true, powerPreference: 'high-performance' as const,
   toneMapping: ACESFilmicToneMapping, toneMappingExposure: OFFICE_EXPOSURE };
@@ -37,9 +39,11 @@ const SHADE_MATERIAL = new MeshStandardMaterial({ color: ROLES.lampLight, emissi
 
 /** Two static geometry batches, no shadow-casting lamp geometry and no animation subscriptions. */
 function Lamps({ rooms }: { rooms: string }) {
+  const baked = useBakedLobbyReady();
   const { bodies, shades } = useMemo(() => {
     const bodies: FurniturePiece[] = [], shades: FurniturePiece[] = [];
-    for (const lamp of OFFICE_LAMPS.filter(lamp => rooms.split(',').includes(lamp.room))) {
+    // Under ?art=baked the baked room brings its own lamp, so the procedural one would stand inside it.
+    for (const lamp of OFFICE_LAMPS.filter(lamp => rooms.split(',').includes(lamp.room) && !bakedReplacesProps(baked, lamp.room))) {
       const [x, y, z] = lamp.base;
       const width = lamp.floor ? 0.35 : 0.22;
       bodies.push({ at: [x, y + 0.025, z], size: [width, 0.05, width], color: ROLES.frame },
@@ -47,7 +51,7 @@ function Lamps({ rooms }: { rooms: string }) {
       shades.push({ at: [x, y + lamp.height, z], size: [width + 0.1, 0.16, width + 0.1], color: ROLES.lampLight });
     }
     return { bodies, shades };
-  }, [rooms]);
+  }, [rooms, baked]);
   if (!bodies.length) return null;
   return <group name='office:lamps'>
     <StaticBoxes pieces={bodies} castShadow={false} />
