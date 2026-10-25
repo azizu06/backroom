@@ -10,7 +10,7 @@ export const STORY_CHAPTERS: readonly StoryChapter[] = [
   { id: 'vendor', anchor: 'vendor_onboarding', title: 'Verify the vendor', caption: 'In the demo, a bank change is held until vendor evidence is checked.', dwellMs: 5200 },
   { id: 'handoff', anchor: 'payables', title: 'Vendor Desk → Payables', caption: 'In the demo, Vendor Desk hands verified evidence to Payables. This handoff is illustrated, not a live task.', dwellMs: 5200, handoff: ['vendor_onboarding', 'payables'] },
   { id: 'dana', anchor: 'dana', title: 'A human decides', caption: 'In the demo, an escalation goes to Dana; only a human can approve, using a passkey.', dwellMs: 5200, preview: 'escalation' },
-  { id: 'treasury', anchor: 'treasury', title: 'Treasury: DENY', caption: 'In the demo, Treasury refuses entry · NOT_IN_BADGE. The preview illustrates a denial; real receipts appear below.', dwellMs: 5200, preview: 'denial' },
+  { id: 'treasury', anchor: 'treasury', title: 'Treasury: DENY', caption: 'In the demo, Treasury refuses entry · NOT_IN_BADGE. Preview only; receipts appear below when this session has recorded them.', dwellMs: 5200, preview: 'denial' },
 ];
 /** Resolve named walking anchors at use time, including after a room layout changes. */
 export function storyCameraPose(anchor: AnchorId, anchors: Readonly<Record<AnchorId, {

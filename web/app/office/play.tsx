@@ -69,7 +69,12 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, st
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
 
+  // Clear held keys only when a tour starts, changes stop or ends: on a plain Play mount the rig can
+  // mount after a key is already held, and clearing then would swallow that first press.
+  const lastStory = useRef(story);
   useEffect(() => {
+    if (lastStory.current === story) return;
+    lastStory.current = story;
     input.clear(); written.current = false;
     if (!story) storyMove.current = null;
     invalidate();

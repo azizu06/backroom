@@ -60,7 +60,7 @@ export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced, sna
   return <aside ref={card} tabIndex={-1} className='story-mode' aria-label='Judge story mode' onPointerDown={event => event.stopPropagation()}>
     <div className='story-progress' role='progressbar' aria-label='Story progress' aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}><span style={{ width: `${progress * 100}%` }} /></div>
     <StoryCaption chapter={chapter} index={index} total={chapters.length} snapshot={snapshot} />
-    {chapter.handoff && <div className='story-handoff' role='img' aria-label='Scripted evidence folder handoff from Vendor Desk to Payables'>
+    {chapter.handoff && <div className='story-handoff' role='img' aria-label={`Scripted evidence folder handoff from ${OFFICE_ANCHORS[chapter.handoff[0]].name} to ${OFFICE_ANCHORS[chapter.handoff[1]].name}`}>
       <span>{OFFICE_ANCHORS[chapter.handoff[0]].name}</span><span aria-hidden='true'>▱ →</span><span>{OFFICE_ANCHORS[chapter.handoff[1]].name}</span>
     </div>}
     {chapter.preview && !onPreview && <p className='story-preview-note'>(preview only in demo mode)</p>}

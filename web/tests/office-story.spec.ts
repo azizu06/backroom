@@ -48,9 +48,14 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
 }
 
 test('story deep link starts in first person and Escape skips a moving tour', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?demo=story');
   const story = page.getByRole('complementary', { name: 'Judge story mode' });
   await expect(story.locator('.story-kicker')).toContainText('Chapter 1 of 7');
+  await expect(story.locator('.story-evidence')).toHaveText('Not recorded in this session');
+  await expect(story.locator('[aria-live]')).toHaveText(/^Scripted walkthrough:/);
+  await expect(page.locator('.office-caption')).not.toContainText('WASD');
   await expect(page.getByLabel('Office view')).toHaveValue('play');
   await expect(page.getByTestId('story-camera')).toHaveAttribute('data-story-moving', 'false');
   await story.getByRole('button', { name: 'Next', exact: true }).click();
@@ -59,4 +64,5 @@ test('story deep link starts in first person and Escape skips a moving tour', as
   await expect(page.getByLabel('Office view')).toHaveValue('play');
   await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
   await expect(page).toHaveURL(/\/office$/);
+  expect(errors).toEqual([]);
 });
