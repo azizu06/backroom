@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import type { InboxPreset, InboxReceipt } from '../lib/inbox/types';
 import '../app/office/lobby.css';
+import { crsFraudText } from '../lib/provenance';
 import './InboxTray.css';
 
 const seatName = { payables: 'Payables', vendor_onboarding: 'Vendor onboarding' };
@@ -122,6 +123,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
   const reason = receipt && 'reason' in receipt.decision ? receipt.decision.reason : undefined;
   const held = receipt?.status === 'held' || receipt?.decision.kind === 'ESCALATE';
   const why = reason ? firstSentence(reason) : quote?.text ?? (receipt?.decision.kind === 'ALLOW' ? 'Every check passed.' : receipt?.notice);
+  const fraudText = receipt?.bankChangeFraud && crsFraudText(receipt.bankChangeFraud);
   const fileHelp = `${uid}-file-help`, fileErrorId = `${uid}-file-error`;
   return <section className="inbox-tray" aria-labelledby={`${uid}-title`}>
     <header className="inbox-heading">
@@ -143,6 +145,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
         <dl className="inbox-facts">
           <div><dt>Seat</dt><dd>{seatName[receipt.seat]}</dd></div>
           <div><dt>Rule</dt><dd>{receipt.decision.ruleIds.join(', ') || 'None tripped'}</dd></div>
+          {fraudText && <div><dt>CRS fraud score</dt><dd>{fraudText}</dd></div>}
           <div><dt>Why</dt><dd>{why}</dd></div>
         </dl>
         <p className="inbox-links">
@@ -153,10 +156,10 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
         <details className="inbox-more">
           <summary>Full receipt</summary>
           <dl className="inbox-facts">
-            <div><dt>Scenario source</dt><dd>judge</dd></div>
+            <div><dt>Scenario source</dt><dd>Custom</dd></div>
             <div><dt>Extraction</dt><dd>{receipt.extractionSource === 'seed' ? 'Frozen seed fields · code' : receipt.extractionSource === 'model' ? 'Model fields · schema validated' : 'Unrecognized · human review'}</dd></div>
-            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie sandbox' : receipt.paymentRail}</dd></div>}
-            {receipt.receiptId && <div><dt>Sandbox debit</dt><dd>{receipt.receiptId}</dd></div>}
+            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie' : receipt.paymentRail}</dd></div>}
+            {receipt.receiptId && <div><dt>Bank debit</dt><dd>{receipt.receiptId}</dd></div>}
             {receipt.reconciliation && <div><dt>Reconciliation</dt><dd>{receipt.reconciliation.match === 'EXACT' ? 'Exact withdrawal match' : 'Mismatch · held for review'}</dd></div>}
           </dl>
           {(held || reason) && <>
@@ -198,7 +201,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
     </section>
     <details className="inbox-advanced">
       <summary>Advanced: try your own email</summary>
-      <form onSubmit={submit} aria-label="Judge scenario">
+      <form onSubmit={submit} aria-label="Custom scenario">
         <fieldset disabled={busy}>
           <div className="inbox-envelope">
             <div><label htmlFor={`${uid}-kind`}>Document type</label><select id={`${uid}-kind`} value={kind} onChange={event => setKind(event.target.value)}>

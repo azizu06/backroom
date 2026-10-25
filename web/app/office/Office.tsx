@@ -1,13 +1,11 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { navLinks, whatsRealLink } from '../../lib/site-nav';
 import { OfficeChromeIcon } from '../../components/OfficeChromeIcon';
-import { NavDisclosure } from '../../components/DemoPill';
-import { useSearchParams } from 'next/navigation';
 import { flushSync } from 'react-dom';
 import { isCloseKey } from '../../lib/office/a11y';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
@@ -75,10 +73,6 @@ const OfficeScene = dynamic(() => import('./scene').then(module => module.Office
   loading: SceneLoading,
 });
 
-/** The shared demo disclosure as a small overlay pill; outside the app router (unit renders) there is no URL to read. */
-function OfficeDisclosure() {
-  return useSearchParams() ? <NavDisclosure /> : null;
-}
 
 /** All finance state comes through OfficeState. Commands belong to an authenticated controller. */
 export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, storyStart = false, storyPreview }: {
@@ -338,7 +332,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     </aside>
     <div className='office-main'>
     <header className='office-toolbar' data-testid='office-topbar'>
-      <Suspense fallback={null}><OfficeDisclosure /></Suspense>
       <div className='office-tools'>
         {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Enter first person</button>}
         <label htmlFor='office-view'>View <select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>

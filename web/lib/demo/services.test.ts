@@ -16,7 +16,7 @@ it('keeps rehearsal offline even when sponsor credentials are present', async ()
   expect(services.status().bank).toBe('mock');
   expect(services.status().services.crs.mode).toBe('FAKE');
   expect(existsSync(cacheFile)).toBe(false);
-  expect((await services.bank.readBalanceWithPostedDeposits(services.accountId)).sandboxLabel).toBe('Mock bank (offline)');
+  expect((await services.bank.readBalanceWithPostedDeposits(services.accountId)).sandboxLabel).toBe('Offline bank');
   expect(http).not.toHaveBeenCalled();
 });
 it('live payments use real Nessie HTTP and reuse invoice memos across new hosts', async () => {
@@ -35,9 +35,32 @@ it('live payments use real Nessie HTTP and reuse invoice memos across new hosts'
   const again = await createDemoServices({ env, fetch: http });
   await again.bank.deposit(payment);
   expect(http.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
-  expect((await first.bank.readBalanceWithPostedDeposits(first.accountId)).sandboxLabel).toBe('Nessie = sandbox bank');
+  expect((await first.bank.readBalanceWithPostedDeposits(first.accountId)).sandboxLabel).toBe('Nessie bank');
   expect(first.status()).toMatchObject({ live: true, bank: 'nessie_sandbox', services: { crs: { mode: 'FAKE' } } });
   expect(JSON.stringify(first.status())).not.toContain('private');
+});
+
+it('reports Nessie proof only from what the live sandbox actually did in this host', async () => {
+  let down = false;
+  const http = vi.fn(async (url: string | URL | Request) => {
+    if (down) throw new Error('nessie-down');
+    return Response.json(String(url).includes('/deposits') ? [] : { balance: 80 });
+  });
+  const env: NodeJS.ProcessEnv = { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private', NESSIE_ACCOUNT_ID: 'sandbox-account', NESSIE_CLAIMS_DIR: claimsDir };
+  const services = await createDemoServices({ env, fetch: http });
+  expect(services.status().services.nessie).toEqual({ mode: 'sandbox' });
+  await services.bank.readBalanceWithPostedDeposits(services.accountId);
+  expect(services.status().services.nessie).toMatchObject({ mode: 'sandbox', proof: { kind: 'sandbox_read' } });
+  services.recordDepositMatch('sandbox-deposit');
+  expect(services.status().services.nessie.proof).toMatchObject({ kind: 'deposit_exact_match', depositId: 'sandbox-deposit' });
+  down = true;
+  await expect(services.bank.readBalanceWithPostedDeposits(services.accountId)).rejects.toThrow();
+  expect(services.status().services.nessie.unreachableAt).toEqual(expect.any(String));
+  expect(JSON.stringify(services.status())).not.toContain('private');
+  const mock = await createDemoServices({ env: { NODE_ENV: 'test' } });
+  await mock.bank.readBalanceWithPostedDeposits(mock.accountId);
+  mock.recordDepositMatch('mock-deposit-1');
+  expect(mock.status().services.nessie).toEqual({ mode: 'mock' });
 });
 
 it('caches even an ambiguous Actor start across resets and reports it without leaking provider text', async () => {
@@ -88,7 +111,7 @@ it('uses clean CRS identity #1 for the lead pre-call and reaches model planning'
     decision: 'ALLOW', ruleIds: ['DEMO_OVERRIDE'],
   });
   expect(precallRows(precallCard(services.precall()))).toContainEqual({
-    label: 'Warning', value: 'Sanctions check not available in CRS sandbox',
+    label: 'Warning', value: 'Sanctions check unavailable',
   });
   expect(modelRoute).toHaveBeenCalledTimes(1);
 });

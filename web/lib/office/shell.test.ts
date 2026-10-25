@@ -31,12 +31,13 @@ describe('office layout ownership', () => {
     expect(sidebar).toMatch(/<button[^>]*>.*?Audit Wall<\/button>/);
     expect(sidebar).not.toContain('href="/inbox"');
     expect(sidebar).not.toContain('href="/audit"');
-    expect(html).toContain('aria-label="Real versus simulated disclosure"');
+    expect(html).toContain('aria-label="System Status"');
     expect(html).toContain('<strong>Info</strong>');
     expect(html).toContain('aria-label="Office shortcuts"');
     expect(html).toContain('>Rooms</button>');
     expect(html).toContain('class="bubbles"');
-    expect(html.match(/aria-label="Demo disclosure"/g)).toHaveLength(1);
+    // #311 removed the demo disclosure pill.
+    expect(html).not.toContain('aria-label="Demo disclosure"');
     expect(html.match(/id="office-view"/g)).toHaveLength(1);
     expect(html).toContain('Story mode');
     expect(html).toContain('data-office-mode="overview"');

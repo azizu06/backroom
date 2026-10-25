@@ -117,3 +117,39 @@ describe('handoff engine', () => {
   });
 });
 const pick = (s: ReturnType<typeof engine.startActivation>) => ({ activationId: s.activation.activationId, leaseToken: s.activation.leaseToken! });
+
+describe('live-call escalation to a human desk', () => {
+  const input = { caseId: 'call:c1', displayId: '1042', from: 'collections' as const, escalationId: 'esc-1', toHuman: 'Dana',
+    ruleIds: ['MAX_INSTALLMENTS'], artifactRefs: ['esc-1', 'ar_invoice:1042'] };
+
+  it('publishes one held offer to Dana per escalation, idempotently, with a passkey reason the office can show', () => {
+    const first = engine.escalateToHuman(undefined, { ...input, now: t, sequence: 7 });
+    expect(first).toMatchObject({ created: true, state: { status: 'held', activations: [] }, record: { status: 'offered', toHuman: 'Dana' } });
+    const again = engine.escalateToHuman(first.state, { ...input, now: t + 1, sequence: 8 });
+    expect(again).toMatchObject({ created: false, record: { handoffId: first.record.handoffId, sequence: 7 } });
+    expect(first.state.handoffs).toHaveLength(1);
+    expect(engine.toPublicHandoff(first.state, first.record)).toMatchObject({ caseDisplayId: '1042', fromRole: 'collections',
+      fromAgentId: 'collections-agent', toRole: 'human', toAgentId: 'human:Dana', fromVoiceRole: 'collections_caller',
+      toVoiceRole: 'collections_caller', status: 'offered', decisionRef: 'esc-1', reason: expect.stringContaining('passkey') });
+  });
+
+  it('completes on approval, returns on denial or expiry, and never reopens a closed row', () => {
+    const { state } = engine.escalateToHuman(undefined, { ...input, now: t, sequence: 1 });
+    engine.escalateToHuman(state, { ...input, escalationId: 'esc-2', now: t, sequence: 2 });
+    expect(engine.resolveHumanEscalation(state, { escalationId: 'esc-1', outcome: 'approved', now: t + 5 }))
+      .toMatchObject({ status: 'completed', acceptedAt: t + 5, completedAt: t + 5 });
+    expect(state.status).toBe('held');
+    expect(engine.resolveHumanEscalation(state, { escalationId: 'esc-2', outcome: 'expired', now: t + 6 }))
+      .toMatchObject({ status: 'rejected', errorCode: 'ESCALATION_EXPIRED' });
+    expect(state.status).toBe('done');
+    expect(engine.resolveHumanEscalation(state, { escalationId: 'esc-1', outcome: 'denied', now: t + 7 })).toMatchObject({ status: 'completed' });
+    expect(engine.resolveHumanEscalation(state, { escalationId: 'unknown', outcome: 'denied', now: t + 7 })).toBeUndefined();
+  });
+
+  it('refuses agent cases, forged humans and model-shaped refs', () => {
+    const { state: agentCase } = started('collections', ['ar_invoice:1042']);
+    expect(() => engine.escalateToHuman(agentCase, { ...input, now: t, sequence: 1 })).toThrow('AGENT_CASE_EXISTS');
+    expect(() => engine.escalateToHuman(undefined, { ...input, toHuman: 'dana<script>', now: t, sequence: 1 })).toThrow('INVALID_HUMAN_ESCALATION');
+    expect(() => engine.escalateToHuman(undefined, { ...input, artifactRefs: ['has space'], now: t, sequence: 1 })).toThrow('INVALID_HUMAN_ESCALATION');
+  });
+});

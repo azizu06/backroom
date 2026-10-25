@@ -44,7 +44,7 @@ the sign-in tap provides (a "Tap to turn on the request chime" button covers rel
 
 The sign-in is a passkey assertion bound to a `session` challenge. It sets an
 `HttpOnly; SameSite=Strict` cookie (`Secure` on HTTPS) scoped to `/api/controller`,
-valid 12 hours, process-local like the credential. The session only lists pending
+valid 12 hours, and persisted with the credential (below). The session only lists pending
 requests: it cannot decide one, a sign-in assertion cannot be spent as a decision,
 and every Approve/Deny/Counter still needs its own decision-bound assertion. The inbox
 lists escalations created through `createApprovalBridge` (every gateway
@@ -75,11 +75,16 @@ must stay open in the foreground.
   are `{ kind: 'Approve' | 'Deny' }` or `{ kind: 'Counter', terms: ApprovalTerms }`.
   A verified decision carries `method: 'passkey'`, `decidedAt` and credential id.
 - `check_approval` reads this call's StateStore row and returns `approval_status`,
-  `decision`, and `counter_terms` when applicable. It still returns
-  `can_confirm: false`: controller review does not create an ALLOW, execute a
-  payment, or bypass a fresh policy check. The voice owner relays the recorded
-  result. Applying an exception to a new committed plan remains a separately
-  policy-checked controller action.
+  `decision`, and `counter_terms` when applicable. Policy always runs first; a
+  passkey decision on this call only lifts a term-limit ESCALATE
+  (`MAX_INSTALLMENTS`, `MIN_FIRST_PCT`, `MAX_PLAN_DAYS`, `MAX_DISCOUNT`) for the
+  exact terms Dana authorized. It never lifts a DENY or a stop signal. An
+  `Approve` makes `check_approval` (and `propose_plan` with the same terms) return
+  `ALLOW`, `can_confirm: true` and a `plan_id`, audited with rule `DANA_APPROVED`
+  and the escalation id. A `Counter` returns `can_confirm: false`; once the caller
+  accepts, `propose_plan` with exactly the counter terms is `ALLOW`. Other terms
+  still escalate. `send_payment_link` re-checks policy the same way, and its
+  amount stays code-computed (NF-027).
 - A live call (`callId` set) stays `pending` for the call, up to
   `APPROVAL_WINDOW_MS` (default 300000, maximum 900000). It also closes when the
   voice relay reports `call_completed` or `call_failed`. That status is
@@ -110,8 +115,17 @@ decision/counter terms, and are consumed before async verification. Assertions
 must match RP, origin, credential id and user verification. Credential counters
 are updated. No claimed `verified` or `method` flag grants authority.
 
-**Current persistence boundary:** all approval credentials, challenges and
-StateStore rows are process-local and lost on restart. Run one server process
+**Current persistence boundary:** the demo host (`BACKROOM_DEMO=1`, i.e.
+`demo:up`) writes Dana's public credential (id, public key, sign counter,
+transports) and SHA-256 hashes of her sign-in tokens to
+`.demo/controller-credential.json` (override with `CONTROLLER_CREDENTIAL_FILE`;
+other hosts persist only when it is set). The file is mode 0600, written by
+temp + rename after enrollment, every counter update and every sign-in, and
+carries an HMAC keyed from `CONTROLLER_ENROLLMENT_SECRET`, which is never
+written. After a restart Dana stays enrolled and signed in. A tampered file, or
+one written for another origin, RP ID or enrollment secret, is ignored with
+`CONTROLLER_CREDENTIAL_FILE_REJECTED` and Dana enrolls again, which replaces it.
+Challenges and StateStore rows remain process-local. Run one server process
 for the rehearsal. They are shared across Next route chunks/dev reloads, not
 across machines or serverless instances. `installApprovalStateStore` must run at
 trusted bootstrap before starting the controller service; it delegates to the

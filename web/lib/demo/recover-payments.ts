@@ -1,5 +1,5 @@
 import { paymentMemo } from '@backroom/nessie';
-import type { PaymentService, StateStore } from '@backroom/orchestrator';
+import type { PaymentRecord, PaymentService, StateStore } from '@backroom/orchestrator';
 
 /** Link identity the demo host can see. Installment 1 matches `authorizedPaymentLink`. */
 export interface DemoRecoveryLink {
@@ -40,7 +40,7 @@ export async function recoverDemoPayments(
   service: PaymentService,
   linkIds: readonly string[],
   state: Pick<StateStore, 'getPayment'>,
-): Promise<void> {
-  try { await service.recover(linkIds, state); }
-  catch (error) { console.error('demo payment recovery failed', error); }
+): Promise<PaymentRecord[]> {
+  try { return (await service.recover(linkIds, state)).restored; }
+  catch (error) { console.error('demo payment recovery failed', error); return []; }
 }

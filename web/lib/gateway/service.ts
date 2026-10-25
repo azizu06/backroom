@@ -1,11 +1,17 @@
 import { randomUUID, randomBytes } from "node:crypto";
 import type { Invocation } from "./parser";
 import {
+  DANA_APPROVED,
   decidePlan,
+  type ApprovedDecision,
   type DecidePlan,
   type GatewayPolicyDecision,
 } from "./policy-adapter";
+import { firstPaymentCents } from "../../../policy/src/index";
 import type { AuditEntry, Escalation, GatewayCall, PlanTerms, ToolResult } from "./store";
+
+const dollars = (cents: number) =>
+  (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 const sameTerms = (a: PlanTerms, b: PlanTerms) =>
   a.installments === b.installments &&
@@ -13,6 +19,61 @@ const sameTerms = (a: PlanTerms, b: PlanTerms) =>
   a.durationDays === b.durationDays &&
   a.waiveFee === b.waiveFee &&
   a.discountPct === b.discountPct;
+/** Plan-term limits Dana may lift. Stop signals (OFAC, closed business, bankruptcy, dispute) never unlock. */
+const TERM_RULES = new Set<string>(["MAX_INSTALLMENTS", "MIN_FIRST_PCT", "MAX_PLAN_DAYS", "MAX_DISCOUNT"]);
+/** Dana's verified passkey decision on this call names exactly these terms: her approval or her counter. */
+const authorizingEscalation = (call: GatewayCall, plan: PlanTerms) =>
+  call.escalations.find(
+    (e) =>
+      e.method === "passkey" &&
+      ((e.status === "approved" && e.decision?.kind === "Approve" && e.plan !== undefined && sameTerms(e.plan, plan)) ||
+        (e.status === "counter" && e.decision?.kind === "Counter" && sameTerms(e.decision.terms, plan))),
+  );
+/** Policy still runs first. Only its term-limit ESCALATE becomes ALLOW, and only for the authorized terms; DENY never does. */
+const withApproval =
+  (decide: DecidePlan) =>
+  (call: GatewayCall, plan: PlanTerms, paymentAmountCents?: number): GatewayPolicyDecision => {
+    const decision = decide(call, plan, paymentAmountCents);
+    if (decision.kind !== "ESCALATE" || !decision.ruleIds.every((rule) => TERM_RULES.has(rule))) return decision;
+    const approval = authorizingEscalation(call, plan);
+    return approval
+      ? { kind: "ALLOW", policyVersion: decision.policyVersion, ruleIds: [...decision.ruleIds, DANA_APPROVED], escalationId: approval.id }
+      : decision;
+  };
+const danaApproved = (decision: GatewayPolicyDecision): decision is ApprovedDecision =>
+  decision.kind === "ALLOW" && "escalationId" in decision;
+/** Records the ALLOW and mints the plan; amounts are code-computed from the authorized terms (NF-027). */
+function authorizePlan(
+  call: GatewayCall,
+  input: Invocation,
+  terms: PlanTerms,
+  decision: Extract<GatewayPolicyDecision, { kind: "ALLOW" }>,
+): ToolResult {
+  const entry = audit(call, input, "ALLOW", decision.ruleIds, terms, decision);
+  const totalCents =
+    Math.round(call.receivable.principalCents * (1 - terms.discountPct / 100)) +
+    (terms.waiveFee ? 0 : call.receivable.lateFeeCents);
+  const plan = {
+    ...terms,
+    id: randomUUID(),
+    auditId: entry.id,
+    totalCents,
+    firstPaymentCents: firstPaymentCents(totalCents, terms.firstPaymentPct, terms.installments),
+  };
+  const first = `The first payment is ${dollars(plan.firstPaymentCents)}.`;
+  call.plans.push(plan);
+  return {
+    kind: "ALLOW",
+    can_confirm: true,
+    speak: danaApproved(decision)
+      ? `Dana approved these exact terms. ${first} Confirm this plan with the caller now and offer to send the payment link.`
+      : `Those terms are authorized. ${first} You may confirm this exact plan.`,
+    rule_ids: decision.ruleIds,
+    audit_id: entry.id,
+    plan_id: plan.id,
+    plan,
+  };
+}
 const deny = (rule: string, speak: string): ToolResult => ({
   kind: "DENY",
   can_confirm: false,
@@ -91,8 +152,9 @@ function audit(
 export function executeTool(
   call: GatewayCall,
   input: Invocation,
-  decide: DecidePlan = decidePlan,
+  policyDecide: DecidePlan = decidePlan,
 ): ToolResult {
+  const decide = withApproval(policyDecide);
   if (input.tool === "verify_identity_result") {
     call.identityConfirmed = input.result === "confirmed";
     if (input.result === "wrong_person") call.status = "human_requested";
@@ -133,7 +195,10 @@ export function executeTool(
     else if (call.status !== "opted_out" && call.status !== "human_requested") call.status = status;
     call.outbox.push({ type: input.tool });
     // Asking for a human is how the voice agent handles anything it does not recognize: escalate.
-    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED", [input.tool.toUpperCase()]);
+    // C05: a hostile caller is a dedicated escalation reason; the stop and spoken line are the same.
+    const hostile = input.tool === "request_human" && input.reason === "hostile";
+    audit(call, input, input.tool === "request_human" ? "ESCALATE" : "RECORDED",
+      [input.tool.toUpperCase(), ...(hostile ? ["HOSTILE_ESCALATE"] : [])]);
     return { kind: "RECORDED", can_confirm: false, speak };
   }
   if (!call.identityConfirmed)
@@ -169,9 +234,15 @@ export function executeTool(
       escalation.status === "pending" || escalation.method !== "passkey"
         ? "pending"
         : escalation.status;
+    const decision = escalation.method === "passkey" ? escalation.decision : undefined;
+    if (status === "approved" && escalation.plan) {
+      const allowed = decide(call, escalation.plan);
+      if (allowed.kind === "ALLOW")
+        return { ...authorizePlan(call, input, escalation.plan, allowed), approval_status: status, decision };
+    }
     return {
       kind: status === "pending" ? "PENDING" : "RECORDED",
-      decision: escalation.method === "passkey" ? escalation.decision : undefined,
+      decision,
       counter_terms: escalation.decision?.kind === "Counter" ? escalation.decision.terms : undefined,
       can_confirm: false,
       approval_status: status,
@@ -180,7 +251,9 @@ export function executeTool(
           ? "I am still waiting for Dana."
           : status === "denied"
             ? "Dana did not approve those terms."
-            : "Dana has reviewed the request. I must check the exact terms before confirming.",
+            : status === "counter"
+              ? "Dana offered different terms. Offer the caller exactly these counter terms. If they accept, call propose_plan with those exact terms."
+              : "Dana approved the request, but I cannot confirm those terms on this call. A human will follow up.",
     };
   }
   if (input.tool === "send_payment_link") {
@@ -191,7 +264,7 @@ export function executeTool(
         (a) =>
           a.id === plan.auditId &&
           a.kind === "ALLOW" &&
-          a.action === "propose_plan" &&
+          (a.action === "propose_plan" || a.action === "check_approval") &&
           a.policyVersion === call.policyVersion,
       );
     if (!plan || !entry || !entry.plan || !sameTerms(plan, entry.plan))
@@ -262,7 +335,7 @@ export function executeTool(
     return {
       kind: "RECORDED",
       can_confirm: false,
-      speak: "The payment link is queued for delivery.",
+      speak: `The payment link for ${dollars(link.amountCents)} is queued for delivery.`,
       link_path: link.path,
       amount_cents: link.amountCents,
       short_code: link.shortCode,
@@ -278,6 +351,7 @@ export function executeTool(
         return { ...deny(blocked.rule, blocked.speak), audit_id: refused.id };
       }
     }
+    if (decision.kind === "ALLOW") return authorizePlan(call, input, input.plan, decision);
     const entry = audit(
       call,
       input,
@@ -286,32 +360,6 @@ export function executeTool(
       input.plan,
       decision,
     );
-    if (decision.kind === "ALLOW") {
-      const totalCents =
-        Math.round(
-          call.receivable.principalCents * (1 - input.plan.discountPct / 100),
-        ) + (input.plan.waiveFee ? 0 : call.receivable.lateFeeCents);
-      const plan = {
-        ...input.plan,
-        id: randomUUID(),
-        auditId: entry.id,
-        totalCents,
-        firstPaymentCents:
-          input.plan.installments === 1
-            ? totalCents
-            : Math.round((totalCents * input.plan.firstPaymentPct) / 100),
-      };
-      call.plans.push(plan);
-      return {
-        kind: "ALLOW",
-        can_confirm: true,
-        speak: "Those terms are authorized. You may confirm this exact plan.",
-        rule_ids: decision.ruleIds,
-        audit_id: entry.id,
-        plan_id: plan.id,
-        plan,
-      };
-    }
     if (decision.kind === "ESCALATE") {
       const escalation = {
         id: randomUUID(),

@@ -23,7 +23,7 @@ const contrast = (a: string, b: string) => {
 };
 
 const pairs: Array<[string, string]> = [['ink', 'paper'], ['ink-soft', 'paper'], ['ink', 'field'], ['ink', 'danger-soft'],
-  ['on-pastel', 'pastel-aqua'], ['on-pastel', 'pastel-yellow'], ['paper', 'ink']];
+  ['on-pastel', 'pastel-aqua'], ['on-pastel', 'pastel-yellow'], ['paper', 'ink'], ['ink-soft', 'line']];
 
 describe('shared page palette contrast', () => {
   for (const [name, tokens] of [['light', light], ['dark', dark]] as const) {

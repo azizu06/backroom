@@ -24,11 +24,14 @@ describe('handoff public contract', () => {
       .map(([key, value]) => [key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`), value]));
     expect(handoffFromRow(snake)).toEqual({ ...raw, acceptedAt: 2000, completedAt: 3000, decisionRef: 'd', errorCode: 'e' });
   });
-  it.each([null, [], 42, {}, { ...raw, handoffId: '' }, { ...raw, fromRole: 'intake_sorter' }, { ...raw, toRole: 'human' },
+  it.each([null, [], 42, {}, { ...raw, handoffId: '' }, { ...raw, fromRole: 'intake_sorter' }, { ...raw, fromRole: 'human' }, { ...raw, toRole: 'Dana' },
     { ...raw, status: 'pending' }, { ...raw, status: 'failed' }, { ...raw, status: 'awaiting_passkey' },
     { ...raw, sequence: -1n }, { ...raw, sequence: 1.1 }, { ...raw, sequence: NaN }, { ...raw, sequence: Number.MAX_SAFE_INTEGER + 1 },
     { ...raw, sequence: 18_446_744_073_709_551_616n }, { ...raw, sequence: '123' }, { ...raw, fromRole: 'intake'.padEnd(300) }])('rejects malformed rows (case %#)', value => {
     expect(handoffFromRow(value)).toBeNull();
+  });
+  it('accepts a code-published escalation to the human desk as the receiver, never as the sender', () => {
+    expect(handoffFromRow({ ...raw, toRole: 'human', toAgentId: 'human:Dana' })).toMatchObject({ toRole: 'human', toAgentId: 'human:Dana' });
   });
   it('caps strings, ignores malformed optional fields and tolerates missing timestamps', () => {
     expect(row({ handoffId: 'x'.repeat(200), summary: 's'.repeat(200), reason: 'r'.repeat(2000), line: 'l'.repeat(400),

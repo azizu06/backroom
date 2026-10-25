@@ -29,9 +29,10 @@ export class TestAuthenticator {
       response: { clientDataJSON: this.data(challenge, 'webauthn.create').toString('base64url'),
         attestationObject: Buffer.from(attestation).toString('base64url'), transports: ['internal'] } };
   }
-  assertion(challenge: string, options: { origin?: string; rpID?: string; verified?: boolean } = {}): AuthenticationResponseJSON {
+  /** `counter` signs with that value (a cloned authenticator) without advancing this one. */
+  assertion(challenge: string, options: { origin?: string; rpID?: string; verified?: boolean; counter?: number } = {}): AuthenticationResponseJSON {
     const client = this.data(challenge, 'webauthn.get', options.origin);
-    const auth = this.authData(options.verified === false ? 0x01 : 0x05, options.rpID, ++this.counter);
+    const auth = this.authData(options.verified === false ? 0x01 : 0x05, options.rpID, options.counter ?? ++this.counter);
     const signature = sign('sha256', Buffer.concat([auth, createHash('sha256').update(client).digest()]), this.keys.privateKey);
     return { id: this.id, rawId: this.id, type: 'public-key', clientExtensionResults: {}, response: {
       clientDataJSON: client.toString('base64url'), authenticatorData: auth.toString('base64url'),

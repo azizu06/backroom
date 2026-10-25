@@ -17,7 +17,7 @@ export default function PayCard({ linkId }: { linkId: string }) {
       if (!response.ok) {
         setError(data.error === 'PAYMENT_LINK_NOT_FOUND' ? 'This payment link is unavailable.'
           : data.error === 'DEPOSIT_UNCERTAIN_REVIEW_REQUIRED' ? 'Deposit needs review. Do not create another payment. Contact Northfield Studio.'
-          : data.error === 'SANDBOX_WHOLE_DOLLARS_REQUIRED' ? 'This sandbox supports whole-dollar payments only. Contact Northfield Studio.'
+          : data.error === 'SANDBOX_WHOLE_DOLLARS_REQUIRED' ? 'Only whole-dollar payments are supported. Contact Northfield Studio.'
           : 'Payment service unavailable. Refresh to check for a posted deposit before trying again.');
         return;
       }
@@ -37,7 +37,7 @@ export default function PayCard({ linkId }: { linkId: string }) {
         <div><dt>Amount due</dt><dd className={styles.amount}>{money(view.amountCents / 100)}</dd></div></dl>
       <p>The amount is fixed by your authorized payment plan. No card details are collected.</p>
       <button disabled={pending || Boolean(payment) || Boolean(error)} onClick={() => void load(true)}>
-        {pending ? 'Checking payment…' : payment ? 'Deposit recorded' : `Pay ${money(view.amountCents / 100)} with simulated card`}
+        {pending ? 'Checking payment…' : payment ? 'Deposit recorded' : `Pay ${money(view.amountCents / 100)}`}
       </button>
       {payment && <p role="status" className={styles.status}>{payment.status === 'pending_reconciliation'
         ? 'Deposit posted. Awaiting reconciliation; your invoice is still open.'

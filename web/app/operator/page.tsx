@@ -12,16 +12,21 @@ type X402Receipt = { rail: string; note?: string; scenario: string; status: stri
   asset?: string; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string }; transaction?: string; explorer?: string;
   holdId?: string; proof?: { vendorRequests: number; signatures: number }; paymentAuditHref?: string };
 const isX402 = (value: unknown): value is X402Receipt => !!value && typeof value === 'object' && 'rail' in value && typeof value.rail === 'string' && value.rail.startsWith('x402');
+// The in-process rail's server label and note predate the console's wording; show it as the offline rail.
+const OFFLINE_RAIL = 'x402 simulated';
 function X402Summary({ receipt }: { receipt: X402Receipt }) {
+  const offline = receipt.rail === OFFLINE_RAIL;
+  const note = offline ? 'In-process vendor and facilitator on loopback. No keys, chain or internet.' : receipt.note;
+  const asset = offline ? 'USDC, offline' : receipt.asset;
   return <dl className={styles.facts} aria-label='x402 payment result'>
-    <dt>Rail</dt><dd><strong>{receipt.rail.toUpperCase()}</strong>{receipt.note && ` · ${receipt.note}`}</dd>
+    <dt>Rail</dt><dd><strong>{offline ? 'X402 OFFLINE' : receipt.rail.toUpperCase()}</strong>{note && ` · ${note}`}</dd>
     <dt>Status</dt><dd>{receipt.status}{receipt.replay ? ' (replay of the earlier receipt; nothing paid again)' : ''}{receipt.reason && ` · ${receipt.reason}`}</dd>
-    {receipt.amount && <><dt>Amount</dt><dd>{receipt.amount} · {receipt.asset} · {receipt.vendor} invoice {receipt.invoiceId}</dd></>}
+    {receipt.amount && <><dt>Amount</dt><dd>{receipt.amount} · {asset} · {receipt.vendor} invoice {receipt.invoiceId}</dd></>}
     {receipt.recipient && <><dt>Recipient</dt><dd><code>{receipt.recipient}</code> (approved vendor-master wallet)</dd></>}
     {receipt.policy && <><dt>Policy</dt><dd>{receipt.policy.decision}{receipt.policy.ruleIds.length ? ` · ${receipt.policy.ruleIds.join(', ')}` : ''}{receipt.policy.reason && ` · ${receipt.policy.reason}`}</dd></>}
     {receipt.proof && <><dt>Signing</dt><dd>{receipt.proof.signatures} signature{receipt.proof.signatures === 1 ? '' : 's'} · {receipt.proof.vendorRequests} vendor request{receipt.proof.vendorRequests === 1 ? '' : 's'}</dd></>}
     {receipt.transaction && <><dt>Transaction</dt><dd>{receipt.explorer ? <a href={receipt.explorer} target='_blank' rel='noreferrer'>View on Base Sepolia basescan</a>
-      : <><code>{receipt.transaction}</code> (simulated hash, not on any chain)</>}</dd></>}
+      : <><code>{receipt.transaction}</code> (local hash, not broadcast to any chain)</>}</dd></>}
     {receipt.holdId && <><dt>Hold</dt><dd>{receipt.holdId} · held on this console, not paid</dd></>}
     {receipt.paymentAuditHref && <><dt>Audit</dt><dd><a href={receipt.paymentAuditHref}>Open payment audit</a></dd></>}
   </dl>;
@@ -52,7 +57,7 @@ export default function OperatorPage() {
     setBusy('session'); setError('');
     try {
       const response = await fetch('/__operator/session', { method: 'POST' });
-      if (!response.ok) throw new Error('Code-free unlock works only at http://127.0.0.1:<demo port>/operator on the host. Use the operator code here instead.');
+      if (!response.ok) throw new Error('Code-free unlock works only at http://127.0.0.1:<port>/operator on the host. Use the operator code here instead.');
       await session();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Console unavailable.'); }
     finally { setBusy(''); }
@@ -86,15 +91,15 @@ export default function OperatorPage() {
   }
   const controllerUrl = links.publicUrl ? `${links.publicUrl}/controller` : '';
   return <main className={styles.page}><div className={styles.content}>
-    <h1>Demo operator</h1>
-    <p className={styles.lede}>Run the demo top to bottom. Every action is audited.</p>
+    <h1>Operator console</h1>
+    <p className={styles.lede}>Run each step in order. Every action is recorded on the audit wall.</p>
     {error && <p role='alert' className={styles.error}>{error}</p>}
     {!authorized ? <><section className={styles.card}><h2>Operator sign-in</h2><p>Also unlocks the desk phone, audit wall and policy editor for eight hours. It never approves a payment.</p>
       <form className={styles.row} onSubmit={e => { e.preventDefault(); void signIn(); }}>
-        <label>Operator code <input type='password' autoComplete='off' required value={code} onChange={e => setCode(e.target.value)} /></label>
+        <label className={styles.grow}>Operator code <input type='password' autoComplete='off' required value={code} onChange={e => setCode(e.target.value)} /></label>
         <button className={styles.primary} disabled={!!busy || !code}>{busy === 'session' ? 'Signing in…' : 'Sign in'}</button>
       </form></section>
-      <section className={styles.card}><h2>On the host itself</h2><p>On the demo host&rsquo;s loopback address, unlock without the code.</p>
+      <section className={styles.card}><h2>On the host itself</h2><p>On this host&rsquo;s loopback address you can unlock without the code.</p>
       <button disabled={!!busy} onClick={() => void unlock()}>Unlock local operator session</button></section></> : <>
       <div className={styles.session}><p role='status'>{busy ? `${operatorActions[busy as OperatorAction]?.[0] || 'Working'}…` : offBusy ? 'Turning models OFF…' : 'Operator session active.'}</p>
         <button disabled={!!busy || offBusy} onClick={() => { void fetch('/api/operator/logout', { method: 'POST' }).then(response => { if (response.ok) setAuthorized(false); }); }}>Lock console</button></div>
@@ -114,7 +119,7 @@ export default function OperatorPage() {
           {unavailable('x402_testnet') && <p role='note' className={styles.muted}>Unavailable: {unavailable('x402_testnet')}</p>}
           {isX402(receipt?.result) && <X402Summary receipt={receipt.result} />}</div></li>
         <li className={styles.card}><h2>Show the guardrails</h2>
-          <nav aria-label='Demo views' className={styles.row}><a href='/inbox'>Inbox</a><a href='/audit'>Audit wall</a><a href='/attack'>Attack demo</a></nav></li>
+          <nav aria-label='Guardrail views' className={styles.row}><a href='/inbox'>Inbox</a><a href='/audit'>Audit wall</a><a href='/attack'>Attack lab</a></nav></li>
       </ol>
       <details className={styles.advanced}><summary>Advanced</summary>
         <section><h2>Host and company</h2>{(['status', 'health', 'preflight'] as const).map(button)}

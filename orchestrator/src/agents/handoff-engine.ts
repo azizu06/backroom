@@ -41,6 +41,14 @@ export interface ActivationRow {
 export interface HandoffRow extends HandoffRecord {
   sequence: number; createdAt: number; acceptedAt?: number; completedAt?: number;
   toActivationId?: string; correction: boolean; errorCode?: string;
+  /** Code-owned live-call escalation to a human desk (`escalateToHuman`); `to` then repeats the source role. */
+  toHuman?: string; escalationId?: string;
+}
+/** Office receiver for a human escalation; the office draws it at Dana's desk. */
+export const HUMAN_DESK = 'human' as const;
+export type HumanOutcome = 'approved' | 'denied' | 'counter' | 'expired' | 'pending_owner';
+export interface HumanEscalationInput {
+  caseId: string; displayId?: string; from: Role; escalationId: string; toHuman: string; ruleIds: string[]; artifactRefs: string[];
 }
 export interface CaseState {
   caseId: string; displayId: string; status: CaseStatus; reason?: string;
@@ -52,7 +60,7 @@ export interface CaseState {
 /** Allowlisted office row. Never carries packets, documents, contacts or bank data. */
 export interface AgentHandoffPublic {
   handoffId: string; sequence: number; caseDisplayId: string;
-  fromAgentId: string; toAgentId: string; fromRole: Role; toRole: Role;
+  fromAgentId: string; toAgentId: string; fromRole: Role; toRole: Role | typeof HUMAN_DESK;
   fromVoiceRole: HandoffRole; toVoiceRole: HandoffRole;
   status: HandoffRow['status']; correction: boolean; reason: string; summary: string;
   /** Cartesia-safe speech line for the author's `fromVoiceRole`, ≤240 chars, no control chars or angle brackets. */
@@ -236,6 +244,46 @@ export function resumeCase(state: CaseState) {
   state.status = 'open'; state.reason = undefined;
 }
 
+/** Code-owned: policy escalated a live call to a human. One `call:` case per call, held for the human,
+ * with one offered row per escalation (idempotent on escalationId). No activation or role owns it, so
+ * no model can commit, resolve or redirect it; only `resolveHumanEscalation` closes the row. */
+export function escalateToHuman(prior: CaseState | undefined, input: HumanEscalationInput & { now: number; sequence: number }) {
+  if (!REF.test(input.caseId) || !ROLES.includes(input.from) || !REF.test(input.escalationId)
+    || !/^[A-Z][A-Za-z0-9_-]{0,39}$/.test(input.toHuman)) fail('INVALID_HUMAN_ESCALATION');
+  if (!Array.isArray(input.ruleIds) || input.ruleIds.length > 10 || !input.ruleIds.every(id => /^[A-Z][A-Z0-9_]{0,63}$/.test(id))
+    || !Array.isArray(input.artifactRefs) || input.artifactRefs.length > 20 || !input.artifactRefs.every(ref => REF.test(ref))) fail('INVALID_HUMAN_ESCALATION');
+  if (prior && (prior.activations.length || prior.handoffs.some(row => !row.escalationId))) fail('AGENT_CASE_EXISTS');
+  const state: CaseState = prior ?? { caseId: input.caseId, displayId: safeText(input.displayId ?? input.caseId, 40), status: 'held',
+    reason: 'HUMAN_ESCALATION', leaseToken: 0, activations: [], knownRefs: [], corrections: 0, handoffs: [], createdAt: input.now };
+  const existing = state.handoffs.find(row => row.escalationId === input.escalationId);
+  if (existing) return { state, record: { ...existing }, created: false };
+  const rules = input.ruleIds.length ? input.ruleIds.join(', ') : 'policy';
+  const record: HandoffRow = { handoffId: `${input.caseId}:h${state.handoffs.length + 1}`, caseId: input.caseId, from: input.from,
+    fromActivationId: `${input.caseId}:call`, leaseToken: 0, status: 'offered', to: input.from, toHuman: input.toHuman,
+    escalationId: input.escalationId, reason: `Escalated to ${input.toHuman} for passkey approval: ${rules}`,
+    summary: `The caller asked for terms outside policy (${rules}). ${input.toHuman} decides with a passkey; the call holds until then.`,
+    artifactRefs: [...input.artifactRefs], sequence: input.sequence, createdAt: input.now, correction: false };
+  state.handoffs.push(record);
+  state.knownRefs = [...new Set([...state.knownRefs, ...input.artifactRefs])];
+  state.status = 'held'; state.reason = 'HUMAN_ESCALATION';
+  return { state, record: { ...record }, created: true };
+}
+const HUMAN_REFUSALS: Record<Exclude<HumanOutcome, 'approved'>, string> = {
+  denied: 'DENIED', counter: 'COUNTER_OFFER', expired: 'ESCALATION_EXPIRED', pending_owner: 'PENDING_OWNER',
+};
+/** Approve completes the row (folder delivered, Dana finished); any other outcome is the return trip. */
+export function resolveHumanEscalation(state: CaseState, input: { escalationId: string; outcome: HumanOutcome; now: number }): HandoffRow | undefined {
+  if (input.outcome !== 'approved' && !Object.hasOwn(HUMAN_REFUSALS, input.outcome)) fail('INVALID_HUMAN_OUTCOME');
+  const row = state.handoffs.find(r => r.escalationId === input.escalationId);
+  if (!row) return undefined;
+  if (row.status === 'offered') {
+    if (input.outcome === 'approved') Object.assign(row, { status: 'completed', acceptedAt: input.now, completedAt: input.now });
+    else Object.assign(row, { status: 'rejected', errorCode: HUMAN_REFUSALS[input.outcome] });
+  }
+  if (state.handoffs.every(r => r.status !== 'offered')) { state.status = 'done'; state.reason = undefined; }
+  return { ...row };
+}
+
 /** Public/TTS text: remove links and mask identifiers before truncating. */
 export function safeText(value: string, max: number): string {
   const text = String(value).replace(/[\x00-\x1f\x7f<>]/g, ' ')
@@ -249,14 +297,16 @@ export function safeText(value: string, max: number): string {
 }
 export function toPublicHandoff(state: Pick<CaseState, 'displayId'>, record: HandoffRow): AgentHandoffPublic {
   const summary = safeText(record.summary, 160);
+  const human = record.toHuman;
   return { handoffId: record.handoffId, sequence: record.sequence, caseDisplayId: state.displayId,
-    fromAgentId: agentIdFor(record.from), toAgentId: agentIdFor(record.to), fromRole: record.from, toRole: record.to,
-    fromVoiceRole: ROLE_VOICE[record.from], toVoiceRole: ROLE_VOICE[record.to] ?? ROLE_VOICE[record.from],
+    fromAgentId: agentIdFor(record.from), toAgentId: human ? `human:${human}` : agentIdFor(record.to), fromRole: record.from,
+    toRole: human ? HUMAN_DESK : record.to,
+    fromVoiceRole: ROLE_VOICE[record.from], toVoiceRole: (!human && ROLE_VOICE[record.to]) || ROLE_VOICE[record.from],
     status: record.status, correction: record.correction, reason: safeText(record.reason, 120), summary,
     line: summary || 'Handing this case over.', createdAt: record.createdAt,
     ...(record.acceptedAt !== undefined ? { acceptedAt: record.acceptedAt } : {}),
     ...(record.completedAt !== undefined ? { completedAt: record.completedAt } : {}),
-    ...(record.toActivationId ? { decisionRef: record.toActivationId } : {}),
+    ...(record.toActivationId || record.escalationId ? { decisionRef: record.toActivationId ?? record.escalationId } : {}),
     ...(record.errorCode ? { errorCode: record.errorCode } : {}) };
 }
 

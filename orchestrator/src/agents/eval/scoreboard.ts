@@ -18,6 +18,8 @@ import { runRecovery } from './recovery';
 import { runDurableRecoveryPreflight } from './durable-recovery';
 import { CRS_RECEIPT_PATH, replayRecordedCrsCoverage } from './crs-availability';
 import { runEmailDispatcher } from './email-dispatcher';
+import { runEmailHost } from './email-host';
+import { probeWrongPersonReply } from './wrong-person';
 import { runBadgeAttack } from './badge-attack';
 import { canonicalTextSha256, evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
@@ -172,6 +174,9 @@ for (const id of PRECALL_STOPS) {
 }
 const callButton = await runCallButton();
 const emailDispatcher = await runEmailDispatcher();
+const emailHost = await runEmailHost();
+const wrongPerson = await probeWrongPersonReply();
+if (!emailHost.match) gaps.push({ id: 'C14:host', detail: `Demo host call-refusal email path missed: ${Object.entries(emailHost.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 if (!emailDispatcher.match) gaps.push({ id: 'C14:dispatcher', detail: `Email fallback missed: ${Object.entries(emailDispatcher.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 if (!callButton.match) gaps.push({ id: 'call-button', detail: `In-app call button missed: ${Object.entries(callButton.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const conversations = [];
@@ -200,9 +205,19 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `${durableRecovery.scope} Frozen integrationOutcome: ${key.payables.P11.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}.` });
     continue;
   }
+  if (row.id === 'C08' && row.seams.includes('integration:not_executed')) {
+    const run = conversations.find(run => run.scenarioId === 'C08');
+    const checks = run?.checks as Record<string, boolean> | undefined;
+    // Code-owned parts: deny + no leak + flag phone (gateway run) and the business-name/callback line (relay probe).
+    if (run?.match && wrongPerson.match) continue;
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C08.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Gateway run: IDENTITY_REQUIRED ${checks?.identityDenied}, no leak ${checks?.noLeakBeforeIdentity}, phone flagged ${checks?.numberFlagged}. Relay wrong-person line: ${JSON.stringify(wrongPerson.checks)}. Keep the integration gap open.` });
+    continue;
+  }
   if (row.id === 'C09' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C09');
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher run queues ${run?.humanFollowup?.queuedRequests ?? 0} request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has ${run?.humanFollowup?.gatewayReviewRecipients.length ?? 0} review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.` });
+    // Code-owned parts: code acknowledgment line, callback persisted to Dana's inbox, no offer after, next call refused.
+    if (run?.match && (run.checks as Record<string, boolean>).danaCallbackAssigned) continue;
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Gateway -> approval bridge -> Dispatcher run: callback row ${JSON.stringify(run?.humanFollowup?.danaCallback ?? null)}, code acknowledgment ${run?.humanFollowup?.acknowledged ?? false}. Keep the integration gap open.` });
     continue;
   }
   if (row.id === 'P01' && row.seams.includes('integration:not_executed')) {
@@ -211,12 +226,14 @@ for (const row of legacy.reports) {
   }
   if (row.id === 'C05' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C05');
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C05.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: ${run?.hostileEvidence?.dedicatedRuleRecorded ?? false}. One spoken de-escalation and provider end-call are not executed; keep the integration gap open.` });
+    // Code-owned parts: dedicated HOSTILE_ESCALATE on gateway + Dispatcher mirror, stop, no offer after, next call refused.
+    if (run?.match && (run.checks as Record<string, boolean>).hostileRuleRecorded) continue;
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C05.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Dedicated HOSTILE_ESCALATE recorded: ${run?.hostileEvidence?.dedicatedRuleRecorded ?? false}; run match ${run?.match ?? false}. Keep the integration gap open.` });
     continue;
   }
   if (row.id === 'C21' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C21');
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. The production Cartesia agent config's fixed voicemail message is generic callback-only with no contact, invoice, amount or business name (${run?.voicemailEvidence?.configuredMessageSafe}): "${run?.voicemailEvidence?.configuredMessage}". Cartesia voicemail detection firing and message delivery on a real call are not executed; keep the integration gap open.` });
     continue;
   }
   if (row.id === 'C15' && row.seams.includes('integration:not_executed')) {
@@ -242,6 +259,9 @@ const metrics = score(observations);
 const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
 const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
+gaps.push({ id: 'C09:scope', detail: 'The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway\'s code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed.' });
+gaps.push({ id: 'C05:scope', detail: 'The gateway records the dedicated HOSTILE_ESCALATE when the voice agent sends request_human with reason hostile; that reason is a scripted tool choice here. The one calm de-escalation reply is prompt-driven agent speech, and it and the provider end-call are not executed on a real call.' });
+gaps.push({ id: 'C08:scope', detail: 'The wrong-person line is code-owned and graded on the production relay, with a scripted stand-in for the Haiku answer reader. Cartesia speaking it on a real call and the provider end-call are not executed.' });
 gaps.push({ id: 'P01:scope', detail: 'The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.' });
 const rates = {
   dispatcherApDebit: fraction(apDebit.match ? 1 : 0, 1),
@@ -256,6 +276,8 @@ const rates = {
   reconciliation: fraction(receivables.filter(row => row.match === true).length, receivables.filter(row => row.match !== null).length),
   dispatcherMemoryRecovery: fraction(recoveryRuns.filter(row => row.outcome === 'RECOVERED_ONE_MOCK_DEBIT').length, recoveryRuns.length),
   dispatcherEmailFollowup: fraction(Number(emailDispatcher.match), 1),
+  hostEmailFollowup: fraction(Number(emailHost.match), 1),
+  relayWrongPerson: fraction(Number(wrongPerson.match), 1),
   runtimeBadgeIsolation: fraction(Number(badgeIsolationMatch), 1),
   dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
   gx10Failover: fraction(failoverRuns.filter(row => row.match).length, failoverRuns.length),
@@ -273,18 +295,22 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'ap-debit.ts', 'email-dispatcher.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'ap-debit.ts', 'email-dispatcher.ts', 'email-host.ts', 'wrong-person.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
       const path = `orchestrator/src/agents/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     voicemailRuntimeSources: { 'orchestrator/src/voice/tools.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/voice/tools.ts'))) },
+    wrongPersonRuntimeSources: Object.fromEntries(['orchestrator/src/voice/index.ts', 'orchestrator/src/voice/server.ts', 'orchestrator/src/voice/answer.ts']
+      .map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     crsRuntimeSources: { 'orchestrator/src/collections/crs.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/collections/crs.ts'))) },
     apDebitRuntimeSources: Object.fromEntries(['integrations/nessie/src/index.ts', 'orchestrator/src/payables/payments.ts',
       'orchestrator/src/payables/index.ts', 'orchestrator/src/agents/tools/payables.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     emailRuntimeSources: Object.fromEntries(['orchestrator/src/agents/roles/collections.ts', 'orchestrator/src/agents/tools/collections.ts',
       'orchestrator/src/agents/roles/index.ts', 'orchestrator/src/collections/email.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
+    emailHostRuntimeSources: Object.fromEntries(['web/lib/calls/request.ts', 'web/lib/calls/runtime.ts', 'web/lib/demo/agents.ts',
+      'web/lib/demo/services.ts', 'web/lib/demo/runtime.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json', CRS_RECEIPT_PATH,
       ...(pdfRun ? [PDF_RESULT_PATH] : [])].map(path => [path, sha(path)])),
@@ -300,6 +326,8 @@ const report = {
     recovery: recoveryRuns[0]!.scope,
     durableRecovery: durableRecovery.scope,
     emailDispatcher: emailDispatcher.scope,
+    emailHost: emailHost.scope,
+    wrongPerson: wrongPerson.scope,
     arConversations: conversations[0]?.scope ?? 'not run',
     judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
@@ -323,6 +351,8 @@ const report = {
   apDebit,
   crsRecordedCoverage,
   emailDispatcher,
+  emailHost,
+  wrongPerson,
   durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
@@ -373,6 +403,8 @@ const lines = [
   `| P01 AP withdrawal + reconciliation through the Dispatcher (synthetic bank HTTP, once per invoice) | ${display(rates.dispatcherApDebit)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| C14 simulated email fallback through the Dispatcher (trusted contact, daily dedupe, no amount or dial) | ${display(rates.dispatcherEmailFollowup)} |`,
+  `| C14 demo host call route: signed-in consumer click -> CALL_DENIED -> host planner email preview (queued, duplicate, next day; no dial) | ${display(rates.hostEmailFollowup)} |`,
+  `| C08 wrong person on the voice relay: code-owned line with business name + callback only, account closed after | ${display(rates.relayWrongPerson)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider, email-only clients get a simulated follow-up with no amount (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
   `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: button withheld, 409, no provider attempt) | ${display(rates.callButton)} |`,
@@ -401,4 +433,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (!apDebit.match || !emailDispatcher.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (!apDebit.match || !emailDispatcher.match || !emailHost.match || !wrongPerson.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;

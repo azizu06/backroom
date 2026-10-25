@@ -72,3 +72,14 @@ select { border-radius: 999px; font-family: var(--font-ui); font-weight: 800; cu
 @media (prefers-reduced-motion: reduce) {
   ::picker(select) { transition: none; }
 }
+
+/* Page frame shared by every page outside the office: one left edge, one heading rhythm, so switching pages never shifts the title.
+   Page modules read --page-max and --page-gutter; .page-frame, .page-title and .page-lede serve pages without a module. */
+:root { --page-max: 1200px; --page-gutter: 24px; }
+.page-frame { box-sizing: border-box; width: 100%; max-width: var(--page-max); min-height: 100svh; margin: 0 auto; padding: 0 var(--page-gutter) 96px; color: var(--ink); font: 16px/1.5 var(--font-ui); }
+.page-title { margin: 32px 0 8px; font: 900 32px/1.15 var(--font-ui); text-wrap: balance; }
+.page-lede { max-width: 65ch; margin: 0 0 24px; color: var(--ink-soft); }
+@media (max-width: 650px) {
+  :root { --page-gutter: 16px; }
+  .page-title { margin-top: 24px; font-size: 28px; }
+}

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { signInOperator } from '../../lib/operator/sign-in-client';
 import type { EmailOnlyScenario } from '../../lib/calls/request';
+import PaymentLinkPanel from '../../components/PaymentLinkPanel';
 import styles from '../approve/[id]/approval.module.css';
 
 type EmailOnlyResult = { ok: boolean; message: string; error?: string; email?: 'queued' | 'duplicate' };
@@ -34,10 +35,11 @@ export default function CallUnlock() {
     finally { setEmailBusy(false); }
   }
   return <main className={styles.page}><div className={styles.sheet}>
-    <p className={styles.status}>Operator setup</p>
-    <h1>Unlock the<br />desk phone.</h1>
-    <p className={styles.intro}>Request call on the office desk phone then rings the approved demo phone. The agent says it is an AI before anything else.</p>
-    {result && <p className={result.ok ? styles.status : styles.error} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
+    <h1>Office calls</h1>
+    <p className={styles.intro}>Press Request call on the office desk phone to ring the approved number. The agent says it is an AI before anything else.</p>
+    {/* Shows only while a call's payment link is live, so nobody needs to know /payment-link. */}
+    <PaymentLinkPanel title="Payment link ready" payButton idle={false} />
+    {result && <p className={result.ok ? styles.notice : styles.error} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
     {result?.ok ? <p className={styles.section}><a href="/office">Back to the office</a></p>
       : <form className={styles.section} onSubmit={e => { e.preventDefault(); void unlock(); }}>
         <div className={styles.fields}><label>Operator code<input type="password" autoComplete="off" required value={code} onChange={e => setCode(e.target.value)} /></label></div>
@@ -45,14 +47,13 @@ export default function CallUnlock() {
       </form>}
     <section className={styles.section} aria-labelledby="email-only-clients">
       <h2 id="email-only-clients">Email-only clients</h2>
-      <p className={styles.intro}>Seeded fixture clients that policy never lets us phone. Pre-call checks refuse the request before any dial; the Collections planner may queue one simulated email preview per invoice per day. Nothing is sent.</p>
+      <p className={styles.intro}>Clients that policy never lets us phone. Pre-call checks refuse the request before any dial; the Collections planner may queue one follow-up email per invoice per day. Nothing is sent.</p>
       <div className={styles.actions}>
         {EMAIL_ONLY_CLIENTS.map(row => <button key={row.scenario} type="button" className={styles.secondary} disabled={emailBusy}
           onClick={() => void requestEmailOnly(row.scenario)}>{emailBusy ? 'Checking…' : row.label}</button>)}
       </div>
-      {emailResult && <p className={emailResult.email ? styles.status : styles.error} role={emailResult.email ? 'status' : 'alert'}>{emailResult.message}</p>}
+      {emailResult && <p className={emailResult.email ? styles.notice : styles.error} role={emailResult.email ? 'status' : 'alert'}>{emailResult.message}</p>}
       {emailResult?.email && <p>Audit rows: <code>office_call_refused</code> ({emailResult.error}) and <code>email_followup_{emailResult.email}</code>. <a href="/audit">Open the audit wall</a></p>}
     </section>
-    <footer className={styles.footer}>Northfield Studio · Office calls</footer>
   </div></main>;
 }
