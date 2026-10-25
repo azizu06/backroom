@@ -15,7 +15,6 @@ export default function CallUnlock() {
     finally { setBusy(false); }
   }
   return <main className={styles.page}><div className={styles.sheet}>
-    <header className={styles.header}><a href="/">Backroom</a><span>Office calls</span></header>
     <p className={styles.status}>Operator setup</p>
     <h1>Unlock the<br />desk phone.</h1>
     <p className={styles.intro}>Once unlocked, Request call on the office desk phone rings the one approved demo phone. The AI says it is an AI before anything else, and the number stays on the server.</p>

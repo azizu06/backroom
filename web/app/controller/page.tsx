@@ -51,7 +51,6 @@ export default function Controller() {
   const signedOut = useCallback(() => setSignedIn(false), []);
   if (registered && signedIn) return <Inbox alert={alert.current} onSignedOut={signedOut} />;
   return <main className={styles.page}><div className={styles.sheet}>
-    <header className={styles.header}><a href="/">Backroom</a><span>Dana’s desk</span></header>
     <p className={styles.status}>Controller</p>
     <h1>Your authority.<br />Your passkey.</h1>
     <p className={styles.intro}>Keep this page open on your phone during the call. Requests from the clerk ring here, and each decision asks you to confirm on your own device.</p>
@@ -131,7 +130,7 @@ function Inbox({ alert, onSignedOut }: { alert: ReturnType<typeof createControll
   const others = (pending ?? []).filter(row => row.id !== currentId);
   const seconds = (row: Escalation) => Math.max(0, Math.ceil((row.expiresAt - Date.now()) / 1000));
   return <main className={styles.page}><div className={styles.sheet}>
-    <header className={styles.header}><a href="/">Backroom</a>
+    <header className={styles.header}>
       <span className={inbox.live} data-state={live ? 'live' : 'retry'} role="status">{live ? 'Live' : 'Reconnecting…'}</span>
     </header>
     <div className={inbox.bar}>
