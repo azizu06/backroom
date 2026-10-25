@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { MeshStandardMaterial } from 'three';
 import type { FurniturePiece } from '../../../lib/office/furniture';
 import type { OfficeSnapshot } from '../../../lib/office/state';
-import { WHITEBOARD_INTERACTION, whiteboardStats, type WhiteboardStats } from '../../../lib/office/props/whiteboard';
+import { WHITEBOARD, WHITEBOARD_INTERACTION, whiteboardStats, type WhiteboardStats } from '../../../lib/office/props/whiteboard';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { StaticBoxes } from '../mounts/StaticGeometry';
 import { BUILDING } from '../../../lib/office/layout';
@@ -12,7 +12,7 @@ import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 const DECISION_COLORS = { ALLOW: PALETTE.mint, DENY: ROLES.deny, ESCALATE: PALETTE.butter, RECORDED: PALETTE.lavender } as const;
 const DECISION_LABELS = { ALLOW: 'ALLOW', DENY: 'DENY', ESCALATE: 'HOLD', RECORDED: 'REC' } as const;
-const WIDTH = 2.4, HEIGHT = 1.4, BOTTOM = 1.15, FACE_W = 2.26, FACE_H = 1.26;
+const { width: WIDTH, height: HEIGHT, bottom: BOTTOM, faceWidth: FACE_W, faceHeight: FACE_H } = WHITEBOARD;
 const TEX_W = 512, TEX_H = Math.round(TEX_W * FACE_H / FACE_W);
 const MARKER_MATERIAL = new MeshStandardMaterial({ vertexColors: true });
 const MARKERS: FurniturePiece[] = [-0.2, 0, 0.2].map((x, i) => ({ at: [x, BOTTOM + 0.02, 0.08],

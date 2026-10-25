@@ -146,7 +146,7 @@ async function patchColor(page: Page, canvas: Locator, point: Point, focus: read
 const BACKGROUND = [1, 3, 5].map(i => parseInt(ROLES.background.slice(i, i + 2), 16));
 const offBackground = (rgb: readonly number[]) => Math.max(...rgb.map((v, i) => Math.abs(v - BACKGROUND[i]!)));
 /** A blank part of the Payables board (right of the empty-audit note) and a point just above it, off the board. */
-const PAYABLES_BOARD: Point = [-1.76, 1.47, -7.349], ABOVE_PAYABLES_BOARD: Point = [-1.76, 3.3, -7.349];
+const PAYABLES_BOARD: Point = [-2.26, 1.47, -7.349], ABOVE_PAYABLES_BOARD: Point = [-2.26, 3.3, -7.349];
 const colorDistance = (a: readonly number[], b: readonly number[]) => Math.max(...a.map((v, i) => Math.abs(v - b[i]!)));
 /** Bright board pixels that are not the cream background: the focus camera settled and the board drew. */
 async function payablesBoardDrawn(page: Page, canvas: Locator): Promise<number> {
