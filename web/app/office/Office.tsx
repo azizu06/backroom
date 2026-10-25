@@ -143,6 +143,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const [motions] = useState(() => new MotionRegistry());
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
+  const [teleportNonce, setTeleportNonce] = useState(0);
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null }; coworkers: { current: readonly CoworkerSpot[] }; entry: { current: PlayEntry | null }; last: { current: PlayEntry | null } } => ({
     input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null }, coworkers: { current: [] }, entry: { current: null }, last: { current: null },
   }));
@@ -264,8 +265,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setTalk(null);
     setMapOpen(false);
     play.entry.current = entry;
-    setLookOnEnter(true);
+    setTeleportNonce(nonce => nonce + 1);
+    if (mode !== 'play') setLookOnEnter(true);
     pickMode('play');
+    requestAnimationFrame(() => play.hud.current?.focus());
   }
   function toOverview() {
     document.exitPointerLock?.();
@@ -389,6 +392,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setDrawerOpen(false);
     setSheet(next);
   }
+  const playView = { ...play, story: storyChapter, teleportNonce };
   const seatStatuses = (<ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
       <div className='seat-statuses'>{visibleSeatAgents(snapshot).map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}
@@ -488,12 +492,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
       </button>}
       <p className='visually-hidden'>{`${plan ? 'Floor plan view' : '3D office view'}. Click a room, or use Rooms in the sidebar, to inspect badges and limits.`}</p>
-      <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
-        {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
+      <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} onPick={mode === 'play' ? openMenu : undefined} />} onFailure={onFailure}>
+        {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} onPick={mode === 'play' ? openMenu : undefined} /> : <>
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? { ...play, story: storyChapter } : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? playView : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
           </div>
           {/* The Full Floor summary announces every name and state (seatLabel). */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
@@ -501,13 +505,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
           </div>)}</div>}
           {!layers.floorPlan && <HandoffTags />}
-          {layers.floorPlan && <FloorPlan snapshot={snapshot} motions={motions} select={inspect} />}
+          {layers.floorPlan && <FloorPlan snapshot={snapshot} motions={motions} select={inspect} onPick={mode === 'play' ? openMenu : undefined} />}
         </>}
       </ViewBoundary>
       {mode === 'play' && layers.scene?.visible && (storyActive
         ? <div ref={play.hud} data-testid='story-camera' aria-hidden='true' />
         : <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} lookOnStart={lookOnEnter} onOverview={toOverview} chat={chat} keyOwners={{ story: storyActive, menu: !!menu || mapOpen || !!talk }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />)}
-      {mode === 'play' && <OverviewMap snapshot={snapshot} motions={motions} open={mapOpen} onPick={(pick, opener) => openMenu(pick, opener)} onFirstPerson={() => enterFirstPerson(play.last.current)} onClose={closeMap} />}
+      {mode === 'play' && <OverviewMap snapshot={snapshot} motions={motions} open={mapOpen} onPick={(pick, opener) => openMenu(pick, opener)} onFirstPerson={closeMap} onClose={closeMap} />}
       {mode === 'play' && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
       {mode === 'play' && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : 'Drag to look around · choose a room to focus'}</div>
