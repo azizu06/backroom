@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_POLICY } from '@backroom/policy';
 import { MemoryStateStore, type AuditInput } from '../store';
-import { runPreCall, type PreCallInput, type PreCallDependencies, type CreditCheck, type HealthCheck, type HealthResult } from './index';
+import { CallPlannerUnavailableError, runPreCall, type PreCallInput, type PreCallDependencies, type CreditCheck, type HealthCheck, type HealthResult } from './index';
 
 const input = (): PreCallInput => ({
   clientId: 'client-1042', invoiceId: '1042', testIdentityId: 7,
@@ -103,9 +103,13 @@ describe('collections pre-call', () => {
 
   it('audits a model outage without exposing provider errors or returning a plan', async () => {
     const { deps, audit } = harness();
-    deps.planner.draft = vi.fn(async () => { throw new Error('secret model provider response'); });
+    deps.planner.draft = vi.fn(async () => { throw new CallPlannerUnavailableError({
+      stage: 'cloud', status: 401, errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5',
+    }); });
     expect(await runPreCall(input(), deps)).toEqual({ status: 'blocked', reason: 'Call planner unavailable' });
-    expect((await audit()).at(-1)).toMatchObject({ action: 'call_plan', decision: 'DENY' });
+    expect((await audit()).at(-1)).toMatchObject({ action: 'call_plan', decision: 'DENY', inputs: {
+      reason: 'Call planner unavailable', failure: { stage: 'cloud', status: 401, errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5' },
+    } });
     expect(JSON.stringify(await audit())).not.toContain('secret');
   });
 

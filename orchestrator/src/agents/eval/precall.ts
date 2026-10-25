@@ -48,12 +48,17 @@ export async function runPrecallStop(id: PrecallStop) {
   const voice = createDialCallStarter({ apiKey: 'offline-not-a-key', now: at(localHour),
     http: async url => { providerRequests.push(String(url)); return Response.json({ calls: [{ agent_call_id: 'should-not-happen' }] }); },
     audit: async entry => { dialAudits.push(entry.action); }, prepare: async session => { prepared.push(session.id); } });
+  let creditCheckCalls = 0;
+  const credit = fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] });
   const deps = {
     cases: { load: async () => ({ sessionId: dialInput.sessionId, invoice: { amountCents: invoice.principalCents + invoice.lateFeeCents, currency: 'USD', daysPastDue: 40 },
       precall: { clientId: client.id, invoiceId: invoice.id, testIdentityId: 7, company: { name: client.name, website: 'https://example.invalid' }, context: policyContext },
       dial: dialInput }) },
     voice,
-    precall: { credit: fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] }), health: fakeHealthCheck({ signals: [] }),
+    precall: { credit: { label: credit.label, check: async (testIdentityId: number) => {
+      creditCheckCalls++;
+      return credit.check(testIdentityId);
+    } }, health: fakeHealthCheck({ signals: [] }),
       planner: { draft: async () => ({ output: { tone: 'neutral' as const, offerOrder: ['pay_in_full' as const],
         plan: { installments: 1, firstPaymentPct: 100, totalDays: 0, waiveFees: false, discountPct: 0 } }, route: 'local' as const, model: 'offline', latencyMs: 0, costUsd: 0 }) },
       audit: state, escalate: async () => {} },
@@ -97,6 +102,8 @@ export async function runPrecallStop(id: PrecallStop) {
     auditChain: (await state.verifyAuditChain()).valid,
   };
   return { id, match: Object.values(checks).every(Boolean), checks, expected, permit: permit ? { decision: permit.decision, ruleIds: permit.ruleIds } : null,
+    ...(id === 'C15' && { sanctionsEvidence: { fixtureOfacHit: policyContext.signals?.ofacHit === true, creditCheckCalls,
+      liveCrsExecuted: false, mappedSanctionsIdentity: null } }),
     plannerResult: planned.kind, email: { status: email.status, ...(email.status === 'blocked' ? { reason: email.reason } : {}), ...(late ? { afterHours: late.status === 'blocked' ? late.reason : late.status } : {}) }, directError: directError ?? null, providerRequests: providerRequests.length,
     scope: 'Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed.' };
 }
