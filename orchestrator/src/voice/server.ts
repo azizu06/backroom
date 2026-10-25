@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname } from 'node:path';
 import { identityFromAnswer, type InterpretAnswer } from './answer';
 import { wrongPersonSpeak, type VoiceSession } from './index';
-import { voiceTools } from './tools';
+import { APPROVAL_HOLD_MS, voiceTools } from './tools';
 
 interface JournalData { sessions: VoiceSession[]; events: { id: string; type: string; callId: string; at: string }[] }
 /** One local process, atomic file replacement. Inject a transactional DB adapter
@@ -56,6 +56,7 @@ const safeStops = ['record_opt_out', 'request_human', 'mark_dispute', 'report_al
 const MAX_IDENTITY_FAILURES = 2;
 /** The same refused request this many times in a row is a loop, not progress. */
 const MAX_REPEATED_DENIALS = 3;
+const HOLDING_LINE = 'Still waiting on Dana, thanks for holding.';
 const OPT_OUT = /\b(stop (calling|contacting|texting)( me)?|stop (the )?collection|(dont|don't|do not) (ever )?(call|contact)|never (call|contact)|no more calls|remove (me|my number)|take me off|unsubscribe|leave me alone|lose (this|my) number|opt(-| )?out)\b/i;
 const BANKRUPTCY = /\b(bankrupt(cy)?|chapter (7|11|13))\b/i;
 const HUMAN = /\b(speak|talk|transfer me|put me through|connect me)\b.{0,16}\b((a|an) (real |actual |live )?(human|person|representative)|(your|a|the) (manager|supervisor)|dana)\b/i;
@@ -72,6 +73,8 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
   interpretAnswer?: InterpretAnswer;
   /** Longest wait for a caller turn that has not arrived yet when identity is checked. */
   answerWaitMs?: number;
+  /** Longest a pending check_approval waits for Dana's decision, and how often it re-reads it. */
+  approvalHoldMs?: number; approvalPollMs?: number;
   /** Gateway call id (voice session id), not the provider call id. Closes that call's open approvals. */
   onCallEnded?: (gatewayCallId: string) => Promise<void> }) {
   if (![options.eventSecret, options.toolSecret, options.gatewaySecret].every(s => s.length > 0)) throw new Error('VOICE_SECRETS_REQUIRED');
@@ -114,7 +117,12 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
       if (!body || Array.isArray(body) || typeof body.call_id !== 'string' || typeof body.webhook_request_id !== 'string'
         || !/^[A-Za-z0-9_.:-]{1,200}$/.test(body.call_id) || !/^[A-Za-z0-9_.:-]{1,200}$/.test(body.webhook_request_id)) throw new HTTPError(400, 'INVALID_ENVELOPE');
       const interpreted = tool === 'verify_identity_result' ? await interpretIdentity(body.call_id) : undefined;
-      return await options.journal.transact(async data => {
+      // A pending approval is re-read outside the journal lock until Dana decides, the caller speaks,
+      // the call ends or the hold runs out, so the agent hears the decision without a caller turn.
+      const hold = tool === 'check_approval' ? options.approvalHoldMs ?? APPROVAL_HOLD_MS : 0, poll = options.approvalPollMs ?? 1500;
+      const started = Date.now();
+      let heardAtStart: number | undefined;
+      const deliver = (attempt: number) => options.journal.transact(async (data): Promise<Response | undefined> => {
         if (event) {
           // https://docs.cartesia.ai/line/infrastructure/observability#webhooks
           // Event IDs stay stable across retries. Commit event and state together.
@@ -184,7 +192,15 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
             const answer = interpreted && identity && JSON.stringify(identity.replies) === interpreted.replies ? interpreted.answer : undefined;
             payload.result = identityFromAnswer(answer, identity?.replies ?? [], session.contactName);
           }
-          result = await forward(tool, payload);
+          // Each re-read is its own gateway delivery; only the final answer advances the relay nonce.
+          result = await forward(tool, attempt ? { ...payload, webhook_request_id: `${nonce}.${attempt}` } : payload);
+          if (tool === 'check_approval' && result.kind === 'PENDING') {
+            const heard = identity?.turns ?? 0;
+            heardAtStart ??= heard;
+            if (heard === heardAtStart && Date.now() - started + poll < hold) return undefined;
+            result = { ...result, next_step: 'poll_again', speak: HOLDING_LINE };
+          }
+          if (tool === 'check_approval' && result.can_confirm === true) result = { ...result, next_step: 'confirm_plan' };
           if (safeStops.includes(tool) || payload.result === 'wrong_person') session.stopped = true;
           if (tool === 'verify_identity_result') {
             result = { ...result, identity: payload.result };
@@ -215,6 +231,11 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
         session.deliveries[nonce] = { fingerprint, next }; session.nonce = next;
         return response({ ...result, next_delivery_nonce: next });
       });
+      for (let attempt = 0; ; attempt++) {
+        const done = await deliver(attempt);
+        if (done) return done;
+        await new Promise(resolve => setTimeout(resolve, poll));
+      }
     } catch (error) {
       return response({ error: error instanceof HTTPError ? error.message : 'VOICE_ERROR', can_confirm: false }, error instanceof HTTPError ? error.status : 500);
     }
