@@ -10,6 +10,8 @@ describe('payment link toast', () => {
     expect(paymentLinkToAnnounce(null, new Set(), 5_000)).toBeNull();
     expect(paymentLinkToAnnounce(link, new Set(), 10_000)).toBeNull();
     expect(paymentLinkToAnnounce(link, new Set(['K7Q2']), 5_000)).toBeNull();
+    expect(paymentLinkToAnnounce({ code: 'K7Q2', expiresAt: Infinity }, new Set(), 5_000)).toBeNull();
+    expect(paymentLinkToAnnounce({ code: ' ', expiresAt: 10_000 }, new Set(), 5_000)).toBeNull();
     expect(paymentLinkToAnnounce({ code: '', expiresAt: 10_000 }, new Set(), 5_000)).toBeNull();
   });
   it('announces the next call’s link after an earlier one', () => {

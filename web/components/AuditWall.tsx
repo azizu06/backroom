@@ -81,6 +81,8 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
+        const session = await api('session', undefined, controller.signal);
+        if (!session.signedIn) { setLocked(true); setSnapshot(undefined); setAnswer(undefined); return; }
         const next: AuditSnapshot = await api('entries', undefined, controller.signal);
         setSnapshot(next); setLocked(false); setError('');
         const requested = new URLSearchParams(window.location.search).get('entry');
