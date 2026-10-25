@@ -10,6 +10,7 @@ import { BUILDING, DOORWAYS, WALL_THICKNESS, spaceAt } from "./layout";
 import { doorPosition } from "./doors";
 import { roomPropColliders } from './room-props';
 import { PINGPONG_COLLIDER } from './pingpong/table';
+import { WING_COLLIDERS } from './wing';
 
 const ALL = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const colliders = officeColliders(ALL);
@@ -36,9 +37,10 @@ describe("play constants", () => {
 describe("collisions", () => {
   const [cx, cz] = OFFICE_ANCHORS.collections.center;
   const wallFace = WALL_THICKNESS / 2;
-  it("keeps both room dressing and ping-pong solid after merging their mounts", () => {
+  it("keeps wing furniture, room dressing and ping-pong solid after merging their mounts", () => {
     for (const rooms of [ALL, []] as const) {
       const merged = officeColliders(rooms);
+      expect(merged).toEqual(expect.arrayContaining([...WING_COLLIDERS]));
       for (const footprint of [...roomPropColliders(rooms), PINGPONG_COLLIDER]) {
         expect(merged).toContainEqual(footprint);
         const x = (footprint.minX + footprint.maxX) / 2;
@@ -65,7 +67,7 @@ describe("collisions", () => {
   });
 
   it("stops at the outer walls and clamps to the floor bounds", () => {
-    expect(walk([-10, -0.5], [-1, 0], 5)[0]).toBeCloseTo(BUILDING.minX + wallFace + PLAYER_RADIUS, 3);
+    expect(walk([-21, -0.5], [-1, 0], 5)[0]).toBeCloseTo(BUILDING.minX + wallFace + PLAYER_RADIUS, 3);
     expect(walk([-0.8, 6], [0, 1], 5)[1]).toBeCloseTo(BUILDING.maxZ - wallFace - PLAYER_RADIUS, 3);
     expect(movePlayer([0, 0.5], [0, 20], [], PLAYER_RADIUS)).toEqual([0, BUILDING.maxZ - wallFace - PLAYER_RADIUS]);
   });

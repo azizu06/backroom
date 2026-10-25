@@ -6,7 +6,8 @@ import {
   type DressingBox, type FloorPoint, type PaintSegment,
 } from './dressing';
 import { FLOOR as PLAY_FLOOR, PLAYER_RADIUS, SPAWN, insideAny, movePlayer, officeColliders, type Box as PlayBox } from '../play';
-import { CLOCK_INTERACTION, OFFICE_PROP_INTERACTIONS, WHITEBOARD_INTERACTION } from './index';
+import { OFFICE_PROP_INTERACTIONS, WHITEBOARD_INTERACTION } from './index';
+import { CLOCK_MOUNT } from './clock';
 import { WHITEBOARD } from './whiteboard';
 import { BUILDING, LOBBY_BOARD, CORRIDOR, CORRIDOR_Z, DOOR_OPENING_HEIGHT, SPACES, WALL_THICKNESS, doorway, roomPad, roomPoint, wallColliders } from '../layout';
 import { doorPosition } from '../doors';
@@ -50,7 +51,8 @@ const OBSTACLES: Box[] = [
   rect('lobby board', LOBBY_BOARD[0], LOBBY_BOARD[1], 2, 0.2),
   rect('inbox tray', PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1),
   span('whiteboard', WHITEBOARD_INTERACTION.position[0] - WHITEBOARD.width / 2, WHITEBOARD_INTERACTION.position[0] + WHITEBOARD.width / 2, BUILDING.minZ + 0.09, BUILDING.minZ + 0.33),
-  span('clock', BUILDING.minX + 0.06, BUILDING.minX + 0.16, CLOCK_INTERACTION.position[1] - 0.4, CLOCK_INTERACTION.position[1] + 0.4),
+  span('clock', CLOCK_MOUNT.position[0] - CLOCK_MOUNT.radius, CLOCK_MOUNT.position[0] + CLOCK_MOUNT.radius,
+    CLOCK_MOUNT.position[2], CLOCK_MOUNT.position[2] + CLOCK_MOUNT.bracketLength + CLOCK_MOUNT.radius),
   ...PLANT_SPOTS.map(([x, z]) => rect('plant', x, z, 1, 1)),
   ...wallColliders().map((wall, i) => toRect(`wall ${i}`, wall)),
   span('treasury door keep-clear', TREASURY_DOOR[0] - 1.5, TREASURY_DOOR[0] + 1.5, TREASURY_DOOR[1] - 0.65, TREASURY_DOOR[1] + 0.65),

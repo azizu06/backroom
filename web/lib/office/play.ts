@@ -1,3 +1,4 @@
+import { WING_COLLIDERS } from './wing';
 /**
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
@@ -67,7 +68,7 @@ const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfie
  */
 export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...roomPropColliders(rooms), PINGPONG_COLLIDER];
+  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...WING_COLLIDERS, ...roomPropColliders(rooms), PINGPONG_COLLIDER];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
     const [x, z] = OFFICE_ANCHORS[room].center;
