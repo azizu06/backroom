@@ -56,7 +56,7 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await openMenu(page);
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   // Pass the collections doorway between its posts, then move to the phone's aisle-side x.
   await page.keyboard.down('w');
@@ -93,7 +93,7 @@ test('phone stays idle without the mock query', async ({ page }) => {
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await openMenu(page);
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeVisible();
   // Target is already within reach at spawn only after approaching the Collections desk.
   await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.0); await page.keyboard.up('w');

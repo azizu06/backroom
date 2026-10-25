@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openPanels } from './office-menu';
+import { openAuditSheet } from './office-menu';
 
 test('payment notice tracks the active link and remembers dismissal per code', async ({ page }) => {
   let active: { code: string; expiresAt: number } | null = null;
@@ -32,7 +32,7 @@ test('anonymous office and audit show sign-in without protected audit requests o
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
-  await openPanels(page);
+  await openAuditSheet(page);
   await expect(page.locator('#office-audit-wall').getByLabel('Operator code')).toBeVisible();
   await page.goto('/audit');
   await expect(page.getByLabel('Operator code')).toBeVisible();

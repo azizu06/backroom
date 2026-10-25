@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openMenu, openPanels } from './office-menu';
+import { openMenu, openOverviewSheet } from './office-menu';
 
 // Mock handoff stream (`?handoffs=mock`). Run via test:office:browser after building; needs WebGL.
 // Set HANDOFF_SHOTS=/some/dir to also save demo screenshots there.
@@ -42,7 +42,7 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
-  await openPanels(page);
+  await openOverviewSheet(page);
   await requireWebGL(page);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Agent handoffs' })).toBeVisible();
@@ -74,7 +74,7 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
 test('reduced motion lists handoffs instead of animating them', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
-  await openPanels(page);
+  await openOverviewSheet(page);
   await requireWebGL(page);
   const region = page.getByRole('region', { name: 'Agent handoffs' });
   await expect(region).toContainText('Reduced motion · listed instead of animated');
@@ -91,7 +91,7 @@ test('renders the first four handoffs from the mocked feed', async ({ page }) =>
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await installHandoffClock(page);
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=8');
-  await openPanels(page);
+  await openOverviewSheet(page);
   await requireWebGL(page);
   const entries = log(page).locator('li[data-status]');
   await expect(page.getByText('No handoffs yet.')).toBeVisible();
@@ -162,13 +162,13 @@ async function face(page: Page, x: number, z: number, tolerance = 0.08) {
 test('play mode: facing a handoff agent and pressing E shows the handoff details', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/office?handoffs=mock&view=overview');
-  await openPanels(page);
+  await openOverviewSheet(page);
   await requireWebGL(page);
   // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
   await expect(log(page)).toContainText('INV-1043', { timeout: 10_000 });
   await page.waitForTimeout(6_000);
   await openMenu(page);
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   // Intake stands in the lobby at (-10, 4), behind and to the left of the spawn; the path through the lobby opening is clear.
@@ -207,7 +207,7 @@ test('voices stay off until enabled, then speak handoff lines through the proxy'
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
-  await openPanels(page);
+  await openOverviewSheet(page);
   const toggle = page.getByRole('button', { name: 'Voices off' });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await page.waitForTimeout(1500);
@@ -230,7 +230,7 @@ test('a failing voice proxy falls back to silent visuals', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
-  await openPanels(page);
+  await openOverviewSheet(page);
   await page.getByRole('button', { name: 'Voices off' }).click();
   await expect(page.getByText('Voices unavailable · visuals only')).toBeVisible({ timeout: 20_000 });
   const after = calls;

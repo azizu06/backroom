@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openOverviewSheet } from './office-menu';
 
 test('lobby props render and stamp the latest Treasury denial without page errors', async ({ page }) => {
   const errors: string[] = [];
@@ -9,9 +10,8 @@ test('lobby props render and stamp the latest Treasury denial without page error
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await expect(page.getByRole('img', { name: /^Inbox · \d+$/ })).toHaveCount(1);
   await expect(page.getByTestId('lobby-deny-stamp')).toHaveCount(0);
-  // Preview controls sit in the corner menu (closed by default); a pick closes it again.
-  const menu = page.getByRole('button', { name: 'Backroom menu' });
-  if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
+  // Preview controls live in the Full Floor sheet.
+  await openOverviewSheet(page);
   await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);

@@ -19,7 +19,7 @@ test('/office opens on the Enter the office splash and Enter starts first person
   await expect(gate).toHaveCount(0);
   await expect(surface(page)).toBeFocused();
   await expect(page.getByLabel('Office view')).toHaveValue('play');
-  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Overview|Rooms \/ Overview/ })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('office.start'))).toBe('play');
   expect(errors).toEqual([]);
 });
@@ -27,13 +27,12 @@ test('/office opens on the Enter the office splash and Enter starts first person
 test.describe('at 1440x1000', () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
 
-  test('the site nav stays inert behind the splash', async ({ page }) => {
+  test('the office sidebar stays inert behind the splash', async ({ page }) => {
     await page.goto('/office');
     const gate = splash(page);
     await expect(gate).toBeVisible();
     expect(await gate.evaluate(element => element.tagName)).not.toBe('DIALOG');
-    // With nothing in the nav kept live, the inert boundary may sit on the nav itself or an ancestor.
-    expect(await page.locator('.site-nav > ul').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
+    expect(await page.getByRole('complementary', { name: 'Office navigation' }).evaluate(element => element.closest('[inert]') !== null)).toBe(true);
   });
 });
 
@@ -46,10 +45,10 @@ test('the Enter key starts first person from the splash', async ({ page }) => {
 });
 
 test('Tab three times stays in the splash, Escape closes it, and focus returns to the opener', async ({ page }) => {
-  // Focus a real control before hydration so the splash's opener is the corner menu button, not the body.
+  // Focus a real control before hydration so the splash's opener is the Play button, not the body.
   await page.addInitScript(() => {
     window.addEventListener('DOMContentLoaded', () => {
-      document.querySelector<HTMLElement>('.office-corner-toggle')?.focus();
+      document.querySelector<HTMLElement>('.office-enter-play')?.focus();
     });
   });
   await page.goto('/office');
@@ -64,9 +63,9 @@ test('Tab three times stays in the splash, Escape closes it, and focus returns t
   await page.keyboard.press('Tab');
   await expect(overview).toBeFocused();
   await expect(gate.locator(':focus')).toHaveCount(1);
-  const menu = page.locator('.office-corner-toggle');
-  expect(await page.locator('.office-corner-toggle').evaluate(element => element.closest('[inert]') !== null)).toBe(true);
-  const blocked = await menu.evaluate(el => {
+  const play = page.locator('.office-enter-play');
+  expect(await play.evaluate(element => element.closest('[inert]') !== null)).toBe(true);
+  const blocked = await play.evaluate(el => {
     const rect = el.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     el.focus();
@@ -76,7 +75,7 @@ test('Tab three times stays in the splash, Escape closes it, and focus returns t
   await page.keyboard.press('Escape');
   await expect(gate).toHaveCount(0);
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
-  await expect(page.getByRole('button', { name: 'Backroom menu' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Play (First Person)', exact: true })).toBeFocused();
 });
 
 test('the splash traps Tab at both ends and Escape still opens the overview', async ({ page }) => {
@@ -110,14 +109,14 @@ test('choosing the overview is remembered for the next visit', async ({ page }) 
   expect(await page.evaluate(() => localStorage.getItem('office.start'))).toBe('overview');
   await page.reload();
   await openMenu(page);
-  await expect(page.getByRole('button', { name: 'Enter first person' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Play (First Person)', exact: true })).toBeVisible();
   await expect(splash(page)).toHaveCount(0);
 });
 
-test('?view=overview shows no splash and offers Enter first person', async ({ page }) => {
+test('?view=overview shows no splash and offers Play (First Person)', async ({ page }) => {
   await page.goto('/office?view=overview');
   await openMenu(page);
-  const enter = page.getByRole('button', { name: 'Enter first person' });
+  const enter = page.getByRole('button', { name: 'Play (First Person)', exact: true });
   await expect(enter).toBeVisible();
   await expect(splash(page)).toHaveCount(0);
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
@@ -125,10 +124,10 @@ test('?view=overview shows no splash and offers Enter first person', async ({ pa
   await expect(surface(page)).toBeFocused();
   await expect(enter).toHaveCount(0);
   // The Enter click asked for pointer lock, which routes mouse clicks to the surface: activate by keyboard.
-  await page.getByRole('button', { name: 'Overview', exact: true }).press('Enter');
+  await page.getByRole('button', { name: /^Overview|Rooms \/ Overview/ }).press('Enter');
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
   await openMenu(page);
-  await expect(page.getByRole('button', { name: 'Enter first person' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Play (First Person)', exact: true })).toBeVisible();
 });
 
 test('the splash does not animate with reduced motion', async ({ page }) => {
@@ -141,12 +140,12 @@ test('the splash does not animate with reduced motion', async ({ page }) => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test('starts in the overview with an Enter first person button', async ({ page }) => {
+  test('starts in the overview with a Play (First Person) button', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('/office');
     await openMenu(page);
-    const enter = page.getByRole('button', { name: 'Enter first person' });
+    const enter = page.getByRole('button', { name: 'Play (First Person)', exact: true });
     await expect(enter).toBeVisible();
     await expect(splash(page)).toHaveCount(0);
     await expect(page.getByLabel('Office view')).not.toHaveValue('play');

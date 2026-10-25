@@ -22,8 +22,9 @@ async function openBaked(page: Page) {
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('canvas')).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
-  // Preview controls sit in the corner menu (closed by default); a pick closes it again.
-  await page.getByRole('button', { name: 'Backroom menu' }).click();
+  // Preview controls live in the Full Floor sheet.
+  const { openOverviewSheet } = await import('./office-menu');
+  await openOverviewSheet(page);
   await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
   return { warnings, errors };
@@ -31,7 +32,7 @@ async function openBaked(page: Page) {
 
 async function enterPlay(page: Page) {
   await openMenu(page);
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
 }

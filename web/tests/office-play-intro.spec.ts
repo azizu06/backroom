@@ -43,7 +43,7 @@ test('Play hands control over after the intro and immediately with reduced motio
   await expect(view).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await openMenu(page);
-  await view.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await page.waitForTimeout(1200);
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
@@ -68,7 +68,7 @@ test('Play hands control over after the intro and immediately with reduced motio
       else if (!Number.isNaN(clock.keyed) && Number.isNaN(clock.moved) && Number(clock.spawnZ) - Number(z) > 0.03) clock.moved = performance.now();
     }).observe(document.body, { attributes: true, attributeFilter: ['data-player-z'], subtree: true });
   });
-  await view.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', '0.600');
   await page.keyboard.down('w');

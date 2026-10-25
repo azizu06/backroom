@@ -21,7 +21,7 @@ async function enterPlay(page: Page, url: string) {
   if (!available) throw new Error('WebGL is unavailable in this headless Chromium, so the first-person Play view cannot render.');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await openMenu(page);
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 20_000 });
 }
