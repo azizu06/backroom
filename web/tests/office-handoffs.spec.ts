@@ -20,6 +20,23 @@ function tag(page: Page, actor: string) {
   return page.locator(`[data-handoff-actor='${actor}']`);
 }
 
+const HANDOFF_TEST_EPOCH = 1_800_000_000_000;
+async function installHandoffClock(page: Page) {
+  await page.addInitScript(epoch => {
+    let now = epoch;
+    Date.now = () => now;
+    Object.defineProperty(window, '__setHandoffTestNow', {
+      configurable: true,
+      value: (next: number) => { now = next; },
+    });
+  }, HANDOFF_TEST_EPOCH);
+}
+async function setHandoffTime(page: Page, elapsed: number) {
+  await page.evaluate(([epoch, offset]) => {
+    (window as typeof window & { __setHandoffTestNow(next: number): void }).__setHandoffTestNow(epoch + offset);
+  }, [HANDOFF_TEST_EPOCH, elapsed] as const);
+}
+
 test('mock handoffs walk folders between desks, return a rejected folder, show a correction and call Dana only for the passkey', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -68,11 +85,18 @@ test('reduced motion lists handoffs instead of animating them', async ({ page })
 
 test('renders the first four handoffs from the mocked feed', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await installHandoffClock(page);
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=8');
   await requireWebGL(page);
   const entries = log(page).locator('li[data-status]');
+  await expect(page.getByText('No handoffs yet.')).toBeVisible();
+  // Feed lead is 600 ms; at 2,000 ms the fourth row has arrived and the fifth has not.
+  await setHandoffTime(page, 2_000);
   // The first four fixture handoffs include the first five-role chain and arrive before later fixtures.
   await expect(entries).toHaveCount(4, { timeout: 10_000 });
+  // Real wall-clock delay cannot race this assertion into a later fixture snapshot.
+  await page.waitForTimeout(1_000);
+  await expect(entries).toHaveCount(4);
   await expect(entries.nth(0)).toContainText('Intake → Extractor · INV-1042');
   await expect(entries.nth(1)).toContainText('Collections → Auditor · INV-0977');
   await expect(entries.nth(2)).toContainText('Intake → Extractor · INV-1043');
