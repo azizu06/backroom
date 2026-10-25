@@ -59,10 +59,12 @@ export function AgentChatBubbles({ stage, reduced, connection, tag }: {
   useEffect(() => { invalidate(); }, [source, reduced, invalidate]);
   useEffect(() => () => clearTimeout(wake.current.timer), []);
   useLayoutEffect(() => {
+    // Only the tag's name label duplicates the plate's header. The tag's handoff bubble (rejection evidence,
+    // correction, passkey) is not duplicated by chat and stays owned by HandoffLayer, so it is never hidden here.
     // Display is independent of HandoffLayer's per-frame visibility projection.
-    const hidden: { element: HTMLDivElement; display: string }[] = [];
+    const hidden: { element: HTMLElement; display: string }[] = [];
     for (const cue of active) {
-      const element = tag?.(cue.actor);
+      const element = tag?.(cue.actor)?.querySelector<HTMLElement>(':scope > strong');
       if (!element) continue;
       hidden.push({ element, display: element.style.display });
       element.style.display = 'none';
