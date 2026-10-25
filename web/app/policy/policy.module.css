@@ -1,7 +1,6 @@
 .page { color-scheme: dark; background: #0b141c; color: #edf2f3; min-height: 100svh; font: 16px/1.5 system-ui, sans-serif; padding: 0 24px 180px; }
 .page * { box-sizing: border-box; }
 .content { max-width: 1000px; margin: auto; }
-.page header { display: flex; gap: 24px; justify-content: space-between; border-bottom: 1px solid #344655; padding: 24px 0; }
 .page a { color: #bad9f5; text-underline-offset: 4px; }
 .page h1 { font-size: 30px; font-weight: 600; margin: 32px 0 8px; }
 .page h2 { font-size: 21px; margin: 0 0 16px; font-weight: 600; }

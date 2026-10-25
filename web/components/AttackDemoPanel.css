@@ -1,5 +1,5 @@
 .attack-page { min-height: 100vh; box-sizing: border-box; padding: 28px 20px 100px; background: #202620; color: #d0d6c6; font: 15px/1.6 system-ui, sans-serif; }
-.attack-page > nav, .attack-panel { max-width: 900px; margin: 0 auto; }
+.attack-panel { max-width: 900px; margin: 0 auto; }
 .attack-page a { color: #f3dfb9; }
 .attack-panel { margin-top: 20px; padding: 28px; box-sizing: border-box; background: #272f25; border: 1px solid #8b987b; overflow-wrap: anywhere; }
 .attack-panel h1 { margin: 0; color: #f3dfb9; font-size: clamp(25px, 5vw, 36px); line-height: 1.25; }

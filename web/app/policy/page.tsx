@@ -56,10 +56,9 @@ export default function PolicyPage() {
     finally { setBusy(false); }
   }
   return <main className={styles.page}><div className={styles.content}>
-    <header><a href="/office">Backroom</a><a href="/audit">Audit wall</a></header>
     <h1>Owner policy</h1>
     <p className={styles.intro}>Set the limits each seat may accept. Requests outside a badge still go to Dana.</p>
-    <p className={styles.auth}>Operator sign-in or owner demo PIN · Policy editing is unavailable to agents and voice tools.</p>
+    <p className={styles.auth}>Unlock with the operator code or the owner PIN. Agents and voice tools can never edit policy.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
     {!policy ? <>

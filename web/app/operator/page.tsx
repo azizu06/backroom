@@ -87,7 +87,6 @@ export default function OperatorPage() {
   }
   const controllerUrl = links.publicUrl ? `${links.publicUrl}/controller` : '';
   return <main className={styles.page}><div className={styles.content}>
-    <header><a href='/office'>Backroom office</a><span className={styles.pill}>Demo · synthetic company · sandbox money</span><a href='/real-vs-sim'>What is real?</a></header>
     <h1>Demo operator</h1>
     <p className={styles.lede}>Run the demo top to bottom. Every action is audited; approvals still need Dana&rsquo;s passkey.</p>
     {error && <p role='alert' className={styles.error}>{error}</p>}
@@ -96,7 +95,7 @@ export default function OperatorPage() {
         <label>Operator code <input type='password' autoComplete='off' required value={code} onChange={e => setCode(e.target.value)} /></label>
         <button className={styles.primary} disabled={!!busy || !code}>{busy === 'session' ? 'Signing in…' : 'Sign in'}</button>
       </form></section>
-      <section className={styles.card}><h2>On the host itself</h2><p>At the demo host&rsquo;s numeric loopback address you can unlock this console without the code.</p>
+      <section className={styles.card}><h2>On the host itself</h2><p>On the demo laptop itself (127.0.0.1), you can unlock this console without the code.</p>
       <button disabled={!!busy} onClick={() => void unlock()}>Unlock local operator session</button></section></> : <>
       <div className={styles.session}><p role='status'>{busy ? `${operatorActions[busy as OperatorAction]?.[0] || 'Working'}…` : offBusy ? 'Turning models OFF…' : 'Operator session active.'}</p>
         <button disabled={!!busy || offBusy} onClick={() => { void fetch('/api/operator/logout', { method: 'POST' }).then(response => { if (response.ok) setAuthorized(false); }); }}>Lock console</button></div>

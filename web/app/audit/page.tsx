@@ -13,7 +13,6 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     return recording ? <ReplaySession recording={recording} view='audit' /> : <ReplayUnavailable />;
   }
   return <main>
-    <nav aria-label="Office" className="audit-page-nav"><a href="/">← Back to office</a></nav>
     <AuditWall originRejected={ORIGIN_REJECTED} codeRejected={CODE_REJECTED} />
   </main>;
 }

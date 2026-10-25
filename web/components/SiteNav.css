@@ -14,7 +14,10 @@
 @media (max-width: 760px) {
   .site-nav { flex-wrap: wrap; gap: 0 10px; padding: 0 12px; }
   .site-nav a { min-height: 40px; padding: 0 8px; }
-  /* The disclosure takes its own row so the links keep their tap targets. */
-  .site-nav-note { order: 1; flex-basis: 100%; padding-bottom: 8px; }
+  .site-nav .site-nav-real { margin-left: auto; }
+  /* Links wrap onto their own rows instead of scrolling out of sight; the disclosure follows. */
+  .site-nav ul { order: 1; flex-basis: 100%; flex-wrap: wrap; overflow: visible; margin-left: -8px; }
+  .site-nav ul a { height: 36px; min-height: 36px; }
+  .site-nav-note { order: 2; flex-basis: 100%; padding: 4px 0 8px; }
   .site-nav .demo-pill { white-space: normal; }
 }
