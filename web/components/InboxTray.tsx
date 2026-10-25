@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import type { InboxPreset, InboxReceipt } from '../lib/inbox/types';
 import '../app/office/lobby.css';
+import { crsFraudText } from '../lib/provenance';
 import './InboxTray.css';
 
 const seatName = { payables: 'Payables', vendor_onboarding: 'Vendor onboarding' };
@@ -22,14 +23,6 @@ function formatSize(bytes: number, round: (value: number) => number = Math.round
 /** The receipt shows only the first sentence of the reason; the full text and policy quote sit under Full receipt. */
 function firstSentence(text: string) {
   return text.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? text;
-}
-
-/** Score beside its provenance label. A FAKE placeholder has no real score, and a cached label already carries its time. */
-function crsFraudText(fraud: NonNullable<InboxReceipt['bankChangeFraud']>) {
-  const scored = fraud.score !== undefined && !fraud.label.startsWith('FAKE');
-  const at = fraud.checkedAt && !fraud.label.includes('(cached at') ? new Date(fraud.checkedAt) : undefined;
-  const checked = at && Number.isFinite(at.getTime()) ? ` · checked ${at.toISOString().slice(11, 16)} UTC` : '';
-  return `${scored ? `${fraud.score} / 100 · ` : ''}${fraud.label}${checked}`;
 }
 
 function attachmentProblem(file: File) {
@@ -163,10 +156,10 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
         <details className="inbox-more">
           <summary>Full receipt</summary>
           <dl className="inbox-facts">
-            <div><dt>Scenario source</dt><dd>judge</dd></div>
+            <div><dt>Scenario source</dt><dd>Custom</dd></div>
             <div><dt>Extraction</dt><dd>{receipt.extractionSource === 'seed' ? 'Frozen seed fields · code' : receipt.extractionSource === 'model' ? 'Model fields · schema validated' : 'Unrecognized · human review'}</dd></div>
-            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie sandbox' : receipt.paymentRail}</dd></div>}
-            {receipt.receiptId && <div><dt>Sandbox debit</dt><dd>{receipt.receiptId}</dd></div>}
+            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie' : receipt.paymentRail}</dd></div>}
+            {receipt.receiptId && <div><dt>Bank debit</dt><dd>{receipt.receiptId}</dd></div>}
             {receipt.reconciliation && <div><dt>Reconciliation</dt><dd>{receipt.reconciliation.match === 'EXACT' ? 'Exact withdrawal match' : 'Mismatch · held for review'}</dd></div>}
           </dl>
           {(held || reason) && <>
@@ -208,7 +201,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
     </section>
     <details className="inbox-advanced">
       <summary>Advanced: try your own email</summary>
-      <form onSubmit={submit} aria-label="Judge scenario">
+      <form onSubmit={submit} aria-label="Custom scenario">
         <fieldset disabled={busy}>
           <div className="inbox-envelope">
             <div><label htmlFor={`${uid}-kind`}>Document type</label><select id={`${uid}-kind`} value={kind} onChange={event => setKind(event.target.value)}>

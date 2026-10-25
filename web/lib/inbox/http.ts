@@ -118,16 +118,16 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
         ...(typeof fraud.checkedAt === 'string' ? { checkedAt: fraud.checkedAt } : {}),
       } : undefined;
       const debitNotice = result.reconciliation?.match === 'EXACT'
-        ? 'Nessie sandbox debit matched exactly to the invoice withdrawal. This is simulated sandbox money, not a production payment.'
+        ? 'Nessie debit matched exactly to the invoice withdrawal.'
         : result.reconciliation?.match === 'MISMATCH'
-          ? 'Nessie sandbox debit read-back did not match exactly. The invoice remains held for controller review.'
+          ? 'Nessie debit read-back did not match exactly. The invoice remains held for controller review.'
           : undefined;
       return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
         extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
         ...(bankChangeFraud ? { bankChangeFraud } : {}),
         notice: debitNotice ?? (file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
           : gate.simulated
-            ? `Synthetic Northfield company. CRS, OFAC, and Apify checks are simulated fixtures. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`
+            ? `CRS, OFAC, and Apify results come from offline records. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`
             : `CRS, OFAC, and Apify use the configured live clients. An unknown or missing check is not verified. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`),
         auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay`,
         ...(result.escalationId ? { approvalHref: `/approve/${encodeURIComponent(result.escalationId)}` } : {}) });

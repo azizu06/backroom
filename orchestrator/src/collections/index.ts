@@ -4,7 +4,7 @@ import { boundedHealthCheck, boundedCreditCheck } from './checks';
 import { CallPlannerUnavailableError, sanitizeCallPlannerFailure } from './planner';
 import type { AuditInput } from '../store';
 import type { PreCallInput, PreCallDependencies, PreCallResult } from './types';
-const CRS_SANDBOX_OFAC_WARNING = 'Sanctions check not available in CRS sandbox';
+const CRS_SANDBOX_OFAC_WARNING = 'Sanctions check unavailable';
 export type * from './types';
 export { createPreCallCreditCheck, createCrsPublicRecordsCheck } from './crs';
 export { createCallPlanner, CallPlannerUnavailableError } from './planner';

@@ -1,16 +1,17 @@
 /* Shared palette tokens (app/theme.css). */
-.attack-page { min-height: 100vh; box-sizing: border-box; padding: 28px 20px 100px; color: var(--ink); font: 15px/1.6 var(--font-ui); }
-.attack-panel { max-width: 900px; margin: 0 auto; }
+.attack-page { min-height: 100vh; box-sizing: border-box; padding: 12px 24px 96px; color: var(--ink); font: 15px/1.6 var(--font-ui); }
+.attack-panel { max-width: 960px; margin: 0 auto; }
 .attack-page a { color: var(--ink); }
-.attack-panel { margin-top: 20px; padding: 28px; box-sizing: border-box; background: var(--bubble-glass); border: var(--bubble-border); border-radius: var(--bubble-radius); box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); overflow-wrap: anywhere; }
-.attack-panel h1 { margin: 0; font-weight: 900; color: var(--ink); font-size: clamp(25px, 5vw, 36px); line-height: 1.25; }
+.attack-panel { margin-top: 20px; padding: 32px; box-sizing: border-box; background: var(--bubble-glass); border: var(--bubble-border); border-radius: var(--bubble-radius); box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); overflow-wrap: anywhere; }
+.attack-panel h1 { margin: 0; font-weight: 900; color: var(--ink); font-size: 32px; line-height: 1.15; text-wrap: balance; }
+.attack-panel header > p { color: var(--ink-soft); max-width: 70ch; margin-top: 8px; }
 .attack-panel h2 { font-size: 21px; color: var(--ink); }
 .attack-panel h3 { margin: 0 0 8px; font-size: 17px; color: var(--ink); }
 .attack-panel p { margin: 10px 0 16px; }
 .attack-eyebrow, .attack-help { font-size: 13px; }
 .attack-eyebrow { font-weight: 600; }
 .attack-panel fieldset { min-width: 0; margin: 20px 0; padding: 0; border: 0; }
-.attack-panel legend, .attack-panel form > label { margin-bottom: 8px; font-weight: 600; }
+.attack-panel legend, .attack-panel form > label { margin-bottom: 8px; padding: 0; font-weight: 800; }
 .attack-panel button, .attack-panel textarea { font: inherit; color: var(--ink); background: var(--field); border: 2px solid var(--pastel-aqua); border-radius: 22px; }
 .attack-panel button { min-height: 44px; padding: 8px 16px; font-weight: 800; cursor: pointer; }
 .attack-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -42,10 +43,11 @@
 .attack-evidence dd { margin: 0 0 8px; white-space: pre-wrap; }
 .attack-panel code { padding: 2px 8px; color: var(--on-pastel); background: var(--pastel-yellow); border-radius: 999px; font-size: 13px; }
 .attack-panel .attack-money { font-size: clamp(19px, 3vw, 25px); font-weight: 700; }
-.attack-panel .attack-error { padding: 12px 16px; border-left: 5px solid var(--danger); border-radius: 20px; background: var(--danger-soft); color: var(--ink); }
+.attack-panel .attack-error { padding: 12px 16px; border: 2px solid var(--danger); border-radius: 20px; background: var(--danger-soft); color: var(--ink); }
 @media (max-width: 760px) {
-  .attack-page { padding: 16px 10px 100px; }
-  .attack-panel { padding: 16px; }
+  .attack-page { padding: 8px 8px 96px; }
+  .attack-panel { padding: 20px 16px; }
+  .attack-panel h1 { font-size: 28px; }
   .attack-trace li, .attack-decision { padding: 12px; }
   .attack-run { width: 100%; }
 }

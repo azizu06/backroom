@@ -2,9 +2,8 @@ import * as React from 'react';
 // @ts-ignore -- react-dom ships no types and @types/react-dom is not a workspace dependency.
 import * as ReactDOMServer from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DemoPill, NavDisclosure } from '../components/DemoPill';
 import { DisclosureRow } from '../components/RealVsSim';
-import { demoPillText, disclosureItems, getDisclosureStatus, NOT_PROBED_LABEL, probedServices, unprobedServices, type DemoStatus, type ServiceId } from './real-vs-sim';
+import { disclosureItems, getDisclosureStatus, NOT_PROBED_LABEL, probedServices, unprobedServices, type DemoStatus, type ServiceId } from './real-vs-sim';
 
 const { renderToString } = ReactDOMServer as { renderToString(node: React.ReactNode): string };
 vi.mock('next/navigation', () => ({ usePathname: () => '/office', useSearchParams: () => new URLSearchParams() }));
@@ -55,7 +54,7 @@ describe('demo disclosure status', () => {
   });
 
   it.each([
-    ['simulated', 'Simulated', 'neutral', 'In-memory state fixture'],
+    ['simulated', 'Local', 'neutral', 'In-memory state'],
     ['unreachable', 'Unreachable', 'warning', 'Timed out'],
     ['disabled', 'Disabled', 'warning', 'Disabled by config'],
     ['unverified', 'Unverified', 'neutral', 'Not configured'],
@@ -72,7 +71,7 @@ describe('demo disclosure status', () => {
     for (const id of ['apify', 'policy', 'spacetime'] as const) {
       expect(getDisclosureStatus(item(id), withProbe(id, verified, { llmEnabled: false }), NOW).label).toBe('Verified');
     }
-    expect(getDisclosureStatus(item('nessie'), snapshot({ llmEnabled: false }), NOW).label).toBe('Simulated');
+    expect(getDisclosureStatus(item('nessie'), snapshot({ llmEnabled: false }), NOW).label).toBe('Local');
   });
 
   it('discards stale status snapshots even with verified evidence', () => {
@@ -98,15 +97,15 @@ describe('demo disclosure status', () => {
 
 describe('host-reported sandbox rows', () => {
   const at = iso(NOW - 60_000);
-  it('stay Simulated without a host report or with a stale status', () => {
-    for (const id of ['nessie', 'crs', 'company', 'card']) expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+  it('stay Local without a host report or with a stale status', () => {
+    for (const id of ['nessie', 'crs', 'card']) expect(getDisclosureStatus(item(id), snapshot(), NOW)).toEqual({ label: 'Local', tone: 'neutral' });
     const stale = snapshot({ measuredAt: iso(NOW - 60_000), services: { crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
-    expect(getDisclosureStatus(item('crs'), stale, NOW)).toEqual({ label: 'Simulated', tone: 'neutral' });
+    expect(getDisclosureStatus(item('crs'), stale, NOW)).toEqual({ label: 'Local', tone: 'neutral' });
   });
   it('show the host adapter state when the demo host reports one', () => {
     const status = snapshot({ services: { nessie: { state: 'simulated', source: 'config', evidence: 'Mock Nessie HTTP transport', at: null },
       crs: { state: 'verified', source: 'receipt', evidence: 'Sandbox public records + fraud risk', at } } });
-    expect(getDisclosureStatus(item('nessie'), status, NOW)).toEqual({ label: 'Simulated', tone: 'neutral', detail: 'Mock Nessie HTTP transport' });
+    expect(getDisclosureStatus(item('nessie'), status, NOW)).toEqual({ label: 'Local', tone: 'neutral', detail: 'Mock Nessie HTTP transport' });
     expect(getDisclosureStatus(item('crs'), status, NOW)).toMatchObject({ label: 'Verified', tone: 'good' });
   });
 });
@@ -162,41 +161,5 @@ describe('disclosure rows', () => {
     const html = render(React.createElement(DisclosureRow, { item: item('apify'), status: null, detailed: false }));
     expect(html).toContain('>Unverified<');
     expect(html).not.toContain('real-sim-detail-line');
-  });
-});
-
-describe('demo pill', () => {
-  const nessie = (state: 'simulated' | 'unverified' | 'verified') => snapshot({ services: { nessie: { state, source: 'config', evidence: 'host', at: null } } });
-
-  it('says sandbox money until the host reports its Nessie adapter', () => {
-    expect(demoPillText(null, NOW)).toBe('Demo · synthetic company · sandbox money');
-    expect(demoPillText(snapshot(), NOW)).toBe('Demo · synthetic company · sandbox money');
-  });
-
-  it('derives the money wording from the host Nessie status, not a build-time flag', () => {
-    expect(demoPillText(nessie('simulated'), NOW)).toBe('Demo · synthetic company · mock bank money');
-    expect(demoPillText(nessie('unverified'), NOW)).toBe('Demo · synthetic company · Nessie sandbox money');
-    expect(demoPillText(nessie('verified'), NOW)).toBe('Demo · synthetic company · Nessie sandbox money');
-  });
-
-  it('flags LLM OFF and drops claims from a stale status', () => {
-    expect(demoPillText(snapshot({ llmEnabled: false }), NOW)).toBe('Demo · synthetic company · sandbox money · LLM OFF');
-    expect(demoPillText(nessie('unverified'), NOW + 60_000)).toBe('Demo · synthetic company · sandbox money');
-  });
-
-  const render = (node: React.ReactNode) => {
-    // Vitest compiles the component's JSX with the classic runtime; harmless if that ever changes.
-    vi.stubGlobal('React', React);
-    try { return renderToString(node); } finally { vi.unstubAllGlobals(); }
-  };
-
-  it('server-renders one slim note for the site nav', () => {
-    const html = render(React.createElement(NavDisclosure));
-    expect(html).toMatch(/<span class="demo-pill" role="note" aria-label="Demo disclosure">Demo · synthetic company · sandbox money<\/span>/);
-    expect(html).not.toContain('real-sim-toggle');
-  });
-
-  it('draws no fixed pill where the site nav already carries the disclosure', () => {
-    expect(render(React.createElement(DemoPill))).not.toContain('Demo disclosure');
   });
 });

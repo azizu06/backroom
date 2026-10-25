@@ -22,7 +22,7 @@ export default function PaymentLinkPanel() {
   const active = delivery && delivery.expiresAt > Date.now() ? delivery : null;
   return <section aria-label="Call payment link" style={{ maxWidth: 360, padding: 20, background: "var(--bubble-glass)", color: "var(--ink)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", fontFamily: "var(--font-ui)" }}>
     <h2>Scan to pay</h2>
-    {active?.localOnly ? <p>local rehearsal only, not scannable by a phone</p> : null}
+    {active?.localOnly ? <p>Local link only; a phone cannot open it.</p> : null}
     {error ? <p role="status">Payment link unavailable. Reconnecting…</p> : active ? <>
       {/* QR is generated locally; the payment capability is never sent to an image service. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}

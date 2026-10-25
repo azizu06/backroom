@@ -31,7 +31,7 @@ function expectLobby(html: string) {
   expect(section).toContain('class="audit-wall"');
   expect(section).toContain('<h3 id="audit-title">Audit wall</h3>');
   // No `recording`: the wall polls /api/audit/entries instead of showing a replay.
-  expect(section).toContain('Every decision in this demo run');
+  expect(section).toContain('Every decision in this run');
   expect(section).toContain('Loading audit records');
   expect(section).not.toContain('REPLAY');
   expect(section).toContain('data-office-mount="ask-why"');
@@ -52,7 +52,7 @@ describe('office lobby', () => {
     expect(html).toContain('class="seat-statuses"');
     expect(html).toContain('class="mock-controls"');
     // Operator is reached through the shared site nav (lib/site-nav.ts), not an office toolbar link.
-    expect(html).not.toContain('<a href="/operator">Operator</a>');
+    expect(html.slice(html.indexOf('class="office-toolbar"'))).not.toContain('<a href="/operator">Operator</a>');
     expect(html).toContain('href="/inbox"');
     expect(html).toContain('Receipts there are not synced into this static scene.');
     expectLobby(html);
