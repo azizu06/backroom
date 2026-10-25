@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { DEMO_GUIDE_STEPS, OFFICE_SHORTCUTS } from '../../lib/office/guide';
+import { helpAnchorScrollTop } from '../../lib/office/help-anchors';
 
 type Entry = { term: string; detail: string; href?: string };
 
@@ -62,6 +63,34 @@ const matches = (query: string, ...texts: string[]) => !query || texts.some(text
 /** Help: one place for how to get around, the main flows, a glossary and the keyboard shortcuts. */
 export function HelpSheet() {
   const [query, setQuery] = useState('');
+  const root = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const help = root.current;
+    const header = help?.closest('.detail-sheet')?.querySelector<HTMLElement>('.detail-sheet-header');
+    if (!help || !header) return;
+    const measure = () => help.style.setProperty('--help-header-height', `${header.offsetHeight}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+  const jumpTo = (id: string) => {
+    const sheet = root.current?.closest<HTMLElement>('.detail-sheet');
+    const heading = root.current?.querySelector<HTMLElement>(`#${id}`);
+    const navigation = root.current?.querySelector<HTMLElement>('.help-navigation');
+    const header = sheet?.querySelector<HTMLElement>('.detail-sheet-header');
+    if (!sheet || !heading || !navigation || !header) return;
+    const top = helpAnchorScrollTop({
+      scrollTop: sheet.scrollTop,
+      headingTop: heading.getBoundingClientRect().top,
+      scrollportTop: sheet.getBoundingClientRect().top + sheet.clientTop,
+      headerHeight: header.offsetHeight,
+      navigationHeight: navigation.offsetHeight,
+      maxScrollTop: sheet.scrollHeight - sheet.clientHeight,
+    });
+    heading.focus({ preventScroll: true });
+    sheet.scrollTo({ top, behavior: 'instant' });
+  };
   const q = query.trim().toLowerCase();
   const around = GETTING_AROUND.filter(entry => matches(q, entry.term, entry.detail));
   const glossary = GLOSSARY.filter(entry => matches(q, entry.term, entry.detail));
@@ -69,27 +98,38 @@ export function HelpSheet() {
   const flows = FLOWS.filter(flow => matches(q, flow.title, ...flow.steps));
   const shortcuts = OFFICE_SHORTCUTS.filter(shortcut => matches(q, shortcut.action, ...shortcut.keys));
   const empty = !around.length && !glossary.length && !tries.length && !flows.length && !shortcuts.length;
-  return <div className='help-sheet'>
-    <label className='help-search'><span className='visually-hidden'>Search help</span>
-      <input type='search' value={query} onChange={event => setQuery(event.target.value)} placeholder='Search help: badge, passkey, escalation…' />
-    </label>
+  return <div className='help-sheet' ref={root}>
+    <div className='help-navigation'>
+      <label className='help-search'><span className='visually-hidden'>Search help</span>
+        <input type='search' value={query} onChange={event => setQuery(event.target.value)} placeholder='Search help: badge, passkey, escalation…' />
+      </label>
+      <nav className='help-anchors' aria-label='Help sections'>
+        {[
+          { id: 'help-around', label: 'Getting Around', count: around.length },
+          { id: 'help-flows', label: 'Flows', count: flows.length },
+          { id: 'help-try', label: 'Things to Try', count: tries.length },
+          { id: 'help-glossary', label: 'Glossary', count: glossary.length },
+          { id: 'help-keys', label: 'Shortcuts', count: shortcuts.length },
+        ].map(section => <button key={section.id} type='button' disabled={!section.count} onClick={() => jumpTo(section.id)}>{section.label}</button>)}
+      </nav>
+    </div>
     {empty && <p role='status'>Nothing matches “{query}”.</p>}
-    {!!around.length && <section aria-labelledby='help-around'><h3 id='help-around'>Getting Around</h3>
+    {!!around.length && <section aria-labelledby='help-around'><h3 id='help-around' tabIndex={-1}>Getting Around</h3>
       <dl className='help-terms'>{around.map(entry => <div key={entry.term}>
         <dt>{entry.href ? <a href={entry.href}>{entry.term}</a> : entry.term}</dt>
         <dd>{entry.detail}</dd>
       </div>)}</dl>
     </section>}
-    {!!flows.length && <section aria-labelledby='help-flows'><h3 id='help-flows'>How Things Flow</h3>
+    {!!flows.length && <section aria-labelledby='help-flows'><h3 id='help-flows' tabIndex={-1}>How Things Flow</h3>
       <div className='help-flows'>{flows.map(flow => <div key={flow.title}><h4>{flow.title}</h4><ol className='sheet-steps help-steps'>{flow.steps.map(step => <li key={step}>{step}</li>)}</ol></div>)}</div>
     </section>}
-    {!!tries.length && <section aria-labelledby='help-try'><h3 id='help-try'>Things to Try</h3>
+    {!!tries.length && <section aria-labelledby='help-try'><h3 id='help-try' tabIndex={-1}>Things to Try</h3>
       <dl className='help-terms'>{tries.map(step => <div key={step.id}><dt>{step.title}</dt><dd>{step.detail}</dd></div>)}</dl>
     </section>}
-    {!!glossary.length && <section aria-labelledby='help-glossary'><h3 id='help-glossary'>Glossary</h3>
+    {!!glossary.length && <section aria-labelledby='help-glossary'><h3 id='help-glossary' tabIndex={-1}>Glossary</h3>
       <dl className='help-terms'>{glossary.map(entry => <div key={entry.term}><dt>{entry.term}</dt><dd>{entry.detail}</dd></div>)}</dl>
     </section>}
-    {!!shortcuts.length && <section aria-labelledby='help-keys'><h3 id='help-keys'>Keyboard Shortcuts</h3>
+    {!!shortcuts.length && <section aria-labelledby='help-keys'><h3 id='help-keys' tabIndex={-1}>Keyboard Shortcuts</h3>
       <dl className='help-keys'>{shortcuts.map((shortcut, index) => <div key={`${shortcut.action}-${index}`}><dt>{shortcut.keys.map(key => <kbd key={key}>{key}</kbd>)}</dt><dd>{shortcut.action}</dd></div>)}</dl>
     </section>}
   </div>;

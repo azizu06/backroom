@@ -202,7 +202,7 @@ body:has(.office-shell) {
   border: 4px solid #ffffff;
   border-radius: 34px;
   box-shadow: 0 18px 48px rgba(25, 33, 59, 0.25);
-  animation: sheet-pop 0.22s cubic-bezier(.2, 1.4, .4, 1);
+  animation: sheet-pop 0.16s ease-out;
 }
 .office-shell .detail-sheet-backdrop .room-inspector { width: min(620px, 100%); padding: 24px 28px; font-size: 15px; }
 .office-shell .detail-sheet-backdrop .room-inspector header { margin: -24px -28px 16px; padding: 16px 20px 16px 28px; background: var(--pastel-yellow); }
@@ -219,7 +219,7 @@ body:has(.office-shell) {
   border-bottom: 3px solid #ffffff;
 }
 .office-shell .detail-sheet-header h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.3px; }
-/* One close button for every modal: a light-grey bubble that spins a quarter turn on hover and squishes on press. */
+/* One close button for every modal: a light-grey bubble with quiet hover and press feedback. */
 .office-shell .detail-sheet-close,
 .office-shell .detail-sheet-backdrop .room-inspector header button {
   display: grid;
@@ -234,35 +234,28 @@ body:has(.office-shell) {
   border: 2px solid #ffffff;
   border-radius: 50%;
   box-shadow: 0 2px 6px rgba(25, 33, 59, 0.12);
-  transition: transform 0.22s cubic-bezier(.34, 1.56, .64, 1), background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease-out, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .office-shell .detail-sheet-close:hover,
 .office-shell .detail-sheet-backdrop .room-inspector header button:hover {
   background: #ffffff;
-  transform: rotate(90deg) scale(1.08);
+  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(25, 33, 59, 0.18);
 }
 .office-shell .detail-sheet-close:active,
-.office-shell .detail-sheet-backdrop .room-inspector header button:active { transform: rotate(90deg) scale(0.9); }
+.office-shell .detail-sheet-backdrop .room-inspector header button:active { transform: translateY(1px); }
 .office-shell .detail-sheet-body { padding: 20px 24px 28px; }
 .office-shell .detail-sheet-empty { display: grid; gap: 6px; justify-items: start; font-size: 15px; }
 .office-shell .detail-sheet-cta { margin-top: 8px; padding: 10px 18px; color: var(--ink); background: var(--pastel-aqua); border: 3px solid #ffffff; border-radius: 999px; font-weight: 900; text-decoration: none; box-shadow: 0 4px 12px rgba(25, 33, 59, 0.15); }
-/* Bubbly entrance: the backdrop fades and blurs in, the sheet rises, overshoots a touch and settles;
-   its header and content follow a beat later so the open feels like a soft bubble popping into place. */
-@keyframes sheet-fade { from { opacity: 0; backdrop-filter: blur(0); } }
-@keyframes sheet-pop {
-  0% { opacity: 0; transform: translateY(18px) scale(0.9); }
-  60% { opacity: 1; transform: translateY(-3px) scale(1.015); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes sheet-content { from { opacity: 0; transform: translateY(6px); } }
-.office-shell .detail-sheet-backdrop { animation-duration: 0.2s; }
+/* Quiet entrances share one short easing, with no stagger or overshoot. */
+@keyframes sheet-fade { from { opacity: 0; } }
+@keyframes sheet-pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sheet-content { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .office-shell .detail-sheet,
-.office-shell .detail-sheet-backdrop .room-inspector { animation: sheet-pop 0.34s cubic-bezier(.22, 1, .36, 1) both; transform-origin: 50% 60%; }
+.office-shell .detail-sheet-backdrop .room-inspector { animation: sheet-pop 0.16s ease-out both; }
 .office-shell .detail-sheet-body,
-.office-shell .detail-sheet-backdrop .room-inspector > :not(header) { animation: sheet-content 0.28s ease-out 0.08s both; }
-.office-shell .detail-sheet-header .room-icon { animation: icon-bounce 0.5s cubic-bezier(.34, 1.56, .64, 1) 0.1s both; }
-@keyframes icon-bounce { 0% { transform: scale(0.4) rotate(-15deg); } 70% { transform: scale(1.12) rotate(4deg); } 100% { transform: none; } }
+.office-shell .detail-sheet-backdrop .room-inspector > :not(header),
+.office-shell .detail-sheet-header .room-icon { animation: sheet-content 0.16s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   .office-shell .detail-sheet-backdrop, .office-shell .detail-sheet, .office-shell .detail-sheet-backdrop .room-inspector,
   .office-shell .detail-sheet-body, .office-shell .detail-sheet-backdrop .room-inspector > :not(header), .office-shell .detail-sheet-header .room-icon { animation: none; }
@@ -619,7 +612,11 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 /* ---------- Help sheet ---------- */
 .office-shell .detail-sheet[data-page='help'] { width: min(980px, 100%); }
 .office-shell .help-sheet { display: grid; gap: 22px; }
-.office-shell .help-search { position: sticky; top: 0; z-index: 1; }
+.office-shell .help-navigation { position: sticky; top: var(--help-header-height, 0px); z-index: 1; display: grid; gap: 8px; padding-bottom: 8px; background: var(--paper); }
+.office-shell .help-search { display: block; }
+.office-shell .help-anchors { display: flex; flex-wrap: wrap; gap: 6px; }
+.office-shell .help-anchors button { padding: 5px 10px; border-radius: 999px; color: var(--ink); background: var(--paper); font: inherit; font-size: 13px; }
+.office-shell .help-sheet h3:focus-visible { outline: 2px solid var(--pastel-aqua); outline-offset: 4px; }
 .office-shell .help-search input { box-sizing: border-box; width: 100%; min-height: 44px; font-size: 15px; }
 .office-shell .help-sheet h3 { margin: 0 0 10px; font-size: 17px; font-weight: 900; }
 .office-shell .help-sheet h4 { margin: 0 0 8px; font-size: 14px; font-weight: 900; }
