@@ -110,3 +110,20 @@ describe("office chrome dark theme", () => {
     for (const selector of PASTEL_TEXT_SELECTORS) expect(rule, selector).toContain(selector);
   });
 });
+
+// Overview HUD (app/office/hud/diegetic/diegetic.css): butter/aqua plates on the map and menus keep --on-pastel ink in dark mode.
+describe("overview map dark theme", () => {
+  const diegetic = css("hud/diegetic/diegetic.css");
+  const start = diegetic.indexOf(":root[data-theme='dark'] .office-shell :is(");
+  const rule = diegetic.slice(start, diegetic.indexOf("{ color: var(--on-pastel); }", start));
+  const FOCUS = ":is(:hover, :focus-visible, [aria-expanded='true'])";
+  it.each([`.overview-map-room:not([data-locked])${FOCUS}`, `.overview-map-room:not([data-locked])${FOCUS} span`, `.overview-map-agent${FOCUS}`, ".overview-map-dot"])("%s gets --on-pastel ink", selector => {
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(rule).toContain(selector);
+  });
+  it.each(["pastel-yellow", "pastel-aqua"])("--on-pastel on %s is at least 4.5:1 and --ink is not", plate => {
+    const dark = theme("dark");
+    expect(ratio(dark.get("on-pastel")!, dark.get(plate)!)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(dark.get("ink")!, dark.get(plate)!)).toBeLessThan(4.5);
+  });
+});

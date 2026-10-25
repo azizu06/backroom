@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Diegetic HUD (variant c): the corner minimap gives way to the 3D Overview (O), which shows the whole floor.
 test('Play keeps the corner map out of view and offers the Overview instead, without page errors', async ({ page }) => {
@@ -7,6 +8,7 @@ test('Play keeps the corner map out of view and offers the Overview instead, wit
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
   const minimap = page.getByRole('img', { name: /Office map/ });
@@ -25,6 +27,7 @@ test.describe('Overview touch control', () => {
   test('opens Overview from first person by touch', async ({ page }) => {
     await page.goto('/office?view=overview');
     const select = page.getByLabel('Office view');
+    await openMenu(page);
     await select.selectOption({ label: 'Play (first person)' });
     await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
     await page.getByRole('button', { name: /^Overview/ }).tap();

@@ -1,0 +1,12 @@
+/* Call payment link notice: top centre, over every office mode (including first person); palette from theme.css. */
+.office-shell .office-payment-toast {
+  position: absolute; z-index: 60; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 16px; color: var(--on-pastel); background: var(--pastel-yellow); border: var(--bubble-border); border-radius: 999px;
+  box-shadow: var(--bubble-shadow); font-family: var(--font-ui);
+}
+.office-shell .office-payment-toast button {
+  min-height: 32px; padding: 4px 12px; font-weight: 800; color: var(--on-pastel); background: var(--pastel-aqua);
+  border: 2px solid var(--on-pastel); border-radius: 999px; cursor: pointer;
+}
+.office-shell .office-payment-dialog { position: absolute; z-index: 61; top: 64px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); }
+.office-shell .office-payment-dialog .play-panel { position: static; transform: none; max-height: calc(100dvh - 96px); overflow: auto; }
