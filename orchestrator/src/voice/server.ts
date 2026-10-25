@@ -2,7 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { identityFromAnswer, type InterpretAnswer } from './answer';
-import type { VoiceSession } from './index';
+import { wrongPersonSpeak, type VoiceSession } from './index';
 import { voiceTools } from './tools';
 
 interface JournalData { sessions: VoiceSession[]; events: { id: string; type: string; callId: string; at: string }[] }
@@ -188,6 +188,8 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
           if (safeStops.includes(tool) || payload.result === 'wrong_person') session.stopped = true;
           if (tool === 'verify_identity_result') {
             result = { ...result, identity: payload.result };
+            // Code owns the wrong-person line: business name and callback number only.
+            if (payload.result === 'wrong_person') result = { ...result, can_confirm: false, next_step: 'say_and_end', speak: wrongPersonSpeak(session) };
             if (payload.result === 'uncertain' && identity) {
               // Only an answer heard since the last count is a failure; a repeated check is not.
               if (identity.turns > identity.countedAt) { identity.failures += 1; identity.countedAt = identity.turns; }
