@@ -12,6 +12,10 @@ import { context, type Trace } from './chain';
 import { MemoryStateStore } from '../../store';
 import { northfield } from '../../payables';
 import { fakeCreditCheck, fakeHealthCheck } from '../../collections/fakes';
+import { MemoryEmailOutbox, runEmailFollowUp } from '../../collections/email';
+
+/** After a refusal, only email-only clients (no consent, consumer) get a follow-up email; hard stops, after-hours callable clients, and email-only clients outside the contact window do not. */
+const EMAIL_EXPECTED: Record<string, 'queued' | 'blocked'> = { C11: 'blocked', C13: 'queued', C14: 'queued', C15: 'blocked', C16: 'blocked', C22: 'blocked' };
 
 const root = fileURLToPath(new URL('../../../../fixtures/', import.meta.url));
 const read = (path: string) => JSON.parse(readFileSync(`${root}${path}`, 'utf8'));
@@ -69,7 +73,22 @@ export async function runPrecallStop(id: PrecallStop) {
   // 2. A direct dial that skips the planner.
   let directError: string | undefined;
   try { await voice.start(dialInput as never); } catch (error) { directError = error instanceof Error ? error.message : 'ERROR'; }
+  // 3. The email-only path: a simulated follow-up instead of a dial, with no amount or invoice detail.
+  const outbox = new MemoryEmailOutbox();
+  const amountCents = invoice.principalCents + invoice.lateFeeCents;
+  const email = await runEmailFollowUp({ clientId: client.id, invoiceId: invoice.id, businessName: 'Northfield Studio', contactName: client.name,
+    email: 'billing@client.example', callbackNumber: '+12025550100', context: policyContext }, { audit: state, outbox });
+  const body = outbox.sent[0]?.body ?? '';
+  // The same email-only client at 22:00 local: outside the contact window, nothing may queue.
+  const lateOutbox = new MemoryEmailOutbox();
+  const late = EMAIL_EXPECTED[id] === 'queued' ? await runEmailFollowUp({ clientId: client.id, invoiceId: invoice.id, businessName: 'Northfield Studio',
+    contactName: client.name, email: 'billing@client.example', callbackNumber: '+12025550100',
+    context: { ...policyContext, client: { ...ctxClient, localHour: 22 } } }, { audit: state, outbox: lateOutbox }) : undefined;
+  const amountForms = [String(amountCents), (amountCents / 100).toFixed(2), (amountCents / 100).toLocaleString('en-US')];
   const checks = {
+    emailPath: email.status === EMAIL_EXPECTED[id] && (email.status !== 'queued'
+      || (outbox.sent.length === 1 && !body.includes(invoice.id) && !amountForms.some(form => body.includes(form))
+        && late?.status === 'blocked' && late.reason === 'CALL_WINDOW' && lateOutbox.sent.length === 0)),
     plannerRule: permit?.decision === expected.kind && JSON.stringify(permit?.ruleIds) === JSON.stringify(expected.ruleIds),
     plannerNoDial: planned.kind === 'not_started' && plannerProviderRequests === 0 && planned.result.kind === 'done',
     laterStepsRefused: !!precallRefused && precallRefused.status !== 'ready' && startRefused?.status === 'DENY',
@@ -78,6 +97,6 @@ export async function runPrecallStop(id: PrecallStop) {
     auditChain: (await state.verifyAuditChain()).valid,
   };
   return { id, match: Object.values(checks).every(Boolean), checks, expected, permit: permit ? { decision: permit.decision, ruleIds: permit.ruleIds } : null,
-    plannerResult: planned.kind, directError: directError ?? null, providerRequests: providerRequests.length,
-    scope: 'Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed.' };
+    plannerResult: planned.kind, email: { status: email.status, ...(email.status === 'blocked' ? { reason: email.reason } : {}), ...(late ? { afterHours: late.status === 'blocked' ? late.reason : late.status } : {}) }, directError: directError ?? null, providerRequests: providerRequests.length,
+    scope: 'Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed.' };
 }
