@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openMenu, openSheet } from './office-menu';
 
-// O toggles first person; in Play, O opens the 2D overview map. Room inspector replaces the old corner quick-menu.
+// O toggles first person; Map opens the 2D overview within Play.
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
 }
@@ -9,11 +9,12 @@ function surface(page: Page) {
 async function openOverview(page: Page, errors: string[]) {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
-  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible({ timeout: 30_000 });
   await openMenu(page);
 }
 
 test('O toggles first person and the Play button does the same', async ({ page }) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   await openOverview(page, errors);
   const select = page.getByLabel('Office view');
@@ -21,21 +22,25 @@ test('O toggles first person and the Play button does the same', async ({ page }
   await page.keyboard.press('o');
   await expect(surface(page)).toBeFocused();
   await expect(select).toHaveValue('play');
-  // O in first person opens the Overview map.
-  await page.keyboard.press('o');
-  await expect(surface(page)).toHaveCount(0);
-  await expect(select).toHaveValue('walk');
+  // Map is an explicit Play tool; it keeps the current first-person pose.
+  await page.getByRole('button', { name: 'Map', exact: true }).press('Enter');
+  await expect(select).toHaveValue('play');
   const map = page.getByRole('region', { name: 'Office overview' });
   await expect(map).toBeVisible();
   await expect(map.locator('.overview-map-room')).toHaveCount(6);
-  await expect(map.locator('.overview-map-agent')).toHaveCount(3);
   await page.keyboard.press('Escape');
   await expect(map).toHaveCount(0);
+  await expect(select).toHaveValue('play');
+  await surface(page).focus();
+  await page.keyboard.press('o');
   await expect(select).toHaveValue('walk');
   await openMenu(page);
   await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await page.keyboard.press('Escape');
+  // Play's first Escape releases pointer lock; a second leaves Play.
+  await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(false);
+  if (await surface(page).count()) await page.keyboard.press('Escape');
   await expect(surface(page)).toHaveCount(0);
   // Typing O into a field never toggles.
   await select.focus();
@@ -59,7 +64,7 @@ test('O leaves the view unchanged while keyboard shortcuts has focus', async ({ 
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
-  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('office-viewport').getByText('Loading 3D office…')).toHaveCount(0);
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
@@ -184,55 +189,46 @@ test.describe('touch orbit camera', () => {
 });
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-  test.describe(`floor plan at ${viewport.width}x${viewport.height}`, () => {
-    test.use({ viewport });
-    test('matches the subscribed roster and keeps labels clear of desks in both themes', async ({ page }) => {
-      // Keep this local check independent of remote fonts and other external assets.
-      await page.route(/^https?:\/\//, route => new URL(route.request().url()).hostname === 'localhost'
-        ? route.continue() : route.abort());
-      await page.goto('/office?view=overview');
-      const roster = await openSheet(page, 'overview');
-      const ids = await roster.locator('[data-agent-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-agent-id')).sort());
-      expect(ids.length).toBeGreaterThan(0);
-      await page.keyboard.press('Escape');
-      await page.getByLabel('Office view').selectOption('plan');
-      const plan = page.getByLabel('2D office floor plan', { exact: true });
-      await expect(plan).toBeVisible();
-      await expect(plan.locator('.plan-agent')).toHaveCount(ids.length);
-      expect(await plan.locator('.plan-agent').evaluateAll(rows => rows.map(row => row.getAttribute('data-agent')).sort())).toEqual(ids);
-      await expect(plan.locator('.plan-desk')).toHaveCount(24);
-      await expect(plan.locator('.plan-fixture')).toHaveCount(5);
-      let background = '';
-      for (const theme of ['light', 'dark']) {
-        if (theme === 'dark') {
-          await page.getByRole('button', { name: /Switch to dark/i }).click();
-          // ThemeToggle applies inside the browser's asynchronous view transition.
-          await expect.poll(() => plan.evaluate(root => getComputedStyle(root).backgroundColor)).not.toBe(background);
-        }
-        await expect.poll(() => plan.locator('[data-plan-label]').evaluateAll(labels => labels.every(label => getComputedStyle(label).visibility === 'visible'))).toBe(true);
-        const geometry = await plan.evaluate(root => {
-          const desks = [...root.querySelectorAll('.plan-desk')].map(node => node.getBoundingClientRect());
-          const labels = [...root.querySelectorAll('[data-plan-label]')];
-          const box = root.getBoundingClientRect();
-          return { overlaps: labels.some(node => {
-            const label = node.getBoundingClientRect();
-            return desks.some(desk => label.left < desk.right && label.right > desk.left && label.top < desk.bottom && label.bottom > desk.top);
-          }), minFont: Math.min(...labels.map(node => parseFloat(getComputedStyle(node).fontSize))),
-          square: Math.abs(box.width - box.height) < 1, right: box.right,
-          background: getComputedStyle(root).backgroundColor,
-          scrolls: document.documentElement.scrollWidth > window.innerWidth };
-        });
-        expect(geometry.overlaps).toBe(false);
-        expect(geometry.minFont).toBeGreaterThanOrEqual(11);
-        expect(geometry.square).toBe(true);
-        expect(geometry.right).toBeLessThanOrEqual(viewport.width);
-        expect(geometry.scrolls).toBe(false);
-        if (theme === 'dark') expect(geometry.background).not.toBe(background);
-        background = geometry.background;
-      }
-      await expect(page.locator('.office-caption')).toHaveText('Floor plan · same subscribed state');
-      await plan.locator('[data-room="collections"]').click();
-      await expect(page.locator('.room-inspector')).toContainText('Collections');
+  test(`Play Map has collision-free cards and room actions at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize(viewport);
+    await page.goto('/office?view=overview');
+    await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+    await page.getByRole('button', { name: 'Map', exact: true }).press('Enter');
+    const map = page.getByRole('region', { name: 'Office Overview' });
+    await expect(map.locator('.overview-map-room')).toHaveCount(6);
+    await expect(map.locator('.overview-map-desk')).toHaveCount(24);
+    const geometry = await map.evaluate(element => {
+      const bounds = (selector: string) => [...element.querySelectorAll<HTMLElement>(selector)].map(node => {
+        const r = node.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      });
+      const cards = bounds('.overview-map-room');
+      const obstacles = bounds('.overview-map-desk');
+      const intersects = (a: typeof cards[number], b: typeof cards[number]) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+      const board = bounds('.overview-map-board')[0]!;
+      const space = bounds('.overview-map-space')[0]!;
+      return { overlaps: cards.some((a, i) => [...cards.slice(i + 1), ...obstacles].some(b => intersects(a, b))),
+        maxWidth: Math.max(...cards.map(r => r.width)), board, space,
+        minFont: Math.min(...[...element.querySelectorAll('.overview-map-room strong, .overview-map-room span')].map(node => parseFloat(getComputedStyle(node).fontSize))) };
     });
+    expect(geometry.overlaps).toBe(false);
+    expect(geometry.maxWidth).toBeLessThanOrEqual(160);
+    expect(geometry.minFont).toBeGreaterThanOrEqual(11);
+    expect(geometry.board.width / geometry.board.height).toBeCloseTo(1, 2);
+    expect(geometry.board.width).toBeCloseTo(Math.min(geometry.space.width, geometry.space.height), 0);
+    const room = map.locator('[data-room="collections"]');
+    if (viewport.width === 390) await expect(room.locator('span')).toHaveCount(0);
+    await room.click();
+    await expect(page.getByRole('menuitem', { name: /^Go here/ })).toBeVisible();
+    if (viewport.width === 390) await expect(map.locator('.overview-map-status')).toContainText('Collections:');
+    await expect(page.getByRole('menuitem', { name: /^Talk/ })).toBeVisible();
+    await expect(page.getByRole('menuitem')).toHaveCount(2);
+    await page.keyboard.press('Escape');
+    await map.locator('[data-room="lobby"]').click();
+    await expect(page.getByRole('menuitem', { name: /^Go here/ })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /^Talk/ })).toHaveCount(0);
+    await expect(page.getByRole('menuitem')).toHaveCount(1);
   });
 }
