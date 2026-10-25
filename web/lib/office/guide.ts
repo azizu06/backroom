@@ -4,7 +4,7 @@ export const DEMO_GUIDE_STEPS: readonly { id: string; title: string; detail: str
   { id: 'treasury', title: 'Test the Treasury Lock', detail: 'Walk to the locked Treasury door on the right and press E. Entry is denied with the real rule id.' },
   { id: 'gx10', title: 'Visit the Server Room', detail: 'Go to the GX10 server room at the far right and press E for live tokens per second.' },
   { id: 'payment', title: 'Find the Pay Kiosk', detail: 'In the lobby, open a payment link from the pay kiosk.' },
-  { id: 'previews', title: 'Replay Key Moments', detail: 'Use “Show escalation” or “Show Treasury denial” in the Full Floor sheet.' },
+  { id: 'previews', title: 'Replay Key Moments', detail: 'Press Story Mode in the top bar to replay the escalation and the Treasury denial, chapter by chapter.' },
   { id: 'why', title: 'Ask Why', detail: 'On the lobby audit wall, ask why to get an explanation grounded in receipts.' },
 ];
 

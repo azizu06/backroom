@@ -404,7 +404,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   return <HandoffPresentation value={presentation}><section ref={shellRef} className='office-shell' aria-label='Backroom office' data-fullscreen={fullscreen || undefined} data-office-mode={mode === 'play' ? 'play' : touring || storyActive ? 'tour' : 'overview'} data-connection={snapshot.connection} data-theme={theme} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio Back Office</h1>}
     <aside className='office-sidebar' aria-label='Office navigation'>
-      <a className='office-sidebar-logo' href='/office' aria-label='Backrooms office home'><img src='/icon.png' alt='' /><span>Backrooms</span></a>
+      <a className='office-sidebar-logo' href='/office' aria-label='Backroom office home'><img src='/icon.png' alt='' /><span>Backroom</span></a>
       <nav className='room-navigation' aria-label='Office shortcuts'>
         <button type='button' aria-pressed={focus === null} onClick={() => { setFocus(null); openSheet('overview'); }}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='house' /></span>Full Floor</button>
         <button ref={roomsButton} type='button' aria-haspopup='dialog' aria-pressed={focus !== null} data-focus={focus ?? undefined} onClick={() => openSheet('rooms')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='rooms' /></span>Rooms</button>
@@ -469,7 +469,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {mode === 'play' && <button ref={drawerToggle} type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => setDrawerOpen(open => !open)}>
         Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
       </button>}
-      <p className='visually-hidden'>3D office view. Click a room, or use Rooms in the sidebar, to inspect badges and limits.</p>
+      <p className='visually-hidden'>{`${plan ? 'Floor plan view' : '3D office view'}. Click a room, or use Rooms in the sidebar, to inspect badges and limits.`}</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.

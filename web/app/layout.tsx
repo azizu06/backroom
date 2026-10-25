@@ -8,7 +8,7 @@ import "./office/lobby.css";
 // Shared page palette (AJ's tokens, light/dark) for every page, the nav and the pill.
 import "./theme.css";
 
-export const metadata = { title: "Backrooms" };
+export const metadata = { title: "Backroom" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

@@ -7,6 +7,12 @@ describe('office guide content', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it('points the replay step at Story Mode', () => {
+    const replay = DEMO_GUIDE_STEPS.find(step => step.id === 'previews');
+    expect(replay?.detail).toContain('Story Mode');
+    expect(replay?.detail).not.toMatch(/Show escalation|Show Treasury denial|Full Floor/);
+  });
+
   it('documents the Play hint keys and office shortcuts', () => {
     const keys = OFFICE_SHORTCUTS.flatMap(shortcut => shortcut.keys);
     for (const key of ['W', 'A', 'S', 'D', 'E', 'Esc', '↑', '←', '↓', '→', '?']) expect(keys).toContain(key);
