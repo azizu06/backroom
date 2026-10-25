@@ -14,7 +14,7 @@ import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING, officeLightRig } from '../../lib/office/lighting';
 import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights';
 import { ROLES } from '../../lib/office/palette';
-import { BUILDING, CORRIDOR, CORRIDOR_Z, SPACES, SPACE_IDS, roomPad, sightBlocked, type SpaceId } from '../../lib/office/layout';
+import { BUILDING, CORRIDOR, CORRIDOR_Z, sightBlocked } from '../../lib/office/layout';
 import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
@@ -28,7 +28,7 @@ import { agentCueKey, deskHeading } from '../../lib/office/agent-motion';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
-import { CLICK_SLOP, roomRect, type OverviewPick } from '../../lib/office/overview';
+import { CLICK_SLOP, type OverviewPick } from '../../lib/office/overview';
 import type { ThreeEvent } from '@react-three/fiber';
 
 /** Overview click handler: what was picked and where (client coordinates). */
@@ -67,10 +67,6 @@ const { base } = OFFICE_LIGHTING;
 registerSceneFrameRequester(invalidate);
 
 const FLOOR_SIZE = [BUILDING.maxX - BUILDING.minX + 0.2, BUILDING.maxZ - BUILDING.minZ + 0.2] as const;
-function RoomPad({ id, color }: { id: SpaceId; color: string }) {
-  const pad = roomPad(SPACES[id].rect);
-  return <Block at={[(pad.minX + pad.maxX) / 2, 0.025, (pad.minZ + pad.maxZ) / 2]} size={[pad.maxX - pad.minX, 0.04, pad.maxZ - pad.minZ]} color={color} />;
-}
 /** First person only: a wall between the eye and a label's floor point hides the label (the overview sees over the cut-away walls). */
 function behindWall(camera: Camera, x: number, z: number): boolean {
   return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked(camera.position.x, camera.position.z, x, z);
@@ -176,7 +172,7 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
     if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
     state.invalidate();
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 44, size.height / 29);
+    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 33, size.height / 25);
     if (tour) {
       const move = tourMove.current;
       if (move.startedAt === null) {
@@ -241,13 +237,13 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     {/* Floor slab, a cream pad per room (tinted while focused) and a blush corridor runner; walls, windows and the ceiling are the WorldShell mount. */}
     <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
     <Block at={[(CORRIDOR.minX + CORRIDOR.maxX) / 2, 0.01, CORRIDOR_Z]} size={[CORRIDOR.maxX - CORRIDOR.minX - 0.5, 0.02, 1.3]} color={ROLES.aisle} />
-    {SPACE_IDS.filter(id => SPACES[id].kind === 'room' && !isAnchorId(id)).map(id => <RoomPad key={id} id={id} color={ROLES.roomPad} />)}
+
     {visibleRooms(snapshot).map(room => {
-      const { center, color } = OFFICE_ANCHORS[room];
+      const { center } = OFFICE_ANCHORS[room];
       return <group key={room}>
-        <RoomPad id={room} color={focus === room ? color : ROLES.roomPad} />
+
         {/* Over the room's far wall, clear of the agent tags (agents stand near each room's door). */}
-        <ScreenLabel at={[center[0] + 1.2, 1.3, roomRect(room).minZ + 0.3]} element={labels[room]} />
+        <ScreenLabel at={[center[0] + 1.2, 1.3, center[1] - 0.4]} element={labels[room]} />
       </group>;
     })}
     {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}

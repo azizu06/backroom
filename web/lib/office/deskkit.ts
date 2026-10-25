@@ -48,7 +48,7 @@ export const TREASURY_VAULT = { x: roomPoint('treasury', 0, 0.6)[0], z: roomPoin
 export const KIT_SHELF_WIDTH = 1.4;
 /** Desk-local offsets (furniture.ts deskPieces), floor or desk-top contact points. */
 const DESK_TOP = 0.91;
-const CHAIR_LOCAL: readonly [x: number, z: number] = [0.05, -0.9];
+const CHAIR_LOCAL: readonly [x: number, z: number] = [0.05, 0.9];
 const KEYBOARD_LOCAL: readonly [x: number, z: number, turn: number] = [0.65, 0.1, -0.12];
 const ART_DEPTH = 0.04;
 
@@ -67,7 +67,7 @@ export function kitSources(): KitSources {
     desks: DESKS.map(room => ({ room, center: OFFICE_ANCHORS[room].center, flip: room === 'dana' ? -1 : 1, tint: OFFICE_ANCHORS[room].color })),
     shelves: DRESSING.shelves,
     plants: DRESSING.plants,
-    details: ROOM_DETAILS,
+    details: [], // Partition decorations are detached in the open office.
     vault: { room: 'treasury', x: TREASURY_VAULT.x, z: TREASURY_VAULT.z, depth: TREASURY_VAULT.depth },
   };
 }
@@ -89,10 +89,10 @@ function deskPlacements({ room, center: [x, z], flip, tint }: KitDesk): KitPlace
   const [mx, mz] = local(MONITOR_FACE.x, MONITOR_FACE.z);
   return [
     { id: `${room}:desk`, node: 'desk', room, source: 'desk', at: [x, 0, z], rotationY: facing },
-    { id: `${room}:chair`, node: 'chair', room, source: 'desk', at: [cx, 0, cz], rotationY: facing, tint },
+    { id: `${room}:chair`, node: 'chair', room, source: 'desk', at: [cx, 0, cz], rotationY: facing + Math.PI, tint },
     { id: `${room}:keyboard`, node: 'keyboard', room, source: 'desk', at: [kx, DESK_TOP, kz], rotationY: facing + KEYBOARD_LOCAL[2] },
     // Every live screen faces +z (deskScreenPiece), Dana's too, so the casing never turns.
-    { id: `${room}:monitor`, node: 'monitor', room, source: 'desk', at: [mx, DESK_TOP, mz], rotationY: 0 },
+    { id: `${room}:monitor`, node: 'monitor', room, source: 'desk', at: [mx, DESK_TOP, mz], rotationY: facing },
   ];
 }
 

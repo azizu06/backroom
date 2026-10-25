@@ -65,7 +65,7 @@ function Screen({ snapshot, room }: { snapshot: OfficeSnapshot; room: MonitorDes
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawScreen(ctx, screen, color, detailed), [key, color, detailed]);
   const { x: sx, y: sy, z: sz } = MONITOR_FACE;
   return <group name={`prop:monitor:${room}`} position={[x, 0, z]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
-    <group position={[sx, sy, sz]} rotation={[0, room === 'dana' ? Math.PI : 0, 0]}>
+    <group position={[sx, sy, sz]}>
       <mesh position={[0, 0, 0.059]}>
         <primitive object={SCREEN_GEOMETRY} attach='geometry' />
         <meshBasicMaterial map={texture} toneMapped={false} />

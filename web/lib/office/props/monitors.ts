@@ -10,7 +10,7 @@ export const MONITOR_MAX_LINES = 4;
 export const MONITOR_FACE = { width: 1.8, height: 1.08, x: -0.15, y: 1.54, z: -0.23 } as const;
 export const MONITOR_TEXTURE = { width: 512, height: 320, overviewFont: 132 } as const;
 /** In front of the screen (desk-local +z), just outside the desk footprint (half depth 0.525). */
-const MONITOR_STAND: readonly [x: number, z: number] = [-0.35, 0.85];
+const MONITOR_STAND: readonly [x: number, z: number] = [-0.35, 1.65];
 
 export type MonitorLineKind = 'agent' | 'away' | 'folder' | 'idle' | 'awaiting' | 'escalation';
 export interface MonitorLine { kind: MonitorLineKind; text: string }
@@ -82,7 +82,7 @@ export function monitorInteraction(room: MonitorDesk): OfficePropInteraction {
     id: `monitor:${room}`,
     prompt: `Read ${name} screen`,
     position: monitorStandPosition(room),
-    radius: 1.4,
+    radius: 1.8,
     visible: snapshot => visibleRooms(snapshot).includes(room),
     panel(snapshot) {
       const screen = monitorScreen(snapshot, room);

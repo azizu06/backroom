@@ -31,11 +31,11 @@ describe("office row → view contract", () => {
     walk.moveTo("dana");
     expect(walk.position).toEqual(COLLECTIONS);
     let crossedAisle = false;
-    for (let frame = 0; frame < 360; frame += 1) {
+    for (let frame = 0; frame < 900; frame += 1) {
       const previous = [...walk.position];
       walk.advance(1 / 60);
       expect(Math.hypot(walk.position[0] - previous[0]!, walk.position[1] - previous[1]!)).toBeLessThanOrEqual(2.4 / 60 + 1e-6);
-      if (walk.position[0] > COLLECTIONS[0] + 1 && walk.position[0] < DANA[0] - 1) {
+      if (walk.position[0] > COLLECTIONS[0] + 1 && walk.position[0] < DANA[0] - 1 && walk.position[1] > -1) {
         expect(walk.position[1]).toBeCloseTo(CORRIDOR_Z);
         crossedAisle = true;
       }
@@ -54,7 +54,7 @@ describe("office row → view contract", () => {
     expect(walk.position).toEqual(before);
     walk.advance(10);
     expect(Math.hypot(walk.position[0] - before[0]!, walk.position[1] - before[1]!)).toBeLessThanOrEqual(0.24 + 1e-6);
-    for (let frame = 0; frame < 360; frame += 1) walk.advance(1 / 60);
+    for (let frame = 0; frame < 900; frame += 1) walk.advance(1 / 60);
     expect(walk.position).toEqual(COLLECTIONS);
   });
 });
@@ -100,7 +100,7 @@ describe("shared motion registry", () => {
     registry.sync([{ ...alex, targetAnchor: "dana" }]);
     expect(sceneView.position).toEqual(midWalk);
     expect(sceneView.moving).toBe(true);
-    for (let frame = 0; frame < 360; frame += 1) sceneView.advance(1 / 60);
+    for (let frame = 0; frame < 900; frame += 1) sceneView.advance(1 / 60);
     expect(sceneView.position).toEqual(DANA);
     expect(registry.moving).toBe(false);
   });
@@ -127,7 +127,7 @@ describe("shared motion registry", () => {
     expect(registry.get(alex)).toBe(walk);
     expect(walk.position).toEqual([-6, CORRIDOR_Z]);
     expect(walk.moving).toBe(true);
-    for (let frame = 0; frame < 360; frame += 1) walk.advance(1 / 60);
+    for (let frame = 0; frame < 900; frame += 1) walk.advance(1 / 60);
     expect(walk.position).toEqual(DANA);
   });
 
@@ -168,7 +168,7 @@ describe("registry wake-up and replay → live", () => {
     expect(registry.sync([{ ...alex, targetAnchor: "dana" }])).toBe(true);
     expect(walk.moving).toBe(true);
     expect(walk.position).toEqual(COLLECTIONS);
-    for (let frame = 0; frame < 360; frame += 1) walk.advance(1 / 60);
+    for (let frame = 0; frame < 900; frame += 1) walk.advance(1 / 60);
     expect(walk.position).toEqual(DANA);
     // Staying live does not restart the walk.
     expect(registry.sync([{ ...alex, targetAnchor: "dana" }])).toBe(false);

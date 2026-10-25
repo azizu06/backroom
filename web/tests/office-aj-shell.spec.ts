@@ -1,8 +1,12 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { OFFICE_ANCHORS } from '../lib/office/state';
+import { INITIAL_FOLDER } from '../lib/office/folder';
+import { sightBlocked } from '../lib/office/layout';
+import { SPAWN } from '../lib/office/play';
+import { PLAY_TARGET_LIST } from '../lib/office/targets';
 
-// Reference: BR-AJ-SOURCE 1f5ea2be9ce6. Run against the refreshed integrated build.
+// AJ shell + BR-OPEN-OFFICE. Run against the refreshed integrated build.
 const out = '/tmp/backrooms-aj-current';
 const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
 async function capture(page: Page, name: string) {
@@ -251,11 +255,21 @@ test('source splash is once per session, with desktop/mobile entry semantics and
   await expect(gate).toHaveCount(0);
 });
 
-test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', async ({ page }, testInfo) => {
+test('open office, clear spawn, WASD/E, HUD/map, tours and baked remain reachable', async ({ page }, testInfo) => {
   const errors: string[] = [];
   const bakedAssets: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.url().includes('/office-art/') && response.url().endsWith('.glb') && response.ok()) bakedAssets.push(response.url()); });
+  // Logical departments share one workspace; partitions must not hide agents from each other.
+  const seats = ['collections', 'payables', 'vendor_onboarding'] as const;
+  for (let i = 0; i < seats.length; i++) {
+    for (const other of seats.slice(i + 1)) {
+      const a = OFFICE_ANCHORS[seats[i]!].position;
+      const b = OFFICE_ANCHORS[other].position;
+      expect(sightBlocked(a[0], a[1], b[0], b[1]), `${seats[i]} and ${other} share an open office`).toBe(false);
+    }
+  }
+  expect(PLAY_TARGET_LIST.map(target => target.id), 'removed leisure furniture offers no Play prompt').not.toContain('pingpong');
   await page.goto('/office?view=overview');
   await overview(page);
   const view = page.getByLabel('Office view');
@@ -270,6 +284,8 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   await view.selectOption('play');
   await expect(page.getByTestId('play-splash')).toHaveCount(0); // View changes enter directly in the source.
   await ready(page);
+  await expect(surface(page)).toHaveAttribute('data-player-x', SPAWN.position[0].toFixed(3));
+  await expect(surface(page)).toHaveAttribute('data-player-z', SPAWN.position[1].toFixed(3));
   await page.evaluate(() => document.exitPointerLock?.());
   await chrome(page);
   await expect(page.locator('.office-shell')).toHaveAttribute('data-hud', 'diegetic');
@@ -281,12 +297,19 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   await surface(page).focus();
   for (const key of ['w', 's', 'a', 'd']) {
     const before = await surface(page).evaluate(el => ({ x: Number((el as HTMLElement).dataset.playerX), z: Number((el as HTMLElement).dataset.playerZ) }));
+    // Walk out of spawn, rather than accepting a tiny nudge against a tree or partition.
+    const distance = key === 'w' ? 0.75 : 0.15;
+    const yaw = SPAWN.yaw;
+    const direction = key === 'w' ? [-Math.sin(yaw), -Math.cos(yaw)]
+      : key === 's' ? [Math.sin(yaw), Math.cos(yaw)]
+      : key === 'a' ? [-Math.cos(yaw), Math.sin(yaw)] : [Math.cos(yaw), -Math.sin(yaw)];
     await page.keyboard.down(key);
     try {
-      await page.waitForFunction(start => {
+      await page.waitForFunction(({ start, direction, distance }) => {
         const el = document.querySelector<HTMLElement>('[data-player-x][data-player-z]');
-        return el && Math.hypot(Number(el.dataset.playerX) - start.x, Number(el.dataset.playerZ) - start.z) > 0.04;
-      }, before, { polling: 'raf', timeout: 8_000 });
+        return el && (Number(el.dataset.playerX) - start.x) * direction[0]!
+          + (Number(el.dataset.playerZ) - start.z) * direction[1]! > distance;
+      }, { start: before, direction, distance }, { polling: 'raf', timeout: 8_000 });
     } finally { await page.keyboard.up(key); }
   }
   const mapToggle = page.locator('.play-minimap-toggle');
@@ -304,6 +327,7 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   // Full map is an explicit Play tool; the replacement HUD must never take over Rooms.
   await page.getByRole('button', { name: 'Map', exact: true }).click();
   await expect(page.locator('.overview-map')).toBeVisible();
+  await expect(page.locator('.overview-map')).not.toContainText(/ping[ -]?pong|lounge/i);
   await capture(page, 'play-map');
   await page.getByRole('button', { name: 'Close overview', exact: true }).click();
   const roomsEntry = page.locator('.play-overview');
@@ -340,7 +364,8 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   await page.keyboard.press('Escape');
   await expect(story).toHaveCount(0);
   await expect(surface(page)).toBeFocused();
-  await page.goto('/office?view=overview&playSpawn=-7,4.75');
+  const [folderX, , folderZ] = INITIAL_FOLDER.position;
+  await page.goto(`/office?view=overview&playSpawn=${folderX + Math.sin(SPAWN.yaw) * 1.05},${folderZ + Math.cos(SPAWN.yaw) * 1.05}`);
   await view.selectOption('play');
   await ready(page);
   await expect(page.locator('.play-prompt')).toHaveText('E · Pick up folder');
@@ -351,8 +376,8 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   await page.goto('/office?art=baked&view=overview');
   await view.selectOption('play');
   await ready(page);
-  await expect(page.locator('[data-lobby-audit-board]')).toHaveAttribute('data-lobby-audit-board', 'baked');
-  await expect.poll(() => bakedAssets.some(url => url.endsWith('/office-art/lobby.glb'))).toBe(true);
+  await expect(page.locator('[data-lobby-audit-board]')).toHaveAttribute('data-lobby-audit-board', 'shown');
+  await expect.poll(() => bakedAssets.some(url => url.endsWith('/office-art/deskkit.glb'))).toBe(true);
   await page.evaluate(() => document.exitPointerLock?.());
   await chrome(page);
   await capture(page, 'baked-opt-in');
@@ -360,14 +385,15 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   await overview(page);
   // Reach a real Play interaction, then hand off to the single Audit Wall question field.
   // Keep this after the tour/baked checks so a handoff regression does not mask them.
-  // Preview Alex uses this anchor; spawn one metre south, facing him at the default yaw.
+  // Preview Alex uses this anchor; approach from one metre away at the canonical spawn yaw.
   // Map "Go here" only supplies an entry for the next rig mount, not an active Play rig.
   const [alexX, alexZ] = OFFICE_ANCHORS.collections.position;
-  await page.goto(`/office?view=overview&playSpawn=${alexX},${alexZ + 1}`);
+  const talkX = alexX + Math.sin(SPAWN.yaw), talkZ = alexZ + Math.cos(SPAWN.yaw);
+  await page.goto(`/office?view=overview&playSpawn=${talkX},${talkZ}`);
   await view.selectOption('play');
   await ready(page);
-  await expect(surface(page)).toHaveAttribute('data-player-x', alexX.toFixed(3));
-  await expect(surface(page)).toHaveAttribute('data-player-z', (alexZ + 1).toFixed(3));
+  await expect(surface(page)).toHaveAttribute('data-player-x', talkX.toFixed(3));
+  await expect(surface(page)).toHaveAttribute('data-player-z', talkZ.toFixed(3));
   await expect(page.locator('.play-prompt')).toHaveText('E · Talk to Alex');
   await surface(page).focus();
   await page.keyboard.press('e');

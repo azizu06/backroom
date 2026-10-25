@@ -13,7 +13,6 @@ import { serverTarget } from "./server";
 import { treasuryTarget } from "./treasury";
 import { doorTarget } from './door';
 import { folderTarget } from './folder';
-import { pingPongTarget } from './pingpong';
 import type { PlayTargetModule } from "./types";
 
 export const PLAY_TARGETS = [
@@ -28,7 +27,6 @@ export const PLAY_TARGETS = [
   inboxTarget,
   doorTarget,
   folderTarget,
-  pingPongTarget,
 ] as const;
 
 type TargetOf<M> = M extends PlayTargetModule<infer T> ? T : never;

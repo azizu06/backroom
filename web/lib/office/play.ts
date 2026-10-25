@@ -1,10 +1,9 @@
-import { WING_COLLIDERS } from './wing';
 /**
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
-import { OPEN_DOORS, doorCollider, doorPosition, type DoorState } from './doors';
+import { OPEN_DOORS, type DoorState } from './doors';
 import { PLANT_SPOTS } from './furniture';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
@@ -14,10 +13,7 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
-import { BUILDING, LOBBY_BOARD, ROOM_SPAWNS, WALL_THICKNESS, roomPoint, wallColliders } from "./layout";
-import { roomPropColliders } from './room-props';
-import { SHARED_ROOM_COLLIDERS } from "./shared-rooms";
-import { PINGPONG_COLLIDER } from './pingpong/table';
+import { WORKSTATIONS, BUILDING, LOBBY_BOARD, ROOM_SPAWNS, WALL_THICKNESS, roomPoint, wallColliders } from "./layout";
 import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
@@ -57,36 +53,23 @@ function box(x: number, z: number, width: number, depth: number): Box {
   return { minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 };
 }
 export const SERVER_ROOM_BOX: Box = box(SERVER_ROOM.position[0], SERVER_ROOM.position[1], SERVER_ROOM.size.width, SERVER_ROOM.size.depth);
-const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfies readonly AnchorId[];
 
 /**
  * Solid footprints mirroring the layout drawn in web/app/office/scene.tsx and its mounts (web/app/office/mounts:
- * WorldShell, SharedRooms, Desks, Doors, Plants, LobbyCounter, TreasuryVault). Walls come from ./layout, so a
- * doorway in the data is a gap here. The Treasury is locked: its doorway is closed by a barrier.
+ * WorldShell, Desks, Plants, LobbyCounter, TreasuryVault). Walls come from ./layout, so a
+ * workstation footprint and chair are shared with the rendered pods; only the vault itself is solid.
  * `extra` takes footprints of room geometry mounted elsewhere (e.g. a self-contained room at an anchor),
  * so new furniture becomes solid without editing this list.
  */
-export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
+export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], _doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...WING_COLLIDERS, ...roomPropColliders(rooms), PINGPONG_COLLIDER];
+  const boxes: Box[] = [...extra, ...wallColliders(), ...WORKSTATIONS.flatMap(({ center: [x, z], flip }) => [box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * flip, z + 0.9 * flip, 0.65, 0.6)])];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
-    const [x, z] = OFFICE_ANCHORS[room].center;
-    // Dana's desk group is rotated by PI, which mirrors the chair offset.
-    const facing = room === "dana" ? -1 : 1;
-    boxes.push(box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * facing, z - 0.9 * facing, 0.65, 0.6));
     if (room === "collections") boxes.push(box(PHONE_STAND.x, PHONE_STAND.z, PHONE_STAND.width, PHONE_STAND.depth));
   }
-  for (const room of DOORS) {
-    if (!visible.has(room)) continue;
-    const [x, z] = doorPosition(room);
-    boxes.push(box(x - 0.72, z, 0.14, 0.18), box(x + 0.72, z, 0.14, 0.18));
-    const leaf = doorCollider(doors, room);
-    if (leaf) boxes.push(leaf);
-  }
   if (visible.has("treasury")) {
-    const [x, z] = TREASURY_DOOR;
-    boxes.push(box(...roomPoint("treasury", 0, 0.6), 1.8, 1.25), box(x - 0.72, z, 0.14, 0.18), box(x + 0.72, z, 0.14, 0.18));
+    boxes.push(box(...roomPoint("treasury", 0, 0.6), 1.8, 1.25));
   }
   if (visible.has("lobby")) boxes.push(box(LOBBY_BOARD[0], LOBBY_BOARD[1], 2, 0.15), box(PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1));
   for (const [x, z] of PLANT_SPOTS) boxes.push(box(x, z, 1, 1));

@@ -49,8 +49,6 @@ import { OverviewMenu, type OverviewMenuItem } from './hud/diegetic/OverviewMenu
 import { OverviewMap } from './hud/diegetic/OverviewMap';
 import { agentEntry, isOverviewKey, roomEntry, seatedAgent, type OverviewPick } from '../../lib/office/overview';
 import { SERVER_ROOM_BOX, officeColliders, type PlayEntry } from '../../lib/office/play';
-import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
-import { bakedArtRequested } from '../../lib/office/baked-art';
 import { interactionStore } from '../../lib/office/interactions';
 import './office-tokens.css';
 import './iisu.css';
@@ -220,7 +218,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   }
   function placeColliders() {
     const rooms = visibleRooms(snapshot);
-    return officeColliders(rooms, lobbyCollisionExtras(bakedArtRequested(location.search), LOBBY_PROP_BOXES, [SERVER_ROOM_BOX]), interactionStore.getSnapshot().doors);
+    return officeColliders(rooms, [SERVER_ROOM_BOX], interactionStore.getSnapshot().doors);
   }
   function goToAgent(id: string) {
     const agent = snapshot.agents.find(row => row.id === id);

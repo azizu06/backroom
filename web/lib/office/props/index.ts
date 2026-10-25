@@ -1,5 +1,4 @@
 import type { OfficeSnapshot } from '../state';
-import { CLOCK_INTERACTION } from './clock';
 import type { OfficePropInteraction } from './interact';
 import { TREASURY_DOOR_INTERACTION } from './treasuryDeny';
 import { MONITOR_DESKS, monitorInteraction } from './monitors';
@@ -16,7 +15,6 @@ export { PHONE_INTERACTION } from './phone';
 /** Every office prop's interaction. A new prop adds one line here. */
 export const OFFICE_PROP_INTERACTIONS: readonly OfficePropInteraction[] = [
   WHITEBOARD_INTERACTION,
-  CLOCK_INTERACTION,
   TREASURY_DOOR_INTERACTION,
   ...MONITOR_DESKS.map(monitorInteraction),
   PHONE_INTERACTION,

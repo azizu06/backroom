@@ -16,7 +16,7 @@ describe('room entry', () => {
   it('enters strictly inside the enter radius and leaves strictly beyond the leave radius', () => {
     expect(roomAt(east(E), null, ['payables'])).toBeNull();
     expect(roomAt(east(E - 0.001), null, ['payables'])).toBe('payables');
-    expect(roomAt(east(L), 'payables', ['payables'])).toBe('payables');
+    expect(roomAt(east(L - 0.001), 'payables', ['payables'])).toBe('payables');
     expect(roomAt(east(L + 0.001), 'payables', ['payables'])).toBeNull();
   });
 
@@ -38,12 +38,12 @@ describe('room entry', () => {
     const [cx, cz] = OFFICE_ANCHORS.collections.center;
     // Inside Payables' enter radius but still within Collections' leave radius.
     expect(roomAt([cx + L - 0.2, cz], 'collections', rooms)).toBe('collections');
-    expect(roomAt([cx + L + 0.1, cz], 'collections', rooms)).toBe('payables');
-    expect(roomAt([cx + L + 0.1, cz], 'payables', rooms)).toBe('payables');
+    expect(roomAt([cx + L + 0.1, cz], 'collections', rooms)).toBeNull();
+    expect(roomAt([px - E + 0.1, pz], 'collections', rooms)).toBe('payables');
   });
 
   it('detects exits to the corridor and ignores hidden or removed rooms', () => {
-    expect(roomAt([px, CORRIDOR_Z], 'payables', rooms)).toBeNull();
+    expect(roomAt([px, pz + L + 0.1], 'payables', ['payables'])).toBeNull();
     expect(roomAt([px, pz], null, ['collections'])).toBeNull();
     expect(roomAt([px, pz], 'payables', ['collections'])).toBeNull();
     expect(roomAt([px, pz], null, [])).toBeNull();

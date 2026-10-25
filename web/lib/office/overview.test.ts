@@ -76,7 +76,7 @@ describe('jumping into a room', () => {
       const entry = roomEntry(room, colliders, avoid);
       expect(standable(entry.position, colliders)).toBe(true);
       for (const other of avoid) expect(Math.hypot(entry.position[0] - other[0], entry.position[1] - other[1])).toBeGreaterThanOrEqual(AGENT_CLEARANCE);
-      if (room === 'treasury') expect(roomAtPoint(entry.position)).not.toBe('treasury');
+      if (room === 'treasury') expect(roomAtPoint(entry.position)).toBe('treasury');
       else {
         const rect = roomRect(room);
         expect(entry.position[0]).toBeGreaterThan(rect.minX);

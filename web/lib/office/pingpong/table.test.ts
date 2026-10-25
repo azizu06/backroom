@@ -22,14 +22,12 @@ describe('break room ping pong integration', () => {
       expect(overlaps(table, { minX: x - door.width / 2, maxX: x + door.width / 2, minZ: z - 0.65, maxZ: z + 0.65 })).toBe(false);
     }
   });
-  it('is solid and offers the E interaction from an accessible edge', () => {
+  it('is detached from office collisions and Play prompts', () => {
     const colliders = officeColliders([]);
-    expect(colliders).toContainEqual(table);
-    const spot = [PINGPONG_TABLE.x, table.maxZ + PLAYER_RADIUS + 0.15] as const;
-    expect(insideAny(spot, colliders, PLAYER_RADIUS)).toBe(false);
-    expect(pickTarget(spot, 0, interactCandidates([], []))).toEqual({ kind: 'pingpong' });
-    const end = movePlayer(spot, [0, -2], colliders);
-    expect(end[1]).toBeCloseTo(table.maxZ + PLAYER_RADIUS, 3);
+    expect(colliders).not.toContainEqual(table);
+    expect(interactCandidates([], []).some(candidate => candidate.target.kind as string === 'pingpong')).toBe(false);
+    const point = [PINGPONG_TABLE.x, PINGPONG_TABLE.z] as const;
+    expect(insideAny(point, colliders, PLAYER_RADIUS)).toBe(false);
   });
   it('starts and stops a local session with subscription cleanup', () => {
     const listener = vi.fn();

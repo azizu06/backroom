@@ -20,11 +20,11 @@ describe('static office furniture', () => {
     const pieces = deskPieces('dana');
     expect(pieces[5]!.at).toEqual([OFFICE_ANCHORS.dana.center[0] - 0.65, 0.95, OFFICE_ANCHORS.dana.center[1] - 0.1]);
     expect(pieces[5]!.rotation![1]).toBeCloseTo(Math.PI - 0.12);
-    expect(pieces[7]!.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] + 1.14);
+    expect(pieces[7]!.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] - 1.14);
     const screen = deskScreenPiece('dana');
     expect(screen.at[0]).toBeCloseTo(OFFICE_ANCHORS.dana.center[0] - MONITOR_FACE.x);
-    expect(screen.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] - MONITOR_FACE.z + 0.05);
-    expect(screen.rotation).toEqual([0, 0, 0]);
+    expect(screen.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] - (MONITOR_FACE.z + 0.05));
+    expect(screen.rotation).toEqual([0, Math.PI, 0]);
   });
 
   it.each(DESKS)('keeps %s monitor face in front of its casing', room => {
@@ -32,13 +32,13 @@ describe('static office furniture', () => {
     const screen = deskScreenPiece(room);
     expect(screen.at[0]).toBe(casing.at[0]);
     expect(screen.at[1]).toBe(casing.at[1]);
-    expect(screen.at[2] - casing.at[2]).toBeCloseTo(0.05);
+    expect(screen.at[2] - casing.at[2]).toBeCloseTo(room === 'dana' ? -0.05 : 0.05);
     expect(casing.size).toEqual([MONITOR_FACE.width + 0.1, MONITOR_FACE.height + 0.1, 0.08]);
     expect(screen.size).toEqual([MONITOR_FACE.width + 0.01, MONITOR_FACE.height + 0.01, 0.015]);
     expect(screen.color).toBe(ROLES.screenGlow);
   });
 
   it('keeps the fixed plant footprints in their corners', () => {
-    expect(PLANT_SPOTS).toEqual([[-11.1, -6.6], [4.6, -6.6], [-1.8, 6], [11.3, -6.8], [11.3, 6.8], [-11.3, 1]]);
+    expect(PLANT_SPOTS).toEqual([[11.3, 6.8], [-11.3, -6.8]]);
   });
 });

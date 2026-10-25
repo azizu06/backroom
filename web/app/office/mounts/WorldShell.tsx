@@ -6,7 +6,7 @@ import type { Group } from 'three';
 import { usePrecompile } from './usePrecompile';
 import { MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial } from 'three';
 import type { FurniturePiece } from '../../../lib/office/furniture';
-import { SPACES, SPACE_IDS, WALL_HEIGHT, wallPieces, windowPieces } from '../../../lib/office/layout';
+import { BUILDING, WALL_HEIGHT, wallPieces, windowPieces } from '../../../lib/office/layout';
 import { OFFICE_LIGHTING } from '../../../lib/office/lighting';
 import { OUTDOOR, ROLES } from '../../../lib/office/palette';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './StaticGeometry';
@@ -27,21 +27,11 @@ const { frames: FRAMES, glass: GLASS } = windowPieces();
 /** Walls and window frames share one merged draw. */
 const FULL_SHELL = [...FULL_WALLS, ...FRAMES];
 const SLAB = 0.1;
-// The atrium mount owns its high roof and skylights; no low slab crosses the hall.
-const CEILING: FurniturePiece[] = SPACE_IDS.filter(id => id !== 'atrium').map(id => {
-  const r = SPACES[id].rect;
-  return { at: [(r.minX + r.maxX) / 2, WALL_HEIGHT + SLAB / 2, (r.minZ + r.maxZ) / 2],
-    size: [r.maxX - r.minX + 0.16, SLAB, r.maxZ - r.minZ + 0.16], color: ROLES.ceiling };
-});
-/** Two light panels per room, one every 3 m along the corridor. */
-const PANELS: FurniturePiece[] = SPACE_IDS.filter(id => id !== 'atrium').flatMap(id => {
-  const { rect, kind } = SPACES[id];
-  const cx = (rect.minX + rect.maxX) / 2, cz = (rect.minZ + rect.maxZ) / 2;
-  const spots: [number, number][] = kind === 'corridor'
-    ? Array.from({ length: Math.floor((rect.maxX - rect.minX) / 3) }, (_, i) => [rect.minX + 1.5 + i * 3, cz])
-    : rect.maxX - rect.minX < 4 ? [[cx, cz]] : [[cx - 1.4, cz], [cx + 1.4, cz]];
-  return spots.map(([x, z]): FurniturePiece => ({ at: [x, WALL_HEIGHT - 0.02, z], size: kind === 'corridor' ? [0.6, 0.03, 1.1] : [1.1, 0.03, 0.6], color: OUTDOOR.ceilingPanel }));
-});
+const CEILING: FurniturePiece[] = [{ at: [0, WALL_HEIGHT + SLAB / 2, 0],
+  size: [BUILDING.maxX - BUILDING.minX + 0.16, SLAB, BUILDING.maxZ - BUILDING.minZ + 0.16], color: ROLES.ceiling }];
+const PANELS: FurniturePiece[] = [-8, 0, 8].flatMap(x => [-4, 3].map(z => ({
+  at: [x, WALL_HEIGHT - 0.02, z], size: [1.1, 0.03, 0.6], color: OUTDOOR.ceilingPanel,
+})));
 
 /**
  * The building shell. First person (perspective camera) gets full-height walls, framed windows with glass,

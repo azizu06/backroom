@@ -6,8 +6,8 @@ import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import { BUILDING } from '../../lib/office/layout';
 import { OFFICE_ANCHORS, matchingDenial, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 
-function planLeft(position: readonly number[]) { return `${50 + position[0]! / 16 * 100}%`; }
-function planTop(position: readonly number[]) { return `${50 + position[1]! / 11 * 100}%`; }
+function planLeft(position: readonly number[]) { return `${(position[0]! - BUILDING.minX) / (BUILDING.maxX - BUILDING.minX) * 100}%`; }
+function planTop(position: readonly number[]) { return `${(position[1]! - BUILDING.minZ) / (BUILDING.maxZ - BUILDING.minZ) * 100}%`; }
 /** Draws the shared motion; Office's MotionRegistry owns re-seating and retargeting. */
 function PlanAgent({ agent, motion, recorded }: { agent: OfficeAgent; motion: WalkMotion; recorded: boolean }) {
   const marker = useRef<HTMLDivElement>(null);

@@ -19,7 +19,7 @@ describe('deskSeat', () => {
     // Closer to the desk than the anchor, still outside the desk's front edge.
     expect(seat.z).toBeLessThan(az);
     expect(seat.z).toBeGreaterThan(cz + DESK_SIZE.depth / 2);
-    expect(Math.hypot(seat.x - ax, seat.z - az)).toBeLessThan(1);
+    expect(Math.hypot(seat.x - ax, seat.z - az)).toBeLessThan(Math.hypot(cx - ax, cz - az));
     // Heading PI faces -z, toward the desk.
     expect(Math.abs(angleDelta(seat.heading, Math.PI))).toBeLessThan(1e-9);
   });

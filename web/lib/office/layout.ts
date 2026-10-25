@@ -13,9 +13,9 @@ import { OUTDOOR, ROLES } from './palette';
 export type Vec2 = readonly [x: number, z: number];
 export interface Rect { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 
-/** Original office stays fixed; the west wing adds 180 square metres. */
+/** One contiguous office; departments are logical destinations, never partitions. */
 export const MAIN_BUILDING: Rect = { minX: -12, maxX: 12, minZ: -7.5, maxZ: 7.5 };
-export const BUILDING: Rect = { ...MAIN_BUILDING, minX: -24 };
+export const BUILDING: Rect = MAIN_BUILDING;
 export const ATRIUM_HEIGHT = 7;
 export const WALL_HEIGHT = 3;
 export const WALL_THICKNESS = 0.16;
@@ -39,43 +39,62 @@ const column = (i: 0 | 1 | 2 | 3) => ({ minX: COLUMNS[i][0], maxX: COLUMNS[i][1]
 const room = (id: SpaceId, name: string, rect: Rect): Space => ({ id, name, rect, kind: 'room' });
 
 export const SPACES: Readonly<Record<SpaceId, Space>> = {
-  atrium: room('atrium', 'Atrium', { minX: BUILDING.minX, maxX: MAIN_BUILDING.minX, minZ: BUILDING.minZ, maxZ: 2.5 }),
-  work_room: room('work_room', 'Work room', { minX: BUILDING.minX, maxX: MAIN_BUILDING.minX, minZ: 2.5, maxZ: BUILDING.maxZ }),
-  collections: room('collections', 'Collections', { ...column(0), ...NORTH }),
-  payables: room('payables', 'Payables', { ...column(1), ...NORTH }),
-  vendor_onboarding: room('vendor_onboarding', 'Vendor Desk', { ...column(2), ...NORTH }),
-  meeting: room('meeting', 'Meeting room', { ...column(3), ...NORTH }),
+  atrium: room('atrium', 'Entry aisle', { minX: -12, maxX: -6, minZ: 1.5, maxZ: 7.5 }),
+  work_room: room('work_room', 'Shared workspace', MAIN_BUILDING),
+  collections: room('collections', 'Collections', { minX: -12, maxX: -4, ...NORTH }),
+  payables: room('payables', 'Payables', { minX: -4, maxX: 4, minZ: -3.1, maxZ: -1.5 }),
+  vendor_onboarding: room('vendor_onboarding', 'Vendor Desk', { minX: 4, maxX: 12, ...NORTH }),
+  meeting: room('meeting', 'Work aisle', { ...column(3), ...NORTH }),
   lobby: room('lobby', 'Lobby', { ...column(0), ...SOUTH }),
-  dana: room('dana', 'Dana’s desk', { ...column(1), ...SOUTH }),
+  dana: room('dana', 'Dana’s desk', { minX: -3, maxX: 3.5, minZ: -7.5, maxZ: -3.1 }),
   treasury: room('treasury', 'Treasury', { ...column(2), ...SOUTH }),
-  break_room: room('break_room', 'Break room', { ...column(3), ...SOUTH }),
+  break_room: room('break_room', 'Open floor', { ...column(3), ...SOUTH }),
   corridor: { id: 'corridor', name: 'Corridor', rect: CORRIDOR, kind: 'corridor' },
-  server_room: room('server_room', 'Server room', { minX: CORRIDOR.maxX, maxX: BUILDING.maxX, minZ: CORRIDOR.minZ, maxZ: CORRIDOR.maxZ }),
+  server_room: room('server_room', 'Compute station', { minX: CORRIDOR.maxX, maxX: BUILDING.maxX, minZ: CORRIDOR.minZ, maxZ: CORRIDOR.maxZ }),
 };
-export const SPACE_IDS = Object.keys(SPACES) as SpaceId[];
+// Legacy destination ids remain available to consumers, without mounting extra rooms.
+export const SPACE_IDS: readonly SpaceId[] = [...ANCHOR_IDS, 'corridor', 'server_room'];
+
+/** Three back-to-back 2 × 2 pods. Facing +z seats are on the south side. */
+export const WORKSTATIONS = [-8, 0, 8].flatMap((podX, pod) =>
+  [-1.2, 1.2].flatMap((dx, column) => [-3.7, -2.5].map((z, row) => ({
+    id: `pod-${pod}:${column}:${row}`, pod, center: [podX + dx, z] as Vec2, flip: (row === 0 ? -1 : 1) as 1 | -1,
+  }))));
+
+/** Routes between workstation approaches via the open cross-pod aisles. */
+export function workspaceRoute(from: Vec2, to: Vec2): Vec2[] {
+  if (from[1] < -3 && to[1] < -3) return [from, [from[0], -6], [to[0], -6], to];
+  const exit = (point: Vec2): Vec2[] => {
+    if (point[1] > -3) return [[point[0], CORRIDOR_Z]];
+    const pod = Math.round(point[0] / 8) * 8;
+    // The compute rack occupies the east end; route the east pod through its west aisle.
+    const side = pod === 8 ? 5 : pod + (point[0] < pod ? -3 : 3);
+    return [[point[0], -6], [side, -6], [side, CORRIDOR_Z]];
+  };
+  return [from, ...exit(from), ...exit(to).reverse(), to].filter((point, i, all) =>
+    i === 0 || Math.hypot(point[0] - all[i - 1]![0], point[1] - all[i - 1]![1]) > 1e-6);
+}
 
 /**
- * Each anchor room's furniture centre (`center`: the desk, counter or vault) and the agent spot in front of it
- * (`position`). The Treasury is locked, so its agent spot is on the corridor side of its door.
+ * Logical business destinations and their clear agent approaches in the shared workspace.
  */
 export const ANCHOR_LAYOUT: Readonly<Record<LayoutAnchorId, { center: Vec2; position: Vec2 }>> = {
   lobby: { center: [-9, 4.4], position: [-9, 4.5] },
-  collections: { center: [-9, -5], position: [-9, -3.8] },
-  payables: { center: [-3.5, -5], position: [-3.5, -3.8] },
-  vendor_onboarding: { center: [2.5, -5], position: [2.5, -3.8] },
-  dana: { center: [-3.5, 4.9], position: [-3.5, 3.7] },
-  treasury: { center: [2.5, 4.9], position: [2.5, 0.95] },
+  collections: { center: [-9.2, -2.5], position: [-9.2, -0.9] },
+  payables: { center: [-1.2, -2.5], position: [-1.2, -0.9] },
+  vendor_onboarding: { center: [6.8, -2.5], position: [6.8, -0.9] },
+  dana: { center: [1.2, -3.7], position: [1.2, -5.3] },
+  treasury: { center: [2.5, 4.9], position: [2.5, 3.6] },
 };
 
 /**
- * The lobby's pay kiosk counter (Play payment-link target, inbox and receipt printer). It stands by the lobby's
- * east wall so the view from the lobby out of its west windows stays clear.
+ * Pay kiosk, inbox and printer counter, east of the clear entrance route.
  */
-export const LOBBY_KIOSK: Vec2 = [-7, 3.4];
-/** The lobby's decision board (last three decisions and the deny stamp) stands against the corridor wall east of the lobby opening, facing into the lobby. */
-export const LOBBY_BOARD: Vec2 = [-7, CORRIDOR.maxZ + WALL_THICKNESS / 2 + 0.1];
-/** The live audit wall hangs on the lobby's solid east wall (an interior wall, no windows), facing west into the lobby. */
-export const LOBBY_AUDIT_WALL = { x: -6 - WALL_THICKNESS / 2 - 0.03, z: 5.3, rotationY: -Math.PI / 2 } as const;
+export const LOBBY_KIOSK: Vec2 = [-5.8, 4.6];
+/** Decision board and deny stamp, supported by the solid north wall. */
+export const LOBBY_BOARD: Vec2 = [-5.2, BUILDING.minZ + 0.2];
+/** Live audit wall on the solid west perimeter, facing into the office. */
+export const LOBBY_AUDIT_WALL = { x: BUILDING.minX + WALL_THICKNESS / 2 + 0.03, z: 5.3, rotationY: Math.PI / 2 } as const;
 
 /** A point given relative to an anchor room's furniture centre. */
 export function roomPoint(room: LayoutAnchorId, dx: number, dz: number): [number, number] {
@@ -102,11 +121,9 @@ export const DOORWAYS: readonly Doorway[] = [
   { id: 'meeting', kind: 'open', axis: 'x', at: [8, CORRIDOR.minZ], width: 1.6, joins: ['meeting', 'corridor'] },
   { id: 'lobby', kind: 'open', axis: 'x', at: [-9, CORRIDOR.maxZ], width: 2, joins: ['lobby', 'corridor'] },
   { id: 'dana', kind: 'open', axis: 'x', at: [-3.5, CORRIDOR.maxZ], width: 1.6, joins: ['dana', 'corridor'] },
-  { id: 'treasury', kind: 'locked', axis: 'x', at: [2.5, CORRIDOR.maxZ], width: LEAF_OPENING, joins: ['treasury', 'corridor'] },
+  { id: 'treasury', kind: 'open', axis: 'x', at: [2.5, 4.8], width: LEAF_OPENING, joins: ['treasury', 'corridor'] },
   { id: 'break_room', kind: 'open', axis: 'x', at: [8, CORRIDOR.maxZ], width: 1.6, joins: ['break_room', 'corridor'] },
   { id: 'server_room', kind: 'open', axis: 'z', at: [CORRIDOR.maxX, 0], width: LEAF_OPENING, joins: ['server_room', 'corridor'] },
-  { id: 'atrium', kind: 'open', axis: 'z', at: [MAIN_BUILDING.minX, 0], width: 2.4, joins: ['atrium', 'corridor'] },
-  { id: 'work_room', kind: 'open', axis: 'x', at: [-18, 2.5], width: 2, joins: ['atrium', 'work_room'] },
   { id: 'entrance', kind: 'entrance', axis: 'x', at: [-7.2, BUILDING.maxZ], width: 1.6, joins: ['lobby', 'outside'] },
 ];
 export function doorway(id: string): Doorway {
@@ -127,33 +144,18 @@ export interface WallRun {
   readonly overviewHeight: number;
   readonly height?: number;
 }
-const OUTER_FAR = 1.1, OUTER_NEAR = 0.35, INNER = 0.76;
+const OUTER_FAR = 1.1, OUTER_NEAR = 0.35;
 export const WALLS: readonly WallRun[] = [
-  { id: 'north', axis: 'x', fixed: BUILDING.minZ, from: MAIN_BUILDING.minX, to: BUILDING.maxX, exterior: true, overviewHeight: OUTER_FAR },
+  { id: 'north', axis: 'x', fixed: BUILDING.minZ, from: BUILDING.minX, to: BUILDING.maxX, exterior: true, overviewHeight: OUTER_FAR },
   { id: 'south', axis: 'x', fixed: BUILDING.maxZ, from: BUILDING.minX, to: BUILDING.maxX, exterior: true, overviewHeight: OUTER_NEAR },
-  { id: 'west', axis: 'z', fixed: MAIN_BUILDING.minX, from: BUILDING.minZ, to: BUILDING.maxZ, exterior: false, overviewHeight: OUTER_FAR },
+  { id: 'west', axis: 'z', fixed: BUILDING.minX, from: BUILDING.minZ, to: BUILDING.maxZ, exterior: true, overviewHeight: OUTER_FAR },
   { id: 'east', axis: 'z', fixed: BUILDING.maxX, from: BUILDING.minZ, to: BUILDING.maxZ, exterior: true, overviewHeight: OUTER_NEAR },
-  { id: 'corridor-north', axis: 'x', fixed: CORRIDOR.minZ, from: MAIN_BUILDING.minX, to: BUILDING.maxX, exterior: false, overviewHeight: INNER },
-  { id: 'corridor-south', axis: 'x', fixed: CORRIDOR.maxZ, from: MAIN_BUILDING.minX, to: BUILDING.maxX, exterior: false, overviewHeight: INNER },
-  ...[-6, 0, 6].flatMap(x => [
-    { id: `partition-north:${x}`, axis: 'z' as const, fixed: x, from: NORTH.minZ, to: NORTH.maxZ, exterior: false, overviewHeight: INNER },
-    { id: `partition-south:${x}`, axis: 'z' as const, fixed: x, from: SOUTH.minZ, to: SOUTH.maxZ, exterior: false, overviewHeight: INNER },
-  ]),
-  { id: 'wing-north', axis: 'x', fixed: BUILDING.minZ, from: BUILDING.minX, to: MAIN_BUILDING.minX, exterior: true, overviewHeight: OUTER_FAR, height: ATRIUM_HEIGHT },
-  { id: 'wing-west-atrium', axis: 'z', fixed: BUILDING.minX, from: BUILDING.minZ, to: 2.5, exterior: true, overviewHeight: OUTER_FAR, height: ATRIUM_HEIGHT },
-  { id: 'wing-west-work', axis: 'z', fixed: BUILDING.minX, from: 2.5, to: BUILDING.maxZ, exterior: true, overviewHeight: OUTER_FAR },
-  { id: 'wing-divider', axis: 'x', fixed: 2.5, from: BUILDING.minX, to: MAIN_BUILDING.minX, exterior: false, overviewHeight: INNER, height: ATRIUM_HEIGHT },
-  { id: 'server', axis: 'z', fixed: CORRIDOR.maxX, from: CORRIDOR.minZ, to: CORRIDOR.maxZ, exterior: false, overviewHeight: INNER },
 ];
 
 /** A framed window in an exterior wall or the original west glazed partition, centred `at` along the wall. Placed clear of wall-mounted props. */
 export interface WindowSpec { readonly wall: string; readonly at: number; readonly width: number; readonly space: SpaceId }
 export const WINDOWS: readonly WindowSpec[] = [
-  { wall: 'wing-west-atrium', at: -4, width: 3, space: 'atrium' },
-  { wall: 'wing-west-work', at: 5, width: 2, space: 'work_room' },
   { wall: 'west', at: -6, width: 1.6, space: 'collections' },
-  { wall: 'west', at: 3, width: 1.6, space: 'lobby' },
-  { wall: 'west', at: 5.6, width: 1.6, space: 'lobby' },
   { wall: 'west', at: -3, width: 1.6, space: 'collections' },
   { wall: 'north', at: -0.8, width: 1.2, space: 'payables' },
   { wall: 'north', at: 4.9, width: 1.6, space: 'vendor_onboarding' },
@@ -166,7 +168,6 @@ export const WINDOWS: readonly WindowSpec[] = [
   { wall: 'south', at: 8, width: 1.6, space: 'break_room' },
   { wall: 'south', at: 10.6, width: 1.6, space: 'break_room' },
   { wall: 'south', at: -1.5, width: 1.6, space: 'dana' },
-  { wall: 'south', at: -4.5, width: 1.6, space: 'dana' },
   { wall: 'south', at: -10.4, width: 1.6, space: 'lobby' },
 ];
 
@@ -325,20 +326,19 @@ export function spaceAt([x, z]: Vec2): SpaceId | null {
 /** Where a teleport lands: floor position and yaw (yaw 0 looks toward -z). `space` is where that point is. */
 export interface RoomSpawn { readonly position: Vec2; readonly yaw: number; readonly space: SpaceId }
 /**
- * One spawn per space, just inside its doorway and facing in. The Treasury is locked, so its spawn is on the
- * corridor side of its door, facing it. Kept clear of every collider (see layout.test.ts).
+ * Clear approaches to logical destinations. Legacy wing destinations return to the open office.
  */
 export const ROOM_SPAWNS: Readonly<Record<SpaceId, RoomSpawn>> = {
-  atrium: { position: [-13.2, 0], yaw: Math.PI / 2, space: 'atrium' },
-  work_room: { position: [-18, 3.3], yaw: Math.PI, space: 'work_room' },
+  atrium: { position: [-7.2, 6.7], yaw: 0, space: 'lobby' },
+  work_room: { position: [0, 0.6], yaw: 0, space: 'corridor' },
   corridor: { position: [-9, 0.6], yaw: 0, space: 'corridor' },
   lobby: { position: [-7.2, 6.7], yaw: 0, space: 'lobby' },
-  collections: { position: [-9, -2.3], yaw: 0, space: 'collections' },
-  payables: { position: [-3.5, -2.3], yaw: 0, space: 'payables' },
-  vendor_onboarding: { position: [2.5, -2.3], yaw: 0, space: 'vendor_onboarding' },
-  meeting: { position: [8, -2.3], yaw: 0, space: 'meeting' },
-  dana: { position: [-3.5, 2.3], yaw: Math.PI, space: 'dana' },
-  treasury: { position: [2.5, 0.6], yaw: Math.PI, space: 'corridor' },
+  collections: { position: [-9.2, -0.5], yaw: 0, space: 'corridor' },
+  payables: { position: [-1.2, -0.5], yaw: 0, space: 'corridor' },
+  vendor_onboarding: { position: [6.8, -0.5], yaw: 0, space: 'corridor' },
+  meeting: { position: [8, 0.6], yaw: 0, space: 'corridor' },
+  dana: { position: [1.2, -5.5], yaw: Math.PI, space: 'dana' },
+  treasury: { position: [2.5, 3.6], yaw: Math.PI, space: 'treasury' },
   break_room: { position: [8, 2.3], yaw: Math.PI, space: 'break_room' },
   server_room: { position: [10.2, 0.5], yaw: -Math.PI / 2, space: 'server_room' },
 };

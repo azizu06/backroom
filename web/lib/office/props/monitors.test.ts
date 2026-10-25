@@ -97,7 +97,8 @@ describe('monitorInteraction', () => {
 
   it('stands in front of each screen, near its desk', () => {
     const [cx, cz] = monitorInteraction('collections').position, [dx, dz] = monitorInteraction('dana').position;
-    expect([cx, cz, dx, dz].map(value => Math.round(value * 100) / 100)).toEqual([-9.35, -4.15, -3.15, 4.05]);
+    expect([cx, cz]).toEqual([OFFICE_ANCHORS.collections.center[0] - 0.35, OFFICE_ANCHORS.collections.center[1] + 1.65]);
+    expect([dx, dz]).toEqual([OFFICE_ANCHORS.dana.center[0] + 0.35, OFFICE_ANCHORS.dana.center[1] - 1.65]);
     for (const room of MONITOR_DESKS) {
       const [x, z] = monitorInteraction(room).position, [cx, cz] = OFFICE_ANCHORS[room].center;
       expect(Math.hypot(x - cx, z - cz)).toBeLessThan(monitorInteraction(room).radius);

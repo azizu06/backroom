@@ -1,3 +1,4 @@
+import { WORKSTATIONS, workspaceRoute } from './layout';
 /**
  * Agent-to-agent handoffs drawn in the office. Visual only: a handoff row never triggers a reducer,
  * policy evaluation or payment. The backend (single-responsibility agents) writes one row per handoff;
@@ -28,16 +29,20 @@ export interface HandoffAgent {
   readonly color: string;
 }
 export const HUMAN = 'human' satisfies HandoffAgentId;
-/** Desks for the runtime roles; the office has five rooms, so some rooms seat two. */
+/** Every runtime role works at a distinct seat in the shared pods. */
+const seat = (index: number): FloorPosition => {
+  const { center: [x, z], flip } = WORKSTATIONS[index]!;
+  return [x, z + flip * 1.6];
+};
 export const HANDOFF_AGENTS: Record<HandoffAgentId, HandoffAgent> = {
-  intake: { name: 'Intake', room: 'lobby', station: roomPoint('lobby', -1, -0.4), color: '#8fa7b8' },
-  extractor: { name: 'Extractor', room: 'lobby', station: roomPoint('lobby', -2, -1.2), color: '#9fb6a0' },
-  auditor: { name: 'Auditor', room: 'lobby', station: roomPoint('lobby', 1, 0.8), color: '#b8a2c8' },
-  collections: { name: 'Collections', room: 'collections', station: roomPoint('collections', 0.6, 1.4), color: '#a9bc8f' },
-  reconciler: { name: 'Reconciler', room: 'payables', station: roomPoint('payables', -0.6, 1.4), color: '#8fb3ad' },
-  payables: { name: 'Payables', room: 'payables', station: roomPoint('payables', 0.6, 1.4), color: '#d2b27a' },
-  vendor: { name: 'Vendor verifier', room: 'vendor_onboarding', station: roomPoint('vendor_onboarding', -0.6, 1.4), color: '#b2a3bb' },
-  human: { name: 'Dana', room: 'dana', station: roomPoint('dana', 0, -1.1), color: '#cc9c7d' },
+  intake: { name: 'Intake', room: 'lobby', station: seat(0), color: '#8fa7b8' },
+  extractor: { name: 'Extractor', room: 'lobby', station: seat(2), color: '#9fb6a0' },
+  auditor: { name: 'Auditor', room: 'lobby', station: seat(10), color: '#b8a2c8' },
+  collections: { name: 'Collections', room: 'collections', station: seat(1), color: '#a9bc8f' },
+  reconciler: { name: 'Reconciler', room: 'payables', station: seat(7), color: '#8fb3ad' },
+  payables: { name: 'Payables', room: 'payables', station: seat(5), color: '#d2b27a' },
+  vendor: { name: 'Vendor verifier', room: 'vendor_onboarding', station: seat(9), color: '#b2a3bb' },
+  human: { name: 'Dana', room: 'dana', station: seat(6), color: '#cc9c7d' },
 };
 export function isHandoffAgent(id: unknown): id is HandoffAgentId {
   return typeof id === 'string' && Object.hasOwn(HANDOFF_AGENTS, id);
@@ -54,25 +59,14 @@ export const ROOM_DOORS: Partial<Record<AnchorId, FloorPosition>> = {
   vendor_onboarding: roomPoint('vendor_onboarding', 0, 1.7), dana: roomPoint('dana', 0, -1.8),
 };
 export const AISLE_Z = CORRIDOR_Z;
-/** Where a visitor stands to hand a folder to `agent`: in front of its station, toward its room door. */
+/** A visitor approaches from the clear side of the agent's desk pod. */
 export function handoffSpot(agent: HandoffAgentId): FloorPosition {
-  const { station, room } = HANDOFF_AGENTS[agent];
-  const door = ROOM_DOORS[room] ?? station;
-  const dx = door[0] - station[0], dz = door[1] - station[1];
-  const length = Math.hypot(dx, dz) || 1;
-  const reach = Math.min(0.6, length);
-  return [station[0] + dx / length * reach, station[1] + dz / length * reach];
+  const { station } = HANDOFF_AGENTS[agent];
+  return [station[0], station[1] + (station[1] < -3 ? -0.6 : 0.6)];
 }
-function same(a: FloorPosition, b: FloorPosition) { return Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6; }
-/** Walk path from `from`'s station to the spot in front of `to`: out its door, along the aisle, in the other door. */
+/** Share the same open-aisle route as the office's agent motion. */
 export function handoffRoute(from: HandoffAgentId, to: HandoffAgentId): FloorPosition[] {
-  const a = HANDOFF_AGENTS[from], b = HANDOFF_AGENTS[to];
-  const spot = handoffSpot(to);
-  const points: FloorPosition[] = a.room === b.room ? [a.station, spot] : (() => {
-    const out = ROOM_DOORS[a.room] ?? a.station, inn = ROOM_DOORS[b.room] ?? b.station;
-    return [a.station, out, [out[0], AISLE_Z], [inn[0], AISLE_Z], inn, spot];
-  })();
-  return points.filter((point, i) => i === 0 || !same(point, points[i - 1]!));
+  return workspaceRoute(HANDOFF_AGENTS[from].station, handoffSpot(to));
 }
 export function routeLength(route: readonly FloorPosition[]): number {
   let total = 0;

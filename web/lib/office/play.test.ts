@@ -37,18 +37,10 @@ describe("play constants", () => {
 describe("collisions", () => {
   const [cx, cz] = OFFICE_ANCHORS.collections.center;
   const wallFace = WALL_THICKNESS / 2;
-  it("keeps wing furniture, room dressing and ping-pong solid after merging their mounts", () => {
-    for (const rooms of [ALL, []] as const) {
-      const merged = officeColliders(rooms);
-      expect(merged).toEqual(expect.arrayContaining([...WING_COLLIDERS]));
-      for (const footprint of [...roomPropColliders(rooms), PINGPONG_COLLIDER]) {
-        expect(merged).toContainEqual(footprint);
-        const x = (footprint.minX + footprint.maxX) / 2;
-        const start: Vec2 = [x, footprint.maxZ + PLAYER_RADIUS + 0.15];
-        const end = movePlayer(start, [0, -0.3], merged);
-        expect(end[1]).toBeGreaterThanOrEqual(footprint.maxZ + PLAYER_RADIUS);
-      }
-    }
+  it('detaches leisure colliders and retains every shared workstation', () => {
+    expect(officeColliders([])).not.toContainEqual(PINGPONG_COLLIDER);
+    const [x, z] = OFFICE_ANCHORS.collections.center;
+    expect(insideAny([x, z], officeColliders([]), 0)).toBe(true);
   });
 
   it("cannot walk through a desk", () => {
@@ -57,13 +49,8 @@ describe("collisions", () => {
     expect(end[1]).toBeGreaterThan(cz + DESK_SIZE.depth / 2 + PLAYER_RADIUS - 0.01);
   });
 
-  it("cannot walk through a wall between rooms and slides along it", () => {
-    // Collections and Payables share the x = -6 wall.
-    const end = walk([-7, -3], [1, 0], 3);
-    expect(end[0]).toBeLessThan(-6 - wallFace - PLAYER_RADIUS + 0.01);
-    const slid = walk([-7, -3], [Math.SQRT1_2, Math.SQRT1_2], 2);
-    expect(slid[0]).toBeLessThan(-6 - wallFace - PLAYER_RADIUS + 0.01);
-    expect(slid[1]).toBeGreaterThan(-3 + 1);
+  it('walks across the removed department partitions in the clear main aisle', () => {
+    expect(walk([-7, 0], [1, 0], 5)).toEqual(expect.arrayContaining([expect.closeTo(-2, 5), 0]));
   });
 
   it("stops at the outer walls and clamps to the floor bounds", () => {
@@ -72,15 +59,10 @@ describe("collisions", () => {
     expect(movePlayer([0, 0.5], [0, 20], [], PLAYER_RADIUS)).toEqual([0, BUILDING.maxZ - wallFace - PLAYER_RADIUS]);
   });
 
-  it("walks through every doorway in the plan and never through the locked or street doors", () => {
-    for (const door of DOORWAYS) {
-      const [x, z] = door.at;
-      const step: Vec2 = door.axis === "x" ? [0, 1] : [1, 0];
-      const start: Vec2 = door.axis === "x" ? [x, z - 0.9] : [x - 0.9, z];
-      const end = walk(start, step, 1.8);
-      const passed = door.axis === "x" ? end[1] > z + 0.5 : end[0] > x + 0.5;
-      expect(passed, door.id).toBe(door.kind !== "locked" && door.kind !== "entrance");
-    }
+  it('keeps the street entrance solid while the department aisles stay open', () => {
+    const door = DOORWAYS.find(door => door.id === 'entrance')!;
+    expect(walk([door.at[0], door.at[1] - 1], [0, 1], 2)[1]).toBeLessThan(door.at[1]);
+    expect(walk([-11, 0], [1, 0], 20)[0]).toBeCloseTo(9);
   });
 
   it("never ends inside a collider even for a large step", () => {
@@ -89,18 +71,10 @@ describe("collisions", () => {
     expect(end[1]).toBeGreaterThan(cz + DESK_SIZE.depth / 2);
   });
 
-  it("cannot reach the vault through or around the locked Treasury door", () => {
-    const inTreasury = (p: Vec2) => spaceAt(p) === "treasury";
-    const [tx, tz] = TREASURY_DOOR;
-    const starts: Vec2[] = [[tx, tz - 0.9], [tx - 2.2, tz - 0.9], [tx + 3.1, tz - 0.9], [tx + 0.5, tz - 1.1], [tx - 3.5, tz - 0.9], [-1, 5], [7.4, 4]];
-    for (const start of starts) {
-      for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
-        const end = walk(start, [Math.sin(angle), Math.cos(angle)], 8);
-        expect(inTreasury(end)).toBe(false);
-      }
-    }
-    // Sliding along the corridor wall finds no gap.
-    expect(inTreasury(walk([tx - 2, tz - 0.9], [0.3, 1], 10))).toBe(false);
+  it('keeps the vault itself solid in the open office', () => {
+    const [tx, tz] = OFFICE_ANCHORS.treasury.center;
+    expect(insideAny([tx, tz + 0.6], colliders, 0)).toBe(true);
+    expect(walk([tx, tz - 1], [0, 1], 3)[1]).toBeLessThan(tz + 0.6 - 0.625);
   });
 
   it("lets the player walk out of a collider that appeared on top of them", () => {
@@ -130,13 +104,10 @@ describe("collisions", () => {
     // Without the extra footprint the same walk passes through.
     expect(walk([9.9, -0.6], [1, 0], 2)[0]).toBeGreaterThan(SERVER_ROOM_BOX.maxX);
   });
-  it("drops furniture colliders for rooms that are not visible, but keeps the walls", () => {
-    const withoutCollections = officeColliders(ALL.filter(room => room !== "collections"));
-    expect(withoutCollections.length).toBeLessThan(colliders.length);
-    expect(walk([cx, cz + 2.5], [0, -1], 4, withoutCollections)[1]).toBeLessThan(cz - 0.6);
-    // The building does not depend on live rows: the locked Treasury stays shut.
-    const withoutTreasury = officeColliders(ALL.filter(room => room !== "treasury"));
-    expect(spaceAt(walk([TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.9], [0, 1], 3, withoutTreasury))).toBe("corridor");
+  it('keeps shared pod geometry stable when live department rows are absent', () => {
+    const withoutCollections = officeColliders(ALL.filter(room => room !== 'collections'));
+    expect(insideAny(OFFICE_ANCHORS.collections.center, withoutCollections, 0)).toBe(true);
+    expect(walk([-11, 0], [1, 0], 20, withoutCollections)[0]).toBeCloseTo(9);
   });
 });
 
@@ -242,21 +213,8 @@ describe("targets", () => {
     expect(pickTarget([0, 0], 0, [desk, alex, closed])).toEqual(desk.target);
   });
 
-  it("offers open doors only when deliberately facing the leaf by the frame", () => {
-    const candidates = interactCandidates([], ALL);
-    for (const room of ["collections", "payables", "vendor_onboarding"] as const) {
-      // Eye points measured from the doorway: 0.65 into the corridor, 0.4 inside the room, 2.65 across the corridor.
-      const [x, door] = doorPosition(room);
-      const target = { kind: "door", room };
-      expect(pickTarget([x - 0.3, door + 0.65], Math.PI / 2, candidates)).toEqual(target);
-      expect(pickTarget([x - 0.3, door - 0.4], Math.atan2(0.35, -1.05), candidates)).toEqual(target);
-      expect(pickTarget([x - 0.3, door + 0.65], 0, candidates)).not.toEqual(target);
-      expect(pickTarget([x - 0.3, door + 2.65], Math.atan2(0.35, 2), candidates)).not.toEqual(target);
-      // The short gamepad walk from spawn must still face empty corridor.
-      for (const z of [0.6, 0.5, 0.4, 0.3, 0.2]) {
-        expect(pickTarget([x, z], 0, candidates)).toBeNull();
-      }
-    }
+  it("offers no removed cosmetic door targets", () => {
+    expect(interactCandidates([], ALL).some(candidate => candidate.target.kind === 'door')).toBe(false);
   });
 
   it("gives every other eligible target priority over a door, including ties and near-ties", () => {
@@ -278,7 +236,7 @@ describe("targets", () => {
     const { source } = createMockOfficeState();
     const snapshot = source.getSnapshot();
     const candidates = interactCandidates(snapshot.agents.map(agent => ({ id: agent.id, position: agent.pos })), ALL);
-    expect(pickTarget(SPAWN.position, SPAWN.yaw, candidates)).toBeNull();
+    expect(pickTarget(SPAWN.position, SPAWN.yaw, candidates)).toEqual({ kind: "agent", id: "collections-clerk" });
     let position: [number, number] = [SPAWN.position[0], SPAWN.position[1]];
     const input = new PlayInput();
     input.press("forward");
@@ -290,7 +248,7 @@ describe("targets", () => {
     expect(found).toEqual({ kind: "agent", id: "collections-clerk" });
     // Found while still walking: the Collections desk stops the player further on.
     const stop = walk(SPAWN.position, [0, -1], 6);
-    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.collections.center[1] + DESK_SIZE.depth / 2 + PLAYER_RADIUS, 2);
+    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.collections.center[1] + 0.9 + 0.3 + PLAYER_RADIUS, 2);
     expect(position[1]).toBeGreaterThan(stop[1] + 0.5);
     // Alex is not solid, so you can walk right up to him and keep the prompt.
     const alexAt = OFFICE_ANCHORS.collections.position;
@@ -316,14 +274,14 @@ describe("targets", () => {
   it("offers the Treasury door only when the room is visible", () => {
     const visible = interactCandidates([], ALL);
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
-    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "door:collections", "folder", "pingpong"]);
+    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "folder"]);
     expect(pickTarget([TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.55], Math.PI, visible)).toEqual({ kind: "treasury" });
   });
 
   it("picks the GX10 server when standing in front of it facing it", () => {
     const candidates = interactCandidates([], ALL);
     expect(candidates).toContainEqual({ target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 });
-    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server", "pingpong"]);
+    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server"]);
     const front: Vec2 = [SERVER_ROOM.position[0], SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS + 0.1];
     expect(pickTarget(front, 0, candidates)).toEqual({ kind: "server" });
     expect(pickTarget(front, Math.PI, candidates)).not.toEqual({ kind: "server" });
@@ -335,7 +293,7 @@ describe("targets", () => {
     const [tx, tz] = TREASURY_DOOR;
     expect(pickTarget([tx, tz - 0.7], Math.PI, visible)).toEqual({ kind: "treasury" });
     const stop = walk([tx, tz - 0.7], [0, 1], 2);
-    expect(stop[1]).toBeCloseTo(tz - WALL_THICKNESS / 2 - PLAYER_RADIUS, 2);
+    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.treasury.center[1] + 0.6 - 0.625 - PLAYER_RADIUS, 2);
     expect(pickTarget(stop, Math.PI, visible)).toEqual({ kind: "treasury" });
     expect(pickTarget([tx, tz + 1.85], 0, visible)).toBeNull();
     expect(pickTarget([tx, tz - 2.15], Math.PI, visible)).toBeNull();
