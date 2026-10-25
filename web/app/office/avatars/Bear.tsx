@@ -6,6 +6,7 @@ import { BoxGeometry, CanvasTexture, MeshStandardMaterial, PlaneGeometry, SRGBCo
 import {
   BEAR, BEAR_CARRY_FRONT, BEAR_CARRY_PAW, CAL_BLUE, CAL_GOLD, armSwing, bearIdle, bearPalette, bearPhase, type ArmPose,
 } from '../../../lib/office/bear';
+import { AvatarAnchors } from './AvatarAnchors';
 import { legSwing } from '../../../lib/office/a11y';
 import { useReducedMotion } from '../mounts/shared';
 
@@ -108,6 +109,7 @@ export function Bear({ color, seed, rig: external, carry, ghost, paw }: {
     if (rig.chest) { rig.chest.scale.x = 1 + idle.breath; rig.chest.scale.z = 1 + idle.breath; }
   });
   return <group name='bear' ref={group => { rig.root = group; }}>
+    {rig.driven && <AvatarAnchors rig={rig} />}
     <group ref={group => { rig.chest = group; }}>
       <Part {...BEAR.torso} material={look.fur} shadow={shadow} />
       <Part {...BEAR.belly} material={look.muzzle} />
@@ -131,8 +133,14 @@ export function Bear({ color, seed, rig: external, carry, ghost, paw }: {
       {side === 1 && paw && <group position={[BEAR.paw.at[0], BEAR.paw.at[1], BEAR.paw.at[2]]}>{paw}</group>}
     </group>)}</group>
     <group ref={group => { rig.legs = group; }}>{SIDES.map(side => <group key={side} position={[side * BEAR.leg.x, BEAR.hip, 0]}>
-      <Part {...BEAR.leg.part} material={look.fur} shadow={shadow} />
-      <Part {...BEAR.foot} material={look.muzzle} shadow={shadow} />
+      <Part at={[0, -BEAR.leg.part.size[1] / 4, 0]}
+        size={[BEAR.leg.part.size[0], BEAR.leg.part.size[1] / 2, BEAR.leg.part.size[2]]} material={look.fur} shadow={shadow} />
+      <group name='shin' position={[0, -BEAR.leg.part.size[1] / 2, 0]}>
+        <Part at={[0, -BEAR.leg.part.size[1] / 4, 0]}
+          size={[BEAR.leg.part.size[0], BEAR.leg.part.size[1] / 2, BEAR.leg.part.size[2]]} material={look.fur} shadow={shadow} />
+        <Part at={[BEAR.foot.at[0], BEAR.foot.at[1] + BEAR.leg.part.size[1] / 2, BEAR.foot.at[2]]}
+          size={BEAR.foot.size} material={look.muzzle} shadow={shadow} />
+      </group>
     </group>)}</group>
   </group>;
 }
