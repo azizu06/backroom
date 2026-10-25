@@ -130,9 +130,11 @@ Generated bindings live in `orchestrator/src/spacetime-client`, exported as
   --lang typescript --module-path spacetime --out-dir orchestrator/src/spacetime-client --yes
 ```
 
-The presence binding additions were written in the existing 2.13 generated style
-because the CLI was unavailable in the presence worktree; regenerate with the
-same command when the pinned CLI is available.
+The presence, `set_call_presence`, `agent_escalate_to_human` and
+`agent_resolve_human_escalation` binding additions were written in the existing
+2.13 generated style because the CLI was unavailable in those worktrees; regenerate
+with the same command when the pinned CLI is available. A running database needs a
+republish of this module before the host can call those reducers.
 
 Browser example (no token):
 

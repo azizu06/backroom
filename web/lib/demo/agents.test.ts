@@ -225,3 +225,51 @@ describe('collections refused-call email preview', () => {
     expect(JSON.stringify(rows)).not.toContain('billing@client.example');
   });
 });
+
+describe('collections call outcome AR chain', () => {
+  it('runs collections -> reconciler -> auditor on a finished call and publishes each handoff through its statuses', async () => {
+    const control = new MemoryStateStore();
+    await control.insertInvoice({ id: '1042', kind: 'ar', state: 'promised' });
+    const callId = '00000000-0000-4000-8000-0000000000dd', caseId = `agent:call:${callId}`;
+    const call = { callId, status: 'active' as const, invoiceId: '1042', clientId: 'northfield-jordan', amountCents: 495000,
+      plans: [{ id: 'plan-1' }], escalations: [], links: [{ id: 'link-1', amountCents: 247500 }], scenarioSource: 'judge' as const };
+    const leases: string[] = [];
+    const lease = async (invoiceId: string, key: string) => {
+      if (!await control.getAgent('agent-reconciler')) await control.registerAgent('agent-reconciler', 'collections', Date.now());
+      await control.enqueueTask({ id: `reconcile:${key}`, seatId: 'collections', refs: [invoiceId], idempotencyKey: `ar:${invoiceId}:1`, steps: [] });
+      const held = (await control.claimTask('agent-reconciler', Date.now(), 60_000))!;
+      leases.push(held.id);
+      return { lease: held, release: () => control.completeTask(held, 'done', Date.now()) };
+    };
+    const reconcile = vi.fn(async () => ({ status: 'exception' as const }));
+    const query = scriptedQuery(role => ({
+      collections: [{ tool: 'get_call_outcome', args: {} }, handoff('reconciler', o => o[0].allowedRefs)],
+      reconciler: [{ tool: 'request_exact_match', args: {} }, handoff('auditor', o => o[0].artifactRefs)],
+      auditor: [{ tool: 'read_audit', args: {} }, { tool: 'verify_chain', args: {} },
+        { tool: 'record_case_summary', args: (o: any[]) => ({ summary: `Call outcome reviewed [entry:${o[1].auditIds[0]}]`, citations: [o[1].auditIds[0]] }) }],
+    } as Record<string, ScriptStep[]>)[role] ?? []);
+    const host = createInboxAgents({ control, ledger: new MemoryUsageLedger(), query, credential: () => 'mock-key',
+      callOutcomes: { read: async id => id === callId ? structuredClone(call) : undefined, lease,
+        bank: { listDeposits: async () => [] }, accountId: 'receivables',
+        payments: () => ({ view: async () => ({ linkId: 'link-1', invoiceId: '1042', amountCents: 247500 }) as never, reconcile: reconcile as never }) } });
+    cleanups.push(() => host.stop());
+    const statuses: string[] = [];
+    (host.store as import('@backroom/orchestrator/agents').MemoryHandoffStore).subscribe(row => statuses.push(`${row.fromRole}>${row.toRole}:${row.status}`));
+
+    const result = await host.submitCallOutcome(callId);
+    expect(result?.status, JSON.stringify(result)).toBe('done');
+    expect(result?.activations.map(row => row.role)).toEqual(['collections', 'reconciler', 'auditor']);
+    expect(await host.submitCallOutcome(callId)).toBe(result);
+    expect(statuses).toEqual(['collections>reconciler:offered', 'collections>reconciler:accepted', 'collections>reconciler:completed',
+      'reconciler>auditor:offered', 'reconciler>auditor:accepted', 'reconciler>auditor:completed']);
+    expect(await host.store.listPublic()).toEqual([
+      expect.objectContaining({ caseDisplayId: '1042', fromRole: 'collections', toRole: 'reconciler', status: 'completed' }),
+      expect.objectContaining({ caseDisplayId: '1042', fromRole: 'reconciler', toRole: 'auditor', status: 'completed' }),
+    ]);
+    expect(reconcile).toHaveBeenCalledOnce();
+    expect(await control.getTask(leases[0]!)).toMatchObject({ status: 'done' });
+    expect((await control.listAudit()).map(row => row.action)).toEqual(expect.arrayContaining(['collections_postcall_handoff',
+      'agent_reconciliation', 'agent_handoff_offered', 'agent_handoff_accepted', 'agent_handoff_completed', 'case_summary']));
+    expect(await control.verifyAuditChain()).toMatchObject({ valid: true });
+  });
+});
