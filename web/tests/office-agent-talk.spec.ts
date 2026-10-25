@@ -28,7 +28,7 @@ async function holdUntil(page: Page, key: string, done: () => Promise<boolean>, 
 async function startPlay(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await requireWebGL(page);
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');

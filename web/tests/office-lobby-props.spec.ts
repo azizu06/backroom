@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('lobby props render and stamp the latest Treasury denial without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('canvas')).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);

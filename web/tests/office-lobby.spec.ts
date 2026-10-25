@@ -25,7 +25,7 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   const errors: string[] = [], audit: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { const path = new URL(request.url()).pathname; if (path.startsWith('/api/audit/')) audit.push(path); });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.locator('.office-toolbar')).toBeVisible();
   await expect(page.getByTestId('office-viewport')).toBeVisible();
   // The world fills the window: nothing stacked above or below the canvas, and the panels drawer starts closed.
@@ -67,7 +67,7 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
 test('office demo guide and keyboard shortcuts help open and restore focus', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const guideButton = page.getByRole('button', { name: 'Demo guide' });
   await guideButton.click();
   const guide = page.getByRole('dialog', { name: 'Try this' });
@@ -108,7 +108,7 @@ test('office demo guide and keyboard shortcuts help open and restore focus', asy
 test('office shows the lobby summary and agent roster without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await openPanels(page);
   await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
   // Diegetic HUD: the seat status row is the one roster (the lobby strip keeps today's counts and the feed).
@@ -123,7 +123,7 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
     entries: [], chain: { valid, length: 0, ...(valid ? {} : { firstBrokenSeq: 1, reason: 'hash mismatch' }) },
     measuredAt: '2026-10-24T12:00:00Z',
   } }));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await openPanels(page);
   const lobby = page.locator('#office-audit-wall');
   const ask = lobby.getByRole('region', { name: 'Ask why by voice' });
@@ -253,7 +253,7 @@ test('office props render in the 3D scene', async ({ page }) => {
   page.on('pageerror', error => errors.push(error.message));
   // Network status noise (e.g. the unauthenticated LLM switch probe) is not a render failure.
   page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const viewport = page.getByTestId('office-viewport');
   const canvas = viewport.locator('canvas');
   await expect(canvas).toBeVisible();
@@ -273,7 +273,7 @@ test('office desk monitors survive the Collections escalation preview', async ({
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const viewport = page.getByTestId('office-viewport');
   const canvas = viewport.locator('canvas');
   await expect(canvas).toBeVisible();
@@ -298,7 +298,7 @@ test('office ambience renders a still scene under reduced motion', async ({ page
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
   const viewport = page.getByTestId('office-viewport');
   const canvas = viewport.locator('canvas');
@@ -315,7 +315,7 @@ test('office ambience renders a still scene under reduced motion', async ({ page
 test('office judge tour visits the rooms with agent tags and stops on any key', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.locator('canvas')).toBeVisible();
   // The preview fixture seats three agents; each gets one tag.
   await expect(page.locator('.seat-statuses > div')).toHaveCount(3);
@@ -338,7 +338,7 @@ test('office judge tour advances under reduced motion and stops on a click', asy
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
@@ -354,7 +354,7 @@ test('office judge tour advances under reduced motion and stops on a click', asy
 
 test('office judge tour is not cancelled by the view select navigation keys', async ({ page }) => {
   // Portable: dispatch the keydown on the select itself, so no platform-specific native-select behaviour is involved.
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
@@ -373,7 +373,7 @@ test('office judge tour is not cancelled by the view select navigation keys', as
 test('office judge tour started with the native select arrow keys', async ({ page, browserName }) => {
   // A closed <select> changes value on ArrowDown/ArrowUp in Linux/Windows Chromium; macOS opens the popup instead.
   test.skip(process.platform === 'darwin' || browserName !== 'chromium', 'native select arrow-key navigation is platform-specific');
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
@@ -397,7 +397,7 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const viewport = page.getByTestId('office-viewport');
   const canvas = viewport.locator('canvas');
   await expect(canvas).toBeVisible();

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { isCloseKey } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
+import { setBakedTalkingAgent } from '../../lib/office/baked-character';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
@@ -24,11 +25,12 @@ import { useHandoffPresentation } from './handoffs/HandoffPresentation';
 import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
+import { agentCues, cueKeyFor } from '../../lib/office/agent-motion';
 import './play.css';
 import './playfeel.css';
 
 export const PLAY_HINT = 'Click to look · WASD move · ←/→ turn · E interact · O overview · Esc exit';
-export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Exit Play to leave';
+export const PLAY_TOUCH_HINT = 'Drag to look · stick to move · tap Interact · Overview to leave';
 const TOUCH_QUERY = '(pointer: coarse), (max-width: 760px)';
 const CONTROLS: Record<string, PlayControl> = {
   w: 'forward', arrowup: 'forward', keyw: 'forward', s: 'back', arrowdown: 'back', keys: 'back',
@@ -147,12 +149,14 @@ export function PlayPanelDialog({ snapshot, target, close, askWhy }: { snapshot:
  * First-person overlay (initial bundle, no WebGL imports). Keys are handled on the play surface;
  * the lazy scene's PlayRig reads `input` and requests frames only while something is held.
  */
-export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOverview, chat, keyOwners = { story: false, menu: false } }: {
+export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOverview, chat, keyOwners = { story: false, menu: false }, lookOnStart = false }: {
   snapshot: OfficeSnapshot; input: PlayInput; target: PlayTarget | null; hud: RefObject<HTMLDivElement | null>; onExit: () => void; onHelp?: () => void;
-  /** Toggle to the Overview camera (O or the Overview button); absent hides the button. */
+  /** Toggle to the Overview camera and map (O or the Overview button); absent, the button just exits Play. */
   onOverview?: () => void; chat?: PlayChat;
   /** Story mode or an Overview menu owning the arrow keys: Play then records no movement or turn input. */
   keyOwners?: { story: boolean; menu: boolean };
+  /** Entered from an explicit Enter click: ask for pointer lock right away (that click is the user gesture). */
+  lookOnStart?: boolean;
 }) {
   const ownsMoveKeys = playOwnsMoveKeys(keyOwners);
   const ownsMoveKeysRef = useRef(ownsMoveKeys);
@@ -171,10 +175,12 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   const knob = useRef<HTMLSpanElement>(null);
   const targetRef = useRef(target);
   targetRef.current = target;
+  const lookOnMount = useRef(lookOnStart);
 
   useEffect(() => {
     const surface = hud.current;
     surface?.focus();
+    if (surface && lookOnMount.current) requestLook(surface);
     requestSceneFrame();
     return () => {
       input.clear();
@@ -184,9 +190,19 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   }, [hud, input]);
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
   useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
+  // The agent being talked to faces the player and listens until the dialog closes (view only).
+  useEffect(() => {
+    agentCues.setTalking(panel ? cueKeyFor(panel) : null);
+    return () => agentCues.setTalking(null);
+  }, [panel]);
   useEffect(() => {
     if (panel && !playPanel(snapshot, panel, handoffFor)) { setPanel(null); hud.current?.focus(); }
   }, [panel, snapshot, hud, handoffFor]);
+  // View-only signal for the baked characters' talk clip (?art=baked); a no-op for the blocky figures.
+  useEffect(() => {
+    setBakedTalkingAgent(panel?.kind === 'agent' ? panel.id : null);
+    return () => setBakedTalkingAgent(null);
+  }, [panel]);
 
   function interact() {
     if (panel || settingsOpen || chatOpen) return;
@@ -210,6 +226,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     input.clear();
     releasePointer();
     requestSceneFrame();
+    const cue = cueKeyFor(current);
+    if (cue) agentCues.greet(cue);
     setPanel(current);
     playOfficeCue('interact');
   }
@@ -346,8 +364,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    {onOverview && <button className='play-overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
-    <button className='play-exit' onClick={onExit}>Exit Play</button>
+    <button className='play-exit' aria-label='Overview' aria-keyshortcuts={onOverview ? 'O' : undefined} onClick={() => { releasePointer(); (onOverview ?? onExit)(); }}>Overview{onOverview && <> <kbd>O</kbd></>}</button>
     <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>

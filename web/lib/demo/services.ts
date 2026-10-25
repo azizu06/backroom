@@ -5,10 +5,18 @@ import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHeal
   type PreCallDependencies, type PreCallInput, type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
 import { environmentHealthRow } from '../../../tools/demo/env';
+import collectionScenarios from '../../../fixtures/scenarios/collections.json';
 import type { PrecallEvidence } from '../calls/precall';
+import type { EmailOnlyScenario } from '../calls/request';
 import type { CallRefusal, DemoCollectionsPlanner } from './agents';
 
 const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
+const LEAD_CRS_TEST_IDENTITY_ID = 1;
+type ClientOverride = { type?: 'business' | 'consumer'; dnc?: boolean };
+const seededClient = (id: string) => (collectionScenarios as { id: string; steps: { contextOverrides?: { client?: ClientOverride } }[] }[])
+  .find(row => row.id === id)?.steps[0]?.contextOverrides?.client;
+/** The frozen consumer (C14) and opt-out (C12) clients, each an override on the lead receivable's client. */
+const EMAIL_ONLY_CLIENTS: Record<EmailOnlyScenario, ClientOverride | undefined> = { consumer: seededClient('C14'), opt_out: seededClient('C12') };
 /** Safe server-only observation for the real-vs-sim route; never initiates a probe. */
 export const getDemoHostServices = () => root.backroomDemoServiceStatus?.() ?? null;
 export function installDemoServiceStatus(read: () => DemoStatus['services']) { root.backroomDemoServiceStatus = read; }
@@ -61,7 +69,10 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
         (async () => {
           try {
             // Exact sponsor persona P01. These are public-record/fraud checks, never OFAC/business credit.
-            evidence.crs = await Promise.all([crs.getPublicRecords(1), crs.getFraudRisk(1)]);
+            evidence.crs = await Promise.all([
+              crs.getPublicRecords(LEAD_CRS_TEST_IDENTITY_ID),
+              crs.getFraudRisk(LEAD_CRS_TEST_IDENTITY_ID),
+            ]);
             crsStatus = 'complete';
           } catch { crsStatus = 'unavailable'; }
         })(),
@@ -88,10 +99,23 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   });
   const emailOnly = (rules: readonly string[]) => rules.length > 0
     && rules.every(rule => (EMAIL_ONLY_RULES as readonly string[]).includes(rule));
-  function emailCase(refusal: CallRefusal) {
-    if (!preCallInput) return undefined;
+  // Scripted pre-call only: synthetic consent and an explicitly logged weekend override.
+  // The separate preverified gateway rehearsal is not evidence of a live dial permit.
+  async function leadInput(state: StateStore): Promise<PreCallInput> {
+    const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
+    const client = northfield.clients.find(row => row.id === invoice.clientId)!;
+    if (client.type !== 'business' && client.type !== 'consumer') throw new Error('DEMO_CLIENT_TYPE');
+    return { clientId: client.id, invoiceId: invoice.id, testIdentityId: LEAD_CRS_TEST_IDENTITY_ID,
+      company: APIFY_DEMO_COMPANY, context: { policy: await state.getPolicy(),
+        client: { ...client, type: client.type, localWeekday: 6, localHour: 11 },
+        demoOverride: { visible: true, logged: true }, signals: {} } };
+  }
+  async function emailCase(refusal: CallRefusal, state: StateStore) {
+    // An offline host never prepares the lead; a seeded email-only refusal still rebuilds it from fixtures.
+    const base = preCallInput ?? (refusal.code === 'CALL_DENIED' ? await leadInput(state) : undefined);
+    if (!base) return undefined;
     let rules: readonly string[] = [];
-    let context = structuredClone(preCallInput.context);
+    let context = structuredClone(base.context);
     if (refusal.code === 'PRECALL_BLOCKED' && preCall?.status === 'blocked' && preCall.decision) {
       rules = preCall.decision.ruleIds;
     } else if (refusal.code === 'CALL_DENIED' && refusal.detail) {
@@ -105,13 +129,13 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       context = { ...context, client };
     }
     if (!emailOnly(rules)) return undefined;
-    const invoice = northfield.arInvoices.find(row => row.id === preCallInput!.invoiceId)!;
-    const client = northfield.clients.find(row => row.id === preCallInput!.clientId)!;
+    const invoice = northfield.arInvoices.find(row => row.id === base.invoiceId)!;
+    const client = northfield.clients.find(row => row.id === base.clientId)!;
     const policyClient = context.client!;
     return {
       sessionId: `demo:email:${invoice.id}`,
       invoice: { amountCents: invoice.principalCents + invoice.lateFeeCents, currency: 'USD', daysPastDue: 40 },
-      precall: { ...structuredClone(preCallInput), context },
+      precall: { ...structuredClone(base), context },
       dial: { sessionId: `demo:email:${invoice.id}`, agentId: 'demo:collections', fromNumberId: 'simulated-email-only',
         clientId: client.id, businessName: northfield.company.name, contactName: client.name, invoiceId: invoice.id,
         callbackNumber: '+12025550100', client: { type: policyClient.type ?? 'business', number: policyClient.phoneNumber ?? client.phoneNumber,
@@ -123,15 +147,26 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   }
   return { bank, accountId, status, precall,
     collectionsPlanner(state: StateStore): DemoCollectionsPlanner {
-      return { caseFor: emailCase, voice: { async start() { throw new Error('REFUSED_CALL_CANNOT_DIAL'); } },
+      return { caseFor: refusal => emailCase(refusal, state), voice: { async start() { throw new Error('REFUSED_CALL_CANNOT_DIAL'); } },
         precall: precallDeps(state) };
+    },
+    /** A seeded email-only client through the production pre-call. Returns its email-only DENY rules; never dials. */
+    async emailOnlyRefusal(state: StateStore, scenario: EmailOnlyScenario): Promise<string[] | undefined> {
+      const override = EMAIL_ONLY_CLIENTS[scenario];
+      if (!override) return undefined;
+      const input = await leadInput(state);
+      input.context = { ...input.context, client: { ...input.context.client!, ...override } };
+      const result = await runPreCall(input, precallDeps(state));
+      const rules = result.status === 'blocked' && result.decision?.kind === 'DENY' ? result.decision.ruleIds : [];
+      return emailOnly(rules) ? [...rules] : undefined;
     },
     async prepare(state: StateStore) {
       if (!live) return;
       await prepare();
       await state.appendAudit({ ts: Date.now(), actor: 'code', seat: 'collections', action: 'demo_pre_call_evidence',
         ruleIds: [], policyVersion: (await state.getPolicy()).policyVersion, refs: ['1042'], route: 'code', latencyMs: 0, costUsd: 0,
-        inputs: { noDial: true, syntheticCaller: true, crsLabel: realCrs ? 'SANDBOX: test identity #1' : 'FAKE: test identity #1',
+        inputs: { noDial: true, syntheticCaller: true,
+          crsLabel: `${realCrs ? 'SANDBOX' : 'FAKE'}: test identity #${LEAD_CRS_TEST_IDENTITY_ID}`,
           apify, crsStatus, ...evidence, ofac: 'unknown', businessCredit: 'unavailable' } });
       const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
       const client = northfield.clients.find(row => row.id === invoice.clientId)!;
@@ -147,12 +182,7 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       } catch (error) {
         console.error('demo signal recording failed', error);
       }
-      // Scripted pre-call only: synthetic consent and an explicitly logged weekend override.
-      // The separate preverified gateway rehearsal is not evidence of a live dial permit.
-      preCallInput = { clientId: client.id, invoiceId: invoice.id, testIdentityId: 7,
-        company: APIFY_DEMO_COMPANY, context: { policy: await state.getPolicy(),
-          client: { ...client, type: client.type, localWeekday: 6, localHour: 11 },
-          demoOverride: { visible: true, logged: true }, signals: {} } };
+      preCallInput = await leadInput(state);
       preCall = await runPreCall(preCallInput, precallDeps(state));
     },
     async health(): Promise<HealthRow[]> {

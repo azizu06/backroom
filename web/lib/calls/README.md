@@ -17,7 +17,7 @@ proxy (`web/lib/demo/state-proxy.ts`), so the public page has the desk phone. A
 signed-out click answers "Calls are locked". After sign-in, each click rings the
 allowlisted phone, with no CLI step. The host's loopback office works the same way.
 
-`request` accepts only `{}` or `{ "line": "collections" }`. The destination is the
+`request` accepts only `{}`, `{ "line": "collections" }`, or a seeded email-only `scenario` (below). The destination is the
 relay's `T1_DIAL_TO`, never request input. It refuses when voice is not running
 (`DEMO_VOICE_RUNNING=1` and `VOICE_ADMIN_SECRET` come from `demo:up`), while a
 request is in flight, while the feed shows a ringing/live call, and for 20 s after
@@ -31,9 +31,18 @@ For an authenticated `PRECALL_BLOCKED` or `CALL_DENIED`, the demo bootstrap asks
 its existing agent host to rebuild the trusted pre-call case. Consumer, DNC and
 missing-consent cases run through the production Collections planner and may queue
 one `SIMULATED: email preview, not sent` per invoice/UTC day. The button result says
-`Email preview (simulated, not sent)` only after that queue reports queued or
+`Email preview (simulated, not sent)` after that queue reports queued, and
+`Email preview already queued today (simulated, not sent); no second email.` after
 duplicate. The shared audit records only the recipient domain; no delivery provider
 is configured. Other refusal reasons keep the normal no-call response.
+
+`/calls` also has **Email-only clients** buttons that post
+`{ "line": "collections", "scenario": "consumer" | "opt_out" }`: the frozen C14
+consumer and C12 opt-out overrides (`fixtures/scenarios/collections.json`) on
+receivable 1042's client. The demo host runs them through the production pre-call
+(`can_call` DENY audit row), and the route refuses `CALL_DENIED` before the relay,
+call lock or cooldown, so nothing dials. The refusal then takes the follow-up path
+above. Without the demo host it answers `SCENARIO_UNAVAILABLE`.
 
 `active` projects `GatewayStore.latestVoiceCall()` plus provider lifecycle
 (`lifecycle.ts`, pushed by the relay over the host's loopback). Status: no

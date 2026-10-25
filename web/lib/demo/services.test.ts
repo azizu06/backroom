@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { route, signalsFromCrs, signalsFromHealth } from '@backroom/orchestrator';
-import { precallCard } from '../calls/precall';
+import { precallCard, precallRows } from '../calls/precall';
 import { createDemoServices } from './services';
 
 mkdirSync('.demo', { recursive: true });
@@ -58,23 +58,39 @@ it('caches even an ambiguous Actor start across resets and reports it without le
   expect(JSON.stringify([audit, services.status()])).not.toContain('private');
 });
 
-it('consumes the CRS pre-call factory and blocks bankruptcy before model planning', async () => {
-  const http: typeof fetch = async url => {
+it('uses clean CRS identity #1 for the lead pre-call and reaches model planning', async () => {
+  const identities: string[] = [];
+  const http: typeof fetch = async (url, init) => {
     const path = new URL(String(url)).pathname;
     if (path.endsWith('/users/login')) return Response.json({ token: 'test-session' });
-    if (path.includes('/pp/')) return Response.json({ Report: { Summary: { BankruptciesFound: '1', JudgmentsFound: '0', LiensFound: '0' } } });
-    if (path.includes('/fraud-finder/')) return Response.json({ risk: { score: 88, tumbling_risk: 0 } });
+    const body = JSON.parse(String(init?.body)) as { terms?: { term?: { person?: { firstName?: string } }[] }; firstName?: string };
+    const firstName = body.terms?.term?.[0]?.person?.firstName ?? body.firstName;
+    if (firstName) identities.push(firstName);
+    if (path.includes('/pp/')) return Response.json({ Report: { Summary: {
+      BankruptciesFound: firstName === 'MARCUS' ? '1' : '0', JudgmentsFound: '0', LiensFound: '0' } } });
+    if (path.includes('/fraud-finder/')) return Response.json({ risk: { score: 11, tumbling_risk: 0 } });
     throw new Error('Unexpected network');
   };
-  const modelRoute = vi.fn();
+  const plan = { tone: 'neutral' as const, offerOrder: ['pay_in_full' as const],
+    plan: { installments: 1, firstPaymentPct: 100, totalDays: 0, waiveFees: false, discountPct: 0 } };
+  const modelRoute = vi.fn(async () => ({ output: plan, route: 'cloud' as const, model: 'test', latencyMs: 1, costUsd: 0 })) as unknown as typeof route;
   const services = await createDemoServices({ env: { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private',
-    NESSIE_ACCOUNT_ID: 'sandbox-account', CRS_USERNAME: 'test-user', CRS_PASSWORD: 'test-pass' }, fetch: http, modelRoute });
+    NESSIE_ACCOUNT_ID: 'sandbox-account', CRS_USERNAME: 'test-user', CRS_PASSWORD: 'test-pass', PRECALL_APIFY: 'fake' }, fetch: http, modelRoute });
   const { MemoryStateStore } = await import('@backroom/orchestrator');
   const state = new MemoryStateStore();
   await services.prepare(state);
-  expect(services.status().services.preCall).toMatchObject({ status: 'blocked' });
-  expect((await state.listAudit()).some(row => row.ruleIds.includes('BANKRUPTCY_STOP'))).toBe(true);
-  expect(modelRoute).not.toHaveBeenCalled();
+  expect(services.status().services.preCall).toMatchObject({ status: 'ready' });
+  expect(identities).toEqual(['MARGARET', 'MARGARET', 'MARGARET']);
+  const audit = await state.listAudit();
+  expect(audit.find(row => row.action === 'credit_check')?.inputs)
+    .toMatchObject({ label: 'CRS sandbox: test identity #1' });
+  expect(audit.find(row => row.action === 'demo_ofac_unavailable_override')).toMatchObject({
+    decision: 'ALLOW', ruleIds: ['DEMO_OVERRIDE'],
+  });
+  expect(precallRows(precallCard(services.precall()))).toContainEqual({
+    label: 'Warning', value: 'Sanctions check not available in CRS sandbox',
+  });
+  expect(modelRoute).toHaveBeenCalledTimes(1);
 });
 
 it('shows a labelled cached balance when Nessie is down', async () => {
@@ -93,7 +109,7 @@ it('shows a labelled cached balance when Nessie is down', async () => {
   expect(cached.freshness).toMatch(/^cached at \d\d:\d\d UTC$/);
 });
 
-it('audits cached CRS evidence and still blocks the pre-call when CRS is down', async () => {
+it('audits cached CRS evidence but still blocks the pre-call when the live CRS check is down', async () => {
   let down = false;
   const http: typeof fetch = async url => {
     if (down) throw new Error('crs-down');
@@ -115,13 +131,14 @@ it('audits cached CRS evidence and still blocks the pre-call when CRS is down', 
   await first.prepare(new MemoryStateStore());
   expect(existsSync(defaultCrsCache)).toBe(true);
   expect(first.status().services.crs.mode).toBe('sandbox');
-  expect(first.status().services.preCall.status).toBe('blocked');
+  expect(first.status().services.preCall.status).toBe('paused');
+  expect(plannerCalls).toHaveLength(1);
   down = true;
   const second = await createDemoServices({ env, fetch: http, modelRoute });
   const state = new MemoryStateStore();
   await second.prepare(state);
   expect(second.status().services.preCall.status).toBe('blocked');
-  expect(plannerCalls).toHaveLength(0);
+  expect(plannerCalls).toHaveLength(1);
   const wall = (await state.listAudit()).filter(row => row.action === 'demo_pre_call_evidence');
   const crs = (wall.at(-1)?.inputs as { crs?: { cached?: boolean; label?: string; product?: string }[] } | undefined)?.crs;
   expect(crs?.map(row => row.product)).toEqual(['publicRecords', 'fraudRisk']);
@@ -190,6 +207,37 @@ it('rebuilds only email-eligible refused calls as trusted planner cases', async 
     .not.toHaveProperty('precall.context.client.consent');
   expect(await planner.caseFor({ outcome: 'refused', code: 'CALL_DENIED', detail: 'BANKRUPTCY_STOP' })).toBeUndefined();
   expect(await planner.caseFor({ outcome: 'refused', code: 'RELAY_REFUSED', detail: 'B2B_ONLY_CALLS' })).toBeUndefined();
+});
+
+it('refuses a seeded consumer or DNC client in pre-call and the production planner queues one simulated preview per day', async () => {
+  const http = vi.fn();
+  // Offline host: no lead preparation, no provider or model route.
+  const services = await createDemoServices({ env: { NODE_ENV: 'test' }, fetch: http });
+  const { MemoryStateStore } = await import('@backroom/orchestrator');
+  const { MemoryUsageLedger } = await import('@backroom/orchestrator/agents');
+  const { scriptedQuery } = await import('../../../orchestrator/src/agents/mock-query');
+  const { createInboxAgents } = await import('./agents');
+  const state = new MemoryStateStore();
+  await expect(services.emailOnlyRefusal(state, 'consumer')).resolves.toEqual(['B2B_ONLY_CALLS']);
+  await expect(services.emailOnlyRefusal(state, 'opt_out')).resolves.toEqual(['DNC']);
+  expect((await state.listAudit()).filter(row => row.action === 'can_call').map(row => [row.decision, row.ruleIds]))
+    .toEqual([['DENY', ['B2B_ONLY_CALLS']], ['DENY', ['DNC']]]);
+  const planner = services.collectionsPlanner(state);
+  const start = vi.spyOn(planner.voice, 'start');
+  const query = scriptedQuery(role => role === 'collections' ? [
+    { tool: 'get_invoice_context', args: {} }, { tool: 'can_call', args: {} },
+    { tool: 'run_precall', args: {} }, { tool: 'start_call', args: {} },
+  ] : []);
+  const host = createInboxAgents({ control: state, ledger: new MemoryUsageLedger(), query, credential: () => 'mock-key', collectionsPlanner: planner });
+  try {
+    await expect(host.submitCallRefusal({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' })).resolves.toEqual({ status: 'queued' });
+    await expect(host.submitCallRefusal({ outcome: 'refused', code: 'CALL_DENIED', detail: 'DNC' })).resolves.toEqual({ status: 'duplicate' });
+  } finally { await host.stop(); }
+  expect(host.emailOutbox.sent).toEqual([expect.objectContaining({ key: expect.stringMatching(/^email:1042:/), label: 'SIMULATED: email preview, not sent' })]);
+  expect((await state.listAudit()).filter(row => row.action.startsWith('email_followup_')).map(row => [row.action, row.ruleIds[0]]))
+    .toEqual([['email_followup_queued', 'B2B_ONLY_CALLS'], ['email_followup_duplicate', 'DNC']]);
+  expect(start).not.toHaveBeenCalled();
+  expect(http).not.toHaveBeenCalled();
 });
 
 it('records the live website signal for invoice 1042 and the card reads that same row', async () => {

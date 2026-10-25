@@ -33,6 +33,8 @@ import { FloorPlan } from './FloorPlan';
 import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
 import { ViewBoundary } from './ViewBoundary';
+import { PlaySplash } from './PlaySplash';
+import { COMPACT_QUERY, readStartView, saveStartView, startView } from '../../lib/office/start-mode';
 import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
 import type { AgentTagLookup, RoomLabels } from './scene';
 import '../office.css';
@@ -94,7 +96,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const chat = useProximityChat({ active: mode === 'play' && presence.enabled, hud: play.hud, selfId: presence.selfId, presence: presence.enabled, showCoworkers });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
-  function exitPlay() { pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
+  function exitPlay() { saveStartView('overview'); setLookOnEnter(false); pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
+  // First person is the default start; the splash supplies the user gesture pointer lock and audio need.
+  const [splash, setSplash] = useState(false);
+  const [lookOnEnter, setLookOnEnter] = useState(false);
+  function enterPlay() { setLookOnEnter(true); enterFirstPerson(play.last.current); }
+  function enterOverview() { setSplash(false); saveStartView('overview'); }
+  function chooseView(next: ViewMode) { saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next); }
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
   useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
@@ -149,6 +157,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
     if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
+    if (storyStart || source.getSnapshot().connection === 'replay') return;
+    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') setSplash(true);
+  // Decided once on mount; later prop changes never reopen the splash.
   }, []);
   const inspectorOpener = useRef<HTMLElement | null>(null);
   const closeInspector = useCallback(() => {
@@ -175,10 +186,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setMenu(null);
     setTalk(null);
     setMapOpen(false);
+    setSplash(false);
+    saveStartView('play');
     play.entry.current = entry;
     pickMode('play');
   }
   function toOverview() {
+    saveStartView('overview');
+    setLookOnEnter(false);
     pickMode(prePlay.current === 'tween' ? 'tween' : 'walk');
     setMapOpen(true);
   }
@@ -274,13 +289,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             <strong>Backroom</strong><span aria-hidden='true'>{cornerOpen ? '▴' : '▾'}</span><span className='visually-hidden'> menu</span>
           </button>
           {lobbyModeLabel(snapshot.connection) && <span className='office-mode-chip'>{lobbyModeLabel(snapshot.connection)}</span>}
-          <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => pickMode(e.target.value as ViewMode)}>
+          <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
             {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
           </select></label>
           <OfficeHelp />
           {overview && <button ref={mapButton} type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => mapOpen ? closeMap() : setMapOpen(true)}>Overview</button>}
-          {overview && <button ref={overviewToggle} type='button' className='overview-toggle' aria-keyshortcuts='O' onClick={() => enterFirstPerson(play.last.current)}>
-            First person <kbd>O</kbd>
+          {mode !== 'play' && <button ref={overviewToggle} type='button' className='overview-toggle' aria-keyshortcuts={overview ? 'O' : undefined} onClick={enterPlay}>
+            Enter first person{overview && <> <kbd>O</kbd></>}
           </button>}
         </div>
         <div id='office-corner-panel' className='office-corner-panel' hidden={!cornerOpen}>
@@ -337,7 +352,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           })}
         </>}
       </ViewBoundary>
-      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} onOverview={toOverview} chat={chat} keyOwners={{ story: storyActive, menu: !!menu }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />}
+      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} onOverview={toOverview} lookOnStart={lookOnEnter} chat={chat} keyOwners={{ story: storyActive, menu: !!menu }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />}
       {overview && <OverviewMap snapshot={snapshot} motions={motions} open={mapOpen} onPick={(pick, opener) => openMenu(pick, opener)} onFirstPerson={() => enterFirstPerson(play.last.current)} onClose={closeMap} />}
       {overview && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
       {overview && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
@@ -348,6 +363,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
     </div>
+    {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {
       const target = event.target as HTMLElement;
       if (isCloseKey(event.key) && !event.defaultPrevented && !target.closest('input, textarea, select, dialog, [role=dialog]')) { event.preventDefault(); closeDrawer(); }

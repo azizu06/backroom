@@ -20,10 +20,27 @@ function tag(page: Page, actor: string) {
   return page.locator(`[data-handoff-actor='${actor}']`);
 }
 
+const HANDOFF_TEST_EPOCH = 1_800_000_000_000;
+async function installHandoffClock(page: Page) {
+  await page.addInitScript(epoch => {
+    let now = epoch;
+    Date.now = () => now;
+    Object.defineProperty(window, '__setHandoffTestNow', {
+      configurable: true,
+      value: (next: number) => { now = next; },
+    });
+  }, HANDOFF_TEST_EPOCH);
+}
+async function setHandoffTime(page: Page, elapsed: number) {
+  await page.evaluate(([epoch, offset]) => {
+    (window as typeof window & { __setHandoffTestNow(next: number): void }).__setHandoffTestNow(epoch + offset);
+  }, [HANDOFF_TEST_EPOCH, elapsed] as const);
+}
+
 test('mock handoffs walk folders between desks, return a rejected folder, show a correction and call Dana only for the passkey', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
   await requireWebGL(page);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Agent handoffs' })).toBeVisible();
@@ -53,7 +70,7 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
 
 test('reduced motion lists handoffs instead of animating them', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
   await requireWebGL(page);
   const region = page.getByRole('region', { name: 'Agent handoffs' });
   await expect(region).toContainText('Reduced motion · listed instead of animated');
@@ -68,11 +85,18 @@ test('reduced motion lists handoffs instead of animating them', async ({ page })
 
 test('renders the first four handoffs from the mocked feed', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office?handoffs=mock&handoffSpeed=8');
+  await installHandoffClock(page);
+  await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=8');
   await requireWebGL(page);
   const entries = log(page).locator('li[data-status]');
+  await expect(page.getByText('No handoffs yet.')).toBeVisible();
+  // Feed lead is 600 ms; at 2,000 ms the fourth row has arrived and the fifth has not.
+  await setHandoffTime(page, 2_000);
   // The first four fixture handoffs include the first five-role chain and arrive before later fixtures.
   await expect(entries).toHaveCount(4, { timeout: 10_000 });
+  // Real wall-clock delay cannot race this assertion into a later fixture snapshot.
+  await page.waitForTimeout(1_000);
+  await expect(entries).toHaveCount(4);
   await expect(entries.nth(0)).toContainText('Intake → Extractor · INV-1042');
   await expect(entries.nth(1)).toContainText('Collections → Auditor · INV-0977');
   await expect(entries.nth(2)).toContainText('Intake → Extractor · INV-1043');
@@ -109,7 +133,7 @@ async function bearing(page: Page, x: number, z: number) {
 }
 
 test('play mode: facing a handoff agent and pressing E shows the handoff details', async ({ page }) => {
-  await page.goto('/office?handoffs=mock');
+  await page.goto('/office?handoffs=mock&view=overview');
   await requireWebGL(page);
   // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
   await expect(log(page)).toContainText('INV-1043', { timeout: 10_000 });
@@ -152,7 +176,7 @@ test('voices stay off until enabled, then speak handoff lines through the proxy'
   });
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
   const toggle = page.getByRole('button', { name: 'Voices off' });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await page.waitForTimeout(1500);
@@ -174,7 +198,7 @@ test('a failing voice proxy falls back to silent visuals', async ({ page }) => {
   await page.route('**/api/handoff', route => { calls++; return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"VOICE_NOT_CONFIGURED"}' }); });
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office?handoffs=mock&handoffSpeed=4');
+  await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
   await page.getByRole('button', { name: 'Voices off' }).click();
   await expect(page.getByText('Voices unavailable · visuals only')).toBeVisible({ timeout: 20_000 });
   const after = calls;

@@ -13,7 +13,10 @@ const RELAY: Record<string, [number, string]> = {
   DIAL_UNCONFIRMED: [504, 'The provider did not confirm the call; the phone may still ring. Not retried.'],
 };
 
-export type CallRequestAudit = { outcome: 'requested' | 'accepted' | 'refused'; code: string; detail?: string; suppressed?: number };
+/** Seeded email-only clients (fixtures/scenarios/collections.json C14, C12). A key, never a destination. */
+export const EMAIL_ONLY_SCENARIOS = ['consumer', 'opt_out'] as const;
+export type EmailOnlyScenario = typeof EMAIL_ONLY_SCENARIOS[number];
+export type CallRequestAudit = { outcome: 'requested' | 'accepted' | 'refused'; code: string; detail?: string; suppressed?: number; scenario?: EmailOnlyScenario };
 export type CallFollowUpResult = { status: 'queued' | 'duplicate' };
 export interface CallRequestOptions {
   /** Operator code; its shared sign-in (`/api/session`) unlocks the desk phone. */
@@ -32,6 +35,8 @@ export interface CallRequestOptions {
   audit: (entry: CallRequestAudit) => Promise<void>;
   /** Trusted demo-host hook. It may queue a simulated preview after a refusal; it never delivers email. */
   followUp?: (entry: CallRequestAudit) => Promise<CallFollowUpResult | undefined>;
+  /** Trusted demo-host hook: the production pre-call's email-only DENY rule ids for a seeded client, else undefined. */
+  emailOnlyRefusal?: (scenario: EmailOnlyScenario) => Promise<string[] | undefined>;
   fetch?: typeof fetch; now?: () => number;
   /** Minimum gap between dial attempts, and after a call ends. */
   cooldownMs?: number;
@@ -49,8 +54,8 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
   // Unauthenticated refusals are audited, but at most one row per code every ten seconds.
   const quiet = new Map<string, { at: number; suppressed: number }>();
   // A refusal places nothing, so its audit is best effort; a dial requires its audit first.
-  const refuse = async (status: number, code: string, message: string, detail?: string, coalesce = false) => {
-    const entry: CallRequestAudit = { outcome: 'refused', code, ...(detail && { detail }) };
+  const refuse = async (status: number, code: string, message: string, detail?: string, coalesce = false, scenario?: EmailOnlyScenario) => {
+    const entry: CallRequestAudit = { outcome: 'refused', code, ...(detail && { detail }), ...(scenario && { scenario }) };
     if (coalesce) {
       const prior = quiet.get(code);
       if (prior && now() - prior.at < 10_000) { prior.suppressed++; return json({ ok: false, error: code, message }, status); }
@@ -59,8 +64,9 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
     } else await options.audit(entry).catch(() => undefined);
     const followedUp = (code === 'PRECALL_BLOCKED' || code === 'CALL_DENIED')
       ? await options.followUp?.(entry).catch(() => undefined) : undefined;
-    const suffix = followedUp ? ' Email preview (simulated, not sent).' : '';
-    return json({ ok: false, error: code, message: `${message}${suffix}` }, status);
+    const suffix = followedUp?.status === 'queued' ? ' Email preview (simulated, not sent).'
+      : followedUp?.status === 'duplicate' ? ' Email preview already queued today (simulated, not sent); no second email.' : '';
+    return json({ ok: false, error: code, message: `${message}${suffix}`, ...(followedUp && { email: followedUp.status }) }, status);
   };
   const readJSON = async (request: Request, limit: number): Promise<Record<string, unknown> | undefined> => {
     if (!request.headers.get('content-type')?.startsWith('application/json')) return undefined;
@@ -83,8 +89,17 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
     if (!operatorSignedIn(request, secret, now())) return refuse(401, 'OPERATOR_SESSION_REQUIRED', UNLOCK, undefined, true);
     const body = await readJSON(request, 1024);
     // The destination, scenario and amounts are server configuration; reject anything else.
-    if (!body || Object.keys(body).some(key => key !== 'line') || (body.line !== undefined && body.line !== 'collections')) {
-      return refuse(400, 'INVALID_REQUEST', 'A call request carries no number or details; only the collections line can be requested.');
+    if (!body || Object.keys(body).some(key => key !== 'line' && key !== 'scenario') || (body.line !== undefined && body.line !== 'collections')
+      || (body.scenario !== undefined && !(EMAIL_ONLY_SCENARIOS as readonly unknown[]).includes(body.scenario))) {
+      return refuse(400, 'INVALID_REQUEST', 'A call request carries no number or details; only the collections line or a seeded email-only client can be requested.');
+    }
+    // A seeded email-only client is refused by code before the relay, the call lock or any dial.
+    if (body.scenario !== undefined) {
+      const scenario = body.scenario as EmailOnlyScenario;
+      const rules = await options.emailOnlyRefusal?.(scenario).catch(() => undefined);
+      if (!rules?.length) return refuse(503, 'SCENARIO_UNAVAILABLE', 'The email-only demo client is not available on this host. No call placed.', undefined, false, scenario);
+      const detail = rules.join(',');
+      return refuse(409, 'CALL_DENIED', `Policy refused the call (${detail}). No call placed.`, detail, false, scenario);
     }
     const relay = options.relay();
     if (!relay) return refuse(503, 'VOICE_NOT_RUNNING', 'The voice relay is not running on this host. No call placed.');

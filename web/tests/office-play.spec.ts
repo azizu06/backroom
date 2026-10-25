@@ -89,7 +89,7 @@ async function walkTo(page: Page, x: number, z: number, tolerance = 0.15) {
 async function startPlay(page: Page, setup?: () => Promise<void>) {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await requireWebGL(page);
   await setup?.();
   const select = page.getByLabel('Office view');
@@ -106,7 +106,7 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('.office-caption')).toHaveText(HINT);
   await expect(viewport.locator('.play-crosshair')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Exit Play' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible();
   const start = await player(page);
 
   const prompt = page.getByText('E · Talk to Alex');
@@ -268,7 +268,7 @@ test.describe('play mode on a phone', () => {
   test('caption shows the touch hint and the joystick is visible', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto('/office');
+    await page.goto('/office?view=overview');
     await requireWebGL(page);
     const select = page.getByLabel('Office view');
     await expect(select).toBeEnabled();
@@ -279,7 +279,7 @@ test.describe('play mode on a phone', () => {
     }).toPass();
     await expect(select).toHaveValue('play');
     const caption = page.getByTestId('office-viewport').locator('.office-caption');
-    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Exit Play to leave');
+    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Overview to leave');
     await expect(caption).not.toContainText('WASD');
     await expect(page.locator('.play-joystick')).toBeVisible();
     await expect(page.locator('.play-touch-hint')).toHaveCount(0);

@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test('Play keeps the corner map out of view and offers the Overview instead, without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });
