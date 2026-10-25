@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `c6b175bf62e72ad6187f05f5adc3470b9e4b6ddb`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `c6c743863cec9550c9f4eb1682029bd320599a84`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -78,7 +78,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **C05**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C08**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C09**: Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.
-- **C15**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
+- **C15**: Frozen integrationOutcome: use_actual_CRS_OFAC_test_identity_if_available_label_sandbox_no_dial. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: 0, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open.
 - **C21**: Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (true), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.
 
 ## Keyed AP items

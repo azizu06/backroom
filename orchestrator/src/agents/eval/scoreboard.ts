@@ -202,6 +202,11 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });
     continue;
   }
+  if (row.id === 'C15' && row.seams.includes('integration:not_executed')) {
+    const run = precallStops.find(run => run.id === 'C15');
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C15.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: ${run?.sanctionsEvidence?.creditCheckCalls ?? 0}, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open.` });
+    continue;
+  }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 const inboxTeam = await runInboxTeam();
