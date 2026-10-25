@@ -54,16 +54,54 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(await visibleText(page)).not.toMatch(BANNED);
 
       await openSheet(page, 'overview');
+      await expect(page.getByRole('heading', { name: 'Full Floor', exact: true, level: 2 })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
       expect(await visibleText(page)).not.toMatch(BANNED);
-      await page.getByRole('button', { name: 'Close Today at Backroom' }).click();
-      await expect(page.getByRole('dialog', { name: 'Today at Backroom' })).toHaveCount(0);
+      await page.getByRole('button', { name: 'Close Full Floor' }).click();
+      await expect(page.getByRole('dialog', { name: 'Full Floor' })).toHaveCount(0);
 
       await openSheet(page, 'help');
       await expect(page.getByRole('heading', { name: 'Things to Try' })).toBeVisible();
       await expect(page.getByText('Test the Treasury Lock')).toBeVisible();
       await page.getByRole('button', { name: 'Close Help' }).click();
       expect(errors).toEqual([]);
+    });
+  });
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`Full Floor at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport, hasTouch: viewport.width === 390 });
+
+    test('summary fits and Handoff history preserves scroll and disclosure state', async ({ page }) => {
+      await page.goto('/office?view=overview');
+      const dialog = await openSheet(page, 'overview');
+      const summary = dialog.getByTestId('full-floor-summary');
+      await expect(summary.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+      await expect(summary.locator('dt')).toHaveText(['Inbox', 'Handoffs in progress', 'Audit entries']);
+      const bounds = await summary.evaluate(element => ({
+        height: element.clientHeight, scrollHeight: element.scrollHeight,
+        bottom: element.getBoundingClientRect().bottom,
+      }));
+      expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.height);
+      const sheet = (await dialog.boundingBox())!;
+      expect(bounds.bottom - sheet.y).toBeLessThanOrEqual(viewport.height * (viewport.width === 390 ? 1.3 : 1));
+      if (viewport.width === 1280) expect(bounds.bottom).toBeLessThanOrEqual(sheet.y + sheet.height);
+      if (viewport.width === 390) {
+        const cards = await summary.locator('li').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
+        expect(new Set(cards).size).toBe(1);
+      }
+      const history = dialog.getByRole('button', { name: 'Handoff history', exact: true });
+      await expect(history).toHaveAttribute('aria-expanded', 'false');
+      await history.scrollIntoViewIfNeeded();
+      const scrollTop = await dialog.evaluate(element => element.scrollTop);
+      if (viewport.width === 390) await history.tap();
+      else await history.click();
+      await expect(history).toHaveAttribute('aria-expanded', 'true');
+      expect(await dialog.evaluate(element => element.scrollTop)).toBe(scrollTop);
+      await expect(dialog.getByRole('heading', { name: /^Agent Handoffs/ })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Workday', exact: true }).click();
+      await expect(history).toHaveAttribute('aria-expanded', 'true');
     });
   });
 }
@@ -240,4 +278,74 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       });
     });
   }
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`office panel tabs at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport });
+
+    test('keeps each job mounted, its scroll position, and keyboard focus', async ({ page }) => {
+      // These checks exercise the drawer, without letting the camera capture browser clicks.
+      await page.addInitScript(() => { Element.prototype.requestPointerLock = async () => {}; });
+      await page.goto('/office?view=overview');
+      await openMenu(page);
+      await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+      await expect(page.getByRole('application', { name: /First-person office/ }))
+        .toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+      await page.evaluate(() => document.exitPointerLock?.());
+      const trigger = page.getByRole('button', { name: 'Office panels', exact: true });
+      await trigger.click();
+      const drawer = page.locator('#office-drawer');
+      const summary = drawer.getByRole('tab', { name: /^Summary/ });
+      await expect(summary).toBeFocused();
+      await expect(summary).toHaveAttribute('aria-selected', 'true');
+      const summaryBody = drawer.getByRole('tabpanel', { name: /^Summary/ });
+      await expect(summaryBody.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+      expect(await summaryBody.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+      expect(await drawer.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+      await page.keyboard.press('ArrowRight');
+      const inboxTab = drawer.getByRole('tab', { name: /^Inbox/ });
+      await expect(inboxTab).toBeFocused();
+      const inbox = drawer.getByRole('tabpanel', { name: /^Inbox/ });
+      await expect(inbox.getByRole('heading', { name: /^Lobby Inbox Tray/ })).toBeVisible();
+      // Make overflow deterministic without relying on a live workday's inbox length.
+      // The node identity also catches a hidden tab being unmounted and fetched again.
+      await inbox.evaluate(element => {
+        const spacer = document.createElement('div');
+        spacer.dataset.scrollFixture = 'inbox'; spacer.style.height = '1800px';
+        element.append(spacer); element.scrollTop = 320;
+      });
+      const offset = await inbox.evaluate(element => element.scrollTop);
+      expect(offset).toBeGreaterThan(0);
+      await page.keyboard.press('ArrowRight');
+      await expect(drawer.getByRole('tab', { name: /^Audit/ })).toBeFocused();
+      await expect(drawer.getByRole('tabpanel', { name: /^Audit/ })).toBeVisible();
+      await page.keyboard.press('ArrowLeft');
+      await expect(inboxTab).toBeFocused();
+      expect(await inbox.evaluate(element => element.scrollTop)).toBe(offset);
+      await expect(inbox.locator('[data-scroll-fixture=inbox]')).toHaveCount(1);
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true');
+      expect(await inbox.evaluate(element => element.scrollTop)).toBe(offset);
+      await summary.click();
+      await page.keyboard.press('Escape');
+      const count = page.locator('.office-drawer-trigger').getByRole('button', { name: /^Inbox/ });
+      await count.click();
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true');
+      await page.keyboard.press('Escape');
+      await expect(count).toBeFocused();
+      // Legacy Ask why callers dispatch without a detail; their input must be visible immediately.
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('office-drawer')));
+      await expect(drawer.getByRole('tab', { name: /^Audit/ })).toHaveAttribute('aria-selected', 'true');
+      await expect(drawer.locator('[data-office-mount=ask-why]')).toBeVisible();
+      await page.evaluate(() => { window.location.hash = 'office-inbox-tray'; });
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true');
+      const tabs = drawer.getByRole('tablist');
+      await expect(tabs).toHaveCSS('overflow-x', 'auto');
+      expect(await drawer.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)).toBe(true);
+    });
+  });
 }

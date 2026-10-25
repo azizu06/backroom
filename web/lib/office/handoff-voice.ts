@@ -1,7 +1,7 @@
 /**
  * Optional handoff voices (#133). Browser-safe: only the HandoffRole *type* comes from the orchestrator;
  * audio is fetched through the same-origin `/api/handoff` proxy, which adds the gateway secret server-side.
- * Sound is off until the viewer turns it on, and any failure falls back to silent visuals.
+ * Sound defaults on after the first user gesture; any failure falls back to silent visuals.
  */
 import type { HandoffLine } from '@backroom/orchestrator/handoff-client';
 
@@ -52,15 +52,17 @@ export class HandoffVoice {
   private queue: VoiceCue[] = [];
   private playing = false;
   private current: AbortController | null = null;
-  enabled = false;
+  enabled = true;
   failed = false;
   constructor(private readonly fetchAudio: FetchAudio, private readonly play: PlayAudio, private readonly onChange: () => void = () => {}) {}
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
-    if (!enabled) { this.queue = []; this.current?.abort(); }
+    if (!enabled) this.stop();
     this.onChange();
   }
+  /** Stop pending audio without changing the viewer’s preference (also safe on effect cleanup). */
+  stop() { this.queue = []; this.current?.abort(); }
   /** Marks a cue as already handled (e.g. it started before sound was turned on). */
   skip(key: string) { this.spoken.add(key); }
   say(cue: VoiceCue) {
@@ -98,7 +100,19 @@ export class HandoffVoice {
   }
 }
 
-// A valid zero-length WAV, played inside the click that enables sound so later clips may autoplay (iOS Safari).
+/** Arm both gesture types, then remove both after whichever happens first. */
+export function unlockOnFirstGesture(target: EventTarget, unlock: () => void) {
+  const cleanup = () => {
+    target.removeEventListener('pointerdown', firstGesture, { capture: true });
+    target.removeEventListener('keydown', firstGesture, { capture: true });
+  };
+  const firstGesture = () => { cleanup(); unlock(); };
+  target.addEventListener('pointerdown', firstGesture, { capture: true });
+  target.addEventListener('keydown', firstGesture, { capture: true });
+  return cleanup;
+}
+
+// A valid zero-length WAV, played inside a user gesture so later clips may autoplay (iOS Safari).
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 /**
  * One reused <audio> element. `unlock` must run inside the user's click; `play` resolves when a clip ends
@@ -106,14 +120,18 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAI
  */
 export function createAudioPlayer() {
   let element: HTMLAudioElement | null = null;
+  let unlocked = false;
   const get = () => (element ??= new Audio());
   return {
     unlock() {
+      if (unlocked) return;
+      unlocked = true;
       const audio = get();
       audio.src = SILENT_WAV;
       audio.play().catch(() => { /* Unlock is best effort; a refused clip later falls back to silence. */ });
     },
     play(clip: Blob, signal: AbortSignal): Promise<void> {
+      if (!unlocked || signal.aborted) return Promise.resolve();
       return new Promise((resolve, reject) => {
         const audio = get();
         const url = URL.createObjectURL(clip);
