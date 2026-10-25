@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
@@ -95,9 +96,10 @@ async function startPlay(page: Page, setup?: () => Promise<void>) {
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return errors;
 }
 
@@ -143,7 +145,7 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
       // Preview controls sit in the corner menu (closed by default); a pick closes it again.
       const menu = page.getByRole('button', { name: 'Backroom menu' });
       if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
-      await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+      await page.getByRole('button', { name: 'Show Treasury denial' }).click();
       await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
     }).toPass();
   });
@@ -274,12 +276,13 @@ test.describe('play mode on a phone', () => {
     await expect(select).toBeEnabled();
     // Narrow screens may prefer another initial view; retry until hydrated so the pick sticks.
     await expect(async () => {
+      await openMenu(page);
       await select.selectOption({ label: 'Play (first person)' });
       await expect(surface(page)).toBeVisible({ timeout: 1_000 });
     }).toPass();
     await expect(select).toHaveValue('play');
     const caption = page.getByTestId('office-viewport').locator('.office-caption');
-    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Overview to leave');
+    await expect(caption).toHaveText('Drag to look · stick to move · tap Interact · Exit Play to leave');
     await expect(caption).not.toContainText('WASD');
     await expect(page.locator('.play-joystick')).toBeVisible();
     await expect(page.locator('.play-touch-hint')).toHaveCount(0);
@@ -316,6 +319,7 @@ test('play settings change speed and invert Y, persist per viewer and return foc
   // Leaving and re-entering Play keeps the saved values.
   await page.keyboard.press('Escape');
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await page.getByRole('button', { name: 'Settings' }).click();

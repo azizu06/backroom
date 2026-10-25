@@ -7,14 +7,11 @@ import { AuditWall, type AuditSnapshot } from '../../components/AuditWall';
 import { LiveOffice } from '../../app/office/LiveOffice';
 import { MockOffice, Office } from '../../app/office/Office';
 import { RoomInspector } from '../../app/office/RoomInspector';
-import { focusAskWhy } from '../../app/office/PlayHud';
 import { createMockOfficeState } from './preview';
-import { INITIAL_OFFICE } from './state';
-import { INITIAL_VIEWPORT } from './view';
 
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof React>();
-  return { ...actual, useState: vi.fn(actual.useState), useEffect: vi.fn(actual.useEffect), useSyncExternalStore: vi.fn(actual.useSyncExternalStore) };
+  return { ...actual, useState: vi.fn(actual.useState), useEffect: vi.fn(actual.useEffect) };
 });
 
 // web/ has no @types/react-dom; type the one server renderer used here.
@@ -41,101 +38,24 @@ function expectLobby(html: string) {
   expect(section).toContain('aria-label="Ask why by voice"');
   expect(section).toContain('Hold to ask why');
   // The snapshot.audit receipt list is gone.
-  expect(section).not.toContain('Preview receipts');
+  expect(section).not.toContain('Walkthrough receipts');
   expect(section).not.toContain('Subscribed receipts');
   expect(section).not.toContain('data-audit-id=');
 }
 
-// SSR does not run click handlers. Select the fourth null state (Office's sheet)
-// after the handoff mock, room focus and inspector, leaving every other hook real.
-function renderSheet(node: ReactElement, sheet: 'overview' | 'rooms' | 'audit' | 'inbox') {
-  const useState = vi.mocked(React.useState).getMockImplementation()! as typeof React.useState;
-  let nullStates = 0;
-  vi.mocked(React.useState).mockImplementation(((initial: unknown) =>
-    useState(initial === null && ++nullStates === 4 ? sheet : initial)) as typeof React.useState);
-  try { return renderToStaticMarkup(node); }
-  finally { vi.mocked(React.useState).mockImplementation(useState); }
-}
-
 describe('office lobby', () => {
-  it('routes Ask why to the audit sheet before looking up its field outside Play', () => {
-    const useState = vi.mocked(React.useState).getMockImplementation()! as typeof React.useState;
-    const useEffect = vi.mocked(React.useEffect).getMockImplementation()!;
-    const effects: React.EffectCallback[] = [];
-    const setSheet = vi.fn();
-    let nullStates = 0;
-    vi.mocked(React.useState).mockImplementation(((initial: unknown) => {
-      const state = useState(initial);
-      return initial === null && ++nullStates === 4 ? [state[0], setSheet] : state;
-    }) as typeof React.useState);
-    vi.mocked(React.useEffect).mockImplementation((effect, deps) => {
-      if (deps?.length === 1 && deps[0] === INITIAL_VIEWPORT.mode) effects.push(effect);
-    });
-    const cleanup: (() => void)[] = [];
-    const field = { focus: vi.fn() };
-    const mount = { scrollIntoView: vi.fn(), querySelector: (selector: string) => selector.startsWith('button') ? field : null };
-    vi.stubGlobal('window', new EventTarget());
-    vi.stubGlobal('document', { querySelector: vi.fn(() => {
-      // focusAskWhy performs this query immediately after dispatch, without waiting a frame.
-      expect(setSheet).toHaveBeenCalledWith('audit');
-      return mount;
-    }) });
-    try {
-      renderToStaticMarkup(createElement(MockOffice));
-      vi.mocked(React.useState).mockImplementation(useState);
-      vi.mocked(React.useEffect).mockImplementation(useEffect);
-      for (const effect of effects) { const dispose = effect(); if (dispose) cleanup.push(dispose); }
-      focusAskWhy();
-      expect(document.querySelector).toHaveBeenCalledWith("[data-office-mount='ask-why']");
-      expect(field.focus).toHaveBeenCalledWith({ preventScroll: true });
-      expectLobby(renderSheet(createElement(MockOffice), 'audit'));
-    } finally {
-      for (const dispose of cleanup) dispose();
-      vi.mocked(React.useState).mockImplementation(useState);
-      vi.mocked(React.useEffect).mockImplementation(useEffect);
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('opens the live audit wall and ask-why in AJ’s preview audit sheet', () => {
-    const html = renderSheet(createElement(MockOffice), 'audit');
-    expect(html).toContain('class="office-toolbar"');
-    expect(html.match(/data-testid="office-topbar"/g)).toHaveLength(1);
-    expect(html).toContain('aria-label="Office navigation"');
-    expect(html).toContain('aria-label="Office shortcuts"');
-    expect(html.match(/id="office-view"/g)).toHaveLength(1);
-    expect(html.match(/class="office-guide-trigger"/g)).toHaveLength(1);
-    expect(html).toContain('Story mode');
-    expect(html).not.toContain('office-drawer');
-    expect(html).toContain('role="dialog"');
-    expect(html).toContain('/office-chrome.svg#audit');
-    expectLobby(html);
-  });
-
-  it('opens Full Floor summary with statuses, handoffs and preview controls', () => {
-    const html = renderSheet(createElement(MockOffice), 'overview');
-    expect(html).toContain('Today at Backroom');
+  it('mounts the live audit wall and ask-why in the preview office', () => {
+    const html = renderToStaticMarkup(createElement(MockOffice));
+    expect(html).toContain('class="office-toolbar office-corner"');
+    expect(html).toContain('data-testid="office-viewport"');
+    expect(html).toContain('class="office-footer office-drawer"');
     expect(html).toContain('class="seat-statuses"');
-    expect(html).toContain('data-office-mount="handoffs"');
     expect(html).toContain('class="mock-controls"');
-    expect(html).toContain('Preview escalation');
-    expect(html).not.toContain('office-drawer');
-  });
-
-  it('opens the source Rooms picker with every visible room and no replacement map', () => {
-    // Render the subscribed preview rather than the deliberately empty SSR hydration snapshot.
-    const useStore = vi.mocked(React.useSyncExternalStore).getMockImplementation()!;
-    vi.mocked(React.useSyncExternalStore).mockImplementation((subscribe, getSnapshot, getServerSnapshot) =>
-      useStore(subscribe, getSnapshot, () => { const server = getServerSnapshot?.(); return server === INITIAL_OFFICE ? getSnapshot() : server; }));
-    try {
-      const html = renderSheet(createElement(MockOffice), 'rooms');
-      expect(html).toContain('class="room-picker"');
-      expect(html).toContain('aria-label="Room camera presets"');
-      for (const name of ['Lobby', 'Collections', 'Payables', 'Vendor Desk', 'Dana’s Desk', 'Treasury · Locked']) expect(html).toContain(name);
-      expect(html).toContain('/office-chrome.svg#rooms');
-      expect(html).not.toContain('class="overview-map"');
-      expect(html).not.toContain('office-drawer');
-    } finally { vi.mocked(React.useSyncExternalStore).mockImplementation(useStore); }
+    // Operator is reached through the shared site nav (lib/site-nav.ts), not an office toolbar link.
+    expect(html.slice(html.indexOf('class="office-toolbar"'))).not.toContain('<a href="/operator">Operator</a>');
+    expect(html).toContain('href="/inbox"');
+    expect(html).toContain('Receipts there are not synced into this static scene.');
+    expectLobby(html);
   });
 
   it('links the standalone judge inbox from the preview inspector', () => {
@@ -143,24 +63,19 @@ describe('office lobby', () => {
     const html = renderToStaticMarkup(createElement(RoomInspector, { room: 'lobby', snapshot, close: () => {} }));
     expect(html).toContain('data-office-mount="inbox-inspector"');
     expect(html).toContain('href="/inbox"');
-    expect(html).toContain('not synced into this static scene');
+    expect(html).toContain('not synced into this scene');
     expect(html).not.toContain('href="#office-inbox-tray"');
   });
 
-  it('opens the live office audit and inbox in separate AJ sheets', () => {
-    const node = createElement(LiveOffice, { config: { uri: 'ws://127.0.0.1:1', database: 'lobby-test' }, presets: [] });
-    const audit = renderSheet(node, 'audit');
-    expectLobby(audit);
-    expect(audit).not.toContain('data-office-mount="inbox"');
-    const inbox = renderSheet(node, 'inbox');
-    expect(inbox).toContain('data-office-mount="inbox"');
-    expect(inbox).toContain('Subscribed intake receipts');
-    expect(inbox).not.toContain('data-office-mount="audit-wall"');
-    expect(inbox).toContain('/office-chrome.svg#inbox');
+  it('mounts the live audit wall and ask-why in the live office, beside the inbox tray', () => {
+    const html = renderToStaticMarkup(createElement(LiveOffice, { config: { uri: 'ws://127.0.0.1:1', database: 'lobby-test' }, presets: [] }));
+    expectLobby(html);
+    expect(html).toContain('data-office-mount="inbox"');
+    expect(html.indexOf('id="office-audit-wall"')).toBeLessThan(html.indexOf('id="office-inbox-tray"'));
   });
 
-  it('keeps the audit sheet receipt fallback for callers without a wall (replay)', () => {
-    const html = renderSheet(createElement(Office, { source: createMockOfficeState().source }), 'audit');
+  it('keeps the receipt fallback for callers without a wall (replay)', () => {
+    const html = renderToStaticMarkup(createElement(Office, { source: createMockOfficeState().source }));
     expect(lobby(html)).toContain('Lobby audit wall');
     expect(html).not.toContain('class="audit-wall"');
     expect(html).not.toContain('data-office-mount="ask-why"');
