@@ -28,7 +28,7 @@ export async function createDemoRuntime() {
   let config: SpacetimeOptions = { uri: process.env.SPACETIMEDB_URI || '', database: process.env.SPACETIMEDB_DATABASE || '', token: process.env.SPACETIMEDB_TOKEN || '' };
   let abort = new AbortController();
   let jobs: Promise<void>[] = [];
-  let paths: Pick<DemoStatus, 'approvePath' | 'payPath'> = {};
+  let paths: Pick<DemoStatus, 'approvePath'> = {};
   let failed = false;
   let gatewayStore: MemoryGatewayStore;
   let collectionTail = Promise.resolve();
@@ -136,12 +136,11 @@ export async function createDemoRuntime() {
       return response.json();
     };
     const escalation = await invoke('propose_plan', { installments: 4, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
-    const plan = await invoke('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
-    const link = await invoke('send_payment_link', { plan_id: plan.plan_id });
-    paths = { approvePath: escalation.approval_path as string, payPath: link.link_path as string };
+    // No payment link is seeded: the office starts with none until a real call sends one.
+    paths = { approvePath: escalation.approval_path as string };
     // Live calls from here on publish their escalations to Dana; the scripted seed above stays as before.
     installCallHandoffs(handoffs);
-    // Advance the scripted ALLOW to promised using the same reducer path as the core demo.
+    // Advance invoice 1042 to promised, the state call payments reconcile from, using the same reducer path as the core demo.
     const bookkeeper = 'demo:reconcile';
     await state.registerAgent(bookkeeper, 'collections', Date.now());
     await state.enqueueTask({ id: 'demo:promise:1042', seatId: 'collections', refs: [invoice.id], steps: [] });
@@ -171,7 +170,7 @@ export async function createDemoRuntime() {
     installPaymentService(service);
     payments = service;
     // Recover before the 5s sweep so a deposit with no receipt is already pending.
-    // Link ids were minted above. A memo deposit that already existed belongs to an older id.
+    // Any link id here was minted in this boot. A memo deposit that already existed belongs to an older id.
     try {
       const prior = await services.bank.listDeposits(services.accountId);
       const call = await gatewayStore.activePaymentCall();

@@ -1,7 +1,7 @@
 export interface DemoStatus {
   live?: boolean; bank?: 'mock' | 'nessie_sandbox'; services?: { preCall?: { status: string; reason?: string; signals?: Record<string, unknown> }; model: { mode: string; cloud: string }; nessie: { mode: string; proof?: { kind: 'sandbox_read' | 'deposit_exact_match'; at: string; depositId?: string }; unreachableAt?: string }; apify: { mode: string; status: string; runId?: string }; crs: { mode: string; status: string; products: string[]; ofac: string; businessCredit: string } };
   llmEnabled: boolean; stateStore: 'memory' | 'spacetime'; voice: boolean;
-  approvePath?: string; payPath?: string; workersHealthy?: boolean; tunnelUrl?: string;
+  approvePath?: string; workersHealthy?: boolean; tunnelUrl?: string;
   attackDemo?: HealthRow;
   envChecks?: import('./env').DemoEnvironmentCheck[];
 }

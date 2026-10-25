@@ -7,7 +7,7 @@ import { signInOperator } from '../../lib/operator/sign-in-client';
 import styles from './operator.module.css';
 
 type Receipt = { result?: unknown; error?: string; auditHref?: string; requestId?: string };
-type Links = { approvePath?: string; payPath?: string; stateStore?: string; bank?: string; llmEnabled?: boolean; publicUrl?: string };
+type Links = { approvePath?: string; stateStore?: string; bank?: string; llmEnabled?: boolean; publicUrl?: string };
 type X402Receipt = { rail: string; note?: string; scenario: string; status: string; reason?: string; replay?: boolean; vendor?: string; invoiceId?: string; amount?: string;
   asset?: string; recipient?: string; policy?: { decision: string; ruleIds: string[]; reason?: string }; transaction?: string; explorer?: string;
   holdId?: string; proof?: { vendorRequests: number; signatures: number }; paymentAuditHref?: string };
@@ -124,8 +124,7 @@ export default function OperatorPage() {
       </ol>
       <details className={styles.advanced}><summary>Advanced</summary>
         <section><h2>Host and Company</h2>{(['status', 'health', 'preflight'] as const).map(button)}
-          {(links.approvePath || links.payPath) && <p>{links.approvePath && <a href={`${links.publicUrl || ''}${links.approvePath}`}>Current seeded approval</a>} {' · '}
-            {links.payPath && <a href={`${links.publicUrl || ''}${links.payPath}`}>Current seeded payment</a>}</p>}
+          {links.approvePath && <p><a href={`${links.publicUrl || ''}${links.approvePath}`}>Current seeded approval</a></p>}
           {links.stateStore && <p className={styles.muted}>State: {links.stateStore} · Bank: {links.bank} · LLM {links.llmEnabled ? 'ON' : 'OFF'}</p>}
         </section>
         <section><h2>Scenarios and Proof</h2><p className={styles.muted}>Runs apart from the office.</p>

@@ -35,9 +35,10 @@ function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string })
   console.log(`Local office: ${status.localUrl}/office`);
   for (const [label, path] of Object.entries({ Office: '/office', 'Audit wall': '/audit', 'Inbox tray': '/inbox',
     'Attack demo': '/attack',
-    'Policy editor': '/policy', Controller: '/controller', Approve: status.approvePath, Pay: status.payPath, 'Real vs simulated': '/real-vs-sim' })) {
+    'Policy editor': '/policy', Controller: '/controller', Approve: status.approvePath, 'Real vs simulated': '/real-vs-sim' })) {
     console.log(`${label}: ${status.publicUrl}${path || '/ (not seeded)'}`);
   }
+  console.log('Pay: no active link until a call');
   console.log(`StateStore=${status.stateStore}; ${status.bank}; synthetic preverified caller; LLM ${status.llmEnabled ? 'ON' : 'OFF'}. See docs/test-v1.md.`);
   for (const row of status.envChecks ?? []) console.log(formatEnvironmentCheck(row));
 }
