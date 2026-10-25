@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { pollWorkday } from '../lib/workday/poll';
 import { isReplayPage } from '../lib/replay/mode';
 import { ROLE_WORK } from '../lib/workday/flow';
 import type { HandoffAgentId } from '../lib/office/handoffs';
@@ -13,18 +14,13 @@ export function WorkdayPanel() {
   useEffect(() => {
     if (isReplayPage()) return;
     let active = true;
-    const refresh = async () => {
-      try {
-        const response = await fetch('/api/operator/workday', { cache: 'no-store' });
-        if (!active) return;
-        if (!response.ok) { setCases(null); return; }
-        const body = await response.json();
-        if (active) { setCases(body.cases ?? []); setStatus(body.status); setStale(false); }
-      } catch { if (active) setStale(true); }
-    };
-    void refresh();
-    const timer = setInterval(() => { void refresh(); }, 1500);
-    return () => { active = false; clearInterval(timer); };
+    const stop = pollWorkday(1500, async response => {
+      if (!active) return;
+      if (!response?.ok) { setCases(null); return; }
+      const body = await response.json();
+      if (active) { setCases(body.cases ?? []); setStatus(body.status); setStale(false); }
+    }, () => { if (active) setStale(true); });
+    return () => { active = false; stop(); };
   }, []);
   if (!cases) return null;
   return <section className='office-audit' aria-label='Workday'>

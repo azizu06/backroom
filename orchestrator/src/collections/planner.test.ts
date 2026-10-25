@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_POLICY } from '@backroom/policy';
 import { createRouter } from '../router';
 import { MemoryStateStore } from '../store';
@@ -9,6 +9,7 @@ const output = { tone: 'neutral', offerOrder: ['pay_in_full'], plan: { installme
 const response = () => Response.json({ choices: [{ message: { content: JSON.stringify({ output, confidence: 0.99 }) } }], usage: { prompt_tokens: 50, completion_tokens: 50 } });
 
 describe('routed pre-call planner', () => {
+  afterEach(() => vi.useRealTimers());
   it('returns LLM_OFF with no model call or fallback when the global store is off', async () => {
     const store = new MemoryStateStore();
     await store.setLlmEnabled(false);
@@ -27,13 +28,78 @@ describe('routed pre-call planner', () => {
     expect(body).toMatchObject({ model: 'gpt-oss:120b', reasoning_effort: 'low' });
     expect(body.messages[0].content).toContain('top-level');
   });
-  it.each([401, 429, 500])('does not downgrade or retry HTTP %s errors', async status => {
+  it.each([400, 401, 403, 404])('does not downgrade or retry HTTP %s errors', async status => {
     const http = vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status }));
     const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn();
     await expect(createCallPlanner({ cloudRoute: cloud.route, fallbackRoute, reportFailure: vi.fn() }).draft(input)).rejects.toThrow('Call planner unavailable');
     expect(fallbackRoute).not.toHaveBeenCalled();
     expect(http).toHaveBeenCalledTimes(1);
+  });
+
+  describe('transient cloud failures', () => {
+    const transient = ['transport', 429, 500, 503, 599] as const;
+    const reply = (failure: typeof transient[number]) => failure === 'transport'
+      ? Promise.reject(new TypeError('private connection error'))
+      : Promise.resolve(new Response('', { status: failure }));
+    const setup = (http: typeof fetch, store = new MemoryStateStore()) => {
+      const cloud = createRouter({ stateStore: store, fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
+      const fallbackRoute = vi.fn(), reportFailure = vi.fn();
+      return { planner: createCallPlanner({ cloudRoute: cloud.route, fallbackRoute, reportFailure }), fallbackRoute, reportFailure };
+    };
+
+    it.each(transient)('backs off for one second then recovers from %s', async failure => {
+      vi.useFakeTimers();
+      const http = vi.fn<typeof fetch>().mockImplementationOnce(() => reply(failure)).mockResolvedValueOnce(response());
+      const { planner, fallbackRoute } = setup(http);
+      const result = planner.draft(input);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(http).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toMatchObject({ output, route: 'cloud' });
+      expect(http).toHaveBeenCalledTimes(2);
+      expect(fallbackRoute).not.toHaveBeenCalled();
+    });
+
+    it.each(transient)('stops after the second %s failure with redacted diagnostics', async failure => {
+      vi.useFakeTimers();
+      const http = vi.fn<typeof fetch>().mockImplementation(() => reply(failure));
+      const { planner, fallbackRoute, reportFailure } = setup(http);
+      const result = expect(planner.draft(input)).rejects.toThrow('Call planner unavailable');
+      await vi.advanceTimersByTimeAsync(1000);
+      await result;
+      expect(http).toHaveBeenCalledTimes(2);
+      expect(fallbackRoute).not.toHaveBeenCalled();
+      expect(reportFailure).toHaveBeenCalledWith(expect.objectContaining({ attempts: 2,
+        kind: failure === 'transport' ? 'transport' : 'http' }));
+      expect(JSON.stringify(reportFailure.mock.calls)).not.toContain('private connection error');
+    });
+
+    it('honors OFF during backoff without a second network call', async () => {
+      vi.useFakeTimers();
+      const store = new MemoryStateStore();
+      const http = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('connection failed'));
+      const { planner, fallbackRoute } = setup(http, store);
+      const result = planner.draft(input);
+      await vi.advanceTimersByTimeAsync(500);
+      await store.setLlmEnabled(false);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(await result).toMatchObject({ kind: 'LLM_OFF' });
+      expect(http).toHaveBeenCalledTimes(1);
+      expect(fallbackRoute).not.toHaveBeenCalled();
+    });
+
+    it('still rejects uncosted output on the retry', async () => {
+      vi.useFakeTimers();
+      const http = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('connection failed'))
+        .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify({ output, confidence: 0.99 }) } }] }));
+      const { planner, fallbackRoute } = setup(http);
+      const result = expect(planner.draft(input)).rejects.toThrow('Call planner unavailable');
+      await vi.advanceTimersByTimeAsync(1000);
+      await result;
+      expect(http).toHaveBeenCalledTimes(2);
+      expect(fallbackRoute).not.toHaveBeenCalled();
+    });
   });
 
   describe('low-confidence cloud plan', () => {
