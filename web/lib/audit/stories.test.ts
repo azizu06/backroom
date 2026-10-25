@@ -77,7 +77,7 @@ describe('audit stories', () => {
     await append('email_followup_queued', { simulated: true, label: 'SIMULATED: email preview, not sent', toDomain: 'client.example' }, 'ALLOW');
     const stories = auditStories(await store.listAudit());
     expect(stories).toHaveLength(1);
-    expect(stories[0]!.lines.at(-1)).toMatchObject({ text: 'Email preview (simulated, not sent) · client.example', outcome: 'ALLOW' });
+    expect(stories[0]!.lines.at(-1)).toMatchObject({ text: 'Email follow-up queued, not sent · client.example', outcome: 'ALLOW' });
     expect(JSON.stringify(stories)).not.toContain('billing@client.example');
   });
 });

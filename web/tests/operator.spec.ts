@@ -63,7 +63,7 @@ test('demo steps are visible in order and diagnostics stay collapsed', async ({ 
   await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveText(
     ['Reset company', 'Start the call', 'Dana’s controller', 'Payment link', 'Pay a vendor (x402)', 'Show the guardrails']);
   await expect(page.locator('[data-operator-slot="x402"]')).toBeVisible();
-  for (const name of ['Run preflight', 'Run scripted eval', 'Turn models OFF', 'Preview month burst']) {
+  for (const name of ['Run preflight', 'Run scripted eval', 'Turn models OFF', 'Plan month burst']) {
     await expect(page.getByRole('button', { name, exact: true })).toBeHidden();
   }
   await expect(page.getByRole('link', { name: 'Open the office' })).toHaveAttribute('href', '/office');

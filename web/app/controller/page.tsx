@@ -51,8 +51,7 @@ export default function Controller() {
   const signedOut = useCallback(() => setSignedIn(false), []);
   if (registered && signedIn) return <Inbox alert={alert.current} onSignedOut={signedOut} />;
   return <main className={styles.page}><div className={styles.sheet}>
-    <p className={styles.status}>Controller</p>
-    <h1>Your authority.<br />Your passkey.</h1>
+    <h1>Dana’s controller</h1>
     <p className={styles.intro}>Keep this page open on your phone during the call. Requests from the clerk ring here, and each decision asks you to confirm on your own device.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {registered === undefined ? (error
@@ -67,7 +66,6 @@ export default function Controller() {
         <p className={styles.note}>Use the private code provided by your Backroom operator.</p>
         <p><button className={styles.primary} disabled={busy || !secret}>{busy ? 'Confirm on your device…' : 'Create Dana’s passkey'}</button></p>
       </form>}
-    <footer className={styles.footer}>Northfield Studio · Controller review</footer>
   </div></main>;
 }
 
