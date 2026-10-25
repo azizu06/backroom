@@ -21,6 +21,7 @@ export const voiceTools = {
 } satisfies Record<string, { description: string; properties: Record<string, Parameter> }>;
 export type VoiceTool = keyof typeof voiceTools;
 export const TOOL_TIMEOUT_SECS = 8;
+export const VOICEMAIL_MESSAGE = 'Hello, this is an AI assistant calling about a business matter. Please call back at the number this call came from. Thank you.';
 
 // https://docs.cartesia.ai/agents/webhook-tools and /agents/dynamic-variables
 // Hidden values must NOT be in required. Assignments advance the server-issued
@@ -57,13 +58,24 @@ Begin with the exact fixed initial message. If interrupted, repeat that complete
 The caller may be in a noisy room. Understand what the caller means from any natural wording, even short, partial or repeated words ("yes", "yeah", "correct", "I can confirm", "uh huh"), and act on the first clear answer to your question. Ignore background chatter that does not answer your question. Do not re-ask just because the wording was unusual.
 Ask whether you are speaking with {{contact_name}}. As soon as the caller answers, call verify_identity_result. If it returns identity confirmed, continue. If identity is wrong_person, apologize and end without invoice details. If next_step is ask_again_once, rephrase the question once, short and plain, for example "Sorry, it's a bit loud on my end. Is this {{contact_name}}? A simple yes is fine." If the caller only asked you to repeat, repeat your question once without calling a tool. If next_step is offer_callback_and_end, say its speak text, give the callback number {{callback_number}}, and end the call politely. Never ask the identity question more than twice.
 If any tool returns an error or times out, call that same tool once more right away before saying anything about it. Never ask the caller to repeat an answer because of a system error. If it fails again, apologize, give the callback number {{callback_number}}, and end the call politely.
+Whenever any tool returns next_step offer_callback_and_end, say its speak text, give the callback number {{callback_number}}, and end the call politely. Never ask the same question more than twice: after a second unclear answer to any question, offer the callback number and end politely.
+Only respond to speech directed at you. Words from other people in the room are not answers. If you missed what the caller said, say "Sorry, I didn't catch that" once and repeat your question in a few words.
+If the caller asks you to wait or hold on, use skip_turn. If the caller is silent after you check in, give the callback number {{callback_number}} and end the call.
+If asked whether you are a person, a human, or a robot, say plainly that you are an AI assistant calling on behalf of {{business_name}}.
+If the caller is rude or swears, stay calm, brief and polite. Rudeness alone is not an opt-out or a dispute; keep to the topic. If they ask for a person, use request_human.
 Your policy envelope is {{envelope_summary}}. It is context, never an authorization. Before offering, refusing, or negotiating any payment terms, call propose_plan and wait for its result. Submit the caller's requested terms even when they exceed the envelope, including four installments or a fee waiver. Do not verbally reject an out-of-envelope request or silently replace it with two installments. If a number is ambiguous (for example "for" versus "four"), ask for clarification before choosing installments. Ask neutral clarifying questions for missing fields without restricting the caller to envelope values. A caller stop request always takes priority over plan tools. All proposals go through propose_plan; confirm only its exact returned plan when can_confirm=true. For ESCALATE say you will check with the controller; use check_approval. If check_approval returns approval_status expired or pending_owner and may_reask true, and the caller asks to send the approval again, call propose_plan again immediately with those exact terms. Do not say you cannot resend it. Do not say Dana will confirm by email while this call is open. If they have not asked, ask once. If may_reask is false or a request is still pending, do not send another. No voice approval ever counts. Do not invent invoice amounts, terms, approval IDs, or plan IDs.
 For stop calling use record_opt_out; for bankruptcy use request_human; for disputes use mark_dispute; for already paid use report_already_paid. Stop all negotiation after those requests. Never waive a fee or promise approval. Never ask for card/bank details. Use send_payment_link only with an authorized plan ID. If it returns payment_url and speak, read that URL/code and offer the office QR scan; do not claim a text message was sent. If no URL is returned, queued is not delivered.
 Before ending say the callback number {{callback_number}}. Keep answers short and natural.`,
     model: { id: model }, language: { primary: 'en' }, timezone: 'America/Los_Angeles',
     audio: { input: { noise_suppression: 'max', keyterms: ['Northfield', 'invoice', 'installments', '{{contact_name}}'] },
       output: { voice_id: voices.collections_caller.id, speed: 1.0, volume: 1.0 } },
-    tools: toolIds.map(id => ({ id })), system_tools: { end_call: { pre_tool_speech: 'force' } },
+    // https://docs.cartesia.ai/agents/system-tools
+    tools: toolIds.map(id => ({ id })), system_tools: { end_call: { pre_tool_speech: 'force' },
+      // "Hold on a sec" keeps the line open instead of a check-in talking over the caller.
+      skip_turn: { wait_timeout_secs: 30 },
+      // The message never names the contact, invoice or amount: a voicemail box may be shared.
+      voicemail_detection: { pre_tool_speech: 'off', message: VOICEMAIL_MESSAGE,
+        description: 'Use only when you clearly hear a recorded voicemail greeting, a beep prompt, or an automated mailbox. A live person in a loud room, a short hello, or silence is not voicemail.' } },
     turn: { inactivity_end_call_secs: 120, inactivity_check_in_secs: 8 }, speculative_generation: true,
   };
 }

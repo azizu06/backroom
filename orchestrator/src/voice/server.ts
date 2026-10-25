@@ -54,6 +54,17 @@ const response = (body: unknown, status = 200) => Response.json(body, { status, 
 const safeStops = ['record_opt_out', 'request_human', 'mark_dispute', 'report_already_paid'];
 /** First unclear answer gets one rephrased re-ask; the second ends with a callback offer. */
 const MAX_IDENTITY_FAILURES = 2;
+/** The same refused request this many times in a row is a loop, not progress. */
+const MAX_REPEATED_DENIALS = 3;
+const OPT_OUT = /\b(stop (calling|contacting|texting)( me)?|stop (the )?collection|(dont|don't|do not) (ever )?(call|contact)|never (call|contact)|no more calls|remove (me|my number)|take me off|unsubscribe|leave me alone|lose (this|my) number|opt(-| )?out)\b/i;
+const BANKRUPTCY = /\b(bankrupt(cy)?|chapter (7|11|13))\b/i;
+const HUMAN = /\b(speak|talk|transfer me|put me through|connect me)\b.{0,16}\b((a|an) (real |actual |live )?(human|person|representative)|(your|a|the) (manager|supervisor)|dana)\b/i;
+/** Caller words that stop collection in code, whatever the model does. Stops only ever end negotiation. */
+export function callerStop(text: string): 'record_opt_out' | 'request_human' | undefined {
+  if (OPT_OUT.test(text)) return 'record_opt_out';
+  if (BANKRUPTCY.test(text) || HUMAN.test(text)) return 'request_human';
+  return undefined;
+}
 
 export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret: string; toolSecret: string; gatewaySecret: string;
   gateway: (tool: string, request: Request) => Promise<Response>; agentId?: string;
@@ -137,10 +148,10 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
                 session.identity.replies = [...session.identity.replies, text.slice(0, 1000).replace(/\+?\d[\d ()-]{7,}\d/g, '[number]')].slice(-4);
                 session.identity.turns += 1;
               }
-              const optOut = /\b(stop (calling|contacting|collection)|dont call|don't call|do not (call|contact)|never call|remove my number|take me off|opt out)\b/i.test(text);
-              if (optOut || /\b(bankrupt(cy)?|chapter (7|11|13))\b/i.test(text)) {
+              const stop = callerStop(text);
+              if (stop) {
                 session.stopped = true;
-                await forward(optOut ? 'record_opt_out' : 'request_human', { call_id: session.id, webhook_request_id: body.webhook_request_id });
+                await forward(stop, { call_id: session.id, webhook_request_id: body.webhook_request_id });
               }
             }
           }
@@ -186,6 +197,16 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
                   speak: `I'm sorry, I couldn't confirm I'm speaking with ${session.contactName}, so I can't go over the account on this call. Please call us back when it's convenient.` };
               } else result = { ...result, next_step: 'ask_again_once' };
             }
+          }
+        }
+        if (!safeStops.includes(tool)) {
+          // A model stuck re-sending the same refused request ends the call politely instead of looping.
+          const key = JSON.stringify([tool, Object.entries(body).filter(([k]) => k !== 'call_id' && k !== 'webhook_request_id').sort(([a], [b]) => a.localeCompare(b))]);
+          session.loop = result.kind !== 'DENY' ? undefined : { key, repeats: session.loop?.key === key ? session.loop.repeats + 1 : 1 };
+          if (session.loop && session.loop.repeats >= MAX_REPEATED_DENIALS) {
+            session.stopped = true;
+            result = { ...result, can_confirm: false, next_step: 'offer_callback_and_end',
+              speak: "I'm sorry, I'm not able to sort this out on this call. Please call us back and we'll help you then." };
           }
         }
         const next = randomUUID();
