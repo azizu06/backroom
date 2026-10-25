@@ -35,16 +35,54 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(await visibleText(page)).not.toMatch(BANNED);
 
       await openSheet(page, 'overview');
+      await expect(page.getByRole('heading', { name: 'Full Floor', exact: true, level: 2 })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
       expect(await visibleText(page)).not.toMatch(BANNED);
-      await page.getByRole('button', { name: 'Close Today at Backroom' }).click();
-      await expect(page.getByRole('dialog', { name: 'Today at Backroom' })).toHaveCount(0);
+      await page.getByRole('button', { name: 'Close Full Floor' }).click();
+      await expect(page.getByRole('dialog', { name: 'Full Floor' })).toHaveCount(0);
 
       await openSheet(page, 'help');
       await expect(page.getByRole('heading', { name: 'Things to Try' })).toBeVisible();
       await expect(page.getByText('Test the Treasury Lock')).toBeVisible();
       await page.getByRole('button', { name: 'Close Help' }).click();
       expect(errors).toEqual([]);
+    });
+  });
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`Full Floor at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport, hasTouch: viewport.width === 390 });
+
+    test('summary fits and Handoff history preserves scroll and disclosure state', async ({ page }) => {
+      await page.goto('/office?view=overview');
+      const dialog = await openSheet(page, 'overview');
+      const summary = dialog.getByTestId('full-floor-summary');
+      await expect(summary.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+      await expect(summary.locator('dt')).toHaveText(['Inbox', 'Handoffs in progress', 'Audit entries']);
+      const bounds = await summary.evaluate(element => ({
+        height: element.clientHeight, scrollHeight: element.scrollHeight,
+        bottom: element.getBoundingClientRect().bottom,
+      }));
+      expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.height);
+      const sheet = (await dialog.boundingBox())!;
+      expect(bounds.bottom - sheet.y).toBeLessThanOrEqual(viewport.height * (viewport.width === 390 ? 1.3 : 1));
+      if (viewport.width === 1280) expect(bounds.bottom).toBeLessThanOrEqual(sheet.y + sheet.height);
+      if (viewport.width === 390) {
+        const cards = await summary.locator('li').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
+        expect(new Set(cards).size).toBe(1);
+      }
+      const history = dialog.getByRole('button', { name: 'Handoff history', exact: true });
+      await expect(history).toHaveAttribute('aria-expanded', 'false');
+      await history.scrollIntoViewIfNeeded();
+      const scrollTop = await dialog.evaluate(element => element.scrollTop);
+      if (viewport.width === 390) await history.tap();
+      else await history.click();
+      await expect(history).toHaveAttribute('aria-expanded', 'true');
+      expect(await dialog.evaluate(element => element.scrollTop)).toBe(scrollTop);
+      await expect(dialog.getByRole('heading', { name: /^Agent Handoffs/ })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Workday', exact: true }).click();
+      await expect(history).toHaveAttribute('aria-expanded', 'true');
     });
   });
 }
