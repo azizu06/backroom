@@ -19,11 +19,11 @@ test('policy unlock explains an HTML 502 and a dropped connection instead of a J
 });
 
 test('audit wall explains an HTML 502 on unlock and recovers its poll after an outage', async ({ page }) => {
-  let entries = 0;
+  let entries = 0, signedIn = false;
+  await page.route('**/api/audit/session', route => route.fulfill({ json: { signedIn } }));
   await page.route('**/api/session', route => route.fulfill(badGateway));
   await page.route('**/api/audit/entries', route => ++entries === 1
-    ? route.fulfill({ status: 401, json: { error: 'Open the audit wall with your operator code.' } })
-    : entries === 2 ? route.fulfill(badGateway)
+    ? route.fulfill(badGateway)
     : route.fulfill({ json: { entries: [], chain: { valid: true, firstBrokenSeq: null, length: 0, headHash: '' }, measuredAt: new Date().toISOString() } }));
   await page.goto('/audit');
   await page.getByLabel('Operator code').fill('any-code');
@@ -31,10 +31,10 @@ test('audit wall explains an HTML 502 on unlock and recovers its poll after an o
   await expect(alert(page)).toContainText(outage);
   // A good unlock bumps the poll: first an outage, then the wall loads and the banner clears.
   await page.unroute('**/api/session');
-  await page.route('**/api/session', route => route.fulfill({ json: { ok: true } }));
+  await page.route('**/api/session', route => { signedIn = true; return route.fulfill({ json: { ok: true } }); });
   await page.getByRole('button', { name: 'Open audit wall' }).click();
   // Prove the entries 502 itself was shown, not the stale session alert.
-  await expect.poll(() => entries).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => entries).toBeGreaterThanOrEqual(1);
   await expect(page.getByText('Loading audit records…')).toBeVisible();
   await expect(alert(page)).toContainText(outage);
   await expect(page.getByText('Chain verified · 0 entries', { exact: true })).toBeVisible({ timeout: 6000 });

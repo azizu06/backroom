@@ -1,3 +1,4 @@
+import { agentName, agentState, latestSeatAgents } from './agent-labels';
 import { projectHandoffRows } from './handoff-subscription';
 import { DbConnection } from '@backroom/orchestrator/spacetime-client';
 import type { Agent, AgentHandoffPublic, AuditEntry, Badge, Escalation, Room, Seat, RuntimeControl } from '@backroom/orchestrator/spacetime-client/types';
@@ -49,12 +50,12 @@ export function projectOfficeRows(rows: OfficeRows): OfficeSnapshot {
     const targetAnchor = anchor(row.targetAnchor || row.room);
     if (!isSeat(row.seatId) || !badges.some(badge => badge.seatId === row.seatId) || !targetAnchor || !hasRoom(targetAnchor)) return [];
     const escalation = rows.escalations.find(e => e.fromAgent === row.id && e.status === 'pending');
-    return [{ id: row.id, name: row.id, seatId: row.seatId, state: row.state, targetAnchor,
+    return [{ id: row.id, name: agentName(row.seatId), seatId: row.seatId, state: agentState(row.state), targetAnchor,
       pos: [row.posX, row.posZ] as const, rowAt: Number(row.heartbeatAt.microsSinceUnixEpoch / 1000n),
       escalationId: targetAnchor === 'dana' ? escalation?.id : undefined }];
   });
   const inboxReceipts = audit.filter(row => ['submit_inbox_item', 'judge_inbox_decision', 'route_inbox_item', 'email_followup_queued'].includes(row.action));
-  return { agents, rooms, badges, audit, denials, inboxReceipts, inboxCount: inboxReceipts.length,
+  return { agents: latestSeatAgents(agents), rooms, badges, audit, denials, inboxReceipts, inboxCount: inboxReceipts.length,
     ...(rows.handoffs ? { handoffs: projectHandoffRows(rows.handoffs) } : {}),
     connection: 'live', llmEnabled: rows.control.find(row => row.id === 'global')?.llmEnabled ?? null };
 }
