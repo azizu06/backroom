@@ -220,6 +220,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
     }
     const fovText = fov.current.toFixed(2);
     if (hud.current && hud.current.dataset.playerFov !== fovText) hud.current.dataset.playerFov = fovText;
+    // Camera readout for browser checks, including the settle frames after movement stops.
+    const eyeYText = camera.current.position.y.toFixed(4);
+    if (hud.current && hud.current.dataset.playerEyeY !== eyeYText) hud.current.dataset.playerEyeY = eyeYText;
     if (active) state.invalidate();
   }, -1);
 

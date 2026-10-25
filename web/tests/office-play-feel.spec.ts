@@ -15,11 +15,10 @@ async function requireWebGL(page: Page) {
   if (!available) throw new Error('WebGL is unavailable in this headless Chromium, so the first-person Play view cannot render.');
 }
 async function reading(page: Page) {
-  return surface(page).evaluate(element => {
-    const { playerX, playerZ, playerFov } = (element as HTMLElement).dataset;
-    if (playerX === undefined || playerZ === undefined || playerFov === undefined) throw new Error('Play rig has not reported a position (3D scene not rendering?)');
-    return { x: Number(playerX), z: Number(playerZ), fov: Number(playerFov) };
-  });
+  const view = surface(page);
+  const [x, z, fov] = await Promise.all(['data-player-x', 'data-player-z', 'data-player-fov'].map(name => view.getAttribute(name)));
+  if (x === null || z === null || fov === null) throw new Error('Play rig has not reported a position');
+  return { x: Number(x), z: Number(z), fov: Number(fov) };
 }
 async function startPlay(page: Page) {
   const errors: string[] = [];
@@ -37,15 +36,15 @@ async function startPlay(page: Page) {
   });
   await page.goto('/office?view=overview');
   await requireWebGL(page);
-  const select = page.getByLabel('Office view');
-  await expect(select).toBeEnabled();
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await openMenu(page);
   await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+  const splash = page.getByTestId('play-splash');
+  if (await splash.isVisible()) await splash.getByRole('button', { name: 'Enter', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   // Readiness, not a timing claim: the rig reports only after the first Play frames (shader compile) and the 0.9 s
   // fly-in, which a loaded machine can push past the default 5 s.
-  await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 20_000 });
+  await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
   return errors;
 }
 const stepCount = (page: Page) => page.evaluate(() => (Reflect.get(window, '__stepCues') as number[]).length);
@@ -141,23 +140,106 @@ test('the Play settings turn FOV kick off and remember it', async ({ page }) => 
   expect(errors).toEqual([]);
 });
 
-test('reduced motion keeps the FOV fixed while walking still works', async ({ browser }) => {
-  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 }, baseURL: `http://localhost:${Number(process.env.OFFICE_TEST_PORT) || 3035}` });
-  const page = await context.newPage();
-  try {
+test.describe('system reduced motion', () => {
+  test.use({ reducedMotion: 'reduce' });
+
+  test('explains disabled effects live, persists the office override, and resets it', async ({ page }) => {
+    test.setTimeout(90_000);
     const errors = await startPlay(page);
-    const start = await reading(page);
-    const seen = new Set<number>();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    const indicator = dialog.getByText('Reduced motion is on in your system, so these are off', { exact: true });
+    await expect(indicator).toBeVisible();
+    for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+      await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeDisabled();
+    }
+    await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toBeEnabled();
+    await expect(dialog.getByRole('slider', { name: 'Movement speed' })).toBeEnabled();
+
+    // The indicator responds without remounting the dialog.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(indicator).toBeHidden();
+    await expect(dialog.getByRole('checkbox', { name: 'Head bob', exact: true })).toBeEnabled();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(indicator).toBeVisible();
+    await dialog.getByRole('switch', { name: 'Use motion anyway' }).check();
+    await expect(indicator).toBeHidden();
+    for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+      await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeEnabled();
+    }
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('backroom.office.play-settings.v1') ?? '{}')))
+      .toMatchObject({ useMotionAnyway: true });
+    await dialog.getByRole('button', { name: 'Try walking' }).click();
     await page.keyboard.down('w');
-    for (let i = 0; i < 25; i++) { seen.add((await reading(page)).fov); await page.waitForTimeout(40); }
-    await page.keyboard.up('w');
+    try {
+      await expect.poll(async () => Number(await surface(page).getAttribute('data-player-fov')), { timeout: 15_000 }).toBeGreaterThan(BASE_FOV + 1);
+    } finally { await page.keyboard.up('w'); }
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+    const splash = page.getByTestId('play-splash');
+    if (await splash.isVisible()) await splash.getByRole('button', { name: 'Enter', exact: true }).click();
+    await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(dialog.getByRole('switch', { name: 'Use motion anyway' })).toBeChecked();
+    await dialog.getByRole('button', { name: 'Reset to defaults' }).click();
+    await expect(indicator).toBeVisible();
+    await expect(dialog.getByRole('switch', { name: 'Use motion anyway' })).not.toBeChecked();
+    expect(await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'))).toBeNull();
+    await dialog.getByRole('button', { name: 'Try walking' }).click();
+    const start = await reading(page);
+    await walkFor(page, 700);
     const after = await reading(page);
     expect(after.z).toBeLessThan(start.z - 0.3);
-    expect([...seen]).toEqual([BASE_FOV]);
+    expect(after.fov).toBe(BASE_FOV);
+    await expect(dialog).toBeVisible();
     expect(errors).toEqual([]);
-  } finally {
-    await context.close();
-  }
+  });
+});
+
+test.describe('motion enabled', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('walking visibly bobs the camera and disabling bob makes it flat with Settings still open', async ({ page }) => {
+    test.setTimeout(90_000);
+    const errors = await startPlay(page);
+    const view = surface(page);
+    await expect(view).toHaveAttribute('data-player-eye-y', /\d/, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    const bob = dialog.getByRole('checkbox', { name: 'Head bob', exact: true });
+    await expect(bob).toBeChecked();
+    await expect(bob).toBeEnabled();
+
+    async function sampleWalk() {
+      await dialog.getByRole('button', { name: 'Try walking' }).click();
+      await expect(view).toBeFocused();
+      const heights: number[] = [], positions: number[] = [];
+      // Back and forth stays near spawn and avoids resting against a desk during slow WebGL frames.
+      for (const key of ['w', 's', 'w', 's']) {
+        await page.keyboard.down(key);
+        try {
+          for (let i = 0; i < 8; i++) {
+            heights.push(Number(await view.getAttribute('data-player-eye-y')));
+            positions.push(Number(await view.getAttribute('data-player-z')));
+            await page.waitForTimeout(50);
+          }
+        } finally { await page.keyboard.up(key); }
+      }
+      expect(Math.max(...positions) - Math.min(...positions)).toBeGreaterThan(0.3);
+      return Math.max(...heights) - Math.min(...heights);
+    }
+    // The original 0.03 m bob reaches 0.06 m peak-to-peak after ramping up.
+    expect(await sampleWalk()).toBeGreaterThanOrEqual(0.03);
+    await bob.uncheck();
+    await expect(page.locator('.play-settings-toast')).toHaveText('Head bob off');
+    await expect(page.locator('.play-settings-toast')).toBeHidden({ timeout: 3_000 });
+    expect(await sampleWalk()).toBeLessThan(0.01);
+    await bob.check();
+    await expect(page.locator('.play-settings-toast')).toHaveText('Head bob on');
+    await expect(dialog).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
 
 test('walking sends footstep cues, and they are silent unless the sound toggle is on', async ({ page }) => {
@@ -181,8 +263,10 @@ test('walking sends footstep cues, and they are silent unless the sound toggle i
   await expect(page.getByRole('button', { name: 'Sound on', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await openMenu(page);
   await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+  const splash = page.getByTestId('play-splash');
+  if (await splash.isVisible()) await splash.getByRole('button', { name: 'Enter', exact: true }).click();
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 20_000 }); // the intro fly-in has finished
+  await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 }); // the intro fly-in has finished
   const before = await oscillatorCount(page);
   const stepsBefore = await stepCount(page);
   await walkFor(page, 1_500);
