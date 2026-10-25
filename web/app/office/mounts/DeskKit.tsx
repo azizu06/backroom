@@ -5,8 +5,9 @@ import { useThree } from '@react-three/fiber';
 import type { Group, Material, Object3D } from 'three';
 import { visibleRooms, type AnchorId } from '../../../lib/office/state';
 import {
-  DESKKIT_GLB_URL, DESKKIT_TINT_MATERIAL, deskKitPlacements, deskKitReady, missingKitNodes, setDeskKitReady, subscribeDeskKit,
+  DESKKIT_GLB_URL, deskKitPlacements, deskKitReady, missingKitNodes, setDeskKitReady, subscribeDeskKit,
 } from '../../../lib/office/deskkit';
+import { buildDeskKitBatch } from '../../../lib/office/deskkit-merge';
 import { bakedArtRequested } from '../../../lib/office/baked-art';
 import type { SceneMountProps } from './types';
 
@@ -32,10 +33,7 @@ function useKitTemplates(enabled: boolean): Map<string, Object3D> | null {
         loaded = gltf.scene;
         if (cancelled) return;
         const map = new Map<string, Object3D>();
-        for (const node of gltf.scene.children) {
-          node.traverse(child => { const mesh = child as MeshLike; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
-          map.set(node.name, node);
-        }
+        for (const node of gltf.scene.children) map.set(node.name, node);
         setTemplates(map);
         invalidate();
       } catch (error) {
@@ -56,51 +54,36 @@ function useKitTemplates(enabled: boolean): Map<string, Object3D> | null {
 }
 
 /**
- * Opt-in desk kit (`?art=baked`): clones named deskkit.glb props onto the procedural anchors (lib/office/deskkit.ts).
- * Publishes the ready flag that hides the replaced procedural pieces only after every clone exists, so a missing or
- * partial GLB leaves the procedural props in place. Lit live, like the baked characters.
+ * Opt-in desk kit (`?art=baked`): places named deskkit.glb props on the procedural anchors (lib/office/deskkit.ts),
+ * merged into one static mesh per kit material (lib/office/deskkit-merge.ts) so draw calls do not grow with the
+ * number of placements. Publishes the ready flag that hides the replaced procedural pieces only after the batch
+ * exists, so a missing or partial GLB leaves the procedural props in place. Lit live, like the baked characters.
  */
 export function DeskKit({ snapshot }: SceneMountProps) {
   const [requested, setRequested] = useState(false);
   useEffect(() => { setRequested(bakedArtRequested(window.location.search)); }, []);
   const templates = useKitTemplates(requested);
   const invalidate = useThree(state => state.invalidate);
+  const canvas = useThree(state => state.gl.domElement);
   const roomsKey = visibleRooms(snapshot).join(',');
   const placed = useMemo(() => {
     if (!templates) return null;
     const placements = deskKitPlacements(roomsKey ? roomsKey.split(',') as AnchorId[] : []);
     if (missingKitNodes(placements, new Set(templates.keys())).length) return null;
-    const owned: Material[] = [];
-    const objects = placements.map(placement => {
-      const object = templates.get(placement.node)!.clone(true);
-      object.name = `deskkit:${placement.id}`;
-      object.position.set(...placement.at);
-      object.rotation.set(0, placement.rotationY, 0);
-      if (placement.scale) object.scale.set(...placement.scale);
-      if (placement.tint) {
-        object.traverse(child => {
-          const mesh = child as MeshLike;
-          if (!mesh.isMesh || !mesh.material) return;
-          const swap = (m: Material) => {
-            if (m.name !== DESKKIT_TINT_MATERIAL || !('color' in m)) return m;
-            const copy = m.clone();
-            (copy as Material & { color: { set(c: string): void } }).color.set(placement.tint!);
-            owned.push(copy);
-            return copy;
-          };
-          mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
-        });
-      }
-      return { id: placement.id, object };
-    });
-    return { objects, owned };
+    try {
+      return buildDeskKitBatch(templates, placements);
+    } catch (error) {
+      console.warn('Desk kit could not be batched; using the procedural props.', error);
+      return null;
+    }
   }, [templates, roomsKey]);
   useEffect(() => {
     if (!placed) return;
     setDeskKitReady(true);
+    canvas.dataset.deskkit = 'ready';
     invalidate();
-    return () => { setDeskKitReady(false); placed.owned.forEach(m => m.dispose()); };
-  }, [placed, invalidate]);
+    return () => { setDeskKitReady(false); delete canvas.dataset.deskkit; placed.dispose(); };
+  }, [placed, invalidate, canvas]);
   if (!placed) return null;
-  return <group name='deskkit'>{placed.objects.map(({ id, object }) => <primitive key={id} object={object} dispose={null} />)}</group>;
+  return <group name='deskkit'>{placed.meshes.map(mesh => <primitive key={mesh.uuid} object={mesh} dispose={null} />)}</group>;
 }
