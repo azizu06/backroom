@@ -16,6 +16,9 @@ describe('head bob curve', () => {
     expect(out.x).toBeCloseTo(-SWAY_AMPLITUDE);
   });
   it('is subtle and scales with intensity', () => {
+    expect(BOB_AMPLITUDE).toBe(0.03);
+    expect(SWAY_AMPLITUDE).toBe(0.012);
+    expect(ROLL_AMPLITUDE).toBe(0.005);
     const out = createHeadBob();
     for (let d = 0; d < 5; d += 0.05) {
       headBob(d, 1, out);
