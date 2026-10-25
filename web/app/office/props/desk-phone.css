@@ -9,3 +9,5 @@
 .desk-phone-precall dl { margin: 0; }
 .desk-phone-precall dt { font-weight: 600; }
 .desk-phone-precall dd { text-align: right; overflow-wrap: anywhere; }
+.desk-phone-panel button[aria-disabled='true'] { cursor: not-allowed; opacity: .55; border-style: dashed; }
+.desk-phone-gate { border-left: 3px solid var(--office-coral); padding-left: .45rem; color: var(--office-navy); font-size: 13px; font-weight: 600; }
