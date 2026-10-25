@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { CrsEvidence } from '../../integrations/crs';
 import { createCrsPublicRecordsCheck } from '../../collections/crs';
-import { inputFileSha256 } from './provenance';
+import { canonicalTextSha256 } from './provenance';
 
 export const CRS_RECEIPT_PATH = 'docs/evidence/crs/live-run.json';
 
@@ -21,7 +21,8 @@ export async function replayRecordedCrsCoverage() {
   } });
   const result = await credit.check(evidence.testIdentityId);
   return {
-    receiptPath: CRS_RECEIPT_PATH, receiptSha256: inputFileSha256(bytes), recordedAt: receipt.measuredAt,
+    receiptPath: CRS_RECEIPT_PATH, receiptSha256: canonicalTextSha256(bytes), recordedAt: receipt.measuredAt,
+    receiptHashEncoding: 'UTF-8 text with LF line endings',
     recordedProducts: Object.values(receipt.evidence).map(row => row.product).sort(),
     recordedTestIdentityId: evidence.testIdentityId,
     recordedOfacEvidence: Object.values(receipt.evidence).some(row => row.product === 'ofac'),

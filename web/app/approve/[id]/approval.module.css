@@ -1,13 +1,13 @@
-/* Office palette tokens (app/office/lobby.css, loaded by the root layout), shared with the site nav and demo pill. */
-.page { --paper: #fff; --ink: var(--office-navy); --muted: var(--office-navy); --line: var(--office-lavender); --accent: var(--office-navy); background: var(--office-cream); color: var(--ink); min-height: 100svh; padding: 0 20px; font: 16px/1.55 system-ui, sans-serif; color-scheme: light; }
+/* Shared palette tokens (app/theme.css). */
+.page { --muted: var(--ink-soft); --accent: var(--ink); color: var(--ink); min-height: 100svh; padding: 0 20px; font: 16px/1.55 var(--font-ui); }
 .page * { box-sizing: border-box; }
 .sheet { max-width: 540px; margin: 0 auto; padding-bottom: 28px; }
 .page a { color: var(--accent); text-underline-offset: 4px; }
 .header { display: flex; justify-content: space-between; align-items: center; padding: 24px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .status { color: var(--accent); font-size: 14px; margin: 28px 0 12px; font-weight: 650; }
-.page h1 { font: 700 clamp(30px, 7vw, 40px)/1.1 system-ui, sans-serif; letter-spacing: -.02em; margin: 0 0 16px; }
+.page h1 { font: 900 clamp(30px, 7vw, 40px)/1.1 var(--font-ui); letter-spacing: -.02em; margin: 0 0 16px; }
 .intro { color: var(--muted); margin: 0 0 28px; }
-.amount { background: var(--paper); padding: 22px 24px; border-left: 3px solid var(--accent); display: flex; flex-direction: column; gap: 4px; }
+.amount { background: var(--bubble-glass); padding: 22px 24px; border: var(--bubble-border); border-radius: var(--bubble-radius); box-shadow: var(--bubble-shadow); display: flex; flex-direction: column; gap: 4px; }
 .amount span { color: var(--muted); font-size: 14px; }
 .amount strong { font-size: 38px; font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
 .section { padding: 24px 0; border-bottom: 1px solid var(--line); }
@@ -19,26 +19,27 @@
 .rules { display: flex; flex-wrap: wrap; gap: 8px; }
 .rules code { font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
 .page blockquote { font-size: 17px; margin: 16px 0; }
-.page cite { display: block; font: 12px/1.6 system-ui, sans-serif; color: var(--muted); margin-top: 10px; }
+.page cite { display: block; font: 12px/1.6 var(--font-ui); color: var(--muted); margin-top: 10px; }
 .page details { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .page summary { cursor: pointer; min-height: 36px; }
 .page ul { padding-left: 20px; }
 .actions { display: grid; gap: 10px; }
-.page button { min-height: 50px; border: 1px solid transparent; padding: 12px 16px; font: 600 15px/1.4 system-ui, sans-serif; border-radius: 6px; cursor: pointer; width: 100%; }
-.primary { background: var(--office-navy); color: var(--office-cream); }
-.deny { color: var(--office-navy); border-color: var(--office-coral) !important; background: var(--office-blush); }
-.secondary { background: var(--office-peach); color: var(--ink); border-color: var(--office-navy) !important; margin-top: 6px; }
+.page button { min-height: 50px; border: 2px solid transparent; padding: 12px 18px; font: 800 15px/1.4 var(--font-ui); border-radius: 999px; cursor: pointer; width: 100%; }
+.primary { background: var(--ink); color: var(--paper); }
+:root[data-theme='dark'] .primary { background: var(--pastel-yellow); color: var(--on-pastel); }
+.deny { color: var(--ink); border-color: var(--danger) !important; background: var(--danger-soft); }
+.secondary { background: var(--pastel-aqua); color: var(--on-pastel); border-color: transparent !important; margin-top: 6px; }
 .page button:disabled { opacity: .5; cursor: default; }
-.page :is(button,input,a,summary):focus-visible { outline: 3px solid var(--office-navy); outline-offset: 4px; }
-.error { background: var(--office-blush); color: var(--office-navy); border-left: 4px solid var(--office-coral); padding: 16px; margin: 16px 0; font-size: 14px; overflow-wrap: anywhere; }
+.page :is(button,input,a,summary):focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+.error { background: var(--danger-soft); color: var(--ink); border-left: 5px solid var(--danger); border-radius: 20px; padding: 16px; margin: 16px 0; font-size: 14px; overflow-wrap: anywhere; }
 .error button { background: transparent; color: inherit; text-align: left; padding: 10px 0 0; min-height: 40px; }
-.result { margin: 24px 0; padding: 22px; border: 1px solid var(--line); background: var(--paper); }
+.result { margin: 24px 0; padding: 22px; border: var(--bubble-border); border-radius: var(--bubble-radius); background: var(--bubble-glass); box-shadow: var(--bubble-shadow); }
 .result p { margin-bottom: 0; color: var(--muted); }
 .fields { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .fields label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 14px; }
-.fields input, .input { font: 16px/1.5 system-ui, sans-serif; width: 100%; min-height: 48px; padding: 10px 12px; background: #fff; color: var(--ink); border: 1px solid var(--office-navy); border-radius: 5px; }
+.fields input, .input { font: 16px/1.5 var(--font-ui); width: 100%; min-height: 48px; padding: 10px 16px; background: var(--field); color: var(--ink); border: 2px solid var(--pastel-aqua); border-radius: 999px; }
 .fields + .note { margin-bottom: 18px; }
 .footer { color: var(--muted); font-size: 12px; padding-top: 26px; }
 @media (max-width: 360px) { .page { padding: 0 16px; } .terms dd { font-size: 19px; } }
 .card .status { margin-top: 18px; }
-.page .cardTitle { font: 700 28px/1.1 system-ui, sans-serif; letter-spacing: -.02em; margin: 0 0 10px; }
+.page .cardTitle { font: 900 28px/1.1 var(--font-ui); letter-spacing: -.02em; margin: 0 0 10px; }

@@ -3,9 +3,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { MemoryStateStore, SpacetimeStateStore, SpacetimeTransport, type SpacetimeOptions, installStateStore, getStateStore, SeatWorker, FakeEffects,
   northfield, createNorthfieldRepository, PaymentService, mirrorBankFeed, type Seat, type InvoiceState } from '@backroom/orchestrator';
-import { installInboxAgents, resetInboxAgents } from './agents';
+import { installInboxAgents, narrateCallRefusal, resetInboxAgents } from './agents';
 import { createDemoServices, installDemoServiceStatus } from './services';
 import { installPrecallEvidence } from '../calls/precall';
+import { installCallRefusalFollowUp } from '../calls/runtime';
 import { createGateway } from '../gateway/http';
 import { installGatewayStore } from '../gateway/runtime';
 import { MemoryGatewayStore, type GatewayCall } from '../gateway/store';
@@ -53,7 +54,10 @@ export async function createDemoRuntime() {
     collectionTail = new Promise<void>(resolve => { release = resolve; });
     await prior; try { return await work(); } finally { release(); }
   }
-  async function stop() { disarmRetry(); await resetInboxAgents(); abort.abort(); await Promise.all(jobs); jobs = []; }
+  async function stop() {
+    disarmRetry(); installCallRefusalFollowUp(undefined); await resetInboxAgents();
+    abort.abort(); await Promise.all(jobs); jobs = [];
+  }
   async function reset(next?: SpacetimeOptions) {
     if (next) config = next;
     await stop();
@@ -64,7 +68,10 @@ export async function createDemoRuntime() {
     const state = transport ? new SpacetimeStateStore({ transport }) : new MemoryStateStore();
     const prior = getStateStore();
     await installStateStore(state);
-    installInboxAgents(state, transport);
+    installInboxAgents(state, transport, services.collectionsPlanner(state));
+    installCallRefusalFollowUp(entry => entry.outcome === 'refused'
+      ? narrateCallRefusal({ outcome: 'refused', code: entry.code, ...(entry.detail ? { detail: entry.detail } : {}) })
+      : Promise.resolve(undefined));
     if (prior instanceof SpacetimeStateStore) await prior.close();
     await state.setLlmEnabled(process.env.DEMO_LLM === 'on' || (process.env.DEMO_LIVE === '1' && process.env.DEMO_LLM !== 'off'));
     await services.prepare(state);

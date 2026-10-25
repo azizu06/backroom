@@ -16,8 +16,9 @@ import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
 import { runDurableRecoveryPreflight } from './durable-recovery';
 import { CRS_RECEIPT_PATH, replayRecordedCrsCoverage } from './crs-availability';
+import { runEmailDispatcher } from './email-dispatcher';
 import { runBadgeAttack } from './badge-attack';
-import { evaluatorSourceHash, inputFileSha256 } from './provenance';
+import { canonicalTextSha256, evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
 
 // All outbound network attempts fail closed, including accidental provider calls in future adapters.
@@ -25,7 +26,11 @@ globalThis.fetch = async () => { throw new Error('EVAL_NETWORK_FORBIDDEN'); };
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const read = (path: string) => JSON.parse(readFileSync(join(root, path), 'utf8'));
-const sha = (path: string) => inputFileSha256(readFileSync(join(root, path)));
+const sha = (path: string) => {
+  const bytes = readFileSync(join(root, path));
+  // This recorded JSON receipt is Git text (CRLF on Windows); fixtures keep byte-exact hashes.
+  return path === CRS_RECEIPT_PATH ? canonicalTextSha256(bytes) : inputFileSha256(bytes);
+};
 const command = 'pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts';
 const key = read('fixtures/answer-key/expected.json');
 const manifest = read('fixtures/answer-key/frozen-manifest.json');
@@ -164,6 +169,8 @@ for (const id of PRECALL_STOPS) {
   if (!run.match) gaps.push({ id: `${id}:precall`, detail: `Pre-call stop missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 }
 const callButton = await runCallButton();
+const emailDispatcher = await runEmailDispatcher();
+if (!emailDispatcher.match) gaps.push({ id: 'C14:dispatcher', detail: `Email fallback missed: ${Object.entries(emailDispatcher.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 if (!callButton.match) gaps.push({ id: 'call-button', detail: `In-app call button missed: ${Object.entries(callButton.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const conversations = [];
 for (const name of CONVERSATIONS) {
@@ -181,8 +188,9 @@ for (const row of legacy.reports) {
   }
   // C17's integration step (record PHONE_MISMATCH_WARN on Dana's audit wall, identity before any amount) is executed
   // end to end by the scripted phone_mismatch conversation; a live phone retest is still a separate, ungraded item.
-  // C14: no dial, and the email-only path queues one simulated follow-up with no amount or invoice detail.
-  if (row.id === 'C14' && precallStops.find(run => run.id === 'C14')?.match) continue;
+  // C14 is complete only when the production planner role queues the preview through Dispatcher,
+  // not when this eval separately invokes the email helper after a refusal.
+  if (row.id === 'C14' && emailDispatcher.match) continue;
   if (row.id === 'C17' && conversations.find(run => run.id === 'phone_mismatch')?.match) continue;
   // C13: the desk-phone gate withholds Request call, the office request is refused, and a direct dial is rejected before the provider.
   if (row.id === 'C13' && callButton.checks.noConsent && precallStops.find(run => run.id === 'C13')?.match) continue;
@@ -243,6 +251,7 @@ const rates = {
   collectionsPermits: fraction(permits.filter(row => row.match === true).length, permits.filter(row => row.match !== null).length),
   reconciliation: fraction(receivables.filter(row => row.match === true).length, receivables.filter(row => row.match !== null).length),
   dispatcherMemoryRecovery: fraction(recoveryRuns.filter(row => row.outcome === 'RECOVERED_ONE_MOCK_DEBIT').length, recoveryRuns.length),
+  dispatcherEmailFollowup: fraction(Number(emailDispatcher.match), 1),
   runtimeBadgeIsolation: fraction(Number(badgeIsolationMatch), 1),
   dispatcherBankChange: fraction(Number(bankChangeMatch), 1),
   gx10Failover: fraction(failoverRuns.filter(row => row.match).length, failoverRuns.length),
@@ -259,8 +268,8 @@ const rates = {
 const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
-    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.',
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'email-dispatcher.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -268,6 +277,8 @@ const report = {
     })),
     voicemailRuntimeSources: { 'orchestrator/src/voice/tools.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/voice/tools.ts'))) },
     crsRuntimeSources: { 'orchestrator/src/collections/crs.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/collections/crs.ts'))) },
+    emailRuntimeSources: Object.fromEntries(['orchestrator/src/agents/roles/collections.ts', 'orchestrator/src/agents/tools/collections.ts',
+      'orchestrator/src/agents/roles/index.ts', 'orchestrator/src/collections/email.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
       'fixtures/answer-key/frozen-manifest.json', 'fixtures/scenarios/payables.json', 'fixtures/scenarios/collections.json', CRS_RECEIPT_PATH,
       ...(pdfRun ? [PDF_RESULT_PATH] : [])].map(path => [path, sha(path)])),
@@ -281,6 +292,7 @@ const report = {
     payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.',
     recovery: recoveryRuns[0]!.scope,
     durableRecovery: durableRecovery.scope,
+    emailDispatcher: emailDispatcher.scope,
     arConversations: conversations[0]?.scope ?? 'not run',
     judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
@@ -302,6 +314,7 @@ const report = {
     scope: 'Production Dispatcher + ClaudeAgentRuntime and all five AP roles, with the AP debit port explicitly absent. Fixture extraction and vendor checks, no network. This measures the unavailable-adapter hold, not a Nessie payment or debit reconciliation.' },
   recovery: recoveryRuns,
   crsRecordedCoverage,
+  emailDispatcher,
   durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
@@ -350,6 +363,7 @@ const lines = [
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
+  `| C14 simulated email fallback through the Dispatcher (trusted contact, daily dedupe, no amount or dial) | ${display(rates.dispatcherEmailFollowup)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider, email-only clients get a simulated follow-up with no amount (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
   `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: button withheld, 409, no provider attempt) | ${display(rates.callButton)} |`,
@@ -378,4 +392,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (!emailDispatcher.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;

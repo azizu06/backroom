@@ -4,7 +4,8 @@ import { assertVendorHandoff, type VendorToolDeps } from '../tools/vendor';
 import type { PayablesToolDeps } from '../tools/payables';
 import { payablesSpecialistFor } from './payables';
 import { chooseVendorModel, createVendorSpecialist } from './vendor';
-import { createCollectionsPostCallSpecialist, runCollectionsPostCall, type PostCallDeps } from './collections';
+import { createCollectionsPlannerSpecialist, createCollectionsPostCallSpecialist, runCollectionsPlanner, runCollectionsPostCall, type PostCallDeps } from './collections';
+import type { CollectionsToolDeps } from '../tools/collections';
 import { createIntakeSpecialist, runIntakeActivation, type IntakePorts } from './intake';
 import { createExtractorSpecialist, type ExtractorDependencies } from './extractor';
 import { createReconciler } from './reconciler';
@@ -39,12 +40,15 @@ export interface RoleDeps {
   payables?: PayablesToolDeps;
   vendor?: VendorToolDeps;
   collections?: PostCallDeps;
+  /** Trusted host chooses the pre-call phase for a separate dispatcher case. Mutually exclusive with post-call. */
+  collectionsPlanner?: CollectionsToolDeps;
   /** Host's `loadCase` supplies the persisted `correctionCount`; use `auditorCorrections(state)`. */
   auditor?: AuditDependencies;
 }
 
 /** Role workers: add one line per role below (and its deps to RoleDeps). */
 export function createRoleRegistry(deps: RoleDeps): RoleRegistry {
+  if (deps.collections && deps.collectionsPlanner) throw new Error('COLLECTIONS_ROLE_AMBIGUOUS');
   const registry: RoleRegistry = {};
   if (deps.intake) registry.intake = intakeRole(deps.intake);
   if (deps.extractor) registry.extractor = extractorRole(deps.extractor);
@@ -52,6 +56,7 @@ export function createRoleRegistry(deps: RoleDeps): RoleRegistry {
   if (deps.payables) registry.payables = payablesRole(deps.payables);
   if (deps.vendor) registry.vendor = vendorRole(deps.vendor);
   if (deps.collections) registry.collections = collectionsRole(deps.collections);
+  if (deps.collectionsPlanner) registry.collections = collectionsPlannerRole(deps.collectionsPlanner);
   if (deps.auditor) registry.auditor = auditorRole(deps.auditor);
   return registry;
 }
@@ -123,5 +128,18 @@ export function collectionsRole(deps: PostCallDeps): RoleModule {
   return {
     specialist: () => createCollectionsPostCallSpecialist(deps),
     run: (runtime, _spec, ctx) => runCollectionsPostCall(runtime, ctx, deps),
+  };
+}
+
+/** Pre-call case completes only when it starts a call or queues/dedupes a permitted simulated email. */
+export function collectionsPlannerRole(deps: CollectionsToolDeps): RoleModule {
+  return {
+    specialist: () => createCollectionsPlannerSpecialist(deps).spec,
+    async run(runtime, _spec, ctx, input) {
+      const run = await runCollectionsPlanner(runtime, ctx, deps, input);
+      const followedUp = run.kind === 'not_started' && (run.email?.status === 'queued' || run.email?.status === 'duplicate');
+      if (run.result.kind === 'done' && run.kind !== 'started' && !followedUp) return { ...run.result, kind: 'held' };
+      return run.result;
+    },
   };
 }
