@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { callFromProjection, callReducer, callStore, IDLE_CALL, isMockCalls, pollCallFeed, requestCall, type CallEvent } from './calls';
+import { callFromProjection, callReducer, callStore, IDLE_CALL, isMockCalls, precallStore, pollCallFeed, requestCall, type CallEvent } from './calls';
 import { createMockCallFeed } from './calls-mock';
 
 describe('call state', () => {
@@ -117,6 +117,22 @@ describe('call state', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(fetch.mock.calls.length).toBe(settled);
     expect(callStore.getSnapshot()).toEqual(IDLE_CALL);
+    vi.unstubAllGlobals();
+  });
+  it.each(['?replay=core-offline', '?replay=', '?replay=missing&calls=mock'])('never starts a live call feed or pre-call request in replay %s', async search => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', { location: { search } });
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ call: null }));
+    const apply = vi.fn();
+    const stop = pollCallFeed(apply);
+    const unsubscribe = callStore.subscribe(() => {});
+    await precallStore.load();
+    await expect(requestCall()).resolves.toMatchObject({ ok: false, message: 'Replay: no call placed' });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+    expect(callStore.getSnapshot()).toEqual(IDLE_CALL);
+    unsubscribe(); stop();
     vi.unstubAllGlobals();
   });
   it('runs mock calls in ringing, live, ended, idle order', () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { isReplayPage } from '../../lib/replay/mode';
 import { PAYMENT_TOAST_POLL_MS, paymentLinkToAnnounce, type ActivePaymentLink } from '../../lib/office/payment-toast';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { PlayPanelDialog, focusAskWhy } from './PlayHud';
@@ -24,7 +25,7 @@ export function PaymentToast({ snapshot }: { snapshot: OfficeSnapshot }) {
   }
   const opener = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (replay) { setReady(null); setOpen(false); return; }
+    if (replay || isReplayPage()) { setReady(null); setOpen(false); return; }
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
