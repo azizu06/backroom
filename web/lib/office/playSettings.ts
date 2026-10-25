@@ -18,14 +18,20 @@ export interface PlaySettings {
   readonly headBob: boolean;
   /** Field of view widens slightly while walking. */
   readonly fovKick: boolean;
+  /** Office-only opt-in when the system requests reduced motion. */
+  readonly useMotionAnyway: boolean;
+  /** Multiplier on bob, sway and FOV kick. */
+  readonly motionIntensity: number;
 }
 export interface SettingRange { readonly min: number; readonly max: number; readonly step: number }
 
 export const DEFAULT_PLAY_SETTINGS: PlaySettings = {
   sensitivity: 1, invertY: false, speed: 1, smoothMove: DEFAULT_FEEL.smoothing, headBob: DEFAULT_FEEL.bob, fovKick: DEFAULT_FEEL.fovKick,
+  useMotionAnyway: false, motionIntensity: 1,
 };
 export const SENSITIVITY_RANGE: SettingRange = { min: SENSITIVITY_MIN, max: SENSITIVITY_MAX, step: 0.25 };
 export const SPEED_RANGE: SettingRange = { min: 0.5, max: 2, step: 0.25 };
+export const MOTION_INTENSITY_RANGE: SettingRange = { min: 0.5, max: 1.5, step: 0.1 };
 export const PLAY_SETTINGS_KEY = "backroom.office.play-settings.v1";
 
 /** Clamps to the range and snaps to its step; anything non-numeric falls back. */
@@ -50,12 +56,15 @@ export function parsePlaySettings(raw: string | null | undefined): PlaySettings 
     smoothMove: typeof row.smoothMove === "boolean" ? row.smoothMove : DEFAULT_PLAY_SETTINGS.smoothMove,
     headBob: typeof row.headBob === "boolean" ? row.headBob : DEFAULT_PLAY_SETTINGS.headBob,
     fovKick: typeof row.fovKick === "boolean" ? row.fovKick : DEFAULT_PLAY_SETTINGS.fovKick,
+    useMotionAnyway: typeof row.useMotionAnyway === "boolean" ? row.useMotionAnyway : DEFAULT_PLAY_SETTINGS.useMotionAnyway,
+    motionIntensity: clampSetting(row.motionIntensity, MOTION_INTENSITY_RANGE, DEFAULT_PLAY_SETTINGS.motionIntensity),
   };
 }
 
 export function sameSettings(a: PlaySettings, b: PlaySettings): boolean {
   return a.sensitivity === b.sensitivity && a.invertY === b.invertY && a.speed === b.speed
-    && a.smoothMove === b.smoothMove && a.headBob === b.headBob && a.fovKick === b.fovKick;
+    && a.smoothMove === b.smoothMove && a.headBob === b.headBob && a.fovKick === b.fovKick
+    && a.useMotionAnyway === b.useMotionAnyway && a.motionIntensity === b.motionIntensity;
 }
 
 type Reader = Pick<Storage, "getItem">;
@@ -85,7 +94,8 @@ export function lookDelta(dx: number, dy: number, settings: PlaySettings, scale 
 
 /** The settings' feel switches as the flags the rig reads (before reduced motion is applied). */
 export function feelFlags(settings: PlaySettings): FeelFlags {
-  return { smoothing: settings.smoothMove, bob: settings.headBob, fovKick: settings.fovKick };
+  return { smoothing: settings.smoothMove, bob: settings.headBob, fovKick: settings.fovKick,
+    useMotionAnyway: settings.useMotionAnyway, motionIntensity: settings.motionIntensity };
 }
 
 export function formatMultiplier(value: number): string {

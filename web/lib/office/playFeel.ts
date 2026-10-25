@@ -4,14 +4,17 @@
  * No imports from ./play or ./playSettings so both can depend on it.
  */
 
-/** Which feel effects are on. All of them are forced off under prefers-reduced-motion (see `effectiveFeel`). */
-export interface FeelFlags { readonly smoothing: boolean; readonly bob: boolean; readonly fovKick: boolean }
-export const DEFAULT_FEEL: FeelFlags = { smoothing: true, bob: true, fovKick: true };
+/** Visual preferences; reduced motion wins unless the viewer explicitly opts in for this office. */
+export interface FeelFlags {
+  readonly smoothing: boolean; readonly bob: boolean; readonly fovKick: boolean;
+  readonly useMotionAnyway?: boolean; readonly motionIntensity?: number;
+}
+export const DEFAULT_FEEL: FeelFlags = { smoothing: true, bob: true, fovKick: true, useMotionAnyway: false, motionIntensity: 1 };
 export const NO_FEEL: FeelFlags = { smoothing: false, bob: false, fovKick: false };
 
-/** Reduced motion wins over the viewer's settings: no smoothing, no bob, no FOV change. */
+/** Apply the system preference without discarding the viewer's saved switches or intensity. */
 export function effectiveFeel(flags: FeelFlags, reducedMotion: boolean): FeelFlags {
-  return reducedMotion ? NO_FEEL : flags;
+  return reducedMotion && !flags.useMotionAnyway ? NO_FEEL : flags;
 }
 
 /** m/s². Full walk speed in about 0.1 s: weighted, not floaty. */
@@ -23,9 +26,9 @@ export const REFERENCE_SPEED = 3;
 /** First-person vertical field of view in degrees. */
 export const BASE_FOV = 75;
 /** Degrees added at full walking speed. Subtle on purpose. */
-export const FOV_KICK = 3.5;
+export const FOV_KICK = 5;
 /** Metres of the eye bobbing up and down at full walking speed. */
-export const BOB_AMPLITUDE = 0.03;
+export const BOB_AMPLITUDE = 0.055;
 /** Metres per footstep; the bob dips once per step, on the footfall. */
 export const STEP_DISTANCE = 0.9;
 /** 1 / seconds: how quickly the bob amplitude and FOV chase their targets. */
@@ -64,9 +67,9 @@ export function approach(current: number, target: number, dt: number, rate = FEE
 /** Footfall progress in steps: 1 per `STEP_DISTANCE` walked. */
 export function stridePhase(distance: number): number { return distance / STEP_DISTANCE; }
 
-/** Eye height offset in metres. The lowest point is the footfall (whole steps); `intensity` is 0..1. */
+/** Eye height offset in metres. The lowest point is the footfall; intensity includes the 0.5–1.5× setting. */
 export function bobHeight(distance: number, intensity: number): number {
-  const level = Math.min(1, Math.max(0, intensity));
+  const level = Math.min(1.5, Math.max(0, intensity));
   return -BOB_AMPLITUDE * level * Math.cos(2 * Math.PI * stridePhase(distance)) || 0;
 }
 
@@ -79,7 +82,7 @@ export function footsteps(from: number, to: number): number {
 export interface FeelState {
   /** Total distance walked in Play. */
   readonly distance: number;
-  /** Smoothed bob amplitude, 0..1. */
+  /** Smoothed bob amplitude, 0..1.5 including the viewer's intensity. */
   readonly bob: number;
   /** Smoothed FOV offset in degrees. */
   readonly fov: number;
@@ -102,9 +105,11 @@ export interface FeelFrame {
 export function advanceFeel(state: FeelState, input: { speed: number; travelled: number; dt: number; flags: FeelFlags }): FeelFrame {
   const { speed, travelled, dt, flags } = input;
   const ratio = Math.min(1, Math.max(0, speed / REFERENCE_SPEED));
+  const intensity = Number.isFinite(flags.motionIntensity) ? Math.min(1.5, Math.max(0.5, flags.motionIntensity!)) : 1;
   const distance = state.distance + Math.max(0, travelled);
-  const bob = flags.bob ? approach(state.bob, ratio, dt) : 0;
-  const fov = flags.fovKick ? approach(state.fov, FOV_KICK * ratio, dt) : 0;
+  // Let the final step visibly settle after release; disabling motion still flattens it immediately.
+  const bob = flags.bob ? approach(state.bob, ratio * intensity, dt, ratio === 0 ? 5.5 : FEEL_RATE) : 0;
+  const fov = flags.fovKick ? approach(state.fov, FOV_KICK * ratio * intensity, dt) : 0;
   const settling = (flags.bob && (bob > 1e-3 || ratio > 0)) || (flags.fovKick && (Math.abs(fov) > 1e-2 || ratio > 0));
   return {
     state: { distance, bob: bob < 1e-3 && ratio === 0 ? 0 : bob, fov: Math.abs(fov) < 1e-2 && ratio === 0 ? 0 : fov },
