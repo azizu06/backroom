@@ -8,7 +8,7 @@
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
-      "orchestrator/src/agents/eval/conversation.ts": "44ab64b3099d002b7af7bb85bbd8b1344741f1face5e274c369bb6bcf1009ea3",
+      "orchestrator/src/agents/eval/conversation.ts": "2923b6c6d14e00bdb5035405d1024534b44e381e6f6db7f1bd7b9f706bfbc889",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -24,7 +24,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "7d118b7748adaefe42ce3d76c959884e6ec0d92edb0ce7da05699f7db475dd1c"
+      "orchestrator/src/agents/eval/scoreboard.ts": "cbec57f623ea402fb4699ebf4c61623c62a74f8790ab30db39e68905582b32a5"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -14374,6 +14374,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
+        "humanFollowupQueued": true,
+        "humanEscalationMirrored": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -14386,6 +14388,40 @@
       ],
       "cleared": false,
       "reconRules": [],
+      "humanFollowup": {
+        "queuedRequests": 1,
+        "gatewayEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "REQUEST_HUMAN"
+            ]
+          }
+        ],
+        "mirroredEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "REQUEST_HUMAN"
+            ]
+          }
+        ],
+        "postcallEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "CALL_HUMAN_REQUESTED"
+            ]
+          }
+        ],
+        "gatewayReviewRecipients": []
+      },
+      "hostileEvidence": {
+        "requiredRule": "HOSTILE_ESCALATE",
+        "dedicatedRuleRecorded": false,
+        "speechMeasured": false,
+        "providerEndCallExecuted": false
+      },
       "gatewayTools": [
         "verify_identity_result:RECORDED",
         "get_invoice_context:CONTEXT",
@@ -15739,7 +15775,7 @@
     },
     {
       "id": "C05",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Frozen integrationOutcome: one_deescalation_then_end_escalate_stop_further_calls_HOSTILE_ESCALATE. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: false. One spoken de-escalation and provider end-call are not executed; keep the integration gap open."
     },
     {
       "id": "C08",

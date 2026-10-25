@@ -83,8 +83,6 @@
 .audit-wall cite { display: block; font-size: 12px; margin-top: 8px; }
 .audit-footer { font-size: 12px; margin: 16px 0 0; }
 .audit-unlock { max-width: 480px; margin: 32px auto; }
-.audit-page-nav { padding: 16px clamp(16px, 3vw, 40px) 0; font: 15px system-ui, sans-serif; background: color-mix(in srgb, var(--office-lavender) 25%, var(--office-cream)); }
-.audit-page-nav a { color: var(--office-navy); text-underline-offset: 3px; }
 @media (max-width: 800px) {
   .audit-heading { flex-direction: column; gap: 8px; }
   .audit-layout, .audit-workspace { grid-template-columns: minmax(0, 1fr); gap: 16px; }

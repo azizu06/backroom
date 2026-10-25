@@ -227,7 +227,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     callbackInstructionConfigured: managedConfig([]).instructions.includes('Before ending say the callback number {{callback_number}}.'),
     speechMeasured: false, messageDelivered: false,
   } : undefined;
-  const humanFollowup = name === 'human_request' ? {
+  const humanFollowup = name === 'human_request' || name === 'hostile' ? {
     queuedRequests: call.outbox.filter(row => row.type === 'request_human').length,
     gatewayEscalations: call.audits.filter(row => row.action === 'request_human')
       .map(row => ({ decision: row.kind, ruleIds: row.ruleIds })),
@@ -238,6 +238,11 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     // Read the actual record: request_human currently queues an unassigned outbox event.
     // Plan approval recipients are not proof that a callback was assigned or delivered.
     gatewayReviewRecipients: call.escalations.map(row => row.toHuman),
+  } : undefined;
+  const hostileEvidence = name === 'hostile' ? {
+    requiredRule: 'HOSTILE_ESCALATE',
+    dedicatedRuleRecorded: [...call.audits, ...audits].some(row => row.ruleIds.includes('HOSTILE_ESCALATE')),
+    speechMeasured: false, providerEndCallExecuted: false,
   } : undefined;
   const checks = {
     dialedOnce: planned.kind === 'started' && dials.length === 1,
@@ -276,6 +281,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   return { id: name, scenarioId, invoiceId, match: Object.values(checks).every(Boolean), checks,
     callStatus: call.status, caseStatus: dispatched.status, reason: dispatched.reason ?? null, roles: roleOrder, cleared, reconRules,
     ...(humanFollowup && { humanFollowup }),
+    ...(hostileEvidence && { hostileEvidence }),
     ...(voicemailEvidence && { voicemailEvidence }),
     gatewayTools: transcript.filter(row => row.tool).map(row => `${row.tool}:${String(row.result?.kind ?? row.result?.error)}`),
     tools: trace.map(row => `${row.role}.${row.tool}`),

@@ -1,7 +1,5 @@
 /* Office palette tokens come from app/office/lobby.css. Text is navy on cream, peach, blush or lavender, or cream on navy (all >= 4.5:1). */
 .inbox-page { margin: 0; min-height: 100dvh; background: var(--office-cream); color: var(--office-navy); }
-.inbox-page > nav { max-width: 960px; margin: 0 auto; padding: 20px 24px 0; font: 14px 'Avenir Next', Avenir, sans-serif; }
-.inbox-page > nav a { color: var(--office-navy); text-underline-offset: 3px; }
 .inbox-tray { color-scheme: light; box-sizing: border-box; width: 100%; max-width: 960px; margin: 0 auto; padding: 24px; background: var(--office-cream); color: var(--office-navy); font: 15px/1.5 'Avenir Next', Avenir, sans-serif; border-radius: 12px; }
 .inbox-tray * { box-sizing: border-box; }
 .inbox-tray h1, .inbox-tray h2, .inbox-tray h3, .inbox-tray h4 { margin: 0 0 12px; font-weight: 700; color: var(--office-navy); }
@@ -73,7 +71,6 @@ body:has(.inbox-page) { background: var(--office-cream); }
 body:has(.inbox-page) .real-sim-overlay { position: static; width: 100%; border-radius: 0; }
 @media (max-width: 640px) {
   .inbox-tray { padding: 16px; }
-  .inbox-page > nav { padding: 16px 16px 0; }
   .inbox-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .inbox-result { padding: 16px; }
   .inbox-envelope { grid-template-columns: minmax(0, 1fr); gap: 0; }
