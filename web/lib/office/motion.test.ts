@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { insideAny, officeColliders, PLAYER_RADIUS } from './play';
+import { ANCHOR_IDS } from './layout';
 import { MotionRegistry, WalkMotion } from "./motion";
 import type { AnchorId } from "./state";
 import { createMockOfficeState } from "./preview";
@@ -35,8 +37,8 @@ describe("office row → view contract", () => {
       const previous = [...walk.position];
       walk.advance(1 / 60);
       expect(Math.hypot(walk.position[0] - previous[0]!, walk.position[1] - previous[1]!)).toBeLessThanOrEqual(2.4 / 60 + 1e-6);
-      if (walk.position[0] > COLLECTIONS[0] + 1 && walk.position[0] < DANA[0] - 1 && walk.position[1] > -1) {
-        expect(walk.position[1]).toBeCloseTo(CORRIDOR_Z);
+      if (walk.position[0] > COLLECTIONS[0] + 1 && walk.position[0] < DANA[0] - 1 ) {
+        expect(insideAny(walk.position, officeColliders(ANCHOR_IDS), PLAYER_RADIUS)).toBe(false);
         crossedAisle = true;
       }
     }

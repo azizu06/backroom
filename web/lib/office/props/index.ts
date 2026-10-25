@@ -7,7 +7,7 @@ import { PHONE_INTERACTION } from './phone';
 
 export type { OfficePropInteraction, PropPanel, PropPanelRow } from './interact';
 export { WHITEBOARD_INTERACTION, whiteboardStats, type WhiteboardStats } from './whiteboard';
-export { CLOCK_INTERACTION, clockFace, msUntilNextMinute, type ClockFace } from './clock';
+export { clockFace, msUntilNextMinute, type ClockFace } from './clock';
 export { DENY_MOMENT_MS, TREASURY_DOOR_INTERACTION, denyMoment, denyPose, denyReceipt, type DenyMoment, type DenyPose, type DenyReceipt } from './treasuryDeny';
 export { MONITOR_DESKS, monitorInteraction, monitorScreen, monitorScreenKey, type MonitorDesk, type MonitorLine, type MonitorScreen, type MonitorStatus } from './monitors';
 export { PHONE_INTERACTION } from './phone';

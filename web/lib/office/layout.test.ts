@@ -1,131 +1,208 @@
 import { describe, expect, it } from 'vitest';
-import { BUILDING, MAIN_BUILDING, WORKSTATIONS, ANCHOR_IDS, ROOM_SPAWNS, WALLS, WINDOWS, WALL_HEIGHT, sightBlocked, wallColliders, wallPieces, windowPieces, type Vec2 } from './layout';
-import { EXTRA_WORKSTATIONS, deskPieces, deskScreenPiece, workstationPieces } from './furniture';
+import { Box3, Euler, Matrix4, Quaternion, Ray, Vector3 } from 'three';
+import { BUILDING, MAIN_BUILDING, WORKSTATIONS, ANCHOR_IDS, ROOM_SPAWNS, WALLS, WINDOWS, WALL_HEIGHT, WALL_THICKNESS, LOBBY_BOARD_MOUNT, DOORWAYS, GRID_AISLES, POD_BOUNDS, FLOOR_FIXTURES, fixtureBounds, workspaceRoute, workstationApproach, sightBlocked, wallPieces, windowPieces, type Vec2 } from './layout';
+import { EXTRA_WORKSTATIONS, deskPieces, deskScreenPiece, workstationPieces, type FurniturePiece } from './furniture';
+import { CAMERA_CLEARANCE, DESK_SIZE } from './metrics';
 import { DESKS } from './targets/desk';
 import { OFFICE_ANCHORS } from './state';
-import { FLOOR, SPAWN, PLAYER_RADIUS, SERVER_ROOM_BOX, PAYLINK_KIOSK, insideAny, movePlayer, officeColliders } from './play';
-import { HANDOFF_AGENTS, FLOOR_AGENTS, handoffRoute } from './handoffs';
+import { EYE_HEIGHT, FLOOR, SPAWN, PLAYER_RADIUS, PAYLINK_KIOSK, insideAny, movePlayer, officeColliders } from './play';
+import { HANDOFF_AGENTS, handoffRoute, handoffSpot, workstationLabel, type HandoffAgentId } from './handoffs';
 import { roomEntry } from './overview';
+import { storyCameraPose } from './story';
+import { TOUR_ORDER, tourRoute } from './tour';
 import { TREES, BUSHES, groundClear } from './outdoors';
-import { OFFICE_PROP_INTERACTIONS } from './props';
 import { AUDIT_WALL } from './props/auditWall';
 import { WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { ROLES } from './palette';
 
-const colliders = officeColliders(ANCHOR_IDS, [SERVER_ROOM_BOX]);
-
-/** Exercise the same swept collision movement as first person, at walking-size increments. */
+const colliders = officeColliders(ANCHOR_IDS);
+function renderedBounds(piece: FurniturePiece): Box3 {
+  const half = new Vector3(...piece.size).multiplyScalar(0.5);
+  return new Box3(half.clone().negate(), half).applyMatrix4(new Matrix4().compose(new Vector3(...piece.at),
+    new Quaternion().setFromEuler(new Euler(...(piece.rotation ?? [0, 0, 0]))), new Vector3(1, 1, 1)));
+}
 function walk(from: Vec2, to: Vec2): Vec2 {
   let point = from;
   const steps = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / 0.05));
   const step: Vec2 = [(to[0] - from[0]) / steps, (to[1] - from[1]) / steps];
   for (let i = 0; i < steps; i++) {
     point = movePlayer(point, step, colliders);
-    expect(insideAny(point, colliders, PLAYER_RADIUS), `${from} → ${to}: ${point}`).toBe(false);
+    expect(insideAny(point, colliders, CAMERA_CLEARANCE), `${from} → ${to}: ${point}`).toBe(false);
   }
   expect(point[0]).toBeCloseTo(to[0], 5);
   expect(point[1]).toBeCloseTo(to[1], 5);
   return point;
 }
+function follow(from: Vec2, to: Vec2) {
+  const route = workspaceRoute(from, to);
+  expect(route[0]).toEqual(from);
+  expect(route.at(-1)).toEqual(to); // A stalled/empty route is not evidence of reachability.
+  for (let i = 1; i < route.length; i++) walk(route[i - 1]!, route[i]!);
+}
 
-describe('open office layout', () => {
-  it('uses one compact room bounded only by four exterior walls', () => {
+describe('square shared office', () => {
+  it('has a 24 m square, four exterior walls and a centred south entrance', () => {
     expect(BUILDING).toEqual(MAIN_BUILDING);
+    expect(BUILDING.maxX - BUILDING.minX).toBe(24);
+    expect(BUILDING.maxX - BUILDING.minX).toBe(BUILDING.maxZ - BUILDING.minZ);
     expect(WALLS).toHaveLength(4);
     expect(WALLS.every(wall => wall.exterior)).toBe(true);
+    expect(DOORWAYS.find(door => door.id === 'entrance')!.at).toEqual([0, BUILDING.maxZ]);
     const full = wallPieces('full');
     expect(Math.max(...full.map(piece => piece.at[1] + piece.size[1] / 2))).toBe(WALL_HEIGHT);
     expect(full.every(piece => piece.size.every(size => size > 0))).toBe(true);
     expect(windowPieces().glass).toHaveLength(WINDOWS.length);
-    expect(WINDOWS.every(window => WALLS.some(wall => wall.id === window.wall))).toBe(true);
+    for (const win of WINDOWS.filter(win => win.wall === 'north')) expect(Math.abs(win.at) - win.width / 2).toBeGreaterThan(3);
+    expect(Math.abs(LOBBY_BOARD_MOUNT.x) - LOBBY_BOARD_MOUNT.width / 2).toBeGreaterThan(3);
   });
 
-  it('has three 2 × 2 pods, exactly twelve desks, chairs and correctly facing screens', () => {
-    expect(WORKSTATIONS).toHaveLength(12);
-    expect(EXTRA_WORKSTATIONS).toHaveLength(8);
-    for (const pod of [0, 1, 2]) {
+  it('keeps six 2 × 2 pods, twenty-four human-scale desks and sixteen open seats', () => {
+    expect(WORKSTATIONS).toHaveLength(24);
+    expect(EXTRA_WORKSTATIONS).toHaveLength(20);
+    expect(WORKSTATIONS.filter((_, i) => workstationLabel(i) === 'Open seat')).toHaveLength(16);
+    expect(DESK_SIZE).toEqual({ width: 2.25, depth: 1.05 });
+    expect(EYE_HEIGHT).toBe(1.55);
+    for (let pod = 0; pod < 6; pod++) {
       const seats = WORKSTATIONS.filter(seat => seat.pod === pod);
       expect(seats).toHaveLength(4);
       expect(new Set(seats.map(seat => seat.center[0])).size).toBe(2);
       expect(new Set(seats.map(seat => seat.center[1])).size).toBe(2);
       expect(seats.filter(seat => seat.flip === 1)).toHaveLength(2);
     }
-    const pieces = [...DESKS.flatMap(deskPieces), ...EXTRA_WORKSTATIONS.flatMap(({ center, flip }) => workstationPieces(center, flip, ROLES.partition))];
-    expect(pieces.filter(piece => piece.color === ROLES.desk && piece.size[0] === 2.25)).toHaveLength(12);
-    expect(pieces.filter(piece => piece.size[0] === 0.65 && piece.size[1] === 0.65)).toHaveLength(12);
-    expect(pieces.filter(piece => Math.abs(piece.size[0] - 1.9) < 1e-6)).toHaveLength(12);
+    const pieces = WORKSTATIONS.flatMap(({ center, flip }) => workstationPieces(center, flip, ROLES.partition));
+    expect(pieces.filter(piece => piece.color === ROLES.desk && piece.size[0] === 2.25)).toHaveLength(24);
     for (const room of DESKS) {
-      const flip = room === 'dana' ? -1 : 1;
-      const casing = deskPieces(room)[3]!;
-      expect(deskScreenPiece(room).at[2] - casing.at[2]).toBeCloseTo(flip * 0.05);
+      expect(WORKSTATIONS.some(seat => String(seat.center) === String(OFFICE_ANCHORS[room].center))).toBe(true);
+      expect(deskScreenPiece(room).at[2] - deskPieces(room)[3]!.at[2]).toBeCloseTo((room === 'dana' ? -1 : 1) * 0.05);
     }
   });
 
-  it('matches every workstation and chair to a real movement obstacle', () => {
-    for (const { center: [x, z], flip } of WORKSTATIONS) {
-      expect(insideAny([x, z], colliders, 0)).toBe(true);
-      expect(insideAny([x + 0.05 * flip, z + 0.9 * flip], colliders, 0)).toBe(true);
-    }
-    // Removed leisure footprints and private partitions must not remain as invisible obstacles.
-    for (const point of [[-18, -3.2], [8.6, 5.3], [9, -0.2], [-6, 2.5], [0, 2.5]] as Vec2[]) {
-      if (point[0] >= FLOOR.minX) expect(insideAny(point, colliders, PLAYER_RADIUS)).toBe(false);
+  it('spaces windows evenly in symmetric bays around the north board span and south entrance', () => {
+    for (const wall of ['north', 'south']) {
+      const centers = WINDOWS.filter(win => win.wall === wall).map(win => win.at).sort((a, b) => a - b);
+      expect(centers).toHaveLength(4);
+      expect(centers).toEqual(centers.map(at => -at).reverse());
+      const pitch = centers[1]! - centers[0]!;
+      expect(pitch).toBeGreaterThan(0);
+      expect(centers[3]! - centers[2]!).toBeCloseTo(pitch);
+      // The reserved centre skips whole bays, preserving the same spacing grid on both sides.
+      expect((centers[2]! - centers[1]!) / pitch).toBeCloseTo(Math.round((centers[2]! - centers[1]!) / pitch));
     }
   });
 
-  it('keeps the entry, every teleport and useful spawn sightlines clear', () => {
+  it('measures clear aisles >= 2.4 m, perimeter >= 2.5 m and a south band >= 4 m from rendered furniture', () => {
+    const pods = POD_BOUNDS.map((_, pod) => {
+      const bounds = new Box3();
+      for (const { center, flip } of WORKSTATIONS.filter(seat => seat.pod === pod)) {
+        for (const piece of workstationPieces(center, flip, ROLES.partition)) {
+          bounds.union(renderedBounds(piece));
+        }
+      }
+      return bounds;
+    });
+    for (const pod of pods) {
+      expect(pod.min.x - FLOOR.minX).toBeGreaterThanOrEqual(2.5);
+      expect(FLOOR.maxX - pod.max.x).toBeGreaterThanOrEqual(2.5);
+      expect(pod.min.z - FLOOR.minZ).toBeGreaterThanOrEqual(2.5);
+      expect(FLOOR.maxZ - pod.max.z).toBeGreaterThanOrEqual(4);
+    }
+    for (const row of [0, 3]) for (const column of [0, 1]) expect(pods[row + column + 1]!.min.x - pods[row + column]!.max.x).toBeGreaterThanOrEqual(2.4);
+    for (let column = 0; column < 3; column++) expect(pods[column + 3]!.min.z - pods[column]!.max.z).toBeGreaterThanOrEqual(2.4);
+    for (const pod of POD_BOUNDS) for (const fixture of Object.values(FLOOR_FIXTURES).map(fixtureBounds)) {
+      const dx = Math.max(0, pod.minX - fixture.maxX, fixture.minX - pod.maxX);
+      const dz = Math.max(0, pod.minZ - fixture.maxZ, fixture.minZ - pod.maxZ);
+      expect(Math.hypot(dx, dz), 'perimeter props preserve the pod walkway').toBeGreaterThanOrEqual(2.5);
+    }
+    expect(WALL_THICKNESS).toBeGreaterThan(0);
+  });
+
+  it('spawns and starts the story/tour in the measured south band, looking north past the pods', () => {
+    const pieces = WORKSTATIONS.flatMap(({ center, flip }) => workstationPieces(center, flip, ROLES.partition));
+    const furniture = pieces.map(renderedBounds);
+    const southEdge = Math.max(...furniture.map(box => box.max.z));
+    expect(FLOOR.maxZ - southEdge).toBeCloseTo(6.52);
+    expect(FLOOR.maxZ - Math.max(...POD_BOUNDS.map(box => box.maxZ))).toBeCloseTo(6.495);
+    expect(SPAWN.position[1]).toBeGreaterThan(southEdge + 4);
+    expect(SPAWN.yaw).toBe(0);
+    const clearance = PLAYER_RADIUS + 0.5;
+    for (const rect of colliders) {
+      const dx = Math.max(rect.minX - SPAWN.position[0], 0, SPAWN.position[0] - rect.maxX);
+      const dz = Math.max(rect.minZ - SPAWN.position[1], 0, SPAWN.position[1] - rect.maxZ);
+      expect(Math.hypot(dx, dz)).toBeGreaterThanOrEqual(clearance);
+    }
+    for (const box of furniture) {
+      const dx = Math.max(box.min.x - SPAWN.position[0], 0, SPAWN.position[0] - box.max.x);
+      const dz = Math.max(box.min.z - SPAWN.position[1], 0, SPAWN.position[1] - box.max.z);
+      expect(Math.hypot(dx, dz)).toBeGreaterThanOrEqual(clearance);
+    }
+    expect(ROOM_SPAWNS.lobby).toEqual(SPAWN);
+    expect(tourRoute(OFFICE_ANCHORS.collections.position, OFFICE_ANCHORS[TOUR_ORDER[0]!].position).at(-1)).toEqual(SPAWN.position);
+    expect(storyCameraPose('lobby')).toEqual({ position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]], quaternion: [0, 0, 0, 1] });
+    const origin = new Vector3(SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]);
+    // Ticket-board bay is reserved here; also test the actual north-wall notice board.
+    for (const target of [new Vector3(0, 2.2, BUILDING.minZ + WALL_THICKNESS / 2 + 0.03),
+      new Vector3(LOBBY_BOARD_MOUNT.x, LOBBY_BOARD_MOUNT.y, LOBBY_BOARD_MOUNT.z)]) {
+      const ray = new Ray(origin, target.clone().sub(origin).normalize());
+      expect(sightBlocked(origin.x, origin.z, target.x, target.z)).toBe(false);
+      for (const box of furniture) {
+        const hit = ray.intersectBox(box, new Vector3());
+        expect(hit && hit.distanceTo(origin) < target.distanceTo(origin), `board sightline: ${box.min.toArray()}`).toBeFalsy();
+      }
+    }
+  });
+
+  it('has clear teleports, board sightlines and clear approaches to all twenty-four seats', () => {
     expect(insideAny(SPAWN.position, colliders, 1)).toBe(false);
     for (const spawn of Object.values(ROOM_SPAWNS)) {
-      expect(insideAny(spawn.position, colliders, PLAYER_RADIUS), String(spawn.position)).toBe(false);
+      expect(insideAny(spawn.position, colliders, CAMERA_CLEARANCE), String(spawn.position)).toBe(false);
       expect(spawn.position[0]).toBeGreaterThan(FLOOR.minX);
       expect(spawn.position[0]).toBeLessThan(FLOOR.maxX);
+      follow(SPAWN.position, spawn.position);
     }
     for (const id of ANCHOR_IDS) {
       const entry = roomEntry(id, colliders);
       expect(insideAny(entry.position, colliders, PLAYER_RADIUS), id).toBe(false);
       expect(sightBlocked(...SPAWN.position, ...OFFICE_ANCHORS[id].position), id).toBe(false);
     }
+    for (let i = 0; i < WORKSTATIONS.length; i++) follow(SPAWN.position, workstationApproach(i));
   });
 
-  it('walks from the entry through the full central aisle and around both sides of every pod', () => {
-    walk(ROOM_SPAWNS.lobby.position, [-7.2, 0]);
-    walk([-11, 0], [9, 0]);
-    walk([9, 0], [-11, 0]);
-    for (const podX of [-8, 0, 8]) {
-      const side = podX - 3;
-      walk([side, 0], [side, -6]);
-      walk([side, -6], [podX + 1.2, -6]);
-      walk([podX + 1.2, -6], [podX + 1.2, -5.3]);
-    }
+  it('walks both perimeter lanes and all grid aisles', () => {
+    for (const x of GRID_AISLES.x) walk([x, GRID_AISLES.z[0]!], [x, GRID_AISLES.z.at(-1)!]);
+    for (const z of GRID_AISLES.z) walk([GRID_AISLES.x[0]!, z], [GRID_AISLES.x.at(-1)!, z]);
   });
 
-  it('seats all seven roles at distinct pod workstations and walks every handoff route', () => {
-    const stations = FLOOR_AGENTS.map(id => HANDOFF_AGENTS[id].station);
-    expect(new Set(stations.map(String)).size).toBe(7);
-    for (const station of stations) {
-      expect(WORKSTATIONS.some(({ center: [x, z], flip }) => Math.hypot(station[0] - x, station[1] - z - flip * 1.6) < 1e-6)).toBe(true);
-      expect(insideAny(station, colliders, PLAYER_RADIUS)).toBe(false);
-    }
-    for (const from of [...FLOOR_AGENTS, 'human' as const]) for (const to of [...FLOOR_AGENTS, 'human' as const]) {
-      if (from === to) continue;
+  it('spreads seven agents and Dana across all six pods and walks every handoff', () => {
+    const ids = Object.keys(HANDOFF_AGENTS) as HandoffAgentId[];
+    const stations = ids.map(id => HANDOFF_AGENTS[id].station);
+    expect(new Set(stations.map(String)).size).toBe(8);
+    const seats = stations.map(station => WORKSTATIONS.findIndex((_, i) => String(workstationApproach(i)) === String(station)));
+    expect(seats.every(i => i >= 0)).toBe(true);
+    expect(new Set(seats.map(i => WORKSTATIONS[i]!.pod)).size).toBe(6);
+    for (const from of ids) for (const to of ids) {
       const route = handoffRoute(from, to);
+      expect(route.at(-1)).toEqual(handoffSpot(to));
       for (let i = 1; i < route.length; i++) walk(route[i - 1]!, route[i]!);
     }
   });
 
-  it('keeps foliage outdoors and away from the building, entry and workspace', () => {
-    expect(TREES.length).toBeGreaterThan(40);
-    for (const tree of TREES) expect(groundClear(tree.x, tree.z, tree.radius, 3.9)).toBe(true);
-    for (const bush of BUSHES) expect(groundClear(bush.x, bush.z, bush.size * 0.5, 0.4)).toBe(true);
+  it('walks every story/tour destination pair with 0.4 m camera clearance and unchanged eye height', () => {
+    for (const from of TOUR_ORDER) for (const to of TOUR_ORDER) {
+      const a = storyCameraPose(from).position, b = storyCameraPose(to).position;
+      expect(a[1]).toBe(EYE_HEIGHT);
+      follow([a[0], a[2]], [b[0], b[2]]);
+    }
   });
 
-  it('mounts evidence boards against solid exterior walls, with reachable approaches', () => {
-    expect(Math.abs(AUDIT_WALL.x - BUILDING.minX)).toBeLessThan(0.2);
-    expect(insideAny([AUDIT_WALL.x, AUDIT_WALL.z], wallColliders(), 0.15)).toBe(true);
-    walk([-9, 5.3], [AUDIT_WALL.x + 0.9, AUDIT_WALL.z]);
-    const [x, z] = WHITEBOARD_INTERACTION.position;
-    walk([-5, -6], [x, -6]);
-    walk([x, -6], [x, z]);
-    walk([-7.2, 0], [PAYLINK_KIOSK[0], PAYLINK_KIOSK[1] - 1]);
-    expect(OFFICE_PROP_INTERACTIONS.map(prop => prop.id)).not.toContain('clock');
+  it('reaches the wall boards, counter, vault and rack without crossing pods', () => {
+    follow(SPAWN.position, [AUDIT_WALL.x + 0.9, AUDIT_WALL.z]);
+    follow(SPAWN.position, WHITEBOARD_INTERACTION.position);
+    follow(SPAWN.position, [PAYLINK_KIOSK[0] + 1.2, PAYLINK_KIOSK[1]]);
+    follow(SPAWN.position, [LOBBY_BOARD_MOUNT.x, BUILDING.minZ + 2]);
+  });
+
+  it('keeps outdoor foliage clear of the larger footprint and centred entrance', () => {
+    for (const tree of TREES) expect(groundClear(tree.x, tree.z, tree.radius, 3.9)).toBe(true);
+    for (const bush of BUSHES) expect(groundClear(bush.x, bush.z, bush.size * 0.5, 0.4)).toBe(true);
   });
 });

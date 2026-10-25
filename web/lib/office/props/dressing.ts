@@ -1,7 +1,7 @@
 import type { Box } from '../play';
 import { OFFICE_ANCHORS, visibleRooms, type AnchorId, type OfficeSnapshot } from '../state';
 import { PALETTE, ROLES } from '../palette';
-import { BUILDING, CORRIDOR, CORRIDOR_Z, DOOR_OPENING_HEIGHT, SPACES, SPACE_IDS, WALL_THICKNESS, roomPad, roomPoint, type LayoutAnchorId } from '../layout';
+import { DOOR_OPENING_HEIGHT } from '../layout';
 
 /** Floor (x, z). */
 export type FloorPoint = readonly [x: number, z: number];
@@ -130,16 +130,8 @@ export function routePaint(routes: readonly DressingRoute[]): PaintSegment[] {
   return out;
 }
 
-const insidePad = (x: number, z: number, margin: number) => SPACE_IDS.some(id => {
-  if (SPACES[id].kind !== 'room') return false;
-  const pad = roomPad(SPACES[id].rect);
-  return x >= pad.minX - margin && x <= pad.maxX + margin && z >= pad.minZ - margin && z <= pad.maxZ + margin;
-});
-/** Centre height for floor paint: just above the aisle strip (top 0.02), or above a room pad (top 0.045) it touches. */
-export function paintY(segment: PaintSegment): number {
-  const touchesPad = [segment.from, segment.to].some(([x, z]) => insidePad(x, z, ROUTE_WIDTH / 2));
-  return (touchesPad ? 0.046 : 0.02) + ROUTE_THICKNESS / 2;
-}
+/** Floor paint clears the shared hall's floor/aisle, with no legacy room pads. */
+export function paintY(_segment: PaintSegment): number { return 0.02 + ROUTE_THICKNESS / 2; }
 
 export type DressingBoxKind = 'shelf' | 'book' | 'pot' | 'sign' | 'paint';
 /** A unit box placed in world space: rotationY about its centre, then position. */

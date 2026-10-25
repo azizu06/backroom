@@ -133,12 +133,15 @@ test('Overview quick menu: Talk opens the agent talk panel without walking', asy
   await expect(dialog).toHaveCount(0);
   await expect(alex).toBeFocused();
 
-  // A desk label opens the same menu with Talk to the seated agent and Details.
-  await page.locator('.desk-label', { hasText: 'Payables' }).click();
+  // The current overview room cell focuses Payables and offers the seated agent and Details.
+  await openMenu(page);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await page.getByRole('region', { name: 'Office overview' }).getByRole('button', { name: /^Payables/ }).click();
   const desk = page.getByRole('menu', { name: /Payables/ });
   await expect(desk.getByRole('menuitem', { name: /^Talk to Sam/ })).toBeVisible();
   await desk.getByRole('menuitem', { name: /^Details/ }).click();
   await expect(page.locator('.room-inspector')).toBeVisible();
+  await expect(page.locator('.room-inspector')).toContainText('Payables');
   expect(errors).toEqual([]);
 });
 

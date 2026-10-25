@@ -29,7 +29,7 @@ const snapshots: { name: string; snapshot: OfficeSnapshot }[] = [
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
 describe.each([false, true])('shared desk renderer (baked kit ready: %s)', kitReady => {
-  it.each(snapshots)('keeps twelve visible workstations matching collisions: $name', ({ snapshot }) => {
+  it.each(snapshots)('keeps twenty-four visible workstations matching collisions: $name', ({ snapshot }) => {
     batches.kitReady = kitReady;
     vi.stubGlobal('React', React);
     renderToStaticMarkup(React.createElement(Desks, { snapshot }));
@@ -42,10 +42,10 @@ describe.each([false, true])('shared desk renderer (baked kit ready: %s)', kitRe
     const seats = boxes.filter(piece => piece.size[0] === 0.65 && piece.size[1] === 0.14);
     const casings = boxes.filter(piece => Math.abs(piece.size[0] - 1.9) < 1e-6);
     const bakedDesks = kit.filter(piece => piece.node === 'desk');
-    expect(tops.length + bakedDesks.length).toBe(12);
-    expect(seats.length + kit.filter(piece => piece.node === 'chair').length).toBe(12);
-    expect(casings.length + kit.filter(piece => piece.node === 'monitor').length).toBe(12);
-    expect(screens).toHaveLength(12);
+    expect(tops.length + bakedDesks.length).toBe(24);
+    expect(seats.length + kit.filter(piece => piece.node === 'chair').length).toBe(24);
+    expect(casings.length + kit.filter(piece => piece.node === 'monitor').length).toBe(24);
+    expect(screens).toHaveLength(24);
 
     const centers = [...tops, ...bakedDesks].map(piece => [piece.at[0], piece.at[2]]);
     const colliders = officeColliders(visibleRooms(snapshot));

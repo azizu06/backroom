@@ -17,7 +17,8 @@ export const MOCK_HANDOFF_SCRIPT: readonly Step[] = [
 ];
 // Fixture voice keys from #133; production rows provide these directly.
 const voice = (role: HandoffRole) => role === 'intake' ? 'intake_sorter' : role === 'vendor' ? 'vendor_verifier' : role === 'collections' ? 'collections_caller' : role;
-export const MOCK_CYCLE_MS = 64_000;
+// Leave time for the longer walks across the square hall before the fixture repeats.
+export const MOCK_CYCLE_MS = 90_000;
 export function mockCycleRows(cycle: number, cycleStart: number, now: number, speed = 1): Handoff[] {
   const time = (offset: number) => cycleStart + offset / speed;
   return MOCK_HANDOFF_SCRIPT.flatMap((step, i) => {
