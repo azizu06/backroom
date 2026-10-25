@@ -60,7 +60,10 @@ export function SoundToggle({ snapshot }: { snapshot: OfficeSnapshot }) {
   }
 
   return <button type='button' className='office-sound-toggle' aria-pressed={enabled} onClick={toggle} disabled={!ready}
-    title='Quiet office sounds. After reload, sound resumes on your next click.'>
-    {enabled ? 'Sound on' : 'Sound off'}
+    aria-label={enabled ? 'Sound on' : 'Sound off'} title={`${enabled ? 'Sound on' : 'Sound off'} · quiet office sounds. After reload, sound resumes on your next click.`}>
+    <svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'>
+      <path d='M4 9.5h3.5L12 5.5v13l-4.5-4H4z' fill='currentColor' />
+      {enabled ? <path d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11' /> : <path d='M16 9.5l5 5M21 9.5l-5 5' />}
+    </svg>
   </button>;
 }

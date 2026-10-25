@@ -52,14 +52,14 @@ export function RealVsSim() {
   return (
     <section className="real-sim-page" aria-label="System status">
       <header className="real-sim-header">
-        <div><h1>System status</h1><p className="real-sim-intro">Current evidence for each service. Refreshes every 10 seconds.</p></div>
+        <div><h1>System Status</h1><p className="real-sim-intro">Current evidence for each service. Refreshes every 10 seconds.</p></div>
         <span className={`real-sim-status ${status?.llmEnabled ? 'real-sim-good' : status ? 'real-sim-warning' : ''}`}>{models}</span>
       </header>
       <div className="real-sim real-sim-detail">
       <div className="real-sim-groups">
         {(['real', 'sandbox'] as const).map(kind => (
           <section key={kind} aria-label={kind === 'real' ? 'Live services' : 'Partner services'}>
-            <h2>{kind === 'real' ? 'Live services' : 'Partner services'}</h2>
+            <h2>{kind === 'real' ? 'Live Services' : 'Partner Services'}</h2>
             <ul>
               {disclosureItems.filter(item => item.kind === kind).map(item => <DisclosureRow key={item.id} item={item} status={status} detailed />)}
             </ul>

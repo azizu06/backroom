@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeAudit, type OfficeSnapshot } from '../state';
-import { CLOCK_INTERACTION, OFFICE_PROP_INTERACTIONS, WHITEBOARD_INTERACTION, clockFace, msUntilNextMinute, propInteractions, whiteboardStats } from './index';
+import { OFFICE_PROP_INTERACTIONS, WHITEBOARD_INTERACTION, clockFace, msUntilNextMinute, propInteractions, whiteboardStats } from './index';
 import { PHONE_INTERACTION } from './phone';
 import { BUILDING } from '../layout';
 
@@ -34,12 +34,10 @@ describe('whiteboardStats', () => {
     expect(whiteboardStats(snapshot({ audit: [row('x', 'ESCALATE')] })).recent).toHaveLength(1);
   });
 
-  it('truncates long summaries with an ellipsis and keeps short ones intact', () => {
+  it('keeps complete summaries for measured wrapping on the board', () => {
     const long = 'Invoice 1042 · four installments requested → Dana for approval';
     const [recent] = whiteboardStats(snapshot({ audit: [row('1', 'ESCALATE', long)] })).recent;
-    expect(recent!.summary.length).toBeLessThanOrEqual(34);
-    expect(recent!.summary.endsWith('…')).toBe(true);
-    expect(long.startsWith(recent!.summary.slice(0, -1))).toBe(true);
+    expect(recent!.summary).toBe(long);
     const exact = 'x'.repeat(34);
     expect(whiteboardStats(snapshot({ audit: [row('1', 'ALLOW', exact)] })).recent[0]!.summary).toBe(exact);
   });
@@ -87,7 +85,7 @@ describe('office prop interactions', () => {
       expect(radius, id).toBeGreaterThan(0);
       if (id !== PHONE_INTERACTION.id) for (const [dx, dz] of desks) expect(Math.abs(x - dx) <= 2.25 / 2 && Math.abs(z - dz) <= 1.05 / 2, `${id} inside desk`).toBe(false);
     }
-    expect(PHONE_INTERACTION.position).toEqual([-8.15, -4.7]);
+    expect(PHONE_INTERACTION.position).toEqual([OFFICE_ANCHORS.collections.center[0] + 0.85, OFFICE_ANCHORS.collections.center[1] + 0.3]);
   });
 
   it('build deterministic, non-empty panels', () => {
@@ -99,22 +97,19 @@ describe('office prop interactions', () => {
       for (const entry of panel.rows) expect(entry.label).not.toBe('');
       expect(prop.panel(full, now)).toEqual(panel);
     }
-    expect(CLOCK_INTERACTION.panel(full, now).rows).toEqual([
-      { label: 'Time', value: '09:41' }, { label: 'Audit receipts', value: '2' },
-    ]);
     expect(WHITEBOARD_INTERACTION.panel(full, now).rows).toContainEqual({ label: 'Deny', value: '1' });
     const held = snapshot({ audit: [row('h', 'ESCALATE', 'four installments')] });
     expect(WHITEBOARD_INTERACTION.panel(held, now).rows).toContainEqual({ label: 'Hold', value: 'four installments' });
   });
 
-  it('hide the whiteboard without payables, the clock without lobby or collections and the Treasury door without treasury', () => {
+  it('hide the whiteboard without payables and the Treasury door without treasury', () => {
     // Desk monitors are covered in monitors.test.ts.
     const ids = (value: OfficeSnapshot) => propInteractions(value).map(prop => prop.id).filter(id => !id.startsWith('monitor:'));
-    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'clock', 'treasury-door', 'desk-phone']);
+    expect(ids(snapshot({ rooms: undefined }))).toEqual(['whiteboard', 'treasury-door', 'desk-phone']);
     expect(ids(withRooms())).toEqual([]);
     expect(ids(withRooms('payables'))).toEqual(['whiteboard']);
-    expect(ids(withRooms('lobby'))).toEqual(['clock']);
-    expect(ids(withRooms('collections', 'treasury'))).toEqual(['clock', 'treasury-door', 'desk-phone']);
+    expect(ids(withRooms('lobby'))).toEqual([]);
+    expect(ids(withRooms('collections', 'treasury'))).toEqual(['treasury-door', 'desk-phone']);
     expect(ids(withRooms('dana', 'treasury', 'vendor_onboarding'))).toEqual(['treasury-door']);
   });
 });

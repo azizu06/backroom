@@ -283,6 +283,5 @@ html body .office-shell .office-drawer {
 .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator']:is(:hover, :focus-visible) { opacity: 1 !important; }
 .office-shell[data-hud='diegetic'] .office-caption { animation: none; opacity: 0; }
 .office-shell:has(.overview-map) .office-caption { display: none; }
-@media (max-width: 760px) {
-  .office-shell[data-hud='diegetic'] .play-overview { right: auto !important; left: 8px; top: 46px !important; }
-}
+
+.overview-map-desk { position: absolute; background: var(--office-cream); border: 1px solid var(--office-navy); border-radius: 2px; }

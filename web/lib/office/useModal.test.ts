@@ -99,9 +99,9 @@ describe('office modal wiring', () => {
     expect(office).not.toMatch(/^<{7} |^={7}$|^>{7} /m);
     expect(office).toContain("from './PlaySplash'");
     expect(office).toContain('useOfficeHandoffs');
-    expect(office).toContain('Enter first person');
+    expect(office).toContain('Play (First Person)');
     expect(office).toContain('<OfficeHelp />');
-    expect(office).toContain("<SiteNav placement='office' />");
+    expect(office).toContain("aria-label='Office shortcuts'");
     expect(office).toContain('lookOnStart={lookOnEnter}');
   });
 });

@@ -1,11 +1,13 @@
-import { WING_COLLIDERS } from './wing';
 /**
  * Pure first-person "Play" helpers for the office view. Visual only: walking, looking and
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
-import { OPEN_DOORS, doorCollider, doorPosition, type DoorState } from './doors';
+import { OPEN_DOORS, type DoorState } from './doors';
 import { PLANT_SPOTS } from './furniture';
+import { AUDIT_WALL } from './props/auditWall';
+import { extraColliders } from './props/extraColliders';
+import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -14,10 +16,7 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
-import { BUILDING, LOBBY_BOARD, ROOM_SPAWNS, WALL_THICKNESS, roomPoint, wallColliders } from "./layout";
-import { roomPropColliders } from './room-props';
-import { SHARED_ROOM_COLLIDERS } from "./shared-rooms";
-import { PINGPONG_COLLIDER } from './pingpong/table';
+import { WORKSTATION_COLLIDERS, BUILDING, FLOOR_FIXTURES, fixtureBounds, LOBBY_BOARD_MOUNT, ROOM_SPAWNS, WALL_THICKNESS, wallColliders } from "./layout";
 import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
@@ -40,7 +39,7 @@ export const INTERACT_RANGE = 1.1;
 export const PICK_CONE = 0.35;
 export const PITCH_LIMIT = 1.2;
 export const LOOK_SENSITIVITY = 0.0025;
-/** Corridor outside the lobby, facing -z through the open Collections door toward its desk. */
+/** Centred south entry, facing north across the shared floor. */
 export const SPAWN = ROOM_SPAWNS.corridor;
 /** Walkable floor: inside the building's outer walls (./layout), whose faces are also colliders. */
 export const FLOOR = {
@@ -57,39 +56,41 @@ function box(x: number, z: number, width: number, depth: number): Box {
   return { minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 };
 }
 export const SERVER_ROOM_BOX: Box = box(SERVER_ROOM.position[0], SERVER_ROOM.position[1], SERVER_ROOM.size.width, SERVER_ROOM.size.depth);
-const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfies readonly AnchorId[];
 
 /**
  * Solid footprints mirroring the layout drawn in web/app/office/scene.tsx and its mounts (web/app/office/mounts:
- * WorldShell, SharedRooms, Desks, Doors, Plants, LobbyCounter, TreasuryVault). Walls come from ./layout, so a
- * doorway in the data is a gap here. The Treasury is locked: its doorway is closed by a barrier.
+ * WorldShell, Desks, Plants, LobbyCounter, TreasuryVault). Walls come from ./layout, so a
+ * workstation footprint and chair are shared with the rendered pods; only the vault itself is solid.
  * `extra` takes footprints of room geometry mounted elsewhere (e.g. a self-contained room at an anchor),
  * so new furniture becomes solid without editing this list.
  */
-export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
+export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], _doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...WING_COLLIDERS, ...roomPropColliders(rooms), PINGPONG_COLLIDER];
+  const boxes: Box[] = [...extra, ...wallColliders(), ...WORKSTATION_COLLIDERS];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
-    const [x, z] = OFFICE_ANCHORS[room].center;
-    // Dana's desk group is rotated by PI, which mirrors the chair offset.
-    const facing = room === "dana" ? -1 : 1;
-    boxes.push(box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * facing, z - 0.9 * facing, 0.65, 0.6));
     if (room === "collections") boxes.push(box(PHONE_STAND.x, PHONE_STAND.z, PHONE_STAND.width, PHONE_STAND.depth));
   }
-  for (const room of DOORS) {
-    if (!visible.has(room)) continue;
-    const [x, z] = doorPosition(room);
-    boxes.push(box(x - 0.72, z, 0.14, 0.18), box(x + 0.72, z, 0.14, 0.18));
-    const leaf = doorCollider(doors, room);
-    if (leaf) boxes.push(leaf);
-  }
   if (visible.has("treasury")) {
-    const [x, z] = TREASURY_DOOR;
-    boxes.push(box(...roomPoint("treasury", 0, 0.6), 1.8, 1.25), box(x - 0.72, z, 0.14, 0.18), box(x + 0.72, z, 0.14, 0.18));
+    // Include the frame and projecting handle in both procedural and opt-in kit modes.
+    boxes.push(fixtureBounds(FLOOR_FIXTURES.vault));
   }
-  if (visible.has("lobby")) boxes.push(box(LOBBY_BOARD[0], LOBBY_BOARD[1], 2, 0.15), box(PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1));
+  if (visible.has("lobby")) {
+    const board = LOBBY_BOARD_MOUNT;
+    boxes.push(box(board.x, board.z, board.width, board.depth), box(PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1),
+      box(AUDIT_WALL.x, AUDIT_WALL.z, 0.06, AUDIT_WALL.width));
+  }
+  if (visible.has("payables")) {
+    const wallFace = BUILDING.minZ + WALL_THICKNESS / 2;
+    boxes.push(box(WHITEBOARD_INTERACTION.position[0], wallFace + WHITEBOARD.depth / 2, WHITEBOARD.width, WHITEBOARD.depth));
+    // Marker tray projects farther than the frame, at eye/body height.
+    boxes.push(box(WHITEBOARD_INTERACTION.position[0], wallFace + WHITEBOARD.depth / 2 + 0.07, 1.1, 0.14));
+  }
   for (const [x, z] of PLANT_SPOTS) boxes.push(box(x, z, 1, 1));
+  boxes.push(...extraColliders);
+  if (!boxes.includes(SERVER_ROOM_BOX)) boxes.push(SERVER_ROOM_BOX);
+  if (visible.has('lobby')) boxes.push(fixtureBounds(FLOOR_FIXTURES.lampWest));
+  if (visible.has('treasury')) boxes.push(fixtureBounds(FLOOR_FIXTURES.lampEast));
   return boxes;
 }
 

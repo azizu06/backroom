@@ -21,7 +21,7 @@ export function BadgeEditor({ policy, busy, onSave }: {
   }
   return <form onSubmit={e => { e.preventDefault(); void onSave({ maxInstallments: Number(fields.maxInstallments), minFirstPct: Number(fields.minFirstPct), maxPlanDays: Number(fields.maxPlanDays), maxPaymentCents: Number(fields.maxPaymentCents) }); }}>
     <fieldset disabled={busy} className={styles.badges}>
-      <legend>Seat badges · v{policy.policyVersion}</legend>
+      <legend>Seat Badges · v{policy.policyVersion}</legend>
       <section className={styles.badge} aria-labelledby="collections-title">
         <h2 id="collections-title">Collections</h2>
         <div className={styles.fields}>
@@ -39,7 +39,7 @@ export function BadgeEditor({ policy, busy, onSave }: {
         {permissions('payables')}
       </section>
       <section className={styles.badge} aria-labelledby="vendor-title">
-        <h2 id="vendor-title">Vendor onboarding</h2>
+        <h2 id="vendor-title">Vendor Onboarding</h2>
         <p>May propose vendors and bank changes. Cannot approve or execute a bank change.</p>
         {permissions('vendor_onboarding')}
       </section>

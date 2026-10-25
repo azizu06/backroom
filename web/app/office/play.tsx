@@ -8,7 +8,7 @@ import { PerspectiveCamera } from '@react-three/drei';
 import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { interpolateIntroPose, playIntroProgress, type IntroPose } from '../../lib/office/play-intro';
-import { storyCameraPose } from '../../lib/office/story';
+import { interpolateStoryPose, storyCameraPose } from '../../lib/office/story';
 import type { MotionRegistry } from '../../lib/office/motion';
 import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, type FeelState } from '../../lib/office/playFeel';
 import { playOfficeCue } from '../../lib/office/sound-events';
@@ -125,7 +125,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
         from: { position: camera.current.position.toArray(), quaternion: camera.current.quaternion.toArray() },
       };
       const progress = playIntroProgress(now - storyMove.current.startedAt, reduced.current);
-      const pose = interpolateIntroPose(storyMove.current.from, storyCameraPose(story.anchor), progress);
+      const pose = interpolateStoryPose(storyMove.current.from, storyCameraPose(story.anchor), progress);
       camera.current.position.fromArray(pose.position);
       camera.current.quaternion.fromArray(pose.quaternion);
       camera.current.rotation.reorder('YXZ');

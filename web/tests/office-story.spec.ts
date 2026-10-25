@@ -7,8 +7,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     page.on('pageerror', error => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
     await page.goto('/office?view=overview');
-    await page.getByRole('button', { name: 'Backroom menu' }).click();
-    await page.getByRole('button', { name: 'Take the tour', exact: true }).click();
+    await page.getByRole('button', { name: 'Story mode', exact: true }).click();
     const story = page.getByRole('complementary', { name: 'Judge story mode' });
     const camera = page.getByTestId('story-camera');
     await expect(page.getByLabel('Office view')).toHaveValue('play');
@@ -66,4 +65,36 @@ test('story deep link starts in first person and Escape skips a moving tour', as
   await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
   await expect(page).toHaveURL(/\/office$/);
   expect(errors).toEqual([]);
+});
+
+test('agent cards show Ready until the preview emits an escalation, with pills in overview', async ({ page }) => {
+  // Observe the actual canvas paint as well as its snapshot mirror; a model-only update is insufficient.
+  await page.addInitScript(() => {
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
+      if (text === 'READY' || text === 'NEEDS YOU') document.documentElement.setAttribute(`data-painted-${text === 'READY' ? 'ready' : 'needs-you'}`, 'true');
+      if (maxWidth === undefined) fillText.call(this, text, x, y);
+      else fillText.call(this, text, x, y, maxWidth);
+    };
+  });
+  await page.goto('/office?view=overview');
+  const canvas = page.getByTestId('office-viewport').locator('canvas');
+  const alexTag = async () => {
+    const cards = JSON.parse(await canvas.getAttribute('data-agent-cards') ?? '[]') as { agentId: string; tag: string }[];
+    return cards.find(card => card.agentId === 'collections-clerk')?.tag;
+  };
+  await expect.poll(alexTag).toBe('READY');
+  await expect(page.locator('html')).toHaveAttribute('data-painted-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-agent-card-view', 'pill');
+  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await expect(canvas).toHaveAttribute('data-agent-card-view', 'full');
+  await expect.poll(alexTag).toBe('READY');
+  await page.getByLabel('Office view').selectOption({ label: 'Orbit camera' });
+  const menu = page.getByRole('button', { name: 'Backroom menu' });
+  await menu.click();
+  await page.getByRole('button', { name: 'Preview escalation', exact: true }).click();
+  await expect.poll(alexTag).toBe('NEEDS YOU');
+  await expect(page.locator('html')).toHaveAttribute('data-painted-needs-you', 'true');
+  const cards = JSON.parse(await canvas.getAttribute('data-agent-cards') ?? '[]') as { agentId: string; tag: string }[];
+  expect(cards.find(card => card.agentId === 'payables-clerk')?.tag).toBe('READY');
 });

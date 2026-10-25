@@ -29,7 +29,7 @@ describe('desk kit anchor mapping', () => {
     }
     // Dana's desk turns round, but its live screen (and so the casing) still faces +z.
     expect(map.get('dana:desk')?.rotationY).toBeCloseTo(Math.PI);
-    expect(map.get('dana:monitor')?.rotationY).toBe(0);
+    expect(map.get('dana:monitor')?.rotationY).toBe(Math.PI);
     const [dx, dz] = OFFICE_ANCHORS.dana.center;
     expect(map.get('dana:monitor')?.at).toEqual([dx - MONITOR_FACE.x, 0.91, dz - MONITOR_FACE.z]);
   });
@@ -43,26 +43,17 @@ describe('desk kit anchor mapping', () => {
     expect(placements.filter(p => p.node === 'desk' && p.room === 'collections').map(p => p.at)).toContainEqual([20, 0, 20]);
   });
 
-  it('maps shelves, floor plants and the Treasury vault, scaled to the procedural footprints', () => {
+  it('retains the Treasury vault and omits detached floor dressing', () => {
     const map = byId();
-    const shelf = DRESSING.shelves.findIndex(s => s.room === 'collections');
-    expect(map.get(`collections:shelf:${shelf}`)).toMatchObject({ node: 'bookshelf', scale: [DRESSING.shelves[shelf]!.width / KIT_SHELF_WIDTH, 1, 1] });
-    const plant = DRESSING.plants.findIndex(p => p.room === 'treasury');
-    expect(map.get(`treasury:floor-plant:${plant}`)).toMatchObject({ node: 'plant_large', scale: [0.6, 0.6, 0.6] });
+    expect(kitSources().shelves).toEqual([]);
+    expect(kitSources().plants).toEqual([]);
     expect(map.get('treasury:vault-body')?.at).toEqual([TREASURY_VAULT.x, 0, TREASURY_VAULT.z]);
     expect(map.get('treasury:vault-door')?.at).toEqual([TREASURY_VAULT.x, 0, TREASURY_VAULT.z - TREASURY_VAULT.depth / 2]);
   });
 
-  it('maps room details onto their kit props at their contact points', () => {
-    const map = byId();
-    expect(map.get('collections:rug')).toMatchObject({ node: 'rug', scale: [0.65, 1, 1.2] });
-    expect(map.get('collections:mug')).toMatchObject({ node: 'mug' });
-    expect(map.get('collections:mug')?.at[1]).toBeCloseTo(0.91);
-    expect(map.get('collections:papers')?.node).toBe('tray');
-    expect(map.get('collections:lamp')?.node).toBe('desk_lamp');
-    expect(map.get('collections:art')?.node).toBe('wall_art');
-    expect(map.get('collections:books')).toBeUndefined();
-    expect(map.get('treasury:plant')?.node).toBe('plant_medium');
+  it('never brings partition art or detached room props back in baked mode', () => {
+    expect(kitSources().details).toEqual([]);
+    expect(deskKitPlacements(ALL).every(piece => piece.source === 'desk' || piece.source === 'treasury-vault')).toBe(true);
   });
 
   it('leaves the baked lobby and hidden rooms alone', () => {

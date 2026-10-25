@@ -34,7 +34,7 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   await lobby.getByRole('button', { name: 'Open audit wall' }).click();
   await expect(lobby.getByText(/^Chain verified · \d+ entries$/)).toBeVisible();
   expect(audit).toContain('/api/audit/entries');
-  await expect(lobby.getByRole('heading', { name: 'Audit wall', exact: true, level: 3 })).toBeVisible();
+  await expect(lobby.getByRole('heading', { name: 'Audit Wall', exact: true, level: 3 })).toBeVisible();
   await expect(lobby.locator('.audit-why')).toHaveCount(0);
   const ask = lobby.getByRole('region', { name: 'Ask why by voice' });
   await expect(ask.getByRole('button', { name: 'Hold to ask why' })).toBeVisible();

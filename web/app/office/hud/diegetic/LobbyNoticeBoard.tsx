@@ -3,21 +3,21 @@
 import { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
 import { PlaneGeometry } from 'three';
-import { NOTICE_DECISION_COLORS, NOTICE_DECISION_LABELS, noticeBoard, noticeBoardKey, type NoticeBoard } from '../../../../lib/office/hud-diegetic';
-import { canvasTextLines } from '../../../../lib/office/props/readability';
+import { NOTICE_DECISION_COLORS, NOTICE_DECISION_LABELS, canvasTextLines, noticeBoard, noticeBoardKey, type NoticeBoard } from '../../../../lib/office/hud-diegetic';
 import { PALETTE, ROLES } from '../../../../lib/office/palette';
 import { visibleRooms } from '../../../../lib/office/state';
 import { LOBBY_BOARD } from '../../../../lib/office/layout';
 import { PROP_FONT, useCanvasTexture } from '../../props/useCanvasTexture';
 import type { SceneMountProps } from '../../mounts/types';
 import { usePlayCamera } from './usePlayCamera';
+import { LOBBY_BOARD_MOUNT } from '../../../../lib/office/layout';
 
-// Painted onto the face of the lobby decision board (LobbyCounter: 2 x 1.45 at LOBBY_BOARD, y 1.25, facing into the lobby).
-const BOARD = { x: LOBBY_BOARD[0], y: 1.25, z: LOBBY_BOARD[1] + 0.075 + 0.045, width: 1.9, height: 1.36 } as const;
+// Same north-wall support as LobbyCounter, painted on its inward (+z) face.
+const BOARD = { ...LOBBY_BOARD_MOUNT, z: LOBBY_BOARD_MOUNT.z + LOBBY_BOARD_MOUNT.faceOffset, width: 1.9, height: 1.36 };
 const TEX_W = 760, TEX_H = Math.round(TEX_W * BOARD.height / BOARD.width);
 const FACE = new PlaneGeometry(BOARD.width, BOARD.height);
 
-function drawBoard(ctx: CanvasRenderingContext2D, board: NoticeBoard) {
+export function drawBoard(ctx: CanvasRenderingContext2D, board: NoticeBoard) {
   const measure = (text: string) => ctx.measureText(text).width;
   ctx.fillStyle = ROLES.frame;
   ctx.fillRect(0, 0, TEX_W, TEX_H);
@@ -60,7 +60,7 @@ function drawBoard(ctx: CanvasRenderingContext2D, board: NoticeBoard) {
     ctx.fillText('Each decision lands here and on the audit wall.', 28, 332);
   }
   board.happened.forEach((entry, i) => {
-    const y = 268 + i * 66;
+    const y = 258 + i * 60;
     ctx.fillStyle = NOTICE_DECISION_COLORS[entry.decision];
     ctx.beginPath(); ctx.roundRect(28, y + 8, 92, 40, 8); ctx.fill();
     ctx.fillStyle = ROLES.text;
@@ -70,7 +70,7 @@ function drawBoard(ctx: CanvasRenderingContext2D, board: NoticeBoard) {
     ctx.textAlign = 'left';
     ctx.fillStyle = PALETTE.cream;
     ctx.font = `500 25px ${PROP_FONT}`;
-    ctx.fillText(canvasTextLines(entry.text, measure, TEX_W - 172, 1)[0] ?? '', 138, y + 37);
+    canvasTextLines(entry.text, measure, TEX_W - 172, 2).forEach((text, line) => ctx.fillText(text, 138, y + 25 + line * 28));
   });
   ctx.fillStyle = PALETTE.lavender;
   ctx.font = `500 19px ${PROP_FONT}`;
@@ -87,7 +87,7 @@ function Board({ snapshot }: SceneMountProps) {
     canvas.dataset.noticeBoard = `${board.stats.map(stat => `${stat.label} ${stat.value}`).join(' · ')} | ${board.happened.map(entry => `${entry.decision} ${entry.text}`).join(' · ') || board.empty}`;
     return () => { delete canvas.dataset.noticeBoard; };
   }, [canvas, board]);
-  return <mesh name='hud-notice-board' geometry={FACE} position={[BOARD.x, BOARD.y, BOARD.z]} rotation={[0, 0, 0]}>
+  return <mesh name='hud-notice-board' geometry={FACE} position={[BOARD.x, BOARD.y, BOARD.z]}>
     <meshBasicMaterial map={texture} toneMapped={false} />
   </mesh>;
 }

@@ -22,7 +22,7 @@ export function LlmToggle({ llmEnabled, onToggle }: {
   return <span>
     <button type="button" role="switch" aria-label="Enable language models" aria-checked={llmEnabled ?? false}
       disabled={pending || llmEnabled === null} onClick={toggle}>
-      {pending ? 'Updating…' : llmEnabled === null ? 'LLM status unavailable' : llmEnabled ? 'LLM ON' : 'LLM OFF'}
+      {pending ? 'Updating…' : llmEnabled === null ? 'LLM Status Unavailable' : llmEnabled ? 'LLM ON' : 'LLM OFF'}
     </button>
     {error && <span role="alert">{error}</span>}
   </span>;
