@@ -9,6 +9,7 @@ import type { PrecallEvidence } from '../calls/precall';
 import type { CallRefusal, DemoCollectionsPlanner } from './agents';
 
 const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
+const LEAD_CRS_TEST_IDENTITY_ID = 1;
 /** Safe server-only observation for the real-vs-sim route; never initiates a probe. */
 export const getDemoHostServices = () => root.backroomDemoServiceStatus?.() ?? null;
 export function installDemoServiceStatus(read: () => DemoStatus['services']) { root.backroomDemoServiceStatus = read; }
@@ -61,7 +62,10 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
         (async () => {
           try {
             // Exact sponsor persona P01. These are public-record/fraud checks, never OFAC/business credit.
-            evidence.crs = await Promise.all([crs.getPublicRecords(1), crs.getFraudRisk(1)]);
+            evidence.crs = await Promise.all([
+              crs.getPublicRecords(LEAD_CRS_TEST_IDENTITY_ID),
+              crs.getFraudRisk(LEAD_CRS_TEST_IDENTITY_ID),
+            ]);
             crsStatus = 'complete';
           } catch { crsStatus = 'unavailable'; }
         })(),
@@ -131,7 +135,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       await prepare();
       await state.appendAudit({ ts: Date.now(), actor: 'code', seat: 'collections', action: 'demo_pre_call_evidence',
         ruleIds: [], policyVersion: (await state.getPolicy()).policyVersion, refs: ['1042'], route: 'code', latencyMs: 0, costUsd: 0,
-        inputs: { noDial: true, syntheticCaller: true, crsLabel: realCrs ? 'SANDBOX: test identity #1' : 'FAKE: test identity #1',
+        inputs: { noDial: true, syntheticCaller: true,
+          crsLabel: `${realCrs ? 'SANDBOX' : 'FAKE'}: test identity #${LEAD_CRS_TEST_IDENTITY_ID}`,
           apify, crsStatus, ...evidence, ofac: 'unknown', businessCredit: 'unavailable' } });
       const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
       const client = northfield.clients.find(row => row.id === invoice.clientId)!;
@@ -149,7 +154,7 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       }
       // Scripted pre-call only: synthetic consent and an explicitly logged weekend override.
       // The separate preverified gateway rehearsal is not evidence of a live dial permit.
-      preCallInput = { clientId: client.id, invoiceId: invoice.id, testIdentityId: 7,
+      preCallInput = { clientId: client.id, invoiceId: invoice.id, testIdentityId: LEAD_CRS_TEST_IDENTITY_ID,
         company: APIFY_DEMO_COMPANY, context: { policy: await state.getPolicy(),
           client: { ...client, type: client.type, localWeekday: 6, localHour: 11 },
           demoOverride: { visible: true, logged: true }, signals: {} } };
