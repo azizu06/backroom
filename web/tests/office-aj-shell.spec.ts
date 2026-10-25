@@ -2,9 +2,13 @@ import { mkdir } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { OFFICE_ANCHORS } from '../lib/office/state';
 import { INITIAL_FOLDER } from '../lib/office/folder';
-import { sightBlocked } from '../lib/office/layout';
+import { BUILDING, LOBBY_KIOSK, ROOM_SPAWNS, sightBlocked } from '../lib/office/layout';
 import { SPAWN } from '../lib/office/play';
+import { AUDIT_WALL } from '../lib/office/props/auditWall';
+import { MONITOR_FACE } from '../lib/office/props/monitors';
+import { WHITEBOARD_INTERACTION } from '../lib/office/props/whiteboard';
 import { PLAY_TARGET_LIST } from '../lib/office/targets';
+import { INBOX_TRAY } from '../lib/office/targets/inbox';
 
 // AJ shell + BR-OPEN-OFFICE. Run against the refreshed integrated build.
 const out = '/tmp/backrooms-aj-current';
@@ -217,6 +221,174 @@ test('source Rooms picker, single topbar, sheets, Info and light/dark survive de
   await expect(page).toHaveURL(/\/operator(?:\?|$)/);
   await page.goto('/office?view=overview');
   await overview(page);
+  expect(errors).toEqual([]);
+});
+
+test('clipping walkthrough: wall faces, financial panels, desk supports and clear walking routes', async ({ page }) => {
+  test.setTimeout(180_000);
+  // Run after these tests are ported to BR-OPEN-OFFICE and its current geometry is compiled.
+  // QA's older layout imports and the old server are not evidence about the corrected scene.
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const directory = '/tmp/backrooms-clipping-current';
+  await mkdir(directory, { recursive: true });
+  const shot = async (name: string) => {
+    const path = `${directory}/${test.info().project.name}-${name}.png`;
+    await page.screenshot({ path });
+    await test.info().attach(name, { path, contentType: 'image/png' });
+  };
+  const pose = () => surface(page).evaluate(element => {
+    const { playerX, playerZ, playerYaw } = (element as HTMLElement).dataset;
+    if (playerX === undefined || playerZ === undefined || playerYaw === undefined) throw new Error('Play pose unavailable');
+    return { x: Number(playerX), z: Number(playerZ), yaw: Number(playerYaw) };
+  });
+  const face = async (x: number, z: number) => {
+    await surface(page).focus();
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const p = await pose();
+      const raw = Math.atan2(-(x - p.x), -(z - p.z)) - p.yaw;
+      const diff = Math.atan2(Math.sin(raw), Math.cos(raw));
+      if (Math.abs(diff) < 0.08) return;
+      const key = diff > 0 ? 'ArrowLeft' : 'ArrowRight';
+      await page.keyboard.down(key);
+      try {
+        await page.waitForFunction(({ x, z, yaw, diff }) => {
+          const el = document.querySelector<HTMLElement>('[data-player-yaw]');
+          if (!el) return false;
+          const next = Number(el.dataset.playerYaw);
+          if (Math.abs(diff) <= 0.35) return next !== yaw;
+          const raw = Math.atan2(-(x - Number(el.dataset.playerX)), -(z - Number(el.dataset.playerZ))) - next;
+          const remaining = Math.atan2(Math.sin(raw), Math.cos(raw));
+          return Math.abs(remaining) < 0.12 || Math.sign(remaining) !== Math.sign(diff);
+        }, { x, z, yaw: p.yaw, diff }, { polling: 'raf', timeout: 8_000 });
+      } finally { await page.keyboard.up(key); }
+    }
+    throw new Error(`Could not face (${x}, ${z})`);
+  };
+  const walk = async (x: number, z: number) => {
+    // Stop on a rendered position, never on an assumed duration or a scripted teleport.
+    for (let leg = 0; leg < 12; leg++) {
+      const p = await pose();
+      if (Math.hypot(x - p.x, z - p.z) <= 0.2) return;
+      await face(x, z);
+      await page.keyboard.down('w');
+      try {
+        await page.waitForFunction(({ x, z }) => {
+          const el = document.querySelector<HTMLElement>('[data-player-yaw]');
+          if (!el) return false;
+          const dx = x - Number(el.dataset.playerX), dz = z - Number(el.dataset.playerZ);
+          const raw = Math.atan2(-dx, -dz) - Number(el.dataset.playerYaw);
+          return Math.hypot(dx, dz) <= 0.2 || Math.abs(Math.atan2(Math.sin(raw), Math.cos(raw))) > 0.2;
+        }, { x, z }, { polling: 'raf', timeout: 10_000 });
+      } finally { await page.keyboard.up('w'); }
+    }
+    const p = await pose();
+    expect(Math.hypot(x - p.x, z - p.z), `walk reached (${x}, ${z})`).toBeLessThanOrEqual(0.2);
+  };
+  const enter = async (x: number, z: number) => {
+    await page.goto(`/office?view=overview&playSpawn=${x},${z}`);
+    await page.getByLabel('Office view').selectOption('play');
+    await ready(page);
+    // Reject the spawn hook's silent fallback if a viewpoint is inside furniture.
+    await expect(surface(page)).toHaveAttribute('data-player-x', x.toFixed(3));
+    await expect(surface(page)).toHaveAttribute('data-player-z', z.toFixed(3));
+    await page.evaluate(() => document.exitPointerLock?.());
+    await surface(page).focus();
+  };
+
+  await test.step('overview and opposite west exterior face; audit and inbox sheets', async () => {
+    await page.goto('/office?view=overview');
+    await overview(page);
+    const canvas = page.getByTestId('office-viewport').locator('canvas');
+    await expect(canvas).toHaveAttribute('aria-description', /Preview feed: no audit entries/);
+    await shot('overview-interior');
+    await page.getByLabel('Office view').selectOption('walk'); // Orbit is disabled in the fixed camera.
+    const label = page.locator('.scene-label').first();
+    await expect(label).toHaveAttribute('style', /translate/);
+    const beforeOrbit = await label.evaluate(el => (el as HTMLElement).style.transform);
+    const box = (await canvas.boundingBox())!;
+    // Orbit to the permitted west side: mounting-wall backs must not expose their panels.
+    await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.7);
+    await page.mouse.down();
+    try { await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.7, { steps: 20 }); }
+    finally { await page.mouse.up(); }
+    await expect.poll(() => label.evaluate(el => (el as HTMLElement).style.transform)).not.toBe(beforeOrbit);
+    await expect(page.locator('.overview-menu')).toHaveCount(0); // A drag must not pick a room.
+    // The existing azimuth clamp exposes the west exterior, but cannot reach the north exterior.
+    await shot('overview-west-exterior');
+    const sidebar = page.locator('.office-sidebar');
+    await sidebar.getByRole('button', { name: 'Audit Wall', exact: true }).click();
+    const audit = page.getByRole('dialog', { name: 'Audit Wall', exact: true });
+    await expect(audit.locator('#office-audit-wall')).toBeVisible();
+    await reachable(audit.getByRole('textbox', { name: 'Question', exact: true }));
+    await shot('audit-panel');
+    await audit.getByRole('button', { name: 'Close Audit Wall', exact: true }).click();
+    await sidebar.getByRole('button', { name: /^Inbox ·/ }).click();
+    const inbox = page.getByRole('dialog', { name: /^Inbox ·/ });
+    await expect(inbox).toContainText('Preview contains 3 fixture items');
+    await expect(inbox.getByRole('link', { name: 'Open the judge inbox' })).toHaveAttribute('href', '/inbox');
+    await shot('inbox-panel');
+    await page.keyboard.press('Escape');
+    await expect(inbox).toHaveCount(0);
+  });
+
+  await test.step('entry aisle and interior audit mounting face', async () => {
+    const [x, z] = ROOM_SPAWNS.lobby.position;
+    await enter(x, z);
+    await shot('entry-before-walk');
+    await walk(x, z - 1);
+    await shot('entry-after-walk');
+    const normal = [Math.sin(AUDIT_WALL.rotationY), Math.cos(AUDIT_WALL.rotationY)];
+    await enter(AUDIT_WALL.x + normal[0]! * 1.65, AUDIT_WALL.z + normal[1]! * 1.65);
+    await face(AUDIT_WALL.x, AUDIT_WALL.z);
+    await expect(page.getByTestId('office-viewport').locator('canvas')).toHaveAttribute('data-audit-wall', '');
+    await shot('audit-interior-face');
+    // The separate lobby counter/label also needs support on its rear side.
+    const [counterX, counterZ] = LOBBY_KIOSK;
+    for (const side of [1, -1]) {
+      await enter(counterX, counterZ + side * 1.6);
+      await face(counterX, counterZ);
+      await shot(side === 1 ? 'lobby-counter-front' : 'lobby-counter-rear');
+    }
+  });
+
+  await test.step('walk to inbox; open and close its financial readout; desk side support', async () => {
+    const [x, z] = INBOX_TRAY;
+    await enter(x, z + 1.7);
+    await walk(x, z + 1);
+    await face(x, z);
+    await expect(page.locator('.play-prompt')).toHaveText('E · Open inbox tray · 3 in inbox');
+    await shot('inbox-desk-front');
+    await page.keyboard.press('e');
+    const panel = page.getByRole('dialog', { name: 'Inbox tray', exact: true });
+    await expect(panel).toContainText('3 in inbox');
+    await expect(panel).toContainText('3 intake items are counted');
+    await expect(panel.getByRole('link', { name: 'Open the full inbox tray' })).toHaveAttribute('href', '/inbox');
+    await shot('inbox-play-panel');
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(surface(page)).toBeFocused();
+    const [deskX, deskZ] = OFFICE_ANCHORS.payables.center;
+    await enter(deskX - 2.2, deskZ + 0.7);
+    await face(deskX + MONITOR_FACE.x, deskZ + MONITOR_FACE.z);
+    await shot('desk-monitor-chair-side');
+  });
+
+  await test.step('whiteboard face and the clear north aisle behind the workstation pods', async () => {
+    const [x, z] = WHITEBOARD_INTERACTION.position;
+    await enter(x, z + 1.25);
+    await face(x, BUILDING.minZ);
+    await shot('whiteboard-interior-face');
+    // These boards are view-only. Do not invent an E prompt or a production camera hook.
+    const [deskX, deskZ] = OFFICE_ANCHORS.collections.center;
+    await walk(deskX, z + 1.25);
+    await face(deskX + MONITOR_FACE.x, deskZ + MONITOR_FACE.z);
+    await shot('pods-monitor-chair-north-aisle');
+    await page.getByRole('button', { name: 'Exit Play', exact: true }).click();
+    await overview(page);
+  });
+  await expect(page.getByTestId('office-viewport').locator('.floor-plan')).toHaveCount(0);
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

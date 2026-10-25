@@ -1,4 +1,4 @@
-import { LOBBY_BOARD } from './layout';
+import { LOBBY_BOARD_MOUNT } from './layout';
 
 /** True for `?art=baked`. Pure so it is testable without the scene. */
 export function bakedArtRequested(search: string): boolean {
@@ -32,7 +32,7 @@ export function bakedReplacesPartition(baked: boolean, overview: boolean, x: num
  * ride on it). In first person under baked art it stands in front of the baked west wall and blocks the window view,
  * while the audit wall mount on that wall shows the same receipts, so it hides there; the overview keeps it.
  */
-export const LOBBY_AUDIT_BOARD = { x: LOBBY_BOARD[0], z: LOBBY_BOARD[1], width: 2, depth: 0.15 } as const;
+export const LOBBY_AUDIT_BOARD = LOBBY_BOARD_MOUNT;
 
 /** True when the baked lobby replaces the procedural audit board (baked art on, first-person walls drawn). */
 export function bakedReplacesAuditBoard(baked: boolean, overview: boolean): boolean {

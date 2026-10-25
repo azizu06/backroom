@@ -7,7 +7,7 @@ import type { OfficeSnapshot } from '../../../lib/office/state';
 import { WHITEBOARD, WHITEBOARD_INTERACTION, whiteboardStats, type WhiteboardStats } from '../../../lib/office/props/whiteboard';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { StaticBoxes } from '../mounts/StaticGeometry';
-import { BUILDING } from '../../../lib/office/layout';
+import { BUILDING, WALL_THICKNESS } from '../../../lib/office/layout';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 const DECISION_COLORS = { ALLOW: PALETTE.mint, DENY: ROLES.deny, ESCALATE: PALETTE.butter, RECORDED: PALETTE.lavender } as const;
@@ -71,9 +71,9 @@ function Board({ snapshot }: { snapshot: OfficeSnapshot }) {
   const { allow, deny, escalate, inbox, recent } = stats;
   const key = JSON.stringify({ allow, deny, escalate, inbox, recent });
   const texture = useCanvasTexture(TEX_W, TEX_H, ctx => drawBoard(ctx, stats), [key]);
-  return <group name='prop:whiteboard' position={[WHITEBOARD_INTERACTION.position[0], 0, BUILDING.minZ + 0.12]}>
+  return <group name='prop:whiteboard' position={[WHITEBOARD_INTERACTION.position[0], 0, BUILDING.minZ + WALL_THICKNESS / 2 + WHITEBOARD.depth / 2]}>
     <mesh position={[0, BOTTOM + HEIGHT / 2, 0]} castShadow receiveShadow>
-      <boxGeometry args={[WIDTH, HEIGHT, 0.06]} /><meshStandardMaterial color={ROLES.frame} roughness={0.8} />
+      <boxGeometry args={[WIDTH, HEIGHT, WHITEBOARD.depth]} /><meshStandardMaterial color={ROLES.frame} roughness={0.8} />
     </mesh>
     <mesh position={[0, BOTTOM + HEIGHT / 2, 0.031]} receiveShadow>
       <planeGeometry args={[FACE_W, FACE_H]} />

@@ -30,9 +30,9 @@ describe('merged static geometry', () => {
     geometry.dispose();
   });
 
-  it('bakes all eight desk parts without dropping faces', () => {
+  it('bakes all ten desk and supported chair parts without dropping faces', () => {
     const geometry = mergeBoxes(deskPieces('dana'));
-    expect(geometry.index!.count / 3).toBe(8 * 12);
+    expect(geometry.index!.count / 3).toBe(10 * 12);
     expect(geometry.boundingSphere!.radius).toBeGreaterThan(1);
     geometry.dispose();
   });

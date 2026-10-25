@@ -4,7 +4,10 @@
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
 import { OPEN_DOORS, type DoorState } from './doors';
-import { PLANT_SPOTS } from './furniture';
+import { CHAIR_FOOTPRINT, PLANT_SPOTS } from './furniture';
+import { TREASURY_VAULT } from './deskkit';
+import { AUDIT_WALL } from './props/auditWall';
+import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -13,7 +16,7 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
-import { WORKSTATIONS, BUILDING, LOBBY_BOARD, ROOM_SPAWNS, WALL_THICKNESS, roomPoint, wallColliders } from "./layout";
+import { WORKSTATIONS, BUILDING, LOBBY_BOARD_MOUNT, ROOM_SPAWNS, WALL_THICKNESS, wallColliders } from "./layout";
 import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
@@ -63,15 +66,27 @@ export const SERVER_ROOM_BOX: Box = box(SERVER_ROOM.position[0], SERVER_ROOM.pos
  */
 export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], _doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra, ...wallColliders(), ...WORKSTATIONS.flatMap(({ center: [x, z], flip }) => [box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + 0.05 * flip, z + 0.9 * flip, 0.65, 0.6)])];
+  const chair = CHAIR_FOOTPRINT;
+  const boxes: Box[] = [...extra, ...wallColliders(), ...WORKSTATIONS.flatMap(({ center: [x, z], flip }) => [box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + chair.x * flip, z + chair.z * flip, chair.width, chair.depth)])];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
     if (room === "collections") boxes.push(box(PHONE_STAND.x, PHONE_STAND.z, PHONE_STAND.width, PHONE_STAND.depth));
   }
   if (visible.has("treasury")) {
-    boxes.push(box(...roomPoint("treasury", 0, 0.6), 1.8, 1.25));
+    // Include the frame and projecting handle in both procedural and opt-in kit modes.
+    boxes.push(box(TREASURY_VAULT.x, TREASURY_VAULT.z - 0.065, 1.84, 1.42));
   }
-  if (visible.has("lobby")) boxes.push(box(LOBBY_BOARD[0], LOBBY_BOARD[1], 2, 0.15), box(PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1));
+  if (visible.has("lobby")) {
+    const board = LOBBY_BOARD_MOUNT;
+    boxes.push(box(board.x, board.z, board.width, board.depth), box(PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1),
+      box(AUDIT_WALL.x, AUDIT_WALL.z, 0.06, AUDIT_WALL.width));
+  }
+  if (visible.has("payables")) {
+    const wallFace = BUILDING.minZ + WALL_THICKNESS / 2;
+    boxes.push(box(WHITEBOARD_INTERACTION.position[0], wallFace + WHITEBOARD.depth / 2, WHITEBOARD.width, WHITEBOARD.depth));
+    // Marker tray projects farther than the frame, at eye/body height.
+    boxes.push(box(WHITEBOARD_INTERACTION.position[0], wallFace + WHITEBOARD.depth / 2 + 0.07, 1.1, 0.14));
+  }
   for (const [x, z] of PLANT_SPOTS) boxes.push(box(x, z, 1, 1));
   return boxes;
 }

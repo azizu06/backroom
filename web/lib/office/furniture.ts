@@ -11,6 +11,8 @@ export interface FurniturePiece {
   rotation?: [number, number, number];
 }
 export type DeskRoom = typeof DESKS[number];
+/** Encloses the procedural chair and opt-in kit chair, including its curved back. */
+export const CHAIR_FOOTPRINT = { x: 0.05, z: 0.9, width: 0.65, depth: 0.65 } as const;
 
 /** Business desks use the same outward-facing furniture as every seat in their pod. */
 export function deskPieces(room: DeskRoom): FurniturePiece[] {
@@ -30,6 +32,8 @@ export function workstationPieces([x, z]: Vec2, flip: 1 | -1, color: string): Fu
     part([0.65, 0.95, 0.1], [0.4, 0.06, 0.5], ROLES.rug, -0.12),
     part([0.05, 0.45, 0.9], [0.65, 0.14, 0.6], color),
     part([0.05, 0.77, 1.14], [0.65, 0.65, 0.12], color),
+    part([0.05, 0.19, 0.9], [0.08, 0.38, 0.08], ROLES.frame),
+    part([0.05, 0.025, 0.9], [0.6, 0.05, 0.55], ROLES.frame),
   ];
 }
 

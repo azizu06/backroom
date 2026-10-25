@@ -248,7 +248,7 @@ describe("targets", () => {
     expect(found).toEqual({ kind: "agent", id: "collections-clerk" });
     // Found while still walking: the Collections desk stops the player further on.
     const stop = walk(SPAWN.position, [0, -1], 6);
-    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.collections.center[1] + 0.9 + 0.3 + PLAYER_RADIUS, 2);
+    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.collections.center[1] + 0.9 + 0.325 + PLAYER_RADIUS, 2);
     expect(position[1]).toBeGreaterThan(stop[1] + 0.5);
     // Alex is not solid, so you can walk right up to him and keep the prompt.
     const alexAt = OFFICE_ANCHORS.collections.position;
@@ -293,7 +293,7 @@ describe("targets", () => {
     const [tx, tz] = TREASURY_DOOR;
     expect(pickTarget([tx, tz - 0.7], Math.PI, visible)).toEqual({ kind: "treasury" });
     const stop = walk([tx, tz - 0.7], [0, 1], 2);
-    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.treasury.center[1] + 0.6 - 0.625 - PLAYER_RADIUS, 2);
+    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.treasury.center[1] + 0.6 - 0.775 - PLAYER_RADIUS, 2);
     expect(pickTarget(stop, Math.PI, visible)).toEqual({ kind: "treasury" });
     expect(pickTarget([tx, tz + 1.85], 0, visible)).toBeNull();
     expect(pickTarget([tx, tz - 2.15], Math.PI, visible)).toBeNull();

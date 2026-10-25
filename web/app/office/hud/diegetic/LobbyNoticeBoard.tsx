@@ -10,9 +10,10 @@ import { visibleRooms } from '../../../../lib/office/state';
 import { PROP_FONT, useCanvasTexture } from '../../props/useCanvasTexture';
 import type { SceneMountProps } from '../../mounts/types';
 import { usePlayCamera } from './usePlayCamera';
+import { LOBBY_BOARD_MOUNT } from '../../../../lib/office/layout';
 
-// Painted onto the face of the lobby counter board (LobbyCounter: 2 x 1.45 at [-5.9, 1.25, 3.9], facing the spawn).
-const BOARD = { x: -5.9, y: 1.25, z: 3.9 - 0.075 - 0.045, width: 1.9, height: 1.36 } as const;
+// Same north-wall support as LobbyCounter, painted on its inward (+z) face.
+const BOARD = { ...LOBBY_BOARD_MOUNT, z: LOBBY_BOARD_MOUNT.z + LOBBY_BOARD_MOUNT.faceOffset, width: 1.9, height: 1.36 };
 const TEX_W = 760, TEX_H = Math.round(TEX_W * BOARD.height / BOARD.width);
 const FACE = new PlaneGeometry(BOARD.width, BOARD.height);
 
@@ -86,7 +87,7 @@ function Board({ snapshot }: SceneMountProps) {
     canvas.dataset.noticeBoard = `${board.stats.map(stat => `${stat.label} ${stat.value}`).join(' · ')} | ${board.happened.map(entry => `${entry.decision} ${entry.text}`).join(' · ') || board.empty}`;
     return () => { delete canvas.dataset.noticeBoard; };
   }, [canvas, board]);
-  return <mesh name='hud-notice-board' geometry={FACE} position={[BOARD.x, BOARD.y, BOARD.z]} rotation={[0, Math.PI, 0]}>
+  return <mesh name='hud-notice-board' geometry={FACE} position={[BOARD.x, BOARD.y, BOARD.z]}>
     <meshBasicMaterial map={texture} toneMapped={false} />
   </mesh>;
 }

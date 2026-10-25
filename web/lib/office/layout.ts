@@ -92,7 +92,9 @@ export const ANCHOR_LAYOUT: Readonly<Record<LayoutAnchorId, { center: Vec2; posi
  */
 export const LOBBY_KIOSK: Vec2 = [-5.8, 4.6];
 /** Decision board and deny stamp, supported by the solid north wall. */
-export const LOBBY_BOARD: Vec2 = [-5.2, BUILDING.minZ + 0.2];
+export const LOBBY_BOARD_MOUNT = { x: -5.2, y: 1.25, z: BUILDING.minZ + WALL_THICKNESS / 2 + 0.03,
+  width: 2, height: 1.45, depth: 0.06, faceOffset: 0.038 } as const;
+export const LOBBY_BOARD: Vec2 = [LOBBY_BOARD_MOUNT.x, LOBBY_BOARD_MOUNT.z];
 /** Live audit wall on the solid west perimeter, facing into the office. */
 export const LOBBY_AUDIT_WALL = { x: BUILDING.minX + WALL_THICKNESS / 2 + 0.03, z: 5.3, rotationY: Math.PI / 2 } as const;
 

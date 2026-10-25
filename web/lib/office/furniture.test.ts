@@ -8,11 +8,11 @@ import { ROLES } from './palette';
 describe('static office furniture', () => {
   it.each(DESKS)('keeps %s furniture at the existing anchor and footprint', room => {
     const pieces = deskPieces(room);
-    expect(pieces).toHaveLength(8);
+    expect(pieces).toHaveLength(10);
     const top = pieces[0]!;
     expect(top.at).toEqual([OFFICE_ANCHORS[room].center[0], 0.83, OFFICE_ANCHORS[room].center[1]]);
     expect(top.size).toEqual([DESK_SIZE.width, 0.16, DESK_SIZE.depth]);
-    expect(pieces.slice(-2).map(piece => piece.color)).toEqual([OFFICE_ANCHORS[room].color, OFFICE_ANCHORS[room].color]);
+    expect(pieces.slice(6, 8).map(piece => piece.color)).toEqual([OFFICE_ANCHORS[room].color, OFFICE_ANCHORS[room].color]);
     expect(deskPieces(room)).toEqual(pieces);
   });
 
