@@ -3,10 +3,12 @@
 html:has(.route-state) { height: 100svh; overflow: hidden; background: var(--page-bg, linear-gradient(165deg, #A9F6FF 0%, #d8fbff 50%, #FFF3A6 100%)); }
 body:has(.route-state) { display: flex; flex-direction: column; height: 100%; margin: 0; overflow: hidden; color: var(--ink, #19213B); }
 
-.route-state { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; color: var(--ink, #19213B); font: 16px/1.5 var(--font-ui, 'Nunito', ui-rounded, system-ui, sans-serif); box-sizing: border-box; }
+.route-state { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: stretch; color: var(--ink, #19213B); font: 16px/1.5 var(--font-ui, 'Nunito', ui-rounded, system-ui, sans-serif); box-sizing: border-box; }
 .route-state * { box-sizing: border-box; }
 .route-state-bar { flex: none; align-self: stretch; display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; background: var(--bubble-glass, rgba(255, 255, 255, 0.78)); border-bottom: 1px solid var(--line, #D6F0F5); font-weight: 800; font-size: 14px; }
-.route-state-content { width: 100%; max-width: 40rem; padding: 32px 24px; }
+/* Same frame and left edge as every other page (app/theme.css); text keeps a readable measure. */
+.route-state-content { width: 100%; max-width: var(--page-max, 1200px); margin: 0 auto; padding: 32px var(--page-gutter, 24px); }
+.route-state-content > * { max-width: 40rem; }
 .route-state-status { display: inline-block; margin: 0; padding: 2px 12px; border-radius: 999px; background: var(--pastel-yellow, #FFF3A6); color: var(--on-pastel, #19213B); font-size: 13px; font-weight: 800; }
 .route-state h1 { font-size: 32px; font-weight: 900; line-height: 1.15; margin: 12px 0 12px; overflow-wrap: anywhere; text-wrap: balance; }
 .route-state-body { color: var(--ink-soft, #4B5577); }
@@ -21,4 +23,4 @@ body:has(.route-state) { display: flex; flex-direction: column; height: 100%; ma
 .route-state :is(a, button):focus-visible { outline: 3px solid var(--ink, #19213B); outline-offset: 3px; }
 .route-state-bar a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 8px; text-decoration: none; }
 .route-state footer { margin-top: 16px; padding: 16px 0 0; border-top: 1px solid var(--line, #D6F0F5); color: var(--ink-soft, #4B5577); font-size: 14px; }
-@media (max-width: 650px) { .route-state-content { padding: 24px 16px; } .route-state h1 { font-size: 28px; } .route-state-actions { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 650px) { .route-state-content { padding-block: 24px; } .route-state h1 { font-size: 28px; } .route-state-actions { flex-direction: column; align-items: flex-start; } }

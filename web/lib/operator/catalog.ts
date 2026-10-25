@@ -7,7 +7,7 @@ export const operatorActions = {
   eval: ['Run scripted eval', 'Offline answer-key evaluation with software authenticators and local transports.'],
   metrics: ['Run offline metrics', 'Fresh offline replay metrics; historical receipts remain labeled.'],
   scoreboard: ['Run agent scoreboard', 'Offline agent evaluation; records gaps as well as passes.'],
-  burst_plan: ['Preview month burst', '25 generated companies; builds inputs without inference.'],
+  burst_plan: ['Plan month burst', '25 generated companies; builds inputs without inference.'],
   burst: ['Run small GX10 burst', 'One company, one item, one worker. Local models only; requires host opt-in and LLM ON.'],
   warm: ['Warm GX10 model', 'One local token on the configured model. Requires host opt-in and LLM ON.'],
   llm_on: ['Enable models', 'Allows model work through the existing global switch. Providers may incur costs.'],

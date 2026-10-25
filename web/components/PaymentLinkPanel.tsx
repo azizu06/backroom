@@ -20,7 +20,7 @@ export default function PaymentLinkPanel() {
     return () => { stopped = true; controller.abort(); clearInterval(timer); };
   }, []);
   const active = delivery && delivery.expiresAt > Date.now() ? delivery : null;
-  return <section aria-label="Call payment link" style={{ maxWidth: 360, padding: 20, background: "var(--bubble-glass)", color: "var(--ink)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", fontFamily: "var(--font-ui)" }}>
+  return <section aria-label="Call payment link" style={{ boxSizing: "border-box", maxWidth: 360, padding: "4px 24px 20px", background: "var(--bubble-glass)", color: "var(--ink)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", fontFamily: "var(--font-ui)" }}>
     <h2>Scan to pay</h2>
     {active?.localOnly ? <p>Local link only; a phone cannot open it.</p> : null}
     {error ? <p role="status">Payment link unavailable. Reconnecting…</p> : active ? <>

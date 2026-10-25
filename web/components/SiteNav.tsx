@@ -16,7 +16,7 @@ function SiteNavContent({ placement }: { placement: SiteNavPlacement }) {
   const embed = useSearchParams()?.get('embed') ?? null;
   if (siteNavHidden(pathname, embed, placement)) return null;
   const current = (href: string) => isActive(pathname, href) ? 'page' as const : undefined;
-  return <nav className='site-nav' aria-label='Site'>
+  return <nav className='site-nav' aria-label='Site' data-placement={placement}>
     <Link className='site-nav-brand' href='/office'>Backroom</Link>
     <ul>
       {navLinks.map(({ label, href }) => <li key={href}><Link href={href} aria-current={current(href)}>{label}</Link></li>)}
