@@ -4,8 +4,8 @@
  */
 import { FLOOR, INTERACT_RANGE, PLAYER_RADIUS, SPAWN, insideAny, interactCandidates, pickTarget, type Box, type PlayEntry, type Vec2 } from './play';
 import { AGENT_RADIUS } from './targets/agent';
-import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type OfficeSnapshot } from './state';
 import { SPACES } from './layout';
+import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type OfficeSnapshot } from './state';
 
 export type { PlayEntry };
 
@@ -13,7 +13,7 @@ export type { PlayEntry };
 export type OverviewPick = { readonly kind: 'agent'; readonly id: string } | { readonly kind: 'room'; readonly room: AnchorId };
 
 export interface FloorRect { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
-/** A desk room's walls, from the floor plan (./layout). */
+/** Room cells are the building's room footprints (layout.ts SPACES), so the map and the walls always agree. */
 export function roomRect(room: AnchorId): FloorRect {
   return SPACES[room].rect;
 }

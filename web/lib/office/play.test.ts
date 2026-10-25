@@ -8,6 +8,9 @@ import { createMockOfficeState } from "./preview";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
 import { BUILDING, DOORWAYS, WALL_THICKNESS, spaceAt } from "./layout";
 import { doorPosition } from "./doors";
+import { roomPropColliders } from './room-props';
+import { PINGPONG_COLLIDER } from './pingpong/table';
+import { WING_COLLIDERS } from './wing';
 
 const ALL = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const colliders = officeColliders(ALL);
@@ -34,6 +37,20 @@ describe("play constants", () => {
 describe("collisions", () => {
   const [cx, cz] = OFFICE_ANCHORS.collections.center;
   const wallFace = WALL_THICKNESS / 2;
+  it("keeps wing furniture, room dressing and ping-pong solid after merging their mounts", () => {
+    for (const rooms of [ALL, []] as const) {
+      const merged = officeColliders(rooms);
+      expect(merged).toEqual(expect.arrayContaining([...WING_COLLIDERS]));
+      for (const footprint of [...roomPropColliders(rooms), PINGPONG_COLLIDER]) {
+        expect(merged).toContainEqual(footprint);
+        const x = (footprint.minX + footprint.maxX) / 2;
+        const start: Vec2 = [x, footprint.maxZ + PLAYER_RADIUS + 0.15];
+        const end = movePlayer(start, [0, -0.3], merged);
+        expect(end[1]).toBeGreaterThanOrEqual(footprint.maxZ + PLAYER_RADIUS);
+      }
+    }
+  });
+
   it("cannot walk through a desk", () => {
     // From inside Collections straight into the desk front.
     const end = walk([cx, cz + 2.5], [0, -1], 3);

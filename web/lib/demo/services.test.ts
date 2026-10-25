@@ -40,6 +40,29 @@ it('live payments use real Nessie HTTP and reuse invoice memos across new hosts'
   expect(JSON.stringify(first.status())).not.toContain('private');
 });
 
+it('reports Nessie proof only from what the live sandbox actually did in this host', async () => {
+  let down = false;
+  const http = vi.fn(async (url: string | URL | Request) => {
+    if (down) throw new Error('nessie-down');
+    return Response.json(String(url).includes('/deposits') ? [] : { balance: 80 });
+  });
+  const env: NodeJS.ProcessEnv = { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private', NESSIE_ACCOUNT_ID: 'sandbox-account', NESSIE_CLAIMS_DIR: claimsDir };
+  const services = await createDemoServices({ env, fetch: http });
+  expect(services.status().services.nessie).toEqual({ mode: 'sandbox' });
+  await services.bank.readBalanceWithPostedDeposits(services.accountId);
+  expect(services.status().services.nessie).toMatchObject({ mode: 'sandbox', proof: { kind: 'sandbox_read' } });
+  services.recordDepositMatch('sandbox-deposit');
+  expect(services.status().services.nessie.proof).toMatchObject({ kind: 'deposit_exact_match', depositId: 'sandbox-deposit' });
+  down = true;
+  await expect(services.bank.readBalanceWithPostedDeposits(services.accountId)).rejects.toThrow();
+  expect(services.status().services.nessie.unreachableAt).toEqual(expect.any(String));
+  expect(JSON.stringify(services.status())).not.toContain('private');
+  const mock = await createDemoServices({ env: { NODE_ENV: 'test' } });
+  await mock.bank.readBalanceWithPostedDeposits(mock.accountId);
+  mock.recordDepositMatch('mock-deposit-1');
+  expect(mock.status().services.nessie).toEqual({ mode: 'mock' });
+});
+
 it('caches even an ambiguous Actor start across resets and reports it without leaking provider text', async () => {
   const http = vi.fn<typeof fetch>(async () => { throw new Error('private-provider-error'); });
   const services = await createDemoServices({ env: { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private',

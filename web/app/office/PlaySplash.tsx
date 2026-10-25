@@ -35,6 +35,7 @@ export function PlaySplash({ onEnter, onOverview }: { onEnter: () => void; onOve
   }, [onEnter]);
   return <div role='dialog' className='play-splash' aria-modal='true' aria-labelledby={titleId} data-testid='play-splash' ref={ref}>
     <div className='play-splash-card'>
+      <img src='/icon.png' alt='' />
       <p className='play-splash-kicker'>Enter the office</p>
       <h2 id={titleId}>Backroom</h2>
       <p className='play-splash-pitch'>Walk the floor of an AI back office: agents work, policy decides, and every receipt is on the wall.</p>

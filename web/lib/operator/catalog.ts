@@ -1,6 +1,6 @@
 export const operatorActions = {
   status: ['Refresh host links', 'Current host state, approval and payment links.'],
-  health: ['Check dependencies', 'Same read-only probes as the live health check; no inference.'],
+  health: ['Check dependencies', 'Same read-only probes as the live health check; no inference. A successful Nessie sandbox read verifies the bank status without paying.'],
   preflight: ['Run preflight', 'Six bounded read-only checks before a call.'],
   reset: ['Reset company', 'Fresh owned database and seeded gateway setup. Existing links expire; reload the office.'],
   core: ['Run core scenarios', 'Offline collections, inbox traps and payables scenarios. Separate from the live office.'],

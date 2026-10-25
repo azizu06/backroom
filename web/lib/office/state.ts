@@ -7,7 +7,7 @@ export const OFFICE_ANCHORS = {
   collections: { name: "Collections", ...ANCHOR_LAYOUT.collections, color: "#a9bc8f" },
   payables: { name: "Payables", ...ANCHOR_LAYOUT.payables, color: "#bdac89" },
   vendor_onboarding: { name: "Vendor Desk", ...ANCHOR_LAYOUT.vendor_onboarding, color: "#b2a3bb" },
-  dana: { name: "Dana’s desk", ...ANCHOR_LAYOUT.dana, color: "#cc9c7d" },
+  dana: { name: "Dana’s Desk", ...ANCHOR_LAYOUT.dana, color: "#cc9c7d" },
   treasury: { name: "Treasury", ...ANCHOR_LAYOUT.treasury, color: "#788b85" },
 } as const;
 export type AnchorId = keyof typeof OFFICE_ANCHORS;

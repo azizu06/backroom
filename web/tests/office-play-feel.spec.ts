@@ -193,8 +193,7 @@ test('walking sends footstep cues, and they are silent unless the sound toggle i
 test('clicking into first person locks the pointer and hides the menu; releasing it brings the menu back and walking still works', async ({ page }) => {
   const errors = await startPlay(page);
   const viewport = page.getByTestId('office-viewport');
-  // The HUD's Overview button leaves first person (it used to read Exit Play).
-  const exit = page.getByRole('button', { name: 'Overview', exact: true });
+  const exit = page.getByRole('button', { name: 'Exit Play' });
   await expect(exit).toBeVisible();
   await surface(page).click({ position: { x: 400, y: 300 } });
   await expect(surface(page)).toBeFocused();

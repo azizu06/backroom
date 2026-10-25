@@ -42,6 +42,37 @@
 html { min-height: 100%; background: var(--page-bg); }
 body { color: var(--ink); font-family: var(--font-ui); }
 
+/* Dropdowns: rounded bubble pickers in the shared palette. `appearance: base-select` (Chromium) makes the open
+   list stylable; other browsers keep their native list with the same rounded closed field. */
+select { border-radius: 999px; font-family: var(--font-ui); font-weight: 800; cursor: pointer; }
+@supports (appearance: base-select) {
+  select, ::picker(select) { appearance: base-select; }
+  select { display: inline-flex; align-items: center; gap: 8px; }
+  select::picker-icon { color: var(--ink-soft); transition: rotate 0.2s ease; }
+  select:open::picker-icon { rotate: 180deg; }
+  ::picker(select) {
+    margin-block: 6px;
+    padding: 6px;
+    color: var(--ink);
+    background: var(--paper);
+    border: var(--bubble-border);
+    border-radius: 22px;
+    box-shadow: var(--bubble-shadow), 0 0 0 2px var(--pastel-aqua);
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    transition: opacity 0.16s ease, transform 0.16s ease, overlay 0.16s allow-discrete, display 0.16s allow-discrete;
+  }
+  select:open::picker(select) { opacity: 1; transform: none; }
+  @starting-style { select:open::picker(select) { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+  select option { padding: 8px 14px; border-radius: 14px; font-weight: 800; color: var(--ink); background: transparent; cursor: pointer; }
+  select option:hover, select option:focus-visible { background: var(--pastel-aqua); color: var(--on-pastel); outline: none; }
+  select option:checked { background: var(--pastel-yellow); color: var(--on-pastel); }
+  select option::checkmark { order: 1; margin-left: auto; color: var(--on-pastel); }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::picker(select) { transition: none; }
+}
+
 /* Page frame shared by every page outside the office: one left edge, one heading rhythm, so switching pages never shifts the title.
    Page modules read --page-max and --page-gutter; .page-frame, .page-title and .page-lede serve pages without a module. */
 :root { --page-max: 1200px; --page-gutter: 24px; }

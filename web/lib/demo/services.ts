@@ -5,6 +5,7 @@ import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHeal
   type PreCallDependencies, type PreCallInput, type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
 import { environmentHealthRow } from '../../../tools/demo/env';
+import { createNessieEvidence } from './nessie-evidence';
 import collectionScenarios from '../../../fixtures/scenarios/collections.json';
 import type { PrecallEvidence } from '../calls/precall';
 import type { EmailOnlyScenario } from '../calls/request';
@@ -29,7 +30,9 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   const claims = new FileClaims(resolve(env.NESSIE_CLAIMS_DIR || '.nessie-state/claims'));
   const deposits: unknown[] = [], mockClaims = new Set<string>();
   const displayCache = new MemoryBalanceDisplayCache();
-  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, surface: 'nessie_sandbox', claims, fetch: http, readAttempts: 1, timeoutMs: 5000, displayCache } : {
+  const nessieEvidence = createNessieEvidence();
+  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, surface: 'nessie_sandbox', claims, fetch: nessieEvidence.watch(http),
+    readAttempts: 1, timeoutMs: 5000, displayCache, observe: nessieEvidence.observe } : {
     apiKey: 'mock-no-network', surface: 'mock', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } }, displayCache,
     fetch: async (url, init) => {
       if (init?.method === 'POST') {
@@ -82,7 +85,7 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   const status = () => ({ live, bank: live ? 'nessie_sandbox' as const : 'mock' as const,
     services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}),
       ...(preCall.status === 'ready' ? { signals: preCall.signals } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
-      nessie: { mode: live ? 'sandbox' : 'mock' }, apify: { ...apify },
+      nessie: live ? { mode: 'sandbox', ...nessieEvidence.snapshot() } : { mode: 'mock' }, apify: { ...apify },
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
   // The same Apify rows prepare() records, rebuilt from its cached evidence.
   const precall = (): PrecallEvidence => ({ preCall: { ...status().services.preCall,
@@ -146,6 +149,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
     };
   }
   return { bank, accountId, status, precall,
+    /** Sandbox deposit reconciled as EXACT_PAYMENT_MATCH; the mock bank never proves Nessie. */
+    recordDepositMatch(depositId: string) { if (live) nessieEvidence.depositMatched(depositId); },
     collectionsPlanner(state: StateStore): DemoCollectionsPlanner {
       return { caseFor: refusal => emailCase(refusal, state), voice: { async start() { throw new Error('REFUSED_CALL_CANNOT_DIAL'); } },
         precall: precallDeps(state) };

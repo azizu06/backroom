@@ -68,7 +68,7 @@ const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfie
  */
 export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...WING_COLLIDERS, PINGPONG_COLLIDER, ...roomPropColliders(rooms)];
+  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...WING_COLLIDERS, ...roomPropColliders(rooms), PINGPONG_COLLIDER];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
     const [x, z] = OFFICE_ANCHORS[room].center;
