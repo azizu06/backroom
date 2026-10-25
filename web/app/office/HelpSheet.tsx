@@ -13,7 +13,7 @@ const GETTING_AROUND: readonly Entry[] = [
   { term: 'Story Mode', detail: 'A guided walkthrough of the key moments, chapter by chapter (←/→ to move, Esc to exit).' },
   { term: 'Full Screen', detail: 'The square button top right of the scene. Hides the sidebar and top bar; the camera picker and status chips stay at the top left.' },
   { term: 'Watch a recorded session', detail: 'Play the bundled offline recording in the office. No live calls or model requests.', href: '/office?replay=core-offline' },
-  { term: 'Sidebar Groups', detail: 'Pages are grouped by job: Calls (place a call, then the payment link), Approvals (Dana’s Controller and the badge Policy), Attack Lab, and Setup (Operator and System Status). Each opens over the office with tabs; “Open page ↗” opens the full page in a new tab.' },
+  { term: 'Sidebar Groups', detail: 'Pages are grouped by job: Calls (place a call, then the payment link), Approvals (Dana’s Controller and the badge Policy), Attack Lab, and Setup (Operator and System Status). Each opens over the office with tabs; everything stays on this one page.' },
 ];
 
 const FLOWS: readonly { title: string; steps: readonly string[] }[] = [

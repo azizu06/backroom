@@ -63,7 +63,7 @@ export function OfficeAdvanced({ connection, replay, llm }: { connection: string
         {llm}
       </section>
       {open && <Gx10Readout replay={replay} />}
-      <p className='office-advanced-note'><a href='/real-vs-sim'>System status ↗</a></p>
+      <p className='office-advanced-note'><a href='/real-vs-sim'>System status</a></p>
     </div>
   </details>;
 }
