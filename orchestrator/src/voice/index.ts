@@ -15,6 +15,8 @@ export interface VoiceSession {
   deliveries: Record<string, { fingerprint: string; next: string }>;
   /** Caller turns since the identity question was last asked, plus the bounded re-ask count. */
   identity?: { question: string; replies: string[]; turns: number; failures: number; countedAt: number };
+  /** Consecutive identical refused tool requests. */
+  loop?: { key: string; repeats: number };
 }
 export interface DialOptions {
   apiKey: string; http?: typeof fetch; now?: Date; allowDemoOverride?: boolean;
