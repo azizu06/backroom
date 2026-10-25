@@ -98,7 +98,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const trace: Trace[] = [];
 
   // 1. Planner: production specialist + runtime with offline pre-call fakes; the dial is a mock CallStarter.
-  const gateway = new MemoryGatewayStore([]);
+  const gateway = new MemoryGatewayStore([], state);
   const precallContext = async () => ({ ...(SCRIPTS[name].signals && { signals: { active: SCRIPTS[name].signals } }), client: { type: client.type as 'business', phoneNumber: client.phoneNumber,
     dnc: client.dnc || await gateway.clientStopped(client.id), localWeekday: 2, localHour: 11, consent: client.consent } });
   const loadCase = async () => ({ sessionId, invoice: { amountCents, currency: 'USD', daysPastDue: 40 },
@@ -219,6 +219,18 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const roleOrder = dispatched.activations.map(row => row.role);
   const expected = EXPECTED[name];
   const reconRules = audits.filter(row => row.action === 'agent_reconciliation').map(row => row.ruleIds[0]);
+  const humanFollowup = name === 'human_request' ? {
+    queuedRequests: call.outbox.filter(row => row.type === 'request_human').length,
+    gatewayEscalations: call.audits.filter(row => row.action === 'request_human')
+      .map(row => ({ decision: row.kind, ruleIds: row.ruleIds })),
+    mirroredEscalations: audits.filter(row => row.action === 'request_human')
+      .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
+    postcallEscalations: audits.filter(row => row.action === 'collections_postcall_terminal')
+      .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
+    // Read the actual record: request_human currently queues an unassigned outbox event.
+    // Plan approval recipients are not proof that a callback was assigned or delivered.
+    gatewayReviewRecipients: call.escalations.map(row => row.toHuman),
+  } : undefined;
   const checks = {
     dialedOnce: planned.kind === 'started' && dials.length === 1,
     callStatus: call.status === expected.callStatus,
@@ -227,6 +239,13 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     cleared: cleared === expected.cleared,
     noLeakBeforeIdentity: !leaked,
     auditChain: (await state.verifyAuditChain()).valid,
+    ...(humanFollowup && {
+      humanFollowupQueued: humanFollowup.queuedRequests === 1,
+      humanEscalationMirrored: humanFollowup.gatewayEscalations.length === 1 && humanFollowup.mirroredEscalations.length === 1 &&
+        humanFollowup.gatewayEscalations[0]!.decision === 'ESCALATE' && humanFollowup.mirroredEscalations[0]!.decision === 'ESCALATE' &&
+        JSON.stringify(humanFollowup.mirroredEscalations[0]!.ruleIds) === JSON.stringify(['REQUEST_HUMAN']) &&
+        humanFollowup.postcallEscalations[0]?.decision === 'ESCALATE',
+    }),
     ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.length > 0 && reconRules.every(rule => rule === 'RECON_UNMATCHED') && !cleared }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
     ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0
@@ -248,6 +267,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   };
   return { id: name, scenarioId, invoiceId, match: Object.values(checks).every(Boolean), checks,
     callStatus: call.status, caseStatus: dispatched.status, reason: dispatched.reason ?? null, roles: roleOrder, cleared, reconRules,
+    ...(humanFollowup && { humanFollowup }),
     gatewayTools: transcript.filter(row => row.tool).map(row => `${row.tool}:${String(row.result?.kind ?? row.result?.error)}`),
     tools: trace.map(row => `${row.role}.${row.tool}`),
     scope: 'Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.' };
