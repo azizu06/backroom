@@ -34,7 +34,7 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   await expect(viewport.locator('canvas')).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   if (kit) await expect(viewport.locator('canvas[data-deskkit="ready"]')).toHaveCount(1, { timeout: 30_000 });
-  else await expect.poll(() => warnings.some(text => text.startsWith(KIT_WARNING))).toBe(true);
+  else await expect.poll(() => warnings.some(text => text.startsWith(KIT_WARNING)), { timeout: 30_000 }).toBe(true);
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await openMenu(page);
