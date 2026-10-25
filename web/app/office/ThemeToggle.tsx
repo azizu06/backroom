@@ -1,31 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import type { OfficeTheme } from '../../lib/office/palette';
-import { applyTheme, nextTheme, themePreference, writeThemePreference } from '../../lib/office/theme';
+import { useEffect, useState } from 'react';
+import { applyTheme, readTheme, type Theme } from '../../lib/theme';
 
-/** Light/dark theme, persisted per viewer under the shared 'backroom-theme' key and applied as [data-theme] on <html> and every office shell. */
-export function useOfficeTheme(): [OfficeTheme, (theme: OfficeTheme) => void, () => void] {
-  const [theme, setThemeState] = useState<OfficeTheme>('light');
-  const [ready, setReady] = useState(false);
-  useEffect(() => { setThemeState(themePreference()); setReady(true); }, []);
-  useEffect(() => {
-    if (!ready) return; // never overwrite the root layout's pre-paint theme with the SSR default
-    applyTheme(theme, document.documentElement, document.querySelectorAll<HTMLElement>('.office-shell'));
-  }, [theme, ready]);
-  const setTheme = useCallback((value: OfficeTheme) => { setThemeState(value); writeThemePreference(value); }, []);
-  const toggle = useCallback(() => {
-    setThemeState(current => { const value = nextTheme(current); writeThemePreference(value); return value; });
-  }, []);
-  return [theme, setTheme, toggle];
-}
-
-/** Self-contained toggle; whichever build owns the office corner menu mounts it. */
+/** The office's own light/dark switch (SiteNav shows its toggle only outside /office). Same app-wide theme and key as #291's lib/theme. */
 export function ThemeToggle({ className = 'theme-toggle' }: { className?: string }) {
-  const [theme, , toggle] = useOfficeTheme();
-  const dark = theme === 'dark';
-  return <button type='button' className={className} onClick={toggle} aria-pressed={dark}
-    aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} title={dark ? 'Light mode' : 'Dark mode'}>
-    <span aria-hidden='true'>{dark ? '☀' : '☾'}</span>
+  const [theme, setTheme] = useState<Theme>();
+  useEffect(() => setTheme(readTheme()), []);
+  if (!theme) return null;
+  const next = theme === 'dark' ? 'light' : 'dark';
+  return <button type='button' className={className} onClick={() => { applyTheme(next); setTheme(next); }} aria-pressed={theme === 'dark'}
+    aria-label={`Switch to ${next} mode`} title={`Switch to ${next} mode`}>
+    <span aria-hidden='true'>{theme === 'dark' ? '☀' : '☾'}</span>
   </button>;
 }

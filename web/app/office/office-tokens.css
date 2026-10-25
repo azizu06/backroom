@@ -1,15 +1,7 @@
-/* Office-scoped chrome tokens; the shared :root tokens live in web/app/theme.css. Dark follows :root[data-theme='dark'] (root layout) or the shell's own data-theme.
-   Office chrome tokens (corner menu, overview panel, prompts, demo pill, drawer, overlays), AJ's names from branch 271-cozy-office-ui.
-   Mirrors CHROME in web/lib/office/palette.ts; lib/office/overlay-contrast.test.ts checks the values and AA pairs.
-   Only the chrome reads these: the 3D world (materials, sky, outdoors) stays on PALETTE/ROLES. */
+/* Office chrome mappings onto the shared palette (web/app/theme.css owns --ink, --paper, --line, --pastel-*, --on-pastel and their dark values).
+   Dark mode is the app-wide <html data-theme="dark">. Only the chrome reads these: the 3D world stays on PALETTE/ROLES (lib/office/palette.ts).
+   lib/office/overlay-contrast.test.ts resolves these against theme.css and checks the AA pairs. */
 .office-shell {
-  --ink: #19213B;
-  --ink-soft: #4B5577;
-  --paper: #FFFDF4;
-  --line: #D6F0F5;
-  --pastel-aqua: #A9F6FF;
-  --pastel-yellow: #FFF3A6;
-  --focus: #19213B;
   /* Re-point the overlay tokens the office stylesheets already use (lobby.css :root keeps the base for other pages). */
   --office-navy: var(--ink);
   --office-slate: var(--ink-soft);
@@ -18,24 +10,16 @@
   --office-aqua: var(--pastel-aqua);
   --office-lavender: var(--line);
 }
-.office-shell :focus-visible { outline-color: var(--focus); }
+.office-shell :focus-visible { outline-color: var(--ink); }
 
-:root[data-theme='dark'] .office-shell,
-.office-shell[data-theme=dark] {
-  --ink: #FFF8DC;
-  --ink-soft: #C7CEE6;
-  --paper: #222C4E;
-  --line: #2E3A63;
-  --pastel-aqua: #A9F6FF;
-  --pastel-yellow: #FFF3A6;
-  --focus: #FFF8DC;
-  /* AJ's dark theme: peach/aqua stay on the pastel accents, lavender deepens; cream/navy follow --paper/--ink. */
+:root[data-theme='dark'] .office-shell {
+  /* AJ's dark lavender; peach/aqua stay on the pastel accents, cream/navy follow --paper/--ink. */
   --office-lavender: #34406A;
   color-scheme: dark;
   color: var(--ink);
-  background-color: #19213B;
+  background: var(--page-bg);
 }
-/* Pastel plates (yellow, aqua, blush) keep dark navy ink in both themes; dark panels use --paper with cream --ink. */
-:is(:root[data-theme='dark'] .office-shell, .office-shell[data-theme=dark]) :is(.play-chat-off button, .coworker-bubble, .office-disconnected, .room-inspector button, .play-panel button:not([aria-pressed='true']),
+/* Pastel plates (yellow, aqua, blush) keep navy ink in both themes; dark panels use --paper with cream --ink. */
+:root[data-theme='dark'] .office-shell :is(.play-chat-off button, .coworker-bubble, .office-disconnected, .room-inspector button, .play-panel button:not([aria-pressed='true']),
   .tour-stop:hover, .story-mode button, .office-sound-toggle[aria-pressed='true'], .agent-talk-line, .agent-talk-recent li[data-tone='fail'],
-  .agent-talk-reply[data-tone='fail'], .agent-talk-recent li[data-tone='correction']) { color: #19213B; }
+  .agent-talk-reply[data-tone='fail'], .agent-talk-recent li[data-tone='correction']) { color: var(--on-pastel); }

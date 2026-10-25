@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CHROME, PALETTE } from "./palette";
+import { PALETTE } from "./palette";
 
 const css = (name: string) => readFileSync(join(__dirname, "../../app/office", name), "utf8");
 const tokens = new Map<string, string>();
@@ -40,28 +40,30 @@ describe("overlay colour tokens", () => {
   });
 });
 
-// Office chrome tokens (app/office/office-tokens.css): AJ's names, light on .office-shell, dark on .office-shell[data-theme=dark].
-const block = (selector: string) => {
-  const source = css("office-tokens.css");
+// Office chrome: --office-* mappings (app/office/office-tokens.css) resolved against the shared palette (app/theme.css).
+const shared = readFileSync(join(__dirname, "../../app/theme.css"), "utf8");
+const office = css("office-tokens.css");
+const body = (source: string, selector: string) => {
   const start = source.indexOf(`${selector} {`);
   expect(start, selector).toBeGreaterThanOrEqual(0);
   return source.slice(start, source.indexOf("}", start));
 };
 const hexes = (text: string) => new Map([...text.matchAll(/--([a-z-]+):\s*(#[0-9A-Fa-f]{6})\s*;/g)].map(m => [m[1]!, m[2]!.toUpperCase()]));
+const DARK = ":root[data-theme='dark'] .office-shell";
 const theme = (name: "light" | "dark") => {
-  const light = hexes(block(".office-shell"));
-  const values = name === "light" ? light : new Map([...light, ...hexes(block(".office-shell[data-theme=dark]"))]);
-  // Resolve the --office-* re-pointing (var(--x)) declared on the light block.
-  for (const m of block(".office-shell").matchAll(/--(office-[a-z]+):\s*var\(--([a-z-]+)\)\s*;/g)) {
-    if (name === "dark" && hexes(block(".office-shell[data-theme=dark]")).has(m[1]!)) continue;
-    values.set(m[1]!, values.get(m[2]!)!);
+  const values = hexes(body(shared, ":root"));
+  if (name === "dark") for (const [k, v] of hexes(body(shared, ":root[data-theme='dark']"))) values.set(k, v);
+  const overrides = name === "dark" ? hexes(body(office, DARK)) : new Map<string, string>();
+  for (const m of body(office, ".office-shell").matchAll(/--(office-[a-z]+):\s*var\(--([a-z-]+)\)\s*;/g)) {
+    expect(values.has(m[2]!), `--${m[2]} comes from theme.css`).toBe(true);
+    values.set(m[1]!, overrides.get(m[1]!) ?? values.get(m[2]!)!);
   }
+  for (const [key, value] of overrides) values.set(key, value);
   for (const [key, value] of tokens) if (!values.has(`office-${key}`)) values.set(`office-${key}`, value);
   return values;
 };
 
-// [text, plate] pairs the office chrome uses. Dark panels carry --ink on --paper in both themes;
-// pastel plates (yellow, aqua, blush) always carry dark navy ink (the light --ink).
+// Dark panels carry --ink on --paper; pastel plates (yellow, aqua, blush) carry --on-pastel navy ink in both themes.
 const PANEL_PAIRS: Array<[string, string]> = [
   ["ink", "paper"],
   ["ink-soft", "paper"],
@@ -73,34 +75,37 @@ const PASTEL_PLATES = ["office-peach", "office-aqua", "office-blush", "pastel-aq
 const PASTEL_TEXT_SELECTORS = [".play-chat-off button", ".coworker-bubble", ".office-disconnected", ".room-inspector button", ".play-panel button", ".story-mode button",
   ".office-sound-toggle[aria-pressed='true']", ".agent-talk-line", ".agent-talk-recent li[data-tone='fail']", ".agent-talk-recent li[data-tone='correction']"];
 
-describe.each(["light", "dark"] as const)("office chrome tokens (%s)", name => {
+describe.each(["light", "dark"] as const)("office chrome on the shared palette (%s)", name => {
   const values = theme(name);
-  it("use AJ's token names with the palette's values", () => {
-    for (const [key, value] of Object.entries(CHROME[name])) expect(values.get(key), key).toBe(value);
-  });
-  it("keep the pastel accents on peach and aqua plates", () => {
-    expect(values.get("office-peach")).toBe(CHROME[name]["pastel-yellow"]);
-    expect(values.get("office-aqua")).toBe(CHROME[name]["pastel-aqua"]);
+  it("keeps the pastel accents on peach and aqua plates", () => {
+    expect(values.get("office-peach")).toBe(values.get("pastel-yellow"));
+    expect(values.get("office-aqua")).toBe(values.get("pastel-aqua"));
+    expect(values.get("office-navy")).toBe(values.get("ink"));
+    expect(values.get("office-cream")).toBe(values.get("paper"));
   });
   it.each(PANEL_PAIRS)("%s text on %s is at least 4.5:1", (fg, bg) => {
     expect(ratio(values.get(fg)!, values.get(bg)!)).toBeGreaterThanOrEqual(4.5);
   });
-  it.each(PASTEL_PLATES)("dark navy ink on %s is at least 4.5:1", plate => {
-    expect(ratio(CHROME.light.ink, values.get(plate)!)).toBeGreaterThanOrEqual(4.5);
+  it.each(PASTEL_PLATES)("--on-pastel ink on %s is at least 4.5:1", plate => {
+    expect(ratio(values.get("on-pastel")!, values.get(plate)!)).toBeGreaterThanOrEqual(4.5);
   });
-  it("has a focus ring visible against paper", () => {
-    expect(ratio(values.get("focus")!, values.get("paper")!)).toBeGreaterThanOrEqual(3);
+  it("has a focus ring (--ink) visible against paper", () => {
+    expect(office).toMatch(/:focus-visible \{ outline-color: var\(--ink\); \}/);
+    expect(ratio(values.get("ink")!, values.get("paper")!)).toBeGreaterThanOrEqual(3);
   });
 });
 
 describe("office chrome dark theme", () => {
-  const dark = css("office-tokens.css").slice(css("office-tokens.css").indexOf(".office-shell[data-theme=dark] {"));
+  const dark = office.slice(office.indexOf(`${DARK} {`));
+  it("defines no shared tokens itself", () => {
+    expect(office).not.toMatch(/--(ink|ink-soft|paper|line|pastel-aqua|pastel-yellow|on-pastel|focus):/);
+  });
   it("uses AJ's deep lavender and no invented plate overrides", () => {
     expect(theme("dark").get("office-lavender")).toBe("#34406A");
     expect(dark).not.toMatch(/--office-(peach|aqua|blush|plate-shadow):/);
   });
-  it("gives every pastel plate dark navy ink", () => {
-    const rule = dark.slice(dark.indexOf(":is("), dark.indexOf("{ color: #19213B; }"));
+  it("gives every pastel plate --on-pastel ink", () => {
+    const rule = dark.slice(dark.indexOf(":is("), dark.indexOf("{ color: var(--on-pastel); }"));
     expect(rule.length).toBeGreaterThan(0);
     for (const selector of PASTEL_TEXT_SELECTORS) expect(rule, selector).toContain(selector);
   });
