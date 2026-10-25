@@ -109,10 +109,10 @@ describe('collections pre-call', () => {
     const request = input();
     request.context.demoOverride = { visible: true, logged: true };
     expect(await runPreCall(request, deps)).toMatchObject({ status: 'ready',
-      warnings: ['Sanctions check not available in CRS sandbox'] });
+      warnings: ['Sanctions check unavailable'] });
     expect((await audit()).find(entry => entry.action === 'demo_ofac_unavailable_override')).toMatchObject({
       decision: 'ALLOW', ruleIds: ['DEMO_OVERRIDE'], inputs: {
-        warning: 'Sanctions check not available in CRS sandbox', ofacAvailability: 'not available in sandbox',
+        warning: 'Sanctions check unavailable', ofacAvailability: 'not available in sandbox',
       },
     });
   });

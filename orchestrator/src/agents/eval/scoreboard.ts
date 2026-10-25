@@ -219,7 +219,7 @@ for (const row of legacy.reports) {
   }
   if (row.id === 'C21' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C21');
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. The production Cartesia agent config's fixed voicemail message is generic callback-only with no contact, invoice, amount or business name (${run?.voicemailEvidence?.configuredMessageSafe}): "${run?.voicemailEvidence?.configuredMessage}". Cartesia voicemail detection firing and message delivery on a real call are not executed; keep the integration gap open.` });
     continue;
   }
   if (row.id === 'C15' && row.seams.includes('integration:not_executed')) {

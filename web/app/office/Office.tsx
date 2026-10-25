@@ -1,12 +1,10 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { SiteNav } from '../../components/SiteNav';
-import { NavDisclosure } from '../../components/DemoPill';
-import { useSearchParams } from 'next/navigation';
 import { flushSync } from 'react-dom';
 import { isCloseKey } from '../../lib/office/a11y';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
@@ -64,11 +62,6 @@ const OfficeScene = dynamic(() => import('./scene').then(module => module.Office
   ssr: false,
   loading: SceneLoading,
 });
-
-/** The shared demo disclosure as a small overlay pill; outside the app router (unit renders) there is no URL to read. */
-function OfficeDisclosure() {
-  return useSearchParams() ? <NavDisclosure /> : null;
-}
 
 /** All finance state comes through OfficeState. Commands belong to an authenticated controller. */
 export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, storyStart = false, storyPreview }: {
@@ -319,7 +312,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           {controls && <div className='office-corner-controls' onClick={event => { if ((event.target as HTMLElement).closest('button')) setCornerOpen(false); }}>{controls}</div>}
         </div>
       </header>
-      <div className='office-disclosure'><Suspense fallback={null}><OfficeDisclosure /></Suspense></div>
       <button ref={drawerToggle} type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => setDrawerOpen(open => !open)}>
         Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
       </button>
@@ -362,7 +354,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
-      {/* Inside the viewport so the disclosure pill (same stacking context) can sit above it. */}
       {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     </div>
     <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {

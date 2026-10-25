@@ -46,7 +46,7 @@ describe('judge inbox HTTP boundary', () => {
 
     expect(result).toMatchObject({ status: 'paid', paymentRail: 'nessie', receiptId: 'sandbox-debit-4401',
       reconciliation: { match: 'EXACT', debitId: 'sandbox-debit-4401', transactionId: 'sandbox-debit-4401' } });
-    expect(result.notice).toContain('Nessie sandbox debit matched exactly');
+    expect(result.notice).toContain('Nessie debit matched exactly');
     expect((await state.listAudit()).find(row => row.action === 'reconcile')).toMatchObject({
       ruleIds: ['EXACT_PAYMENT_MATCH'], inputs: { transactionKind: 'withdrawal', invoiceId: '4401', amountCents: 64000 },
     });
@@ -214,7 +214,7 @@ describe('judge inbox HTTP boundary', () => {
     expect(opened.decision).toMatchObject({ kind: 'ESCALATE', ruleIds: ['BANK_CHANGE_HOLD'] });
     expect(opened.decision.ruleIds).not.toContain('INVALID_INPUT');
     expect(opened.status).toBe('awaiting_controller');
-    expect(opened.notice).toContain('simulated');
+    expect(opened.notice).toContain('offline records');
     expect(opened.evidenceRefs).toEqual(expect.arrayContaining(['simulated:crs:cedar', 'simulated:ofac:cedar', 'simulated:apify:cedar']));
     expect(opened.approvalHref).toBe(`/approve/${encodeURIComponent(opened.escalationId)}`);
     expect(await readInboxBankChange(opened.escalationId)).toMatchObject({ status: 'awaiting_controller', accountId: 'bank-master:cedar', verified: true });
@@ -266,7 +266,7 @@ describe('judge inbox HTTP boundary', () => {
     expect(result.status).toBe('held');
     expect(result.decision.ruleIds).toContain('INVALID_INPUT');
     expect(result.decision.ruleIds).not.toContain('BANK_CHANGE_HOLD');
-    expect(result.notice).not.toContain('simulated');
+    expect(result.notice).not.toContain('offline records');
     expect(result.evidenceRefs.join(' ')).not.toContain('simulated:');
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(await readInboxBankChange(result.escalationId)).toBeUndefined();

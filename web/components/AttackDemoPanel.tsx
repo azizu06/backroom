@@ -6,7 +6,9 @@ import { parseAttackPresets, parseAttackResult, record, type AttackMode, type At
 import './AttackDemoPanel.css';
 
 const LIVE_HELP = 'Live allows one Haiku activation per service instance, capped at $0.02. The server enforces the global OFF switch. No money moves.';
-const BLOCKED_HELP = 'Live is disabled by the demo server. Runs use Mock.';
+const BLOCKED_HELP = 'Live is disabled on this server. Runs use Scripted.';
+// The server names the deterministic agents "mock"; the page calls them scripted.
+const modeLabel = (mode: string) => mode === 'mock' ? 'scripted' : mode;
 
 /** Displays server evidence only. No policy decisions or fabricated offline trace. */
 const INVOICE_LINE_EXAMPLE = 'Invoice #INV-9001. Vendor ID: V-ACME. PO: none. Currency: USD. Total cents: 150000. Bank account reference: BA-NEW-4242. Line items: [{"description":"Consulting","quantity":1,"unitPriceCents":150000}]. Adjustment cents: 0.';
@@ -85,7 +87,7 @@ export function AttackDemoPanel() {
   }
 
   return <section className='attack-panel' aria-labelledby={`${id}-title`}>
-    <header><p className='attack-eyebrow'>Judge playground</p><h1 id={`${id}-title`}>Try to trick the agents</h1>
+    <header><h1 id={`${id}-title`}>Try to trick the agents</h1>
       <p>Choose an attack or write a malicious email or invoice. Follow what each agent observes and proposes, then read the server’s policy decision.</p></header>
     <form onSubmit={run}>
       <fieldset disabled={running} className='attack-presets'><legend>Attack presets</legend>
@@ -109,7 +111,7 @@ export function AttackDemoPanel() {
         <button type='button' onClick={() => { setText(current => current ? `${current}\n${INVOICE_LINE_EXAMPLE}` : INVOICE_LINE_EXAMPLE); setSelected(undefined); }}>Insert example line</button>
       </details>
       <fieldset className='attack-mode' disabled={running}><legend>Run mode</legend>
-        <label><input type='radio' name={`${id}-mode`} value='mock' checked={mode === 'mock'} onChange={() => setMode('mock')} /> Mock</label>
+        <label><input type='radio' name={`${id}-mode`} value='mock' checked={mode === 'mock'} onChange={() => setMode('mock')} /> Scripted</label>
         <label><input type='radio' name={`${id}-mode`} value='live' checked={mode === 'live'} disabled={liveBlocked !== false}
           aria-describedby={`${id}-live-help`} onChange={() => setMode('live')} /> Live</label>
         <p id={`${id}-live-help`} className='attack-help'>{liveBlocked === true ? BLOCKED_HELP
@@ -121,13 +123,13 @@ export function AttackDemoPanel() {
       {running && <p role='status'>Tracing the agents and checking policy… This may take up to 30 seconds.</p>}
       {error && <p role='alert' className='attack-error'>{error}</p>}
       {result && <>
-        <p className='attack-eyebrow'>Completed · {result.mode} · source: {result.source}</p>
+        <p className='attack-eyebrow'>Completed · {modeLabel(result.mode)} · source: {result.source}</p>
         <p className='attack-help'>Untrusted data</p>
         <p>Sender: {result.senderDomain === 'unknown.invalid' ? 'unknown (your text)' : result.senderDomain}</p>
         {result.liveBlocked && <p>{BLOCKED_HELP}</p>}
         <h2>Agent trace</h2>
         <ol className='attack-trace'>{result.steps.map((step, index) => <li key={index}>
-          <h3>{step.role} <span className='attack-execution'>{step.execution === 'live' ? 'live model' : step.execution}</span></h3>
+          <h3>{step.role} <span className='attack-execution'>{step.execution === 'live' ? 'live model' : modeLabel(step.execution)}</span></h3>
           <dl><dt>Observed</dt><dd>{step.observed}</dd><dt>Proposed</dt><dd>{step.proposed}</dd>
             {step.decision !== undefined && <><dt>Decision</dt><dd>{typeof step.decision === 'string' ? step.decision : <>
               <strong>{step.decision.kind}</strong> · {step.decision.reason}<br />
@@ -150,7 +152,7 @@ export function AttackDemoPanel() {
             role={result.moneyMoved || result.paymentAttempts > 0 ? 'alert' : undefined}>
             Money moved: {result.moneyMoved ? 'yes' : 'no'} · Payment attempts: {result.paymentAttempts}
           </p>
-          {result.moneyMoved && <p role='alert' className='attack-error'>Unexpected money movement reported. Stop the demo and notify the operator.</p>}
+          {result.moneyMoved && <p role='alert' className='attack-error'>Unexpected money movement reported. Stop and notify the operator.</p>}
         </section>
         {result.modelEvidence && <details className='attack-evidence'><summary>Model evidence</summary>
           <dl>{Object.entries(result.modelEvidence).map(([key, value]) => <div key={key}><dt>{key}</dt>
