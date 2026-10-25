@@ -24,6 +24,15 @@ async function setup() {
 }
 
 describe('private audit HTTP boundary', () => {
+  it('checks sign-in quietly without reading protected records', async () => {
+    const { handle, cookie, store } = await setup();
+    const read = vi.spyOn(store, 'listAudit');
+    const signedOut = await handle('session', request('session'));
+    expect(signedOut.status).toBe(200);
+    expect(await signedOut.json()).toEqual({ signedIn: false });
+    expect(await (await handle('session', request('session', undefined, cookie))).json()).toEqual({ signedIn: true });
+    expect(read).not.toHaveBeenCalled();
+  });
   it('authenticates without exposing a server secret and returns a verified snapshot', async () => {
     const { handle, cookie } = await setup();
     expect((await handle('entries', request('entries'))).status).toBe(401);

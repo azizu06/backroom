@@ -1,3 +1,4 @@
+import { agentName } from '../agent-labels';
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type OfficeSnapshot } from '../state';
 import type { OfficePropInteraction } from './interact';
 import { ROLES } from '../palette';
@@ -51,7 +52,7 @@ export function denyReceipt(snapshot: OfficeSnapshot): DenyReceipt | null {
   const ruleIds = row?.ruleIds ?? [];
   const rule = ruleIds[0] ?? 'DENIED';
   return {
-    auditId: denial.auditId, agentId: denial.agentId, agentName: agent?.name ?? denial.agentId,
+    auditId: denial.auditId, agentId: denial.agentId, agentName: agent?.name ?? agentName(seat ?? ''),
     color: isAnchorId(seat) ? OFFICE_ANCHORS[seat].color : DENY_FALLBACK_COLOR,
     ruleIds, rule, signText: `DENIED · ${rule}`,
   };
