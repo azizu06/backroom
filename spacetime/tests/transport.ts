@@ -7,7 +7,7 @@ import { SpacetimeStateStore, type StateTransport, type ControlSnapshot } from '
 // obtain ctx.timestamp from SpacetimeDB, and ignore those arguments on the wire.
 const clockAt: Record<string, number> = { savePolicyLimits: 2, registerAgent: 2, heartbeat: 1, claimTask: 1, renewLease: 1,
   assertLease: 1, reapExpired: 0, setAgentState: 2, setAgentTargetLeased: 2, pauseTask: 1, advanceTask: 1,
-  completeTask: 2, createEscalation: 2, createCallEscalation: 1, decideEscalation: 1, expireEscalations: 0,
+  completeTask: 2, createEscalation: 2, createCallEscalation: 1, setCallPresence: 3, decideEscalation: 1, expireEscalations: 0,
   reservePayment: 3, recordPayment: 2, transitionInvoice: 4 };
 export function harnessStore() {
   const h = createModuleTestHarness(schema, reducers);
