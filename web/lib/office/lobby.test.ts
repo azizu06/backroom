@@ -46,9 +46,9 @@ function expectLobby(html: string) {
 describe('office lobby', () => {
   it('mounts the live audit wall and ask-why in the preview office', () => {
     const html = renderToStaticMarkup(createElement(MockOffice));
-    expect(html).toContain('class="office-toolbar"');
+    expect(html).toContain('class="office-toolbar office-corner"');
     expect(html).toContain('data-testid="office-viewport"');
-    expect(html).toContain('class="office-footer"');
+    expect(html).toContain('class="office-footer office-drawer"');
     expect(html).toContain('class="seat-statuses"');
     expect(html).toContain('class="mock-controls"');
     // Operator is reached through the shared site nav (lib/site-nav.ts), not an office toolbar link.

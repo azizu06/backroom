@@ -73,6 +73,9 @@ async function startPlay(page: Page) {
   await requireWebGL(page);
   // Retry until hydrated: a click before hydration is a no-op. The denial adds a real preview audit row.
   await expect(async () => {
+    // Preview controls sit in the corner menu (closed by default); a pick closes it again.
+    const menu = page.getByRole('button', { name: 'Backroom menu' });
+    if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
     await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
     await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
   }).toPass();

@@ -25,6 +25,34 @@ import { Bear, createBearRig, poseBear } from './avatars/Bear';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
+import { CLICK_SLOP, roomRect, type OverviewPick } from '../../lib/office/overview';
+import type { ThreeEvent } from '@react-three/fiber';
+
+/** Overview click handler: what was picked and where (client coordinates). */
+export type OverviewPickHandler = (pick: OverviewPick, at: { x: number; y: number }) => void;
+/** Pointer cursor over pickable things in Overview; a drag (orbit) is not a pick. */
+function pickHandlers(pick: OverviewPick, onPick: OverviewPickHandler) {
+  return {
+    onClick(event: ThreeEvent<MouseEvent>) {
+      event.stopPropagation();
+      if (event.delta > CLICK_SLOP) return;
+      onPick(pick, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY });
+    },
+    onPointerOver(event: ThreeEvent<PointerEvent>) { event.stopPropagation(); document.body.style.cursor = 'pointer'; },
+    onPointerOut() { document.body.style.cursor = ''; },
+  };
+}
+/** Invisible pads over each room floor: clicking a room in Overview jumps into it in first person. */
+function RoomPicks({ rooms, onPick }: { rooms: readonly AnchorId[]; onPick: OverviewPickHandler }) {
+  useEffect(() => () => { document.body.style.cursor = ''; }, []);
+  return <>{rooms.map(room => {
+    const { center } = OFFICE_ANCHORS[room];
+    return <mesh key={room} name={`room-pick:${room}`} position={[center[0], 0.06, center[1]]} rotation-x={-Math.PI / 2} {...pickHandlers({ kind: 'room', room }, onPick)}>
+      <planeGeometry args={[4.25, room === 'lobby' ? 3.6 : 3.4]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>;
+  })}</>;
+}
 
 type LabelRef = RefObject<HTMLDivElement | null>;
 export type RoomLabels = Record<AnchorId, LabelRef>;
@@ -59,7 +87,7 @@ function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkM
   return null;
 }
 /** Draws the shared motion; Office's MotionRegistry owns re-seating, retargeting and the wake-up frame. */
-function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean }) {
+function Avatar({ agent, motion, tween, recorded, paused, onPick }: { agent: OfficeAgent; motion: WalkMotion; tween: boolean; recorded: boolean; paused: boolean; onPick?: OverviewPickHandler }) {
   const reduced = useReducedMotion();
   const body = useRef<Group>(null);
   const [rig] = useState(createBearRig);
@@ -85,7 +113,7 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
   </group> : null;
   // Same paw the bear holds the folder in (bear.ts pawPosition). The GLB has no paw, so the folder sits there on its own.
   const carried = pawPosition(1, BEAR_CARRY_PAW);
-  return <group ref={body} name={`agent:${agent.id}`} position={[motion.position[0], 0, motion.position[1]]}>
+  return <group ref={body} name={`agent:${agent.id}`} position={[motion.position[0], 0, motion.position[1]]} {...(onPick ? pickHandlers({ kind: 'agent', id: agent.id }, onPick) : {})}>
     {showGlb ? null : <Bear color={color} seed={agent.id} rig={rig} carry={agent.escalationId ? 'paw' : 'none'} paw={folder} />}
     {showGlb && folder && <group position={[carried[0], carried[1], carried[2]]}>{folder}</group>}
   </group>;
@@ -113,7 +141,7 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
     if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
     state.invalidate();
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
+    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 20, size.height / 13.5);
     if (tour) {
       const move = tourMove.current;
       if (move.startedAt === null) {
@@ -170,10 +198,13 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [], chatBubbles }: {
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [], chatBubbles, onPick }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
   agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[]; chatBubbles?: ChatBubble[];
+  /** Overview quick actions; only used outside Play. */
+  onPick?: OverviewPickHandler;
 }) {
+  const picking = play ? undefined : onPick;
   const lowPower = useOfficeLowPower();
   return <Canvas role='img' aria-label='3D office floor with agent desks. Use the room buttons to inspect badges and limits.' frameloop='demand' shadows={officeLightRig(lowPower).shadows} dpr={[1, 1.5]} orthographic camera={{ position: [13, 15, 17], zoom: 40, near: 0.1, far: 100 }}
     gl={OFFICE_RENDERER} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
@@ -191,17 +222,19 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
         <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : ROLES.roomPad} />
-        <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
+        {/* Over the room's far wall, clear of the agent tags (agents stand near each room's door). */}
+        <ScreenLabel at={[center[0] + 1.2, 1.3, roomRect(room).minZ + 0.3]} element={labels[room]} />
       </group>;
     })}
     {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}
     {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     {snapshot.agents.map(agent => <Fragment key={agent.id}>
-      <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />
+      <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} onPick={picking} />
       {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
     </Fragment>)}
     </Instances>
     {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
+    {picking && <RoomPicks rooms={visibleRooms(snapshot)} onPick={picking} />}
     {play ? <CoworkerAvatars peers={presence} bubbles={chatBubbles} /> : <PresenceGhosts peers={presence} />}
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
