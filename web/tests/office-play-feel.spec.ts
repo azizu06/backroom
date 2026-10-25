@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
-const BASE_FOV = 70;
+const BASE_FOV = 75;
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
@@ -98,7 +98,7 @@ test('walking eases the FOV out and back, and the player keeps moving', async ({
   expect(start.fov).toBe(BASE_FOV);
 
   await page.keyboard.down('w');
-  await page.waitForFunction(() => Number(document.querySelector<HTMLElement>('[data-player-fov]')?.dataset.playerFov) > 71, undefined, { polling: 'raf', timeout: 15_000 });
+  await page.waitForFunction(() => Number(document.querySelector<HTMLElement>('[data-player-fov]')?.dataset.playerFov) > 76, undefined, { polling: 'raf', timeout: 15_000 });
   const walking = await reading(page);
   expect(walking.z).toBeLessThan(start.z);
   expect(walking.fov).toBeGreaterThan(BASE_FOV);
@@ -106,7 +106,7 @@ test('walking eases the FOV out and back, and the player keeps moving', async ({
   await page.keyboard.up('w');
 
   // Friction stops the player within a body length, and the FOV settles back to the base.
-  await page.waitForFunction(() => Number(document.querySelector<HTMLElement>('[data-player-fov]')?.dataset.playerFov) === 70, undefined, { polling: 'raf', timeout: 15_000 });
+  await page.waitForFunction(() => Number(document.querySelector<HTMLElement>('[data-player-fov]')?.dataset.playerFov) === 75, undefined, { polling: 'raf', timeout: 15_000 });
   const stopped = await reading(page);
   await page.waitForTimeout(200);
   const later = await reading(page);
@@ -181,5 +181,31 @@ test('walking sends footstep cues, and they are silent unless the sound toggle i
   const newSteps = (await stepCount(page)) - stepsBefore;
   expect(newSteps).toBeGreaterThanOrEqual(2);
   expect((await oscillatorCount(page)) - before).toBeGreaterThanOrEqual(2);
+  expect(errors).toEqual([]);
+});
+
+test('clicking into first person locks the pointer and hides the menu; releasing it brings the menu back and walking still works', async ({ page }) => {
+  const errors = await startPlay(page);
+  const viewport = page.getByTestId('office-viewport');
+  const exit = page.getByRole('button', { name: 'Exit Play' });
+  await expect(exit).toBeVisible();
+  await surface(page).click({ position: { x: 400, y: 300 } });
+  await expect(surface(page)).toBeFocused();
+  // Some headless builds grant the lock, others refuse it; both must leave a usable view.
+  if (await page.evaluate(() => document.pointerLockElement !== null)) {
+    await expect(viewport).toHaveAttribute('data-pointer-locked', '');
+    await expect(exit).toBeHidden();
+    await expect(page.getByRole('button', { name: /^Sound (on|off)$/ })).toBeHidden();
+    await expect(viewport.locator('.play-crosshair')).toBeVisible();
+    // What Esc does in a real browser: the lock goes and the menu returns, still in Play.
+    await page.evaluate(() => document.exitPointerLock());
+  }
+  await expect(viewport).not.toHaveAttribute('data-pointer-locked');
+  await expect(exit).toBeVisible();
+  await expect(surface(page)).toBeFocused();
+  const start = await reading(page);
+  await walkFor(page, 700);
+  const after = await reading(page);
+  expect(after.z).toBeLessThan(start.z - 0.3);
   expect(errors).toEqual([]);
 });
