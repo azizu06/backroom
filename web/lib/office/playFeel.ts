@@ -20,7 +20,8 @@ export const ACCELERATION = 30;
 export const FRICTION = 45;
 /** Walking speed the bob amplitude and FOV kick are normalised against (matches `WALK_SPEED` in ./play). */
 export const REFERENCE_SPEED = 3;
-export const BASE_FOV = 70;
+/** First-person vertical field of view in degrees. */
+export const BASE_FOV = 75;
 /** Degrees added at full walking speed. Subtle on purpose. */
 export const FOV_KICK = 3.5;
 /** Metres of the eye bobbing up and down at full walking speed. */
