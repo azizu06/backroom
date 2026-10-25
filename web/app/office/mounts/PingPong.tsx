@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Html } from '@react-three/drei';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { useFrame, useThree } from '@react-three/fiber';
-import type { Mesh } from 'three';
+import { Vector3, type Camera, type Mesh } from 'three';
 import { COURT, newMatch, paddleX, stepMatchInPlace, type GameEvent } from '../../../lib/office/pingpong/game';
 import { PINGPONG_TABLE } from '../../../lib/office/pingpong/table';
 import { pingPongSession } from '../../../lib/office/pingpong/session';
@@ -25,21 +25,6 @@ export function PingPong() {
   const readout = useRef<HTMLDivElement>(null);
   const [score, setScore] = useState({ player: 0, ai: 0, winner: null as 'player' | 'ai' | null });
   const invalidate = useThree(state => state.invalidate);
-  const get = useThree(state => state.get);
-
-  useEffect(() => {
-    // A low-rate check also catches camera changes after the demand-rendered scene goes idle.
-    const updateVisibility = () => {
-      if (!readout.current) return;
-      const camera = get().camera;
-      const blocked = (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true
-        && sightBlocked(camera.position.x, camera.position.z, PINGPONG_TABLE.x, PINGPONG_TABLE.z);
-      readout.current.style.visibility = blocked ? 'hidden' : 'visible';
-    };
-    updateVisibility();
-    const timer = window.setInterval(updateVisibility, 100);
-    return () => window.clearInterval(timer);
-  }, [get]);
 
   useEffect(() => {
     if (!active) return;
@@ -167,11 +152,60 @@ export function PingPong() {
         <sphereGeometry args={[COURT.radius, 12, 8]} /><meshStandardMaterial color={PALETTE.butter} />
       </mesh>
     </group>
-    <Html center position={[PINGPONG_TABLE.x, 1.75, PINGPONG_TABLE.z]} distanceFactor={3} style={{ pointerEvents: 'none' }}>
+    <ScoreCard readout={readout}>
       <div ref={readout} data-testid='pingpong-score' data-active={String(active)} style={{ color: ROLES.text, background: PALETTE.cream, border: `1px solid ${ROLES.frame}`, borderRadius: 6, padding: '6px 10px', textAlign: 'center', whiteSpace: 'nowrap', fontSize: 13 }}>
         <strong>Ping pong · You {score.player} : {score.ai} AI</strong>
         <div>{active ? score.winner ? `${score.winner === 'player' ? 'You win!' : 'AI wins'} · Enter: rematch · Esc: leave` : 'Mouse or A/D · First to 5 · Esc: leave' : 'E to play · First to 5'}</div>
       </div>
-    </Html>
+    </ScoreCard>
   </group>;
+}
+
+const CARD_ANCHOR = new Vector3(PINGPONG_TABLE.x, 1.75, PINGPONG_TABLE.z);
+
+/**
+ * In-world score card. Like the GX10 readout it owns a DOM root outside the Canvas reconciler and defers
+ * root work past its commit (drei Html's inner root does not render here). Placement reuses one vector.
+ */
+function ScoreCard({ readout, children }: { readout: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  const gl = useThree(state => state.gl);
+  const get = useThree(state => state.get);
+  const portal = useRef<{ host: HTMLDivElement; root: Root } | null>(null);
+  const point = useRef(new Vector3());
+  const last = useRef({ left: NaN, top: NaN });
+  useEffect(() => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;top:0;left:0;z-index:5;pointer-events:none';
+    gl.domElement.parentElement?.appendChild(host);
+    const root = createRoot(host);
+    portal.current = { host, root };
+    return () => { portal.current = null; host.remove(); queueMicrotask(() => root.unmount()); };
+  }, [gl]);
+  useEffect(() => {
+    const current = portal.current;
+    queueMicrotask(() => { if (current && portal.current === current) current.root.render(children); });
+  }, [children, gl]);
+  const place = (camera: Camera, width: number, height: number) => {
+    const host = portal.current?.host;
+    if (!host) return;
+    // First person: a wall between the eye and the table hides the card (the overview sees over cut-away walls).
+    const blocked = (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true
+      && sightBlocked(camera.position.x, camera.position.z, PINGPONG_TABLE.x, PINGPONG_TABLE.z);
+    const p = point.current.copy(CARD_ANCHOR).project(camera);
+    const hidden = blocked || Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || p.z < -1 || p.z > 1;
+    if (readout.current) readout.current.style.visibility = hidden ? 'hidden' : 'visible';
+    if (hidden) return;
+    // Only touch the transform when the card actually moved, so an idle or steady view builds no strings.
+    const left = Math.round((p.x + 1) * width / 2), top = Math.round((1 - p.y) * height / 2);
+    if (left === last.current.left && top === last.current.top) return;
+    last.current.left = left; last.current.top = top;
+    host.style.transform = `translate(${left}px, ${top}px) translate(-50%, -50%)`;
+  };
+  useFrame(({ camera, size }) => place(camera, size.width, size.height));
+  useEffect(() => {
+    // A low-rate check also catches camera changes after the demand-rendered scene goes idle.
+    const timer = window.setInterval(() => { const { camera, size } = get(); place(camera, size.width, size.height); }, 100);
+    return () => window.clearInterval(timer);
+  }, [get]); // eslint-disable-line react-hooks/exhaustive-deps -- place only reads refs
+  return null;
 }
