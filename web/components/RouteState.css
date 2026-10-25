@@ -1,0 +1,23 @@
+/* Office palette tokens (app/office/lobby.css). Fallbacks match those values on pages that do not load the office. */
+/* The root SiteNav sits above an in-layout state. Lock the page to the viewport and scroll this main, so 100svh here cannot add a second screen. */
+html:has(.route-state) { height: 100svh; overflow: hidden; }
+body:has(.route-state) { display: flex; flex-direction: column; height: 100%; margin: 0; overflow: hidden; background: var(--office-cream, #FFF7EC); color: var(--office-navy, #4A5A7A); }
+
+.route-state { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; color-scheme: light; background: var(--office-cream, #FFF7EC); color: var(--office-navy, #4A5A7A); font: 16px/1.5 Avenir, 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; }
+.route-state * { box-sizing: border-box; }
+.route-state-bar { flex: none; display: flex; gap: 16px; align-items: center; min-height: 40px; padding: 0 16px; background: var(--office-navy, #4A5A7A); color: var(--office-cream, #FFF7EC); font: 13px/1.3 Avenir, 'Segoe UI', system-ui, sans-serif; }
+.route-state-content { width: 100%; max-width: 40rem; padding: 24px 24px 32px; }
+.route-state-status { margin: 0; font: 600 13px/1.4 ui-monospace, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.route-state h1 { font-size: 30px; font-weight: 600; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.route-state-body p { margin: 0 0 12px; }
+.route-state a { color: var(--office-navy, #4A5A7A); text-underline-offset: 4px; }
+.route-state-reference { font-size: 14px; overflow-wrap: anywhere; }
+.route-state-reference code { font: inherit; }
+.route-state-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 0; }
+.route-state-actions a, .route-state-actions button { min-height: 44px; display: inline-flex; align-items: center; }
+.route-state button { padding: 8px 16px; border: 1px solid var(--office-navy, #4A5A7A); border-radius: 4px; background: var(--office-navy, #4A5A7A); color: var(--office-cream, #FFF7EC); font: inherit; cursor: pointer; }
+.route-state :is(a, button):focus-visible { outline: 2px solid var(--office-navy, #4A5A7A); outline-offset: 3px; }
+.route-state-bar a { display: inline-flex; align-items: center; min-height: 40px; color: var(--office-cream, #FFF7EC); text-decoration: none; }
+.route-state-bar a:focus-visible { outline-color: var(--office-cream, #FFF7EC); }
+.route-state footer { padding: 16px 0 0; font-size: 14px; }
+@media (max-width: 650px) { .route-state-content { padding-inline: 16px; } .route-state h1 { font-size: 26px; } .route-state-actions { flex-direction: column; align-items: flex-start; } }
