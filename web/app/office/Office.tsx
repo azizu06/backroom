@@ -1,6 +1,8 @@
 'use client';
 
 import { visibleSeatAgents } from '../../lib/office/agent-labels';
+import { officePanelTabForTarget, type OfficePanelTab } from '../../lib/office/office-panels';
+import { OfficePanels } from './hud/diegetic/OfficePanels';
 
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentType, type MouseEvent, type ReactNode, type RefObject } from 'react';
 import dynamic from 'next/dynamic';
@@ -12,7 +14,6 @@ import { PAYMENT_LINK_HREF, navLinks, whatsRealLink } from '../../lib/site-nav';
 import { useActivePaymentLink } from '../../components/useActivePaymentLink';
 import { OfficeChromeIcon } from '../../components/OfficeChromeIcon';
 import { flushSync } from 'react-dom';
-import { isCloseKey } from '../../lib/office/a11y';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, PlayPanelDialog, focusAskWhy, useTouch } from './PlayHud';
 import { seatLabel } from '../../lib/office/a11y';
@@ -376,15 +377,44 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const escalations = snapshot.agents.filter(agent => agent.escalationId);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerToggle = useRef<HTMLButtonElement>(null);
+  const drawerOpener = useRef<HTMLElement | null>(null);
+  const [drawerTab, setDrawerTab] = useState<OfficePanelTab>('summary');
   useEffect(() => { if (mode === 'play' || mode === 'tour' || storyActive) { setDrawerOpen(false); setSheet(null); setInspecting(null); } }, [mode, storyActive]);
   // Ask why queries its field immediately after this event; mount the active view's audit surface synchronously.
   useEffect(() => {
-    const open = () => flushSync(() => { setSheet(mode === 'play' ? null : 'audit'); setInspecting(null); setDrawerOpen(mode === 'play'); });
+    const open = (event: Event) => {
+      const tab = officePanelTabForTarget((event as CustomEvent).detail) ?? 'audit';
+      if (mode === 'play') document.exitPointerLock?.();
+      drawerOpener.current = (document.activeElement as HTMLElement | null) ?? null;
+      flushSync(() => { setDrawerTab(tab); setSheet(mode === 'play' ? null : tab === 'inbox' ? 'inbox' : 'audit'); setInspecting(null); setDrawerOpen(mode === 'play'); });
+    };
     window.addEventListener('office-drawer', open);
     return () => window.removeEventListener('office-drawer', open);
   }, [mode]);
-  function closeDrawer() { setDrawerOpen(false); drawerToggle.current?.focus(); }
+  useEffect(() => {
+    if (mode !== 'play') return;
+    const followHash = () => {
+      const tab = officePanelTabForTarget(window.location.hash);
+      if (!tab) return;
+      document.exitPointerLock?.();
+      setDrawerTab(tab); setDrawerOpen(true); setSheet(null); setInspecting(null);
+    };
+    followHash();
+    window.addEventListener('hashchange', followHash);
+    return () => window.removeEventListener('hashchange', followHash);
+  }, [mode]);
+  function closeDrawer() {
+    setDrawerOpen(false);
+    const opener = drawerOpener.current;
+    (opener?.isConnected && !opener.closest('#office-drawer') ? opener : drawerToggle.current)?.focus();
+  }
   function openSheet(next: DetailSheetId) {
+    if (mode === 'play' && (next === 'inbox' || next === 'audit')) {
+      document.exitPointerLock?.();
+      drawerOpener.current = (document.activeElement as HTMLElement | null) ?? null;
+      setDrawerTab(next); setDrawerOpen(true); setSheet(null); setInspecting(null); setMapOpen(false); setMenu(null); setTalk(null);
+      return;
+    }
     if (mode === 'play') { document.exitPointerLock?.(); chooseView('walk'); }
     setInspecting(null);
     setMapOpen(false);
@@ -489,9 +519,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         {paymentLink && <button type='button' className='office-fullscreen-chip' data-tone='ready' onClick={() => openSheet(PAYMENT_LINK_HREF)}>Payment link ready</button>}
       </div>}
       {mode !== 'play' && !storyActive && <RealSimDetails />}
-      {mode === 'play' && <button ref={drawerToggle} type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => setDrawerOpen(open => !open)}>
-        Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
-      </button>}
+      {mode === 'play' && <div className='office-drawer-toggle office-drawer-trigger'>
+        <button ref={drawerToggle} type='button' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => {
+          if (drawerOpen) closeDrawer(); else { document.exitPointerLock?.(); drawerOpener.current = drawerToggle.current; setDrawerOpen(true); }
+        }}>Office panels</button>
+        <button type='button' aria-label={`Inbox · ${snapshot.inboxCount}`} aria-controls='office-drawer' onClick={event => {
+          document.exitPointerLock?.(); drawerOpener.current = event.currentTarget; setDrawerTab('inbox'); setDrawerOpen(true);
+        }}>· {snapshot.inboxCount}</button>
+      </div>}
       <p className='visually-hidden'>{`${plan ? 'Floor plan view' : '3D office view'}. Click a room, or use Rooms in the sidebar, to inspect badges and limits.`}</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} onPick={mode === 'play' ? openMenu : undefined} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} onPick={mode === 'play' ? openMenu : undefined} /> : <>
@@ -564,13 +599,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       </nav>
     </DetailSheet>}
     {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
-    {mode === 'play' && <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {
-      const target = event.target as HTMLElement;
-      if (isCloseKey(event.key) && !event.defaultPrevented && !target.closest('input, textarea, select, dialog, [role=dialog]')) { event.preventDefault(); closeDrawer(); }
-    }}>
-      <header className='office-drawer-head'><h2>Office Panels</h2><button type='button' onClick={closeDrawer} aria-label='Close office panels'>Close</button></header>
-      {!sheet && <>{seatStatuses}{auditContent}{previewReceipts}{inboxContent}{workdayContent}{handoffContent}</>}
-    </footer>}
+    {mode === 'play' && <OfficePanels open={drawerOpen} tab={drawerTab} select={setDrawerTab} close={closeDrawer} snapshot={snapshot} content={{
+      summary: <><section className='office-panel-today' aria-label='Today’s status'><h2>Today at Backroom</h2>
+        <p>{snapshot.inboxCount} in the inbox · {escalations.length} awaiting Dana · {snapshot.audit.length} decisions received</p>
+      </section>{seatStatuses}</>,
+      inbox: <>{inboxContent}{previewReceipts}</>,
+      audit: auditContent,
+      activity: <>{workdayContent}{handoffContent}</>,
+    }} />}
   </section></HandoffPresentation>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */
