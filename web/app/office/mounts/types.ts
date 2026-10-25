@@ -11,5 +11,7 @@ export interface SceneMount {
    * false: drawn after it, for pieces with their own meshes and materials.
    */
   readonly instanced: boolean;
+  /** Non-instanced mounts that move (doors, carried folders, handoff walkers): their contact shadow redraws every frame. */
+  readonly moving?: boolean;
   readonly Component: ComponentType<SceneMountProps>;
 }
