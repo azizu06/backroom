@@ -41,24 +41,15 @@ body:has(.office-shell[data-hud='diegetic']) { overflow: hidden; }
 }
 @keyframes diegetic-hint { 0%, 70% { opacity: .9; } 100% { opacity: 0; } }
 
-/* Real-vs-sim disclosure (product requirement): on office pages, its one-line note as a pill, bottom left; details via Advanced. */
-body:has(.office-shell) .real-sim.real-sim-overlay {
-  position: fixed; z-index: 100; left: 12px; right: auto; bottom: 12px; top: auto; width: auto; max-width: min(460px, calc(100% - 24px));
-  margin: 0; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--office-slate); background: var(--office-navy); color: var(--office-cream);
-}
-body:has(.office-shell) .real-sim.real-sim-overlay > :not(.real-sim-note) { display: none; }
-body:has(.office-shell) .real-sim.real-sim-overlay .real-sim-note {
-  margin: 0; color: var(--office-cream); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-body:has(.office-shell) .real-sim.real-sim-overlay .real-sim-note::before { content: 'Real vs. sim · '; font-weight: 700; }
 @media (max-width: 760px) { .office-shell[data-hud='diegetic'] .office-caption { top: 46px; white-space: normal; max-width: calc(100% - 24px); } }
 
 /* The agent card: a speech card pinned over the agent's head by the scene (AgentCardAnchor). */
 .office-shell .play-panel.diegetic-card {
   top: 0; left: 0; width: min(300px, calc(100vw - 24px)); max-height: none; overflow: visible; padding: 12px 14px 10px;
-  border-radius: 14px; border-color: var(--office-lavender); transform-origin: 50% 100%; visibility: hidden; will-change: transform;
+  border-radius: 14px; border-color: var(--office-lavender); transform-origin: 50% 100%; opacity: 0; will-change: transform;
 }
-.office-shell .play-panel.diegetic-card[data-anchored] { visibility: visible; }
+/* Transparent (not hidden) until the scene places it, so its Close button can take focus on open. */
+.office-shell .play-panel.diegetic-card[data-anchored] { opacity: 1; }
 .office-shell .play-panel.diegetic-card::after {
   content: ''; position: absolute; top: 100%; left: var(--tail-x, 50%); width: 16px; height: 16px; margin-top: -8px;
   background: var(--office-cream); border-right: 1px solid var(--office-lavender); border-bottom: 1px solid var(--office-lavender);
@@ -121,3 +112,172 @@ body:has(.office-shell) .real-sim.real-sim-overlay .real-sim-note::before { cont
 .office-shell .office-advanced-gx10 summary { cursor: pointer; }
 .office-shell .office-advanced-note { color: var(--office-slate); font-size: 11px; }
 .office-shell .office-advanced-panel a { color: var(--office-navy); }
+
+/* Overview (O): the overhead 3D camera with quick actions. Agent tags and desk labels are the keyboard targets. */
+.office-shell .agent-tag:has(.agent-tag-pick) { padding: 0; pointer-events: none; }
+.office-shell .agent-tag .agent-tag-pick {
+  pointer-events: auto; display: block; margin: 0; padding: 2px 6px; font: inherit; text-align: left; cursor: pointer;
+  color: inherit; background: transparent; border: 0; border-radius: 8px;
+}
+.office-shell .agent-tag:has(.agent-tag-pick:is(:hover, :focus-visible, [aria-expanded='true'])) { background: var(--office-butter); border-color: var(--office-navy); }
+.office-shell [data-overview] .desk-label { cursor: pointer; }
+.office-shell .overview-toggle {
+  position: absolute; z-index: 4; top: 12px; left: 12px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  color: var(--office-cream); background: var(--office-navy); border: 1px solid var(--office-navy); border-radius: 999px; box-shadow: var(--office-plate-shadow);
+}
+.office-shell .overview-toggle:hover { background: var(--office-slate); }
+.office-shell :is(.overview-toggle, .play-overview) kbd {
+  margin-left: 6px; padding: 0 5px; font-size: 11px; font-weight: 700; line-height: 1.5; font-family: inherit; border-radius: 4px;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender);
+}
+.office-shell .overview-menu {
+  position: absolute; z-index: 7; min-width: 196px; padding: 6px; display: grid; gap: 2px;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 12px; box-shadow: var(--office-plate-shadow);
+}
+.office-shell .overview-menu-title { margin: 2px 8px 6px; font-size: 13px; display: grid; }
+.office-shell .overview-menu-title span { font-size: 11px; color: var(--office-slate); max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-shell .overview-menu [role='menuitem'] {
+  display: grid; padding: 6px 10px; text-align: left; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  color: var(--office-navy); background: transparent; border: 0; border-radius: 8px;
+}
+.office-shell .overview-menu [role='menuitem']:is(:hover, :focus-visible) { background: var(--office-butter); }
+.office-shell .overview-menu-hint { font-size: 11px; font-weight: 400; color: var(--office-slate); }
+/* In Play the Overview button joins the quiet control row (left of Sound). */
+.office-shell .play-overview { position: absolute; top: 12px; }
+.office-shell[data-hud='diegetic'] .play-overview {
+  top: 12px; right: 346px; padding: 4px 10px; font-size: 12px; line-height: 1.4; font-weight: 600; cursor: pointer;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px;
+  box-shadow: var(--office-plate-shadow); opacity: .62; transition: opacity 120ms ease;
+}
+.office-shell[data-hud='diegetic'] .play-overview:is(:hover, :focus-visible) { opacity: 1; }
+.office-shell[data-hud='diegetic'] .play-overview kbd { padding: 0 4px; font-size: 10px; }
+/* Overview talk card: the agent speaks in the card; the old floating bubble would double it. */
+.office-shell:has(.diegetic-card) .agent-talk-bubble { display: none; }
+@media (prefers-reduced-motion: reduce) { .office-shell[data-hud='diegetic'] .play-overview { transition: none; } }
+/* Agents are the main Overview targets: their tags sit above the room labels. */
+.office-shell [data-overview] .agent-tags { z-index: 3; }
+/* Overview room labels: one compact line (badge and limits are under Details); the full text stays in the aria-label. */
+.office-shell [data-overview] .desk-label { padding: 2px 9px; font-size: 12px; border-radius: 999px; opacity: .92; }
+.office-shell [data-overview] .desk-label span { display: none; }
+.office-shell [data-overview] .desk-label:is(:hover, :focus-visible, [aria-expanded='true']) { opacity: 1; background: var(--office-butter); }
+
+/*
+ * /office is just the 3D world: the canvas fills the window (100dvh) with nothing above or below it.
+ * Chrome is one corner menu (top left), a drawer of office panels (closed by default) and the demo disclosure pill.
+ */
+body:has(.office-shell) { overflow: hidden; }
+html body .office-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+html body .office-shell .office-viewport.office-viewport { position: fixed; inset: 0; height: auto; min-height: 0; flex: none; }
+.office-shell .office-corner {
+  position: absolute; z-index: 8; top: 12px; left: 12px; min-height: 0; max-width: calc(100% - 24px); padding: 6px; display: grid; gap: 8px;
+  justify-content: start; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 14px; box-shadow: var(--office-plate-shadow);
+}
+.office-shell .office-corner-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.office-shell .office-corner-row > *, .office-shell .office-corner-panel button { font-size: 13px; }
+.office-shell .office-corner-toggle {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;
+  color: var(--office-cream); background: var(--office-navy); border: 1px solid var(--office-navy); border-radius: 999px;
+}
+.office-shell .office-corner-toggle strong { font-size: 14px; letter-spacing: -0.2px; }
+.office-shell .office-corner-view select, .office-shell .office-corner .office-guide-trigger {
+  padding: 4px 8px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px; cursor: pointer;
+}
+.office-shell .office-corner .overview-toggle { position: static; padding: 5px 12px; box-shadow: none; }
+.office-shell .office-corner .office-mode-chip { margin: 0; }
+.office-shell .office-corner-panel { display: grid; gap: 10px; padding: 4px 2px 2px; }
+.office-shell .office-corner-panel[hidden], .office-shell .office-drawer[hidden] { display: none; }
+.office-shell .office-corner-panel .site-nav { border-radius: 10px; flex-wrap: wrap; }
+.office-shell .office-corner-panel .office-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.office-shell .office-corner-panel .office-tools > button, .office-shell .office-corner-panel .room-navigation button {
+  padding: 4px 10px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px; cursor: pointer;
+}
+.office-shell .office-corner-panel .office-tools > button:hover, .office-shell .office-corner-panel .room-navigation button:hover { background: var(--office-butter); }
+.office-shell .office-corner-panel .office-tools label { color: var(--office-navy); }
+/* Advanced opens in full below its summary (no clipping parent); it scrolls on its own only if taller than the screen. */
+.office-shell .office-corner-panel .office-advanced-panel { left: 0; right: auto; z-index: 12; max-height: calc(100dvh - 190px); overflow: auto; }
+.office-shell .office-corner-panel .room-navigation { position: static; display: flex; flex-wrap: wrap; gap: 4px; padding: 0; min-height: 0; border: 0; background: transparent; overflow: visible; }
+.office-shell .office-corner-panel .room-navigation button[aria-pressed='true'] { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
+/* Demo disclosure stays visible as a small pill, bottom left; the caption moves to the bottom centre. */
+.office-shell .office-disclosure { position: absolute; z-index: 5; left: 12px; bottom: 12px; max-width: min(520px, calc(100% - 200px)); }
+.office-shell .office-disclosure .demo-pill { white-space: normal; box-shadow: var(--office-plate-shadow); }
+.office-shell:not([data-hud='diegetic']) .office-caption { left: 50%; transform: translateX(-50%); bottom: 12px; max-width: min(520px, calc(100% - 420px)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.office-shell .office-drawer-toggle {
+  position: absolute; z-index: 5; right: 12px; bottom: 12px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px; box-shadow: var(--office-plate-shadow);
+}
+.office-shell .office-drawer-toggle[aria-expanded='true'] { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
+html body .office-shell .office-drawer {
+  position: fixed; z-index: 9; top: 12px; right: 12px; bottom: 56px; width: min(620px, calc(100vw - 24px)); min-height: 0; overflow: auto;
+  padding: 12px 16px 16px; border: 1px solid var(--office-lavender); border-radius: 14px; box-shadow: var(--office-plate-shadow);
+}
+.office-shell .office-drawer-head { position: sticky; top: -12px; z-index: 1; display: flex; justify-content: space-between; align-items: center; margin: -12px -16px 10px; padding: 10px 16px; background: inherit; background-color: var(--office-navy); border-radius: 14px 14px 0 0; }
+.office-shell .office-drawer-head h2 { margin: 0; font-size: 15px; color: var(--office-cream); }
+.office-shell .office-drawer-head button { padding: 3px 10px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px; cursor: pointer; }
+/* In first person the HUD owns the screen: the corner menu and the drawer toggle step aside (Overview is on O). */
+.office-shell[data-hud='diegetic'] .office-drawer-toggle { display: none; }
+/* Hidden, not removed: the corner hosts the keyboard-shortcuts dialog that ? opens from Play. */
+.office-shell[data-hud='diegetic'] .office-corner { visibility: hidden; }
+.office-shell[data-hud='diegetic'] .office-corner dialog[open] { visibility: visible; }
+.office-shell[data-hud='diegetic'] .office-disclosure { z-index: 100; }
+@media (max-width: 760px) {
+  .office-shell .office-disclosure { max-width: calc(100% - 150px); }
+  .office-shell:not([data-hud='diegetic']) .office-caption { display: none; }
+  html body .office-shell .office-drawer { top: 64px; }
+}
+.office-shell .office-corner-controls .mock-controls { margin: 0; padding-top: 8px; border-top: 1px solid var(--office-lavender); }
+.office-shell .office-corner-controls .mock-controls span { color: var(--office-slate); }
+.office-shell .office-corner-controls .mock-controls a { color: var(--office-navy); font-size: 12px; }
+.office-shell .office-corner-controls .mock-controls button { color: var(--office-navy); background: var(--office-peach); border: 1px solid var(--office-navy); border-radius: 999px; }
+/* The talk card sits above the corner menu while it is open (it is pinned near the top in Overview). */
+.office-shell .play-panel.diegetic-card { z-index: 9; }
+
+/* Overview map (O): a large 2D board of the floor over the scene; rooms are tiles, agents move on it live. */
+.office-shell .office-map-button {
+  padding: 5px 12px; font-weight: 700; cursor: pointer; color: var(--office-navy); background: var(--office-butter); border: 1px solid var(--office-navy); border-radius: 999px;
+}
+.office-shell .office-map-button[aria-expanded='true'] { color: var(--office-cream); background: var(--office-navy); }
+.office-shell .overview-map {
+  position: absolute; z-index: 7; inset: 72px 24px 52px; display: grid; grid-template-rows: auto 1fr; gap: 12px; padding: 16px 18px 18px;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 18px; box-shadow: var(--office-plate-shadow);
+}
+.office-shell .overview-map-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.office-shell .overview-map-head h2 { margin: 0; font-size: 20px; }
+.office-shell .overview-map-head p { margin: 2px 0 0; font-size: 13px; color: var(--office-slate); }
+.office-shell .overview-map-actions { display: flex; gap: 8px; }
+.office-shell .overview-map-actions button {
+  padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px;
+}
+.office-shell .overview-map-actions .overview-map-fp { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
+.office-shell .overview-map-actions kbd { margin-left: 4px; padding: 0 4px; font: inherit; font-size: 11px; border: 1px solid var(--office-lavender); border-radius: 4px; color: var(--office-navy); background: var(--office-cream); }
+.office-shell .overview-map-board { position: relative; align-self: center; justify-self: center; width: min(100%, calc((100dvh - 230px) * 16 / 11)); aspect-ratio: 16 / 11; border-radius: 14px; background: var(--office-peach); border: 2px solid var(--office-navy); }
+.office-shell .overview-map-hall { position: absolute; display: grid; place-items: center; background: var(--office-blush); opacity: .7; }
+.office-shell .overview-map-hall span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--office-navy); }
+.office-shell .overview-map-room {
+  position: absolute; box-sizing: border-box; display: grid; align-content: start; gap: 4px; margin: 0; padding: 12px 14px; text-align: left; font: inherit; cursor: pointer;
+  color: var(--office-navy); background: var(--office-cream); border: 3px solid var(--office-lavender); border-radius: 12px; box-shadow: inset 0 6px 0 var(--room-color);
+}
+.office-shell .overview-map-room strong { font-size: clamp(14px, 1.6vw, 20px); }
+.office-shell .overview-map-room span { font-size: clamp(11px, 1.05vw, 14px); color: var(--office-slate); overflow: hidden; text-overflow: ellipsis; }
+.office-shell .overview-map-room:is(:hover, :focus-visible, [aria-expanded='true']) { border-color: var(--office-navy); background: var(--office-butter); }
+.office-shell .overview-map-room[data-locked] { background: var(--office-lavender); }
+.office-shell .overview-map-server { position: absolute; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--office-cream); background: var(--office-navy); border-radius: 4px; pointer-events: none; }
+.office-shell .overview-map-agent {
+  position: absolute; z-index: 1; display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 2px 8px 2px 2px; transform: translate(-50%, -50%);
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--office-navy); background: var(--office-cream); border: 2px solid var(--office-navy); border-radius: 999px;
+  box-shadow: var(--office-plate-shadow); transition: left 240ms linear, top 240ms linear;
+}
+.office-shell .overview-map-dot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: var(--office-navy); background: var(--office-aqua); }
+.office-shell .overview-map-agent[data-escalating] .overview-map-dot { background: var(--office-butter); }
+.office-shell .overview-map-agent:is(:hover, :focus-visible, [aria-expanded='true']) { background: var(--office-butter); }
+.office-shell .overview-menu { z-index: 10; }
+@media (prefers-reduced-motion: reduce) { .office-shell .overview-map-agent { transition: none; } }
+@media (max-width: 760px) { .office-shell .overview-map { inset: 120px 8px 52px; padding: 10px; } .office-shell .overview-map-room { padding: 6px; } }
+
+/* First person shows only the crosshair, the E prompt and the disclosure pill. The control row and hint stay
+   reachable by keyboard and hover (Esc exits, O opens the Overview), but sit invisible until then. */
+.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle, .play-overview),
+.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { opacity: 0 !important; }
+.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle, .play-overview):is(:hover, :focus-visible),
+.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator']:is(:hover, :focus-visible) { opacity: 1 !important; }
+.office-shell[data-hud='diegetic'] .office-caption { animation: none; opacity: 0; }
+.office-shell:has(.overview-map) .office-caption { display: none; }

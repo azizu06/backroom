@@ -4,7 +4,6 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3, type Object3D } from 'three';
 import { anchoredCard } from './cardAnchor';
-import { usePlayCamera } from './usePlayCamera';
 
 const HEAD_Y = 1.9;
 const EDGE = 12;
@@ -42,7 +41,10 @@ function Projector() {
   return null;
 }
 
-/** HUD variant (c): Play-only scene piece behind the anchored agent card. View-only. */
+/**
+ * HUD variant (c): scene piece behind the anchored agent card. Play opens the card on E; Overview opens it
+ * from the quick menu's Talk, so it runs under either camera. View-only.
+ */
 export function AgentCardAnchor() {
-  return usePlayCamera() ? <Projector /> : null;
+  return <Projector />;
 }
