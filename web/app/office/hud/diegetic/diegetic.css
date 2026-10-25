@@ -185,6 +185,10 @@ html body .office-shell .office-viewport.office-viewport { position: fixed; inse
 .office-shell .office-corner-panel { display: grid; gap: 10px; padding: 4px 2px 2px; }
 .office-shell .office-corner-panel[hidden], .office-shell .office-drawer[hidden] { display: none; }
 .office-shell .office-corner-panel .site-nav { border-radius: 10px; flex-wrap: wrap; }
+.office-shell .office-corner-panel .office-more-screens ul { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.office-shell .office-corner-panel .office-more-screens a { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px; font-weight: 700; color: var(--office-navy);
+  text-decoration: none; background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px; }
+.office-shell .office-corner-panel .office-more-screens a:hover { background: var(--office-butter); }
 .office-shell .office-corner-panel .office-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .office-shell .office-corner-panel .office-tools > button, .office-shell .office-corner-panel .room-navigation button {
   padding: 4px 10px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px; cursor: pointer;

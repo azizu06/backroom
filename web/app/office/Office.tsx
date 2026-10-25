@@ -23,6 +23,7 @@ import type { StoryChapter } from '../../lib/office/story';
 import { SoundToggle } from './SoundToggle';
 import { ThemeToggle } from './ThemeToggle';
 import { RainToggle } from './RainToggle';
+import { PaymentToast } from './PaymentToast';
 import { PresenceChip } from './PresenceChip';
 import { usePresence } from './usePresence';
 import { useProximityChat } from './useProximityChat';
@@ -51,6 +52,11 @@ import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-c
 import { bakedArtRequested } from '../../lib/office/baked-art';
 import { interactionStore } from '../../lib/office/interactions';
 import './office-tokens.css';
+
+/** Screens the shared site nav leaves out, so every page is one click from the corner menu. */
+const OFFICE_MORE_SCREENS = [
+  { label: 'Calls', href: '/calls' }, { label: 'Policy', href: '/policy' }, { label: 'Payment link', href: '/payment-link' },
+] as const;
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -294,6 +300,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         </div>
         <div id='office-corner-panel' className='office-corner-panel' hidden={!cornerOpen}>
           <SiteNav placement='office' />
+          <nav className='office-more-screens' aria-label='More screens'><ul>{OFFICE_MORE_SCREENS.map(({ label, href }) => <li key={href}><a href={href}>{label}</a></li>)}</ul></nav>
           <div className='office-tools'>
             <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>{storyActive ? 'Skip tour' : 'Take the tour'}</button>
             <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Camera tour</button>
@@ -358,6 +365,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
+      <PaymentToast snapshot={snapshot} />
       {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     </div>
     <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {
