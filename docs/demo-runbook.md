@@ -129,6 +129,17 @@ public: share only the intended judging URLs. Controller, operator and tool
 secrets stay private. The printed **public** origin is the one configured for
 passkeys and policy/audit authentication; use that origin consistently.
 
+`DEMO_PUBLIC_URL` is an optional preset public origin. It must be `https`, with no username, password, path, query, or hash; `demo:up` stores `url.origin` as `DEMO_PUBLIC_URL` and as the passkey origin (`WEBAUTHN_ORIGIN` / RP ID). Cloudflare quick tunnels are skipped while it is set. Leave it unset to keep the quick-tunnel default (`cloudflared` on PATH). `DEMO_TUNNEL=0` still forces `http://localhost:<port>` and does not start a tunnel. Invalid values stop startup with `DEMO_PUBLIC_URL_INVALID`.
+
+The live host uses Tailscale Funnel instead of a quick tunnel (those returned 429 and a new hostname each time):
+
+```sh
+tailscale funnel --bg 3000
+DEMO_PUBLIC_URL=https://backroom.tail289372.ts.net pnpm demo:up
+```
+
+The passkey is bound to that Funnel origin. Re-enroll it if the origin changes. Funnel must already forward to `127.0.0.1:3000` (or the chosen `DEMO_PORT`).
+
 The printed URLs include `/attack` for the judge's hostile-document proof.
 The supervisor owns its private loopback server on port 8790 (`ATTACK_DEMO_PORT`
 overrides it), checks that port before starting, and sets `ATTACK_DEMO_BASE_URL`
