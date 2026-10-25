@@ -4,7 +4,7 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "c6b175bf62e72ad6187f05f5adc3470b9e4b6ddb",
+    "baseCommit": "c6c743863cec9550c9f4eb1682029bd320599a84",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
@@ -12,7 +12,7 @@
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
-      "orchestrator/src/agents/eval/precall.ts": "293834a7bed572def972e1346867ba27c585cfaeece371534454f3a0ae6d2738",
+      "orchestrator/src/agents/eval/precall.ts": "ec46ddbf87457c7492518bf6d4a8bf95cefbe834d685b154e747c2e4897f0bee",
       "orchestrator/src/agents/eval/call-button.ts": "5016f5366709333e75c15c9c489241166a2a7d444996bf51fae39e272b4356c2",
       "orchestrator/src/agents/eval/failover.ts": "9506d421ed7f91396eeed59c0752743a93c7ea887352a3159382d15dc607f36c",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
@@ -23,7 +23,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "07c548dd157c3ef197f9092ab0208b1bc8faee93af9c267b03fd34e3c83b04af"
+      "orchestrator/src/agents/eval/scoreboard.ts": "296f2aeea2eaba404ba030deabb954192c275d10631e5a0b3629a7776aa078b5"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -14905,6 +14905,12 @@
           "OFAC_STOP"
         ]
       },
+      "sanctionsEvidence": {
+        "fixtureOfacHit": true,
+        "creditCheckCalls": 0,
+        "liveCrsExecuted": false,
+        "mappedSanctionsIdentity": null
+      },
       "plannerResult": "not_started",
       "email": {
         "status": "blocked",
@@ -15728,7 +15734,7 @@
     },
     {
       "id": "C15",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Frozen integrationOutcome: use_actual_CRS_OFAC_test_identity_if_available_label_sandbox_no_dial. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: 0, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open."
     },
     {
       "id": "C21",
