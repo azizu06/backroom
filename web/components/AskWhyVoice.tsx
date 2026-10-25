@@ -10,6 +10,11 @@ export function askWhyErrorMessage(status?: number, voice = false, code?: string
   return voice ? 'Voice is unavailable. Type your question below.' : 'Could not answer. Try again.';
 }
 
+/** Text ask-why stays editable while voice arms/records; only the chain pause and in-flight text submit lock it. */
+export function askWhyTextLocked(disabled: boolean, phase: 'idle' | 'arming' | 'recording' | 'thinking'): boolean {
+  return disabled || phase === 'thinking';
+}
+
 /** The wall/office owns placement and optional citation selection. */
 export function AskWhyVoice({ onAnswer, label = 'Ask why', disabled = false, disabledReason = 'Ask why is paused.' }: {
   onAnswer?: (answer: AskWhyVoiceResult) => void;
@@ -171,14 +176,31 @@ export function AskWhyVoice({ onAnswer, label = 'Ask why', disabled = false, dis
     </button>
     <form onSubmit={event => {
       event.preventDefault();
-      if (disabledRef.current || busy.current || !question.trim()) return;
+      if (disabledRef.current || phase === 'thinking' || !question.trim()) return;
+      // Prefer typed ask-why over a stuck mic arm/recording: cancel voice and submit text.
+      if (phase === 'arming' || phase === 'recording') {
+        if (recorder.current) recorder.current.onstop = null;
+        release();
+        busy.current = false;
+        setPhase('idle');
+      }
+      if (busy.current) return;
       busy.current = true;
       playback.current?.pause();
       void send(JSON.stringify({ question: question.trim() }), false);
     }}>
-      <label>Question <input value={question} maxLength={1000} disabled={disabled || phase !== 'idle'}
-        onChange={event => setQuestion(event.target.value)} /></label>
-      <button type="submit" disabled={disabled || phase !== 'idle' || !question.trim()}>Ask why</button>
+      {/* Text stays editable during voice arm/record so a mic prompt or stray Hold click cannot trap the field. */}
+      <label>Question <input value={question} maxLength={1000} disabled={askWhyTextLocked(disabled, phase)}
+        onChange={event => {
+          if (phase === 'arming' || phase === 'recording') {
+            if (recorder.current) recorder.current.onstop = null;
+            release();
+            busy.current = false;
+            setPhase('idle');
+          }
+          setQuestion(event.target.value);
+        }} /></label>
+      <button type="submit" disabled={askWhyTextLocked(disabled, phase) || !question.trim()}>Ask why</button>
     </form>
     <span role="status">{phase === 'thinking' ? 'Checking the audit log…' : phase === 'recording' ? 'Recording (15 seconds maximum)' : ''}</span>
     {disabled && <p role="status">{disabledReason}</p>}
