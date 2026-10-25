@@ -20,6 +20,7 @@ export interface InboxNarration {
   repository: FinanceRepository;
   result: SeatResult;
   auditId: string;
+  displayId?: string;
 }
 export const demoAgentsEnabled = (env: Record<string, string | undefined> = process.env) =>
   env.DEMO_AGENTS === '1' || (env.DEMO_AGENTS === undefined && env.BACKROOM_DEMO === '1');
@@ -144,7 +145,7 @@ export function createInboxAgents(options: {
       auditor: { store: control, loadCase: async () => ({ refs, correctionCount: auditorCorrections((await store.getCase(caseId))!) }) },
     });
     const dispatcher = new Dispatcher({ runtime, store, ledger, control, roles, mode: 'demo', runnerId: `judge-narration:${randomUUID()}` });
-    const opened = store.openCase({ caseId, role: 'intake', artifactRefs: [item.id], displayId: item.id });
+    const opened = store.openCase({ caseId, role: 'intake', artifactRefs: [item.id], displayId: unchecked.displayId ?? item.id });
     const done = opened.then(() => stopped ? undefined : dispatcher.runCase({ caseId, role: 'intake',
       artifactRefs: [item.id], credentialOwnerId: 'aziz', signal: abort.signal,
       input: { inboxRef: item.id, decisionRef: auditId, narrationOnly: true } }));
@@ -296,15 +297,19 @@ export async function resetInboxAgents() {
     root.backroomInboxAgentConfig = undefined;
   }
 }
-export async function narrateInbox(input: InboxNarration) {
-  if (!demoAgentsEnabled()) return;
-  // Demo bootstrap installs its exact transport, including the database selected by reset.
+/** The same lazy host is shared by inbox requests and the operator workday producer. */
+export function getInboxAgents() {
+  if (!demoAgentsEnabled()) throw new Error('DEMO_AGENTS_OFF');
   if (!root.backroomInboxAgents) {
     const config = root.backroomInboxAgentConfig;
     if (!config && process.env.STATE_STORE === 'spacetime') throw new Error('DEMO_AGENTS_NOT_INSTALLED');
     root.backroomInboxAgents = createInboxAgents(config ?? { control: getStateStore() });
   }
-  return root.backroomInboxAgents?.submit(input);
+  return root.backroomInboxAgents;
+}
+export async function narrateInbox(input: InboxNarration) {
+  if (!demoAgentsEnabled()) return;
+  return getInboxAgents().submit(input);
 }
 
 /** The authenticated call route reports a refusal; the installed demo host rebuilds trusted case data. */
