@@ -94,8 +94,12 @@ function describe(entry: AuditEntry): string {
     case 'record_opt_out': return 'Client opted out; calls stopped';
     case 'request_human': return 'Handed the call to a human';
     case 'report_already_paid': return 'Client said it was already paid';
-    case 'reconcile': return entry.ruleIds.includes('EXACT_PAYMENT_MATCH')
-      ? `Deposit matched invoice ${invoice ?? ''} exactly`.trimEnd() : 'No exact deposit match; held for review';
+    case 'reconcile': {
+      const debit = inputs.transactionKind === 'withdrawal';
+      return entry.ruleIds.includes('EXACT_PAYMENT_MATCH')
+        ? `${debit ? 'Debit' : 'Deposit'} matched invoice ${invoice ?? ''} exactly`.trimEnd()
+        : debit ? 'Debit did not match the invoice; held for review' : 'No exact deposit match; held for review';
+    }
     case 'nessie_completed': return 'Sandbox bank transfer completed';
     case 'pay': return 'Client paid through the link';
     case 'judge_inbox_decision': {

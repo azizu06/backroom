@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "live": "tsx --env-file=../../.env.local src/live.ts",
+    "debit:live": "tsx --env-file=../../.env.local src/debit-live.ts",
     "balance-proof": "tsx --env-file=../../.env.local src/balance-proof-cli.ts"
   },
   "devDependencies": {
