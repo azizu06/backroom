@@ -9,6 +9,7 @@ import { masterPayment } from '../payment-boundary';
 import { domain } from '../payables/decisions';
 import type { FinanceRepository, PayablesClient, SeatOptions } from '../payables/types';
 import { loadTestnetWallet, type WalletLabel } from './cdp';
+import { facilitatorReason } from './diagnostics';
 
 export const X402_NETWORK = 'eip155:84532' as const;
 export const X402_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
@@ -137,11 +138,17 @@ export function x402Payables(options: X402Options): PayablesClient {
         const payload = await protocol.createPaymentPayload(required);
         const authorization = payload.payload.authorization as { nonce?: unknown } | undefined;
         if (typeof authorization?.nonce !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(authorization.nonce)) throw new Error('X402_INVALID_AUTHORIZATION');
+        const signed = payload.payload.authorization as Record<string, unknown>;
+        await log('authorization', 'ALLOW', { payer: signer.address, payTo, amount, asset: X402_USDC,
+          domain: { name: 'USDC', version: '2', chainId: 84532 },
+          validAfter: signed.validAfter, validBefore: signed.validBefore });
         const paid = await request(protocol.encodePaymentSignatureHeader(payload));
         const settlement = protocol.getPaymentSettleResponse(name => paid.headers.get(name));
+        const errorReason = facilitatorReason(settlement.errorReason);
         // Preserve facilitator hash even when later HTTP/chain confirmation fails.
         await log('settlement', settlement.success ? 'ALLOW' : 'ESCALATE', {
           payer: signer.address, walletLabel,
+          ...(errorReason ? { errorReason } : {}),
           transaction: settlement.transaction, authorizationNonce: authorization.nonce, success: settlement.success, settlementNetwork: settlement.network,
         });
         if (!paid.ok || !settlement.success || settlement.network !== X402_NETWORK ||

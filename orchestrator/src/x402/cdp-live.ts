@@ -9,6 +9,7 @@ import { loadTestnetWallet } from './cdp';
 import { cdpCredentialsPresent, testnetAccount } from './keychain';
 import { X402_NETWORK, x402Payables } from './index';
 import { startTestnetVendor } from './vendor';
+import type { FacilitatorDiagnostic } from './diagnostics';
 
 /** Explicit one-shot TESTNET evidence run through the actual in-process MCP handler. */
 async function main() {
@@ -21,6 +22,7 @@ async function main() {
   // Refuse any repeat even after a crash or an uncertain chain/provider response.
   await writeFile(evidencePath, JSON.stringify({ status: 'reserved', network: X402_NETWORK, amountCents: 1 }) + '\n', { flag: 'wx' });
   const state = new MemoryStateStore();
+  const facilitatorDiagnostics: FacilitatorDiagnostic[] = [];
   let vendor: Awaited<ReturnType<typeof startTestnetVendor>> | undefined;
   try {
     const wallet = await loadTestnetWallet();
@@ -32,7 +34,8 @@ async function main() {
     const source = { id: 'invoice:cdp-testnet', source: 'seed' as const, senderDomain: 'acme.example' };
     const repository = new MemoryFinanceRepository({ vendors: [{ id: fields.vendorId, accountId: fields.bankAccountId, domain: source.senderDomain, approved: true, revision: 1 }],
       purchaseOrders: [{ id: fields.poId, vendorId: fields.vendorId, amountCents: 1, lineItems: fields.lineItems }] });
-    vendor = await startTestnetVendor({ id: fields.invoiceId, amountCents: 1, payTo: recipient }, { port: 0 });
+    vendor = await startTestnetVendor({ id: fields.invoiceId, amountCents: 1, payTo: recipient }, { port: 0,
+      onFacilitatorResult: event => { facilitatorDiagnostics.push(event); console.log(JSON.stringify({ facilitatorDiagnostic: event })); } });
     const controller = { request: async () => 'cdp-testnet-held' };
     const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'x402',
       x402: x402Payables({ repository, state, vendorOrigin: vendor.origin, signer: () => wallet }) });
@@ -46,6 +49,7 @@ async function main() {
     const result = JSON.parse(block.text) as { status?: string; receiptId?: string };
     const evidence = { label: 'x402 testnet', network: X402_NETWORK, tool: 'mcp__backroom__coinbase_x402_pay', walletLabel: wallet.walletLabel,
       payer: wallet.address, recipient, invoiceId: fields.invoiceId, amountCents: 1, ...result,
+      facilitatorDiagnostics,
       explorer: result.receiptId ? `https://sepolia.basescan.org/tx/${result.receiptId}` : undefined,
       auditChain: await state.verifyAuditChain(), audit: await state.listAudit(), at: new Date().toISOString() };
     await writeFile(evidencePath, JSON.stringify(evidence, null, 2) + '\n');

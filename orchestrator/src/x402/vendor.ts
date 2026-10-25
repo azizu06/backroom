@@ -4,16 +4,32 @@ import { HTTPFacilitatorClient, x402ResourceServer, type FacilitatorClient } fro
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { decodePaymentSignatureHeader, encodePaymentRequiredHeader, encodePaymentResponseHeader } from '@x402/core/http';
 import { X402_FACILITATOR, X402_LABEL, X402_NETWORK, X402_USDC, type X402Label } from './index';
+import { facilitatorReason, type FacilitatorDiagnostic } from './diagnostics';
 
 export interface VendorInvoice { id: string; amountCents: number; payTo: `0x${string}` }
 /** Demo vendor, separate from the office/UI. Catalog and recipient are bootstrap-owned. */
-export async function startTestnetVendor(invoice: VendorInvoice, options: { port?: number; facilitator?: FacilitatorClient; label?: X402Label } = {}) {
+export async function startTestnetVendor(invoice: VendorInvoice, options: { port?: number; facilitator?: FacilitatorClient; label?: X402Label;
+  onFacilitatorResult?: (event: FacilitatorDiagnostic) => void } = {}) {
   // A simulated label is only honest with an injected in-process facilitator.
   if (options.label && options.label !== X402_LABEL && !options.facilitator) throw new Error('X402_SIMULATION_NEEDS_MOCKS');
   const label = options.label ?? X402_LABEL;
   if (!Number.isSafeInteger(invoice.amountCents) || invoice.amountCents <= 0 || invoice.amountCents > 200_000 ||
       !/^0x[0-9a-fA-F]{40}$/.test(invoice.payTo)) throw new Error('X402_INVALID_VENDOR_INVOICE');
-  const protocol = new x402ResourceServer(options.facilitator ?? new HTTPFacilitatorClient({ url: X402_FACILITATOR }))
+  const upstream = options.facilitator ?? new HTTPFacilitatorClient({ url: X402_FACILITATOR });
+  const observed: FacilitatorClient = {
+    getSupported: () => upstream.getSupported(),
+    verify: async (...args) => {
+      const result = await upstream.verify(...args);
+      options.onFacilitatorResult?.({ stage: 'verify', success: result.isValid, reason: facilitatorReason(result.invalidReason) });
+      return result;
+    },
+    settle: async (...args) => {
+      const result = await upstream.settle(...args);
+      options.onFacilitatorResult?.({ stage: 'settle', success: result.success, reason: facilitatorReason(result.errorReason) });
+      return result;
+    },
+  };
+  const protocol = new x402ResourceServer(observed)
     .register(X402_NETWORK, new ExactEvmScheme());
   await protocol.initialize();
   const requirements = (await protocol.buildPaymentRequirements({ scheme: 'exact', network: X402_NETWORK,
