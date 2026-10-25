@@ -118,6 +118,8 @@ export function workspaceRoute(from: Vec2, to: Vec2): Vec2[] {
   return [from];
 }
 
+// Conservative chair footprints end at z=5.425: 6.495 m to the inner south wall.
+const ENTRY_POSITION: Vec2 = [0, 10.8];
 const deskAnchor = (index: number) => ({ center: WORKSTATIONS[index]!.center, position: workstationApproach(index) });
 export const ANCHOR_LAYOUT: Readonly<Record<LayoutAnchorId, { center: Vec2; position: Vec2 }>> = {
   lobby: { center: [FLOOR_FIXTURES.kiosk.x, FLOOR_FIXTURES.kiosk.z], position: [FLOOR_FIXTURES.kiosk.x + 1.5, FLOOR_FIXTURES.kiosk.z] },
@@ -360,7 +362,7 @@ export interface RoomSpawn { readonly position: Vec2; readonly yaw: number; read
 /**
  * Clear approaches to logical destinations. Legacy wing destinations return to the open office.
  */
-const ENTRY_SPAWN: RoomSpawn = { position: [0, 10.2], yaw: 0, space: 'lobby' };
+const ENTRY_SPAWN: RoomSpawn = { position: ENTRY_POSITION, yaw: 0, space: 'lobby' };
 export const ROOM_SPAWNS: Readonly<Record<SpaceId, RoomSpawn>> = {
   atrium: ENTRY_SPAWN, work_room: ENTRY_SPAWN, corridor: ENTRY_SPAWN, lobby: ENTRY_SPAWN,
   collections: { position: ANCHOR_LAYOUT.collections.position, yaw: 0, space: 'collections' },

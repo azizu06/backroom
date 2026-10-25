@@ -2,22 +2,21 @@
 
 import { useMemo } from 'react';
 import { BoxGeometry, MeshStandardMaterial, PlaneGeometry } from 'three';
-import { PLATE_TONES, deskPlateKey, deskPlates, type DeskPlate } from '../../../../lib/office/hud-diegetic';
-import { canvasTextLines } from '../../../../lib/office/props/readability';
+import { PLATE_TONES, canvasTextLines, deskPlateKey, deskPlates, type DeskPlate } from '../../../../lib/office/hud-diegetic';
 import { PALETTE, ROLES } from '../../../../lib/office/palette';
 import { PROP_FONT, useCanvasTexture } from '../../props/useCanvasTexture';
 import type { SceneMountProps } from '../../mounts/types';
 import { usePlayCamera } from './usePlayCamera';
 
 // A hanging sign over each seated agent's desk: name, current task, status colour. Two draws per plate.
-const PLATE_W = 1.56, PLATE_H = 0.56, HANG_Y = 2.5;
-const TEX_W = 624, TEX_H = 224;
+const PLATE_W = 1.56, PLATE_H = 0.8, HANG_Y = 2.5;
+const TEX_W = 624, TEX_H = 320;
 const FACE = new PlaneGeometry(PLATE_W, PLATE_H);
 const FRAME = new BoxGeometry(PLATE_W + 0.06, PLATE_H + 0.06, 0.04);
 const ROD = new BoxGeometry(0.02, 0.5, 0.02);
 const FRAME_MATERIAL = new MeshStandardMaterial({ color: ROLES.frame, roughness: 0.7 });
 
-function drawPlate(ctx: CanvasRenderingContext2D, plate: DeskPlate) {
+export function drawPlate(ctx: CanvasRenderingContext2D, plate: DeskPlate) {
   const tone = PLATE_TONES[plate.tone];
   const measure = (text: string) => ctx.measureText(text).width;
   ctx.fillStyle = PALETTE.cream;
@@ -31,28 +30,28 @@ function drawPlate(ctx: CanvasRenderingContext2D, plate: DeskPlate) {
   ctx.textAlign = 'left';
   ctx.fillStyle = ROLES.text;
   ctx.font = `800 54px ${PROP_FONT}`;
-  ctx.fillText(canvasTextLines(plate.name, measure, 300, 1)[0] ?? '', 44, 70);
+  canvasTextLines(plate.name, measure, 300, 2).forEach((text, i) => ctx.fillText(text, 44, 64 + i * 58));
   ctx.textAlign = 'right';
   ctx.font = `600 26px ${PROP_FONT}`;
   ctx.fillStyle = PALETTE.slate;
-  ctx.fillText(plate.desk.toUpperCase(), TEX_W - 24, 64);
+  canvasTextLines(plate.desk.toUpperCase(), measure, 220, 2).forEach((text, i) => ctx.fillText(text, TEX_W - 24, 50 + i * 32));
   ctx.textAlign = 'left';
   ctx.fillStyle = ROLES.text;
   ctx.font = `600 34px ${PROP_FONT}`;
-  ctx.fillText(canvasTextLines(plate.task, measure, TEX_W - 70, 1)[0] ?? '', 44, 128);
+  canvasTextLines(plate.task, measure, TEX_W - 70, 2).forEach((text, i) => ctx.fillText(text, 44, 176 + i * 40));
   // Status pill: tone fill, navy ink (contrast holds on every palette tone).
   ctx.font = `700 26px ${PROP_FONT}`;
-  const status = canvasTextLines(plate.status, measure, TEX_W - 100, 1)[0] ?? '';
-  const pillW = Math.min(TEX_W - 66, measure(status) + 52);
+  const status = canvasTextLines(plate.status, measure, TEX_W - 110, 2);
+  const pillW = Math.min(TEX_W - 66, Math.max(0, ...status.map(measure)) + 52);
   ctx.fillStyle = tone.color;
   ctx.beginPath();
-  ctx.roundRect(44, 154, pillW, 46, 23);
+  ctx.roundRect(44, 238, pillW, 70, 23);
   ctx.fill();
   ctx.fillStyle = ROLES.text;
   ctx.beginPath();
-  ctx.arc(66, 177, 7, 0, Math.PI * 2);
+  ctx.arc(66, 266, 7, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillText(status, 82, 186);
+  status.forEach((text, i) => ctx.fillText(text, 82, 270 + i * 30));
 }
 
 function Plate({ plate }: { plate: DeskPlate }) {

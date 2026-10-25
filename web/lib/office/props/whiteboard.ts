@@ -20,7 +20,7 @@ export function whiteboardStats(snapshot: OfficeSnapshot): WhiteboardStats {
   return {
     allow: count('ALLOW'), deny: count('DENY'), escalate: count('ESCALATE'), recorded: count('RECORDED'),
     total: snapshot.audit.length, inbox: snapshot.inboxCount, agents: snapshot.agents.length, connection: snapshot.connection,
-    recent: snapshot.audit.slice(-3).reverse().map(row => ({ decision: row.decision, summary: truncateSummary(row.summary) })),
+    recent: snapshot.audit.slice(-3).reverse().map(row => ({ decision: row.decision, summary: row.summary })),
   };
 }
 

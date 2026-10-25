@@ -58,7 +58,7 @@ function Lamps({ rooms }: { rooms: string }) {
 }
 
 export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot; lowPower: boolean }) {
-  const { key, fill, hemisphere, pointLights, contactShadows } = officeLightRig(lowPower);
+  const { key, fill, hemisphere, pointLights, ceilingFill, contactShadows } = officeLightRig(lowPower);
   const rooms = visibleRooms(snapshot);
   const baked = useBakedLobbyReady();
   return <>
@@ -69,6 +69,7 @@ export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot;
       shadow-camera-left={key.shadow.left} shadow-camera-right={key.shadow.right} shadow-camera-top={key.shadow.top} shadow-camera-bottom={key.shadow.bottom} />
     <directionalLight position={fill.position} color={fill.color} intensity={fill.intensity} castShadow={fill.castShadow} />
     {pointLights.filter(light => rooms.includes(light.room)).map(({ room, ...light }) => <pointLight key={room} {...light} />)}
+    {ceilingFill && <pointLight name='office:ceiling-fill' {...ceilingFill} />}
     {/* Demand frames only; dropping this pass entirely is essential in low-power mode. Static casters bake once per room set. */}
     {contactShadows && <OfficeContactShadows config={contactShadows} version={`${rooms.join(',')}|${baked}`} />}
     <Lamps rooms={rooms.join(',')} />

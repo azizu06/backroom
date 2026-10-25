@@ -6,7 +6,7 @@
 import { ROLES } from "./palette";
 import type { FurniturePiece } from './furniture';
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { BUILDING, FLOOR_FIXTURES } from "./layout";
+import { BUILDING, FLOOR_FIXTURES, WALL_HEIGHT } from "./layout";
 
 export type Vec3 = [number, number, number];
 
@@ -83,6 +83,15 @@ export const MAX_OFFICE_LIGHTS = 6;
 export const OFFICE_EXPOSURE = 1;
 export const LOW_POWER_QUERY = '(prefers-reduced-data: reduce)';
 
+/** Warm diffuse surfaces retain their palette even on the ceiling's downward-facing underside. */
+export const OFFICE_SHELL_MATERIALS = {
+  wall: { emissive: ROLES.wall, emissiveIntensity: 0.38 },
+  ceiling: { emissive: ROLES.ceiling, emissiveIntensity: 0.6 },
+};
+/** One shared soft pool beneath the ceiling panels, using the sixth (last) light slot. */
+const CEILING_FILL = { position: [0, WALL_HEIGHT - 0.4, 3] as Vec3, color: ROLES.lampLight,
+  intensity: 8, distance: 18, decay: 2, castShadow: false as const };
+
 export interface OfficeLamp {
   room: AnchorId;
   base: Vec3;
@@ -129,6 +138,7 @@ export function officeLightRig(lowPower = false) {
     fill: OFFICE_LIGHTING.fill,
     hemisphere: OFFICE_LIGHTING.hemisphere,
     pointLights: lowPower ? [] : LAMP_POOLS,
+    ceilingFill: lowPower ? null : CEILING_FILL,
     contactShadows: lowPower ? null : OFFICE_LIGHTING.contactShadows,
     shadows: lowPower ? false as const : 'soft' as const,
     exposure: OFFICE_EXPOSURE,

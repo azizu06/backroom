@@ -1,6 +1,6 @@
 /** Pure judge-tour timing and order. Visual only: the tour moves the camera and never decides business state. */
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { workspaceRoute, type Vec2 } from './layout';
+import { ROOM_SPAWNS, workspaceRoute, type Vec2 } from './layout';
 
 /** Lobby, then the agent desks, then Dana, then Treasury. */
 export const TOUR_ORDER: readonly AnchorId[] = ["lobby", "collections", "payables", "vendor_onboarding", "dana", "treasury"];
@@ -30,10 +30,16 @@ export function tourProgress(elapsedMs: number, reduced: boolean): number {
 
 /** Route the aerial focus through the same clear aisles as the first-person story. */
 export function tourRoute(from: Vec2, to: Vec2): Vec2[] {
+  // CameraRig supplies logical anchors. Keep the kiosk interaction in place while the
+  // tour's lobby stop surveys the office from the same entry band as Play/story.
+  const entry = (point: Vec2): Vec2 => point[0] === OFFICE_ANCHORS.lobby.position[0] && point[1] === OFFICE_ANCHORS.lobby.position[1]
+    ? ROOM_SPAWNS.lobby.position : point;
+  from = entry(from);
+  to = entry(to);
   const route = workspaceRoute(from, to);
   if (route.length > 1 || (from[0] === to[0] && from[1] === to[1])) return route;
   // Overview can focus inside furniture; enter the tour at the nearest clear approach.
-  const approaches = Object.values(OFFICE_ANCHORS).map(anchor => anchor.position);
+  const approaches = Object.values(OFFICE_ANCHORS).map(anchor => entry(anchor.position));
   approaches.sort((a, b) => Math.hypot(a[0] - from[0], a[1] - from[1]) - Math.hypot(b[0] - from[0], b[1] - from[1]));
   return workspaceRoute(approaches[0]!, to);
 }

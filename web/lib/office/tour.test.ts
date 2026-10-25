@@ -4,7 +4,7 @@ import {
   easeInOutCubic, tourCaption, tourIndexAt, tourProgress, tourStops, tourRoute, tourRoutePoint,
 } from "./tour";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { ANCHOR_IDS, workspaceRoute, type Vec2 } from './layout';
+import { ANCHOR_IDS, ROOM_SPAWNS, workspaceRoute, type Vec2 } from './layout';
 import { CAMERA_CLEARANCE } from './metrics';
 import { insideAny, officeColliders } from './play';
 
@@ -13,8 +13,9 @@ describe('aerial tour routing', () => {
 
   it('follows the clear grid route between every stop, including reverse or skipped stops', () => {
     for (const from of TOUR_ORDER) for (const to of TOUR_ORDER) {
-      const a = OFFICE_ANCHORS[from].position, b = OFFICE_ANCHORS[to].position;
-      const route = tourRoute(a, b);
+      const a = from === 'lobby' ? ROOM_SPAWNS.lobby.position : OFFICE_ANCHORS[from].position;
+      const b = to === 'lobby' ? ROOM_SPAWNS.lobby.position : OFFICE_ANCHORS[to].position;
+      const route = tourRoute(OFFICE_ANCHORS[from].position, OFFICE_ANCHORS[to].position);
       expect(route).toEqual(workspaceRoute(a, b));
       expect(tourRoutePoint(route, 0)).toEqual(a);
       const end = tourRoutePoint(route, 1);
@@ -30,7 +31,7 @@ describe('aerial tour routing', () => {
     const starts: Vec2[] = [[0, 0], ...Object.values(OFFICE_ANCHORS).map(anchor => anchor.center)];
     for (const start of starts) {
       const route = tourRoute(start, OFFICE_ANCHORS.lobby.position);
-      expect(route.at(-1)).toEqual(OFFICE_ANCHORS.lobby.position);
+      expect(route.at(-1)).toEqual(ROOM_SPAWNS.lobby.position);
       for (let i = 0; i <= 100; i++) expect(insideAny(tourRoutePoint(route, i / 100), colliders, CAMERA_CLEARANCE)).toBe(false);
     }
   });

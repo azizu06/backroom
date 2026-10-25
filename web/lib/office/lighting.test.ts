@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { OrthographicCamera, Vector3 } from 'three';
-import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, MAX_OFFICE_LIGHTS, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LAMPS, OFFICE_LIGHTING, officeLightRig, officeLowPower } from './lighting';
+import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, MAX_OFFICE_LIGHTS, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LAMPS, OFFICE_LIGHTING, OFFICE_SHELL_MATERIALS, officeLightRig, officeLowPower } from './lighting';
 import { ROLES } from './palette';
-import { ATRIUM_HEIGHT, BUILDING } from './layout';
+import { ATRIUM_HEIGHT, BUILDING, WALL_HEIGHT } from './layout';
 
 function rgb(hex: string) {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -60,7 +60,7 @@ describe('office lighting', () => {
 
   it('caps the complete rig, sharing two non-shadow-casting lamp pools across six emissive lamps', () => {
     const rig = officeLightRig();
-    const allLights = [rig.key, rig.fill, rig.hemisphere, ...rig.pointLights];
+    const allLights = [rig.key, rig.fill, rig.hemisphere, ...rig.pointLights, rig.ceilingFill];
     expect(allLights.length).toBeLessThanOrEqual(MAX_OFFICE_LIGHTS);
     expect(MAX_OFFICE_LIGHTS).toBeLessThanOrEqual(6);
     expect(OFFICE_LAMPS).toHaveLength(6);
@@ -76,10 +76,24 @@ describe('office lighting', () => {
     expect(rig.shadows).toBe('soft');
   });
 
+  it('warms the procedural shell and fills the ceiling with the sixth light, without adding shadows', () => {
+    expect(OFFICE_SHELL_MATERIALS.wall.emissive).toBe(ROLES.wall);
+    expect(OFFICE_SHELL_MATERIALS.ceiling.emissive).toBe(ROLES.ceiling);
+    expect(OFFICE_SHELL_MATERIALS.ceiling.emissiveIntensity).toBeGreaterThan(0.35);
+    const fill = officeLightRig().ceilingFill!;
+    expect(fill.color).toBe(ROLES.lampLight);
+    expect(fill.castShadow).toBe(false);
+    expect(fill.position[1]).toBeLessThan(WALL_HEIGHT);
+    expect(fill.position[1]).toBeGreaterThan(3);
+    expect(fill.intensity).toBeGreaterThan(0);
+    expect(fill.distance).toBeLessThanOrEqual(18);
+  });
+
   it('drops every point light and both shadow passes in low-power while preserving the room colours and exposure', () => {
     const normal = officeLightRig();
     const saving = officeLightRig(true);
     expect(saving.pointLights).toEqual([]);
+    expect(saving.ceilingFill).toBeNull();
     expect(saving.key.castShadow).toBe(false);
     expect(saving.fill.castShadow).toBe(false);
     expect(saving.contactShadows).toBeNull();

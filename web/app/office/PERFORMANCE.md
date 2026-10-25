@@ -52,3 +52,32 @@ the shadow casters wrapped in `ContactDynamic` (avatars, door leaves, handoff wa
 characters). In first person an avatar whose centre and four sides are all behind walls (`sightBlocked`) is
 hidden, which drops its ~20 meshes from the main, sun-shadow and contact passes. The budget spec fails above
 300 draws.
+
+## Square office polish (BR-SQUARE-POLISH)
+
+Source-derived counts for the procedural square office with all rooms visible:
+
+| Submission / light budget | Before | After |
+| --- | ---: | ---: |
+| First-person shell draws (walls/frames, glass, ceiling, panels) | 4 | 4 |
+| Overview shell draws | 1 | 1 |
+| Lamp body / shade draws | 2 | 2 |
+| Additional draws from ceiling fill | 0 | 0 |
+| Lights (hemisphere, two directional, floor pools, ceiling fill) | 5 | 6 |
+| Shadow-casting lights | 1 | 1 |
+| Low-power lights / shadow casters | 3 / 0 | 3 / 0 |
+
+The sixth light is one shared butter-coloured point fill beneath the ceiling panels,
+with no shadows, animation or frame requests. It is omitted in low-power mode.
+Existing wall/ceiling batches reuse the cream palette roles with stronger diffuse
+emission, and panels reuse the butter lamp role. No geometry or shadow passes were added;
+the 1024 directional and 512 contact maps and the 300-draw moving-Play budget are unchanged.
+
+Text wrapping adds no draws or textures. Desk plates grow from 624 × 224 to 624 × 320
+and from 1.56 × 0.56 m to 1.56 × 0.8 m, preserving font size and pixel density while
+making room for two task/status lines. All backing stores remain below the 1024 cap.
+
+These counts are a source inventory, not new renderer measurements. The planner must
+run the perf overlay and square walkthrough against a build. This checkout registers
+only `lobby.glb`, not a full baked hall; hiding the entire procedural shell on lobby
+readiness would remove the rest of the office, so the existing baked behaviour is retained.

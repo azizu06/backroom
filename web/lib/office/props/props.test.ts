@@ -34,12 +34,10 @@ describe('whiteboardStats', () => {
     expect(whiteboardStats(snapshot({ audit: [row('x', 'ESCALATE')] })).recent).toHaveLength(1);
   });
 
-  it('truncates long summaries with an ellipsis and keeps short ones intact', () => {
+  it('keeps complete summaries for measured wrapping on the board', () => {
     const long = 'Invoice 1042 · four installments requested → Dana for approval';
     const [recent] = whiteboardStats(snapshot({ audit: [row('1', 'ESCALATE', long)] })).recent;
-    expect(recent!.summary.length).toBeLessThanOrEqual(34);
-    expect(recent!.summary.endsWith('…')).toBe(true);
-    expect(long.startsWith(recent!.summary.slice(0, -1))).toBe(true);
+    expect(recent!.summary).toBe(long);
     const exact = 'x'.repeat(34);
     expect(whiteboardStats(snapshot({ audit: [row('1', 'ALLOW', exact)] })).recent[0]!.summary).toBe(exact);
   });
