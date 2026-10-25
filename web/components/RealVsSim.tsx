@@ -50,7 +50,7 @@ export function RealVsSim() {
   return (
     <section className="real-sim real-sim-detail" aria-label="Real versus simulated disclosure">
       <header className="real-sim-header"><h1>Real vs. simulated</h1></header>
-      <p className="real-sim-intro">A real integration can be offline. Status describes current evidence, not a successful end-to-end demo.</p>
+      <p className="real-sim-intro">Each status is current evidence for that service.</p>
       <div className="real-sim-groups">
         {(['real', 'sandbox'] as const).map(kind => (
           <section key={kind} aria-label={kind === 'real' ? 'Real integrations' : 'Sandbox and simulated'}>
@@ -62,7 +62,7 @@ export function RealVsSim() {
         ))}
       </div>
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
-      <p className="real-sim-note">Verified: a fresh live check or a saved receipt (time shown). Simulated: a stand-in replaces the service. Unreachable: the check failed. Unverified: no fresh evidence yet. Refreshes every 10 seconds.</p>
+      <p className="real-sim-note">Verified: live check or saved receipt. Simulated: a stand-in replaces the service. Unreachable: the check failed. Unverified: no fresh evidence. Refreshes every 10 s.</p>
     </section>
   );
 }

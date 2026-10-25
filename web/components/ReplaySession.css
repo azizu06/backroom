@@ -1,15 +1,16 @@
-/* Office palette tokens (app/office/lobby.css, loaded by the root layout). */
-.replay-session { color-scheme: light; background: var(--office-cream); color: var(--office-navy); min-height: 100dvh; font: 14px/1.45 'Avenir Next', Avenir, sans-serif; }
-.replay-controls { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 20px; background: var(--office-peach); color: var(--office-navy); border-bottom: 2px solid var(--office-navy); }
+/* Shared palette tokens (app/theme.css). */
+.replay-session { color: var(--ink); min-height: 100dvh; font: 14px/1.45 var(--font-ui); }
+.replay-controls { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 20px; background: var(--pastel-yellow); color: var(--on-pastel); border-bottom: 3px solid #ffffff; }
 .replay-controls strong { font-size: 18px; }
 .replay-controls label { display: flex; align-items: center; gap: 6px; }
-.replay-controls button, .replay-controls select { font: inherit; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-navy); padding: 6px 9px; border-radius: 4px; }
-.replay-controls a, .replay-session > p a { color: var(--office-navy); }
+.replay-controls button, .replay-controls select { font: inherit; color: var(--on-pastel); background: #ffffff; border: 2px solid var(--pastel-aqua); padding: 6px 12px; border-radius: 999px; }
+.replay-controls a { color: var(--on-pastel); }
+.replay-session > p a { color: var(--ink); }
 .replay-controls output { font-variant-numeric: tabular-nums; }
 .replay-controls details { font-size: 12px; }
 .replay-controls details p { margin: 8px 0; max-width: 650px; }
 .replay-session > p { padding: 20px; }
 .replay-scrub { flex: 1; min-width: 180px; }
-.replay-scrub input { flex: 1; min-width: 60px; accent-color: var(--office-navy); }
+.replay-scrub input { flex: 1; min-width: 60px; accent-color: var(--on-pastel); }
 .replay-session .office-shell { height: calc(100dvh - 64px); }
 @media (max-width: 760px) { .replay-controls { padding: 10px 12px; gap: 8px; font-size: 12px; }.replay-controls > span { width: calc(100% - 90px); overflow-wrap: anywhere; }.replay-session .office-shell { height: auto; } }

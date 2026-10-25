@@ -122,7 +122,7 @@ export function AttackDemoPanel() {
       {error && <p role='alert' className='attack-error'>{error}</p>}
       {result && <>
         <p className='attack-eyebrow'>Completed · {result.mode} · source: {result.source}</p>
-        <p className='attack-help'>Untrusted data · isolated synthetic company</p>
+        <p className='attack-help'>Untrusted data</p>
         <p>Sender: {result.senderDomain === 'unknown.invalid' ? 'unknown (your text)' : result.senderDomain}</p>
         {result.liveBlocked && <p>{BLOCKED_HELP}</p>}
         <h2>Agent trace</h2>
