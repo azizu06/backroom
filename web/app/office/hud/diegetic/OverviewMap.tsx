@@ -3,16 +3,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { isCloseKey } from '../../../../lib/office/a11y';
 import type { MotionRegistry } from '../../../../lib/office/motion';
-import { roomRect, seatedAgent, type OverviewPick } from '../../../../lib/office/overview';
+import { seatedAgent, type OverviewPick } from '../../../../lib/office/overview';
 import { WORKSTATIONS, CORRIDOR_Z } from '../../../../lib/office/layout';
 import { workstationLabel } from '../../../../lib/office/handoffs';
-import { DESK_SIZE } from '../../../../lib/office/metrics';
-import { FLOOR, SERVER_ROOM_BOX } from '../../../../lib/office/play';
-import { OFFICE_ANCHORS, anchorLabel, visibleRooms, type AnchorId, type OfficeSnapshot } from '../../../../lib/office/state';
+import { overviewMapAgents, overviewMapLayout } from '../../../../lib/office/overview-map';
+import { FLOOR } from '../../../../lib/office/play';
+import { OFFICE_ANCHORS, visibleRooms, type AnchorId, type OfficeSnapshot } from '../../../../lib/office/state';
 
 const SPAN_X = FLOOR.maxX - FLOOR.minX, SPAN_Z = FLOOR.maxZ - FLOOR.minZ;
-/** The board keeps the floor's proportions. */
-const BOARD_STYLE = { aspectRatio: `${SPAN_X} / ${SPAN_Z}`, width: `min(100%, calc((100dvh - 230px) * ${(SPAN_X / SPAN_Z).toFixed(3)}))` };
 /** World floor (x, z) to a percentage of the map board; z runs down the board like the overhead view. */
 function pct([x, z]: readonly [number, number]) {
   return { left: `${((x - FLOOR.minX) / SPAN_X) * 100}%`, top: `${((z - FLOOR.minZ) / SPAN_Z) * 100}%` };
@@ -30,9 +28,9 @@ function roomStatus(snapshot: OfficeSnapshot, room: AnchorId): string {
 }
 
 /**
- * HUD variant (c) Overview: a large 2D map of the whole floor over the scene. Every room is a tile and agents move
- * on it live (read from the shared motions); a room or agent opens the quick menu ("Go here" / "Talk").
- * Never shown in first person. View-only: picks move the camera or open read-only panels.
+ * HUD variant (c) Overview: a large 2D map of the whole floor over the scene.
+ * Room cards open the quick menu ("Go here" / "Talk"); live seat occupancy tints the desks.
+ * Opened from Play. View-only: picks move the camera or open read-only panels.
  */
 export function OverviewMap({ snapshot, motions, open, onPick, onFirstPerson, onClose }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; open: boolean;
@@ -41,42 +39,75 @@ export function OverviewMap({ snapshot, motions, open, onPick, onFirstPerson, on
   const headingId = useId();
   const root = useRef<HTMLElement>(null);
   const [, setTick] = useState(0);
-  // Agents walk between desks: re-read their drawn positions a few times a second while the map is open.
+  const space = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [selected, setSelected] = useState<AnchorId | null>(null);
+  const statusId = useId();
+  useEffect(() => {
+    if (!open || !space.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const width = Math.max(0, Math.min(entry.contentRect.width - 4, (entry.contentRect.height - 4) * SPAN_X / SPAN_Z));
+      setSize({ width, height: width * SPAN_Z / SPAN_X });
+    });
+    observer.observe(space.current);
+    return () => observer.disconnect();
+  }, [open]);
+  // Agents walk between desks: refresh seat occupancy while the map is open.
   useEffect(() => {
     if (!open) return;
     const timer = setInterval(() => setTick(tick => tick + 1), 250);
     return () => clearInterval(timer);
   }, [open]);
-  useEffect(() => { if (open) root.current?.querySelector<HTMLButtonElement>('.overview-map-room')?.focus(); }, [open]);
+  useEffect(() => { if (open) root.current?.querySelector<HTMLButtonElement>('.overview-map-room')?.focus(); }, [open, size.width > 0]);
   if (!open) return null;
   const rooms = visibleRooms(snapshot);
+  const agents = overviewMapAgents(snapshot, motions);
+  const layout = overviewMapLayout(size.width, size.height, rooms);
   return <section ref={root} className='overview-map' role='region' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key) && !event.defaultPrevented && !(event.target as HTMLElement).closest('[role=menu]')) { event.preventDefault(); onClose(); }
   }}>
     <header className='overview-map-head'>
-      <div><h2 id={headingId}>Office Overview</h2><p>Click a room or a person: go there in first person, or talk.</p></div>
+      <div><h2 id={headingId}>Office Overview</h2><p>Click a room: go there in first person, or talk to its agent.</p></div>
       <div className='overview-map-actions'>
         <button type='button' className='overview-map-fp' aria-keyshortcuts='O' onClick={onFirstPerson}>First person <kbd>O</kbd></button>
         <button type='button' onClick={onClose} aria-label='Close overview'>Close <kbd>Esc</kbd></button>
       </div>
     </header>
-    <div className='overview-map-board' style={{ aspectRatio: `${SPAN_X} / ${SPAN_Z}`, width: `min(100%, calc((100dvh - 230px) * ${SPAN_X / SPAN_Z}))` }}>
+    <div className='overview-map-space' ref={space}>
+    {size.width > 0 && <div className='overview-map-board' data-compact={layout.compact} style={size}>
       <div className='overview-map-hall' style={rectStyle({ minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: CORRIDOR_Z - 0.65, maxZ: CORRIDOR_Z + 0.65 })} aria-hidden='true'><span>Shared office</span></div>
-      {WORKSTATIONS.map(({ id, center: [x, z] }, index) => <div key={id} className='overview-map-desk' aria-label={workstationLabel(index)} title={workstationLabel(index)} style={rectStyle({ minX: x - DESK_SIZE.width / 2, maxX: x + DESK_SIZE.width / 2, minZ: z - DESK_SIZE.depth / 2, maxZ: z + DESK_SIZE.depth / 2 })} />)}
-      {rooms.map(room => <button key={room} type='button' className='overview-map-room' data-room={room} data-locked={room === 'treasury' || undefined}
-        style={{ ...rectStyle(roomRect(room)), ['--room-color' as string]: OFFICE_ANCHORS[room].color }} aria-haspopup='menu'
-        onClick={event => onPick({ kind: 'room', room }, event.currentTarget)}>
-        <strong>{OFFICE_ANCHORS[room].name}</strong><span>{roomStatus(snapshot, room)}</span>
-      </button>)}
-      <div className='overview-map-server' style={rectStyle(SERVER_ROOM_BOX)} aria-hidden='true'>GX10</div>
-      {snapshot.agents.map(agent => {
-        const position = motions.get(agent).position;
-        return <button key={agent.id} type='button' className='overview-map-agent' data-agent={agent.id} data-escalating={agent.escalationId ? true : undefined}
-          style={pct(position)} aria-haspopup='menu' aria-label={`${agent.name}, ${agent.state}${agent.escalationId ? `, carrying a folder to ${anchorLabel(agent.targetAnchor)}` : ''}. Go here or talk`}
-          onClick={event => onPick({ kind: 'agent', id: agent.id }, event.currentTarget)}>
-          <span className='overview-map-dot' aria-hidden='true'>{agent.name.slice(0, 1)}</span><span className='overview-map-name'>{agent.name}</span>
+      {WORKSTATIONS.map(({ id, pod, flip }, index) => {
+        const occupant = agents.find(agent => agent.seat === index);
+        const desk = layout.desks[index]!;
+        return <div key={id} className='overview-map-desk' data-pod={pod} data-seat-side={flip < 0 ? 'top' : 'bottom'} data-occupant={occupant?.id}
+          aria-label={workstationLabel(index)} title={occupant?.name ?? workstationLabel(index)}
+          style={{ left: desk.x, top: desk.y, width: desk.width, height: desk.height, ['--seat-color' as string]: occupant?.color }} />;
+      })}
+      <svg className='overview-map-leaders' width={size.width} height={size.height} aria-hidden='true'>
+        {layout.labels.map(label => <line key={label.id} x1={label.anchor.x} y1={label.anchor.y}
+          x2={Math.max(label.x, Math.min(label.x + label.width, label.anchor.x))}
+          y2={Math.max(label.y, Math.min(label.y + label.height, label.anchor.y))} />)}
+      </svg>
+      {layout.labels.map(label => {
+        const room = label.id as AnchorId;
+        return <button key={room} type='button' className='overview-map-room' data-room={room} data-locked={room === 'treasury' || undefined}
+          style={{ left: label.x, top: label.y, width: label.width, height: label.height, ['--room-color' as string]: OFFICE_ANCHORS[room].color }} aria-haspopup='menu'
+          aria-describedby={layout.compact && selected === room ? statusId : undefined}
+          onClick={event => {
+            setSelected(room);
+            const agent = seatedAgent(snapshot, room);
+            onPick(agent ? { kind: 'agent', id: agent } : { kind: 'room', room }, event.currentTarget);
+          }}>
+          <strong>{OFFICE_ANCHORS[room].name}</strong>{!layout.compact && <span>{roomStatus(snapshot, room)}</span>}
         </button>;
       })}
+      <div className='overview-map-server' style={{ left: layout.server.x, top: layout.server.y, width: layout.server.width, height: layout.server.height }} aria-hidden='true'>GX10</div>
+
+    </div>}
     </div>
+    <p className='overview-map-status' id={statusId} aria-live='polite'>
+      {layout.compact && selected ? `${OFFICE_ANCHORS[selected].name}: ${roomStatus(snapshot, selected)}` : 'Select a room for actions.'}
+    </p>
   </section>;
 }
