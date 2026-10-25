@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 import { mkdir } from 'node:fs/promises';
 import { PHONE_INTERACTION } from '../lib/office/props/phone';
 
@@ -54,6 +55,7 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await page.goto('/office?calls=mock&callsSpeed=fast&view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   // Pass the collections doorway between its posts, then move to the phone's aisle-side x.
@@ -89,6 +91,7 @@ test('collections desk phone plays a mock callback and keeps the preview from re
 test('phone stays idle without the mock query', async ({ page }) => {
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeVisible();
   // Target is already within reach at spawn only after approaching the Collections desk.

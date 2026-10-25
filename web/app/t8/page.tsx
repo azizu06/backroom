@@ -53,23 +53,26 @@ export default function T8Page() {
     }
   }, [rows]);
 
+  const cell = { padding: "10px 12px", borderBottom: "1px solid var(--line)", textAlign: "left" as const };
   return (
-    <main style={{ minHeight: "100vh", padding: 32, boxSizing: "border-box", background: "#111", color: "#eee", fontFamily: "monospace" }}>
-      <h1>T8 · SpacetimeDB subscription</h1>
-      <p role="status" data-testid="connection-status">{status}</p>
-      <p>Read-only view. Room permissions are checked by the reducer.</p>
-      <table cellPadding={12} style={{ borderCollapse: "collapse", border: "1px solid #555" }}>
-        <thead><tr><th>Agent</th><th>Seat</th><th>Room</th><th>Target anchor</th><th>Heartbeat (µs)</th></tr></thead>
-        <tbody>{rows.map(row => (
-          <tr key={row.id} data-agent-id={row.id} data-target={row.targetAnchor}>
-            <td>{row.id}</td><td>{row.seatId}</td><td>{row.room}</td><td>{row.targetAnchor}</td>
-            <td>{row.heartbeatAt.microsSinceUnixEpoch.toString()}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-      <h2>Row write → DOM commit (same-host clocks)</h2>
-      <p>Only targets prefixed t8-sample- are measured. An initial snapshot is excluded by using fresh targets.</p>
-      <pre data-testid="latency-samples">{JSON.stringify(samples, null, 2)}</pre>
+    <main className="page-frame">
+      <h1 className="page-title">T8 · SpacetimeDB subscription</h1>
+      <p className="page-lede">Read-only view. Room permissions are checked by the reducer.</p>
+      <p role="status" data-testid="connection-status" style={{ display: "inline-block", margin: "0 0 24px", padding: "2px 12px", borderRadius: 999, color: "var(--on-pastel)", background: "var(--pastel-yellow)", fontSize: 13, fontWeight: 800 }}>{status}</p>
+      <div style={{ overflowX: "auto", background: "var(--bubble-glass)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", padding: "8px 16px" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>
+          <thead><tr>{["Agent", "Seat", "Room", "Target anchor", "Heartbeat (µs)"].map(label => <th key={label} style={{ ...cell, fontWeight: 800 }}>{label}</th>)}</tr></thead>
+          <tbody>{rows.length ? rows.map(row => (
+            <tr key={row.id} data-agent-id={row.id} data-target={row.targetAnchor}>
+              <td style={cell}>{row.id}</td><td style={cell}>{row.seatId}</td><td style={cell}>{row.room}</td><td style={cell}>{row.targetAnchor}</td>
+              <td style={cell}>{row.heartbeatAt.microsSinceUnixEpoch.toString()}</td>
+            </tr>
+          )) : <tr><td colSpan={5} style={{ ...cell, color: "var(--ink-soft)", borderBottom: 0 }}>No agent rows yet.</td></tr>}</tbody>
+        </table>
+      </div>
+      <h2 style={{ margin: "32px 0 8px", fontSize: 19, fontWeight: 800 }}>Row write → DOM commit (same-host clocks)</h2>
+      <p style={{ margin: "0 0 12px", color: "var(--ink-soft)" }}>Only targets prefixed t8-sample- are measured. An initial snapshot is excluded by using fresh targets.</p>
+      <pre data-testid="latency-samples" style={{ margin: 0, padding: 16, overflow: "auto", background: "var(--paper)", border: "2px solid var(--line)", borderRadius: 16, font: "12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace" }}>{JSON.stringify(samples, null, 2)}</pre>
     </main>
   );
 }

@@ -43,7 +43,6 @@ import './lobby.css';
 import './tags.css';
 import './hud/diegetic/diegetic.css';
 import { OfficeAdvanced } from './hud/diegetic/OfficeAdvanced';
-import { lobbyModeLabel } from '../../lib/office/lobby-v2';
 import { OverviewMenu, type OverviewMenuItem } from './hud/diegetic/OverviewMenu';
 import { OverviewMap } from './hud/diegetic/OverviewMap';
 import { agentEntry, isOverviewKey, roomEntry, seatedAgent, type OverviewPick } from '../../lib/office/overview';
@@ -177,11 +176,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const [menu, setMenu] = useState<{ pick: OverviewPick; at: { x: number; y: number }; opener: HTMLElement | null } | null>(null);
   const [talk, setTalk] = useState<{ id: string; opener: HTMLElement | null } | null>(null);
   const overviewToggle = useRef<HTMLButtonElement>(null);
-  const mapButton = useRef<HTMLButtonElement>(null);
   // The Overview map: a large 2D board of the floor over the scene. Never open in first person.
   const [mapOpen, setMapOpen] = useState(false);
   useEffect(() => { if (!overview) { setMenu(null); setTalk(null); setMapOpen(false); } }, [overview]);
-  function closeMap() { setMapOpen(false); setMenu(null); requestAnimationFrame(() => mapButton.current?.focus()); }
+  function closeMap() { setMapOpen(false); setMenu(null); requestAnimationFrame(() => cornerToggle.current?.focus()); }
   function enterFirstPerson(entry: PlayEntry | null) {
     setMenu(null);
     setTalk(null);
@@ -230,7 +228,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     const fromMap = !!opener?.closest('.overview-map');
     setMenu(null);
     if (fromMap) setMapOpen(false);
-    setTalk({ id, opener: fromMap ? document.querySelector<HTMLElement>(`[data-agent-tag="${CSS.escape(id)}"] button`) ?? mapButton.current : opener });
+    setTalk({ id, opener: fromMap ? document.querySelector<HTMLElement>(`[data-agent-tag="${CSS.escape(id)}"] button`) ?? cornerToggle.current : opener });
   }
   function closeTalk() { const opener = talk?.opener; setTalk(null); opener?.focus(); }
   function menuContent(pick: OverviewPick, opener: HTMLElement | null): { title: string; subtitle?: string; items: OverviewMenuItem[] } {
@@ -266,7 +264,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const [cornerOpen, setCornerOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const cornerToggle = useRef<HTMLButtonElement>(null);
-  const drawerToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (mode === 'play') { setCornerOpen(false); setDrawerOpen(false); } }, [mode]);
   // Other parts of the office (Play's "Ask why", the lobby) open the drawer before focusing something in it.
   useEffect(() => {
@@ -275,30 +272,35 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     return () => window.removeEventListener('office-drawer', open);
   }, []);
   function closeCorner() { setCornerOpen(false); cornerToggle.current?.focus(); }
-  function closeDrawer() { setDrawerOpen(false); drawerToggle.current?.focus(); }
+  function closeDrawer() { setDrawerOpen(false); cornerToggle.current?.focus(); }
   return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
     <div ref={element => { viewportRef.current = element; viewportBox.current = element; }} className='office-viewport' data-testid='office-viewport' data-overview={overview || undefined}>
-      <SoundToggle snapshot={snapshot} />
-      {/* One small corner menu: brand + view picker + guide + Overview toggle always; the rest behind Menu. */}
+      {/* One small corner menu, closed by default: every office control lives in it (O and Esc still work from the keyboard). */}
       <header className='office-toolbar office-corner' data-open={cornerOpen || undefined} onKeyDown={event => {
-        if (cornerOpen && isCloseKey(event.key) && !(event.target instanceof HTMLSelectElement)) { event.preventDefault(); event.stopPropagation(); closeCorner(); }
+        if (cornerOpen && isCloseKey(event.key) && !(event.target instanceof HTMLSelectElement) && !(event.target as HTMLElement).closest('dialog, [role=dialog]')) { event.preventDefault(); event.stopPropagation(); closeCorner(); }
       }}>
         <div className='office-corner-row'>
           <button ref={cornerToggle} type='button' className='office-corner-toggle' aria-expanded={cornerOpen} aria-controls='office-corner-panel' onClick={() => setCornerOpen(open => !open)}>
             <strong>Backroom</strong><span aria-hidden='true'>{cornerOpen ? '▴' : '▾'}</span><span className='visually-hidden'> menu</span>
           </button>
-          {lobbyModeLabel(snapshot.connection) && <span className='office-mode-chip'>{lobbyModeLabel(snapshot.connection)}</span>}
-          <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select disabled={storyActive} ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
-            {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
-          </select></label>
-          <OfficeHelp />
-          {overview && <button ref={mapButton} type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => mapOpen ? closeMap() : setMapOpen(true)}>Overview</button>}
-          {mode !== 'play' && <button ref={overviewToggle} type='button' className='overview-toggle' aria-keyshortcuts={overview ? 'O' : undefined} onClick={enterPlay}>
-            Enter first person{overview && <> <kbd>O</kbd></>}
-          </button>}
         </div>
-        <div id='office-corner-panel' className='office-corner-panel' hidden={!cornerOpen}>
+        {/* Closed, the panel is visibility-hidden rather than display:none so the guide and shortcuts dialogs it hosts can still open. */}
+        <div id='office-corner-panel' className='office-corner-panel' data-open={cornerOpen || undefined}>
+          <div className='office-corner-quick'>
+            <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select disabled={storyActive} ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
+              {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
+            </select></label>
+            {overview && <button type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => { if (mapOpen) closeMap(); else { setCornerOpen(false); setMapOpen(true); } }}>Overview</button>}
+            {mode !== 'play' && <button ref={overviewToggle} type='button' className='overview-toggle' aria-keyshortcuts={overview ? 'O' : undefined} onClick={enterPlay}>
+              Enter first person{overview && <> <kbd>O</kbd></>}
+            </button>}
+            <OfficeHelp />
+            <SoundToggle snapshot={snapshot} />
+            <button type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => { setCornerOpen(false); setDrawerOpen(open => !open); }}>
+              Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
+            </button>
+          </div>
           <SiteNav placement='office' />
           <nav className='office-more-screens' aria-label='More screens'><ul>{OFFICE_MORE_SCREENS.map(({ label, href }) => <li key={href}><a href={href}>{label}</a></li>)}</ul></nav>
           <div className='office-tools'>
@@ -308,7 +310,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             <RainToggle />
             <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
             <OfficeAdvanced replay={snapshot.connection === 'replay'}
-              connection={snapshot.connection === 'preview' ? 'Walkthrough · local state, not live' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}
+              connection={snapshot.connection === 'preview' ? 'Local state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}
               llm={<fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
                 <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
               </fieldset>} />
@@ -317,13 +319,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             <button aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); setCornerOpen(false); }}>Full floor</button>
             {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); setCornerOpen(false); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
           </nav>
-          {/* Preview-only controls: a pick closes the menu so the scene shows the result. */}
+          {/* Scenario controls (local state only): a pick closes the menu so the scene shows the result. */}
           {controls && <div className='office-corner-controls' onClick={event => { if ((event.target as HTMLElement).closest('button')) setCornerOpen(false); }}>{controls}</div>}
         </div>
       </header>
-      <button ref={drawerToggle} type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => setDrawerOpen(open => !open)}>
-        Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
-      </button>
       <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
@@ -360,7 +359,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {overview && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
       {overview && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Overview · click someone for quick actions · click a room to jump in' : 'Overview · drag to look · click someone for quick actions · click a room to jump in'}</div>
+      {/* The overview shows no hint strip: the world is the page. */}
+      {!overview && <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Overview · click someone for quick actions · click a room to jump in' : 'Overview · drag to look · click someone for quick actions · click a room to jump in'}</div>}
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
@@ -383,8 +383,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         {typeof auditWall === 'function' ? auditWall(snapshot, setFocus) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
         </ViewBoundary>
       </section>
-      {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Walkthrough audit receipts'>
-        <ViewBoundary name='Walkthrough receipts' resetKey={snapshot} fallback={<p role='status'>Walkthrough receipts unavailable · a received row could not be displayed.</p>}>
+      {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Local audit receipts'>
+        <ViewBoundary name='Receipts' resetKey={snapshot} fallback={<p role='status'>Receipts unavailable · a received row could not be displayed.</p>}>
           <ReceiptList snapshot={snapshot} title='Office receipts' />
         </ViewBoundary>
       </section>}
@@ -401,7 +401,7 @@ export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
   return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
-    <span>Walkthrough controls</span>
+    <span>Scenarios</span>
     <a href='/inbox'>Judge inbox</a>
     <span>Receipts there are not synced into this static scene.</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Show escalation'}</button>

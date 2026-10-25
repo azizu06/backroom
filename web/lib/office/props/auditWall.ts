@@ -24,7 +24,7 @@ export interface AuditWallView {
 /** Preview and replay snapshots are fixtures or derived copies, not `/api/audit/entries`; only the live feed carries real receipt ids. */
 export const AUDIT_WALL_UNVERIFIED_FEEDS: readonly OfficeSnapshot['connection'][] = ['preview', 'replay'];
 const AUDIT_WALL_NOTICES = {
-  preview: 'Walkthrough feed: no audit entries. Live receipts appear here; see /audit.',
+  preview: 'No audit entries in this view. Live receipts appear here; see /audit.',
   replay: 'Replay feed: no audit entries. Live receipts appear here; see /audit.',
 } as const satisfies Record<'preview' | 'replay', string>;
 

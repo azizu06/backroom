@@ -61,18 +61,19 @@ function describe(entry: AuditEntry): string {
   const invoice = invoiceOf(entry);
   const outcome = entry.decision;
   switch (entry.action) {
-    case 'seed_company': return 'Loaded the synthetic Northfield Studio company';
-    case 'operator_reset': return 'Operator reset the demo company';
+    case 'seed_company': return 'Loaded the Northfield Studio company';
+    case 'operator_reset': return 'Operator reset the company';
     case 'save_policy': return `Saved policy v${entry.policyVersion}`;
     case 'office_call_requested': return 'Collections desk phone asked for a call';
-    case 'office_call_accepted': return 'Call placed to the allowlisted demo phone';
+    case 'office_call_accepted': return 'Call placed to the allowlisted phone';
     case 'office_call_refused': return `Call not placed (${text(inputs.code) ?? 'refused'})`;
-    case 'email_followup_queued': return `Email preview (simulated, not sent)${text(inputs.toDomain) ? ` · ${text(inputs.toDomain)}` : ''}`;
-    case 'email_followup_duplicate': return `Email preview already queued today (simulated, not sent)${text(inputs.toDomain) ? ` · ${text(inputs.toDomain)}` : ''}`;
-    case 'email_followup_blocked': return 'Email preview blocked';
+    case 'email_followup_queued': return `Email follow-up queued, not sent${text(inputs.toDomain) ? ` · ${text(inputs.toDomain)}` : ''}`;
+    case 'email_followup_duplicate': return `Email follow-up already queued today, not sent${text(inputs.toDomain) ? ` · ${text(inputs.toDomain)}` : ''}`;
+    case 'email_followup_blocked': return 'Email follow-up blocked';
     case 'CALL_PERMIT': case 'can_call': case 'pre_call_permit':
       return outcome === 'DENY' ? 'Pre-call checks blocked the call' : 'Pre-call checks allowed the call';
     case 'CALL_BLOCKED_PRECALL': case 'pre_call_blocked': return 'Call blocked before dialing';
+    case 'fake_pre_call_signals': return 'Pre-call signals loaded offline';
     case 'credit_check': return 'Credit check before calling';
     case 'health_check': return 'Business health check before calling';
     case 'verify_identity_result': return 'Identity check recorded before any amount';
@@ -100,7 +101,7 @@ function describe(entry: AuditEntry): string {
         ? `${debit ? 'Debit' : 'Deposit'} matched invoice ${invoice ?? ''} exactly`.trimEnd()
         : debit ? 'Debit did not match the invoice; held for review' : 'No exact deposit match; held for review';
     }
-    case 'nessie_completed': return 'Sandbox bank transfer completed';
+    case 'nessie_completed': return 'Nessie bank transfer completed';
     case 'pay': return 'Client paid through the link';
     case 'judge_inbox_decision': {
       const kind = text(inputs.kind)?.replaceAll('_', ' ') ?? 'item';

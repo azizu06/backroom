@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 const BASE_FOV = 75;
@@ -39,6 +40,7 @@ async function startPlay(page: Page) {
   const select = page.getByLabel('Office view');
   await expect(select).toBeEnabled();
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   // Readiness, not a timing claim: the rig reports only after the first Play frames (shader compile) and the 0.9 s
@@ -172,8 +174,10 @@ test('walking sends footstep cues, and they are silent unless the sound toggle i
   // Sound on: the same walking now makes oscillators, two per footstep.
   await page.keyboard.press('Escape');
   await expect(surface(page)).toHaveCount(0);
+  await openMenu(page);
   await page.getByRole('button', { name: 'Sound off', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sound on', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 20_000 }); // the intro fly-in has finished

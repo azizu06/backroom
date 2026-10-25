@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { OFFICE_ANCHORS } from '../lib/office/state';
+import { openMenu } from './office-menu';
 
 // HUD variant (c) Overview: O toggles the overhead 3D camera and first person; agents and desks open quick actions.
 function surface(page: Page) {
@@ -16,7 +17,7 @@ async function openOverview(page: Page, errors: string[]) {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: /first person/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Backroom menu' })).toBeVisible();
 }
 /** Alex's seat (OFFICE_ANCHORS.collections.position), where the preview keeps him. */
 const ALEX = { x: OFFICE_ANCHORS.collections.position[0], z: OFFICE_ANCHORS.collections.position[1] };
@@ -51,13 +52,15 @@ test('O toggles Overview and first person, and the buttons do the same', async (
   await page.keyboard.press('Escape');
   await expect(map).toHaveCount(0);
   await expect(select).toHaveValue('walk');
-  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeFocused();
-  // The corner's First person button enters first person too.
+  await expect(page.getByRole('button', { name: 'Backroom menu' })).toBeFocused();
+  // The corner menu's Enter first person button enters first person too.
+  await openMenu(page);
   await page.getByRole('button', { name: /first person/i }).click();
   await expect(surface(page)).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(surface(page)).toHaveCount(0);
   // Typing O into a field never toggles.
+  await openMenu(page);
   await select.focus();
   await page.keyboard.press('o');
   await expect(surface(page)).toHaveCount(0);
@@ -95,6 +98,7 @@ test('Overview quick menu: Go here lands in first person beside the agent, facin
 test('Overview map: an agent tile offers Go here, which lands in first person next to them', async ({ page }) => {
   const errors: string[] = [];
   await openOverview(page, errors);
+  await openMenu(page);
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   const map = page.getByRole('region', { name: 'Office overview' });
   await map.getByRole('button', { name: /^Alex,/ }).click();

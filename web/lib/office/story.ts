@@ -4,13 +4,13 @@ import type { IntroPose } from './play-intro';
 
 export type StoryChapter = { readonly id: string; readonly anchor: AnchorId; readonly title: string; readonly caption: string; readonly dwellMs: number; readonly preview?: 'escalation' | 'denial'; readonly handoff?: readonly [from: AnchorId, to: AnchorId] };
 export const STORY_CHAPTERS: readonly StoryChapter[] = [
-  { id: 'inbox', anchor: 'lobby', title: 'The audit wall and inbox', caption: 'In this walkthrough, invoices enter the inbox; the audit wall shows received decision receipts.', dwellMs: 5200 },
-  { id: 'collections', anchor: 'collections', title: 'A disclosed AI call', caption: 'In this walkthrough, the caller identifies as AI, checks consent and observes calling hours.', dwellMs: 5200 },
-  { id: 'sort', anchor: 'payables', title: 'Agents sort and extract', caption: 'In this walkthrough, Payables matches invoice details before any money moves.', dwellMs: 5200 },
-  { id: 'vendor', anchor: 'vendor_onboarding', title: 'Verify the vendor', caption: 'In this walkthrough, a bank change is held until vendor evidence is checked.', dwellMs: 5200 },
-  { id: 'handoff', anchor: 'payables', title: 'Vendor Desk → Payables', caption: 'In this walkthrough, Vendor Desk hands verified evidence to Payables. This handoff is illustrated, not a live task.', dwellMs: 5200, handoff: ['vendor_onboarding', 'payables'] },
-  { id: 'dana', anchor: 'dana', title: 'A human decides', caption: 'In this walkthrough, an escalation goes to Dana; only a human can approve, using a passkey.', dwellMs: 5200, preview: 'escalation' },
-  { id: 'treasury', anchor: 'treasury', title: 'Treasury: DENY', caption: 'In this walkthrough, Treasury refuses entry · NOT_IN_BADGE. Illustration only; receipts appear below when this session has recorded them.', dwellMs: 5200, preview: 'denial' },
+  { id: 'inbox', anchor: 'lobby', title: 'The audit wall and inbox', caption: 'Invoices enter the inbox; the audit wall shows received decision receipts.', dwellMs: 5200 },
+  { id: 'collections', anchor: 'collections', title: 'A disclosed AI call', caption: 'The caller identifies as AI, checks consent and observes calling hours.', dwellMs: 5200 },
+  { id: 'sort', anchor: 'payables', title: 'Agents sort and extract', caption: 'Payables matches invoice details before any money moves.', dwellMs: 5200 },
+  { id: 'vendor', anchor: 'vendor_onboarding', title: 'Verify the vendor', caption: 'A bank change is held until vendor evidence is checked.', dwellMs: 5200 },
+  { id: 'handoff', anchor: 'payables', title: 'Vendor Desk → Payables', caption: 'Vendor Desk hands verified evidence to Payables. This handoff is illustrated, not a live task.', dwellMs: 5200, handoff: ['vendor_onboarding', 'payables'] },
+  { id: 'dana', anchor: 'dana', title: 'A human decides', caption: 'An escalation goes to Dana; only a human can approve, using a passkey.', dwellMs: 5200, preview: 'escalation' },
+  { id: 'treasury', anchor: 'treasury', title: 'Treasury: DENY', caption: 'Treasury refuses entry · NOT_IN_BADGE. Illustration only; receipts appear below when this session has recorded them.', dwellMs: 5200, preview: 'denial' },
 ];
 /** Resolve named walking anchors at use time, including after a room layout changes. */
 export function storyCameraPose(anchor: AnchorId, anchors: Readonly<Record<AnchorId, {

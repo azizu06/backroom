@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL for the first-person Play view.
 const WARNING = 'Baked art /office-art/lobby.glb failed to load; using the procedural scene.';
@@ -29,6 +30,7 @@ async function openBaked(page: Page) {
 }
 
 async function enterPlay(page: Page) {
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });

@@ -1,11 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openPanels } from './office-menu';
 
 // Run via test:office:browser after building the web app.
-/** The kiosk lives in the office panels drawer, closed by default. */
-async function openPanels(page: Page) {
-  const toggle = page.getByRole('button', { name: /^Office panels/ });
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-}
 const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 test('office lobby kiosk shows the authorized payment link', async ({ page }) => {

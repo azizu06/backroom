@@ -502,7 +502,7 @@ describe("Cartesia tool gateway", () => {
     ).toBe(2);
   });
 
-  it("retains fees, rounds cents per policy, and rechecks fresh stop signals before queuing a link", async () => {
+  it("retains fees, rounds the first payment up to a whole dollar, and rechecks fresh stop signals before queuing a link", async () => {
     const call = seed();
     call.identityConfirmed = true;
     call.amountCents = 11002;
@@ -525,11 +525,11 @@ describe("Cartesia tool gateway", () => {
     });
     expect(allowed.plan).toMatchObject({
       totalCents: 11002,
-      firstPaymentCents: 5611,
+      firstPaymentCents: 5700,
     });
     expect(
       await invoke("send_payment_link", { plan_id: allowed.plan_id }),
-    ).toMatchObject({ kind: "RECORDED", amount_cents: 5611 });
+    ).toMatchObject({ kind: "RECORDED", amount_cents: 5700 });
     await store.transact("call-1", (c) => {
       c.policyState = { signals: { bankruptcy: true } };
     });

@@ -38,5 +38,5 @@ export function lobbyRoster(snapshot: OfficeSnapshot) {
 }
 
 export function lobbyModeLabel(connection: OfficeSnapshot['connection']): string | undefined {
-  return connection === 'preview' ? 'Walkthrough' : connection === 'replay' ? 'REPLAY' : undefined;
+  return connection === 'replay' ? 'REPLAY' : undefined;
 }

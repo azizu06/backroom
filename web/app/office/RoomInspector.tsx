@@ -29,7 +29,7 @@ export function RoomInspector({ room, snapshot, close, inboxTray }: {
     </> : room === 'treasury' ? <p>Locked · Dana only. Entry and money movement require server authorization.</p>
       : room === 'dana' ? <p>Human review. Approvals require Dana’s passkey on the approval card.</p>
       : <><h3>Audit wall</h3><p><a href='#office-audit-wall'>Open the audit wall below</a></p>
-        <div data-office-mount='inbox-inspector'><h3>Inbox tray · {snapshot.inboxCount}</h3>{inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <><p>This walkthrough holds three sample items.</p><p>Receipts on the judge inbox are not synced into this static scene.</p><a href='/inbox'>Open the judge inbox</a></>}</div></>}
+        <div data-office-mount='inbox-inspector'><h3>Inbox tray · {snapshot.inboxCount}</h3>{inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <><p>Receipts on the inbox page are not synced into this scene.</p><a href='/inbox'>Open the inbox</a></>}</div></>}
     {denial && <p className='denial-text' role='status'>Entry denied · audit {denial.auditId}</p>}
   </section>;
 }
