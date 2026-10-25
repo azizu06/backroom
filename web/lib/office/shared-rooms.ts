@@ -100,11 +100,11 @@ const breakRoom: DetailPiece[] = [
     box([10.5 + side * 0.32, 1.91, 1.685], [0.04, 0.04, 0.01], PALETTE.coral),
     ...[0, 1, 2].map(i => box([10.5 + side * 0.32, 1.8 - i * 0.1, 1.685], [0.26, 0.018, 0.01], ROLES.text)),
   ]),
-  // Clock face on the west wall, clear of the kitchen cupboards.
-  { ...cylinder([6.13, 2.2, 6.7], [0.55, 0.05, 0.55], ROLES.frame), rotation: [0, 0, Math.PI / 2] },
-  { ...cylinder([6.165, 2.2, 6.7], [0.48, 0.02, 0.48], PALETTE.cream), rotation: [0, 0, Math.PI / 2] },
-  box([6.18, 2.28, 6.7], [0.01, 0.18, 0.025], ROLES.text),
-  box([6.18, 2.2, 6.76], [0.01, 0.025, 0.14], ROLES.text),
+  // Clock face on the west wall above the fridge, past the end of the upper cupboard (z 6.1) so it never hides the face.
+  { ...cylinder([6.13, 2.35, 7.0], [0.55, 0.05, 0.55], ROLES.frame), rotation: [0, 0, Math.PI / 2] },
+  { ...cylinder([6.165, 2.35, 7.0], [0.48, 0.02, 0.48], PALETTE.cream), rotation: [0, 0, Math.PI / 2] },
+  box([6.18, 2.43, 7.0], [0.01, 0.18, 0.025], ROLES.text),
+  box([6.18, 2.35, 7.06], [0.01, 0.025, 0.14], ROLES.text),
   // Pendant cable and shade; the emissive underside is mounted in SharedRooms.
   cylinder([TABLE.x, 2.7, TABLE.z], [0.025, 0.6, 0.025], ROLES.frame),
   cylinder([TABLE.x, 2.36, TABLE.z], [0.55, 0.2, 0.55], PALETTE.butter),

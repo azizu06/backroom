@@ -100,6 +100,23 @@ export function denyPose(ageMs: number, reduced: boolean, out: DenyPose = create
   return out;
 }
 
+/** Longest stretch of the moment one rendered frame may cover (20 fps). */
+export const DENY_MAX_STEP_MS = 50;
+
+/**
+ * Frame-paced age of the scene's moment. Each rendered frame advances it by its wall-clock step, capped at
+ * DENY_MAX_STEP_MS, so a slow or contended GPU plays the sign and echo in slow motion instead of skipping
+ * most of the beat between a few frames. It never runs ahead of the wall clock and never lags it by more
+ * than DENY_MOMENT_MS, so the moment always ends within 2 x DENY_MOMENT_MS of the row's `at`.
+ * `previous` is null on the first frame, which starts at the wall-clock age (a late mount does not replay).
+ */
+export function pacedDenyAge(previous: number | null, stepMs: number, realAgeMs: number): number {
+  const real = Math.max(0, realAgeMs);
+  if (previous === null) return real;
+  const paced = previous + Math.min(DENY_MAX_STEP_MS, Math.max(0, stepMs));
+  return Math.min(real, Math.max(real - DENY_MOMENT_MS, paced));
+}
+
 /** Null without a matching server denial for Treasury or once the moment is over. */
 export function denyMoment(snapshot: OfficeSnapshot, now: number, reduced: boolean): DenyMoment | null {
   const denial = matchingDenial(snapshot, 'treasury');

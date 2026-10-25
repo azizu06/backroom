@@ -71,11 +71,14 @@ function vignette(site: PropSite, index: number): DetailPiece[] {
 }
 
 export const ROOM_PROP_GROUPS = ROOM_PROP_SITES.map((site, index) => ({ room: site.room, pieces: vignette(site, index) }));
-/** Only the large floor bookcases collide; tabletop objects and wall frames add no blockers. */
+/** The corridor and server room are always furnished; the other rooms only while they are visible. */
+export const roomPropsVisible = (room: SpaceId, rooms: readonly SpaceId[]) => room === 'corridor' || room === 'server_room' || rooms.includes(room);
+/** Only the large floor bookcases collide; tabletop objects and wall frames add no blockers. Precomputed once. */
+const SITE_COLLIDERS: readonly { room: SpaceId; box: Rect }[] = ROOM_PROP_SITES.map(site => {
+  const cos = Math.abs(Math.cos(site.turn)), sin = Math.abs(Math.sin(site.turn));
+  const halfX = (WIDTH * cos + DEPTH * sin) / 2, halfZ = (WIDTH * sin + DEPTH * cos) / 2;
+  return { room: site.room, box: { minX: site.x - halfX, maxX: site.x + halfX, minZ: site.z - halfZ, maxZ: site.z + halfZ } };
+});
 export function roomPropColliders(rooms: readonly SpaceId[]): Rect[] {
-  return ROOM_PROP_SITES.filter(site => rooms.includes(site.room) || site.room === 'corridor' || site.room === 'server_room').map(site => {
-    const cos = Math.abs(Math.cos(site.turn)), sin = Math.abs(Math.sin(site.turn));
-    const halfX = (WIDTH * cos + DEPTH * sin) / 2, halfZ = (WIDTH * sin + DEPTH * cos) / 2;
-    return { minX: site.x - halfX, maxX: site.x + halfX, minZ: site.z - halfZ, maxZ: site.z + halfZ };
-  });
+  return SITE_COLLIDERS.filter(({ room }) => roomPropsVisible(room, rooms)).map(({ box }) => box);
 }
