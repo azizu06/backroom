@@ -13,7 +13,10 @@ import { OUTDOOR, ROLES } from './palette';
 export type Vec2 = readonly [x: number, z: number];
 export interface Rect { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 
-export const BUILDING: Rect = { minX: -12, maxX: 12, minZ: -7.5, maxZ: 7.5 };
+/** Original office stays fixed; the west wing adds 180 square metres. */
+export const MAIN_BUILDING: Rect = { minX: -12, maxX: 12, minZ: -7.5, maxZ: 7.5 };
+export const BUILDING: Rect = { ...MAIN_BUILDING, minX: -24 };
+export const ATRIUM_HEIGHT = 7;
 export const WALL_HEIGHT = 3;
 export const WALL_THICKNESS = 0.16;
 /** Top of every doorway; the wall above it is a header. */
@@ -22,11 +25,11 @@ export const WINDOW_SILL = 0.9;
 export const WINDOW_HEAD = 2.5;
 /** Centre line of the corridor; agents and painted routes walk along it. */
 export const CORRIDOR_Z = 0;
-export const CORRIDOR: Rect = { minX: BUILDING.minX, maxX: 9.5, minZ: -1.5, maxZ: 1.5 };
+export const CORRIDOR: Rect = { minX: MAIN_BUILDING.minX, maxX: 9.5, minZ: -1.5, maxZ: 1.5 };
 
 export const ANCHOR_IDS = ['lobby', 'collections', 'payables', 'vendor_onboarding', 'dana', 'treasury'] as const;
 export type LayoutAnchorId = typeof ANCHOR_IDS[number];
-export type SpaceId = LayoutAnchorId | 'meeting' | 'break_room' | 'server_room' | 'corridor';
+export type SpaceId = LayoutAnchorId | 'meeting' | 'break_room' | 'server_room' | 'corridor' | 'work_room' | 'atrium';
 export interface Space { readonly id: SpaceId; readonly name: string; readonly rect: Rect; readonly kind: 'room' | 'corridor' }
 
 const NORTH = { minZ: BUILDING.minZ, maxZ: CORRIDOR.minZ } as const;
@@ -36,6 +39,8 @@ const column = (i: 0 | 1 | 2 | 3) => ({ minX: COLUMNS[i][0], maxX: COLUMNS[i][1]
 const room = (id: SpaceId, name: string, rect: Rect): Space => ({ id, name, rect, kind: 'room' });
 
 export const SPACES: Readonly<Record<SpaceId, Space>> = {
+  atrium: room('atrium', 'Atrium', { minX: BUILDING.minX, maxX: MAIN_BUILDING.minX, minZ: BUILDING.minZ, maxZ: 2.5 }),
+  work_room: room('work_room', 'Work room', { minX: BUILDING.minX, maxX: MAIN_BUILDING.minX, minZ: 2.5, maxZ: BUILDING.maxZ }),
   collections: room('collections', 'Collections', { ...column(0), ...NORTH }),
   payables: room('payables', 'Payables', { ...column(1), ...NORTH }),
   vendor_onboarding: room('vendor_onboarding', 'Vendor Desk', { ...column(2), ...NORTH }),
@@ -100,6 +105,8 @@ export const DOORWAYS: readonly Doorway[] = [
   { id: 'treasury', kind: 'locked', axis: 'x', at: [2.5, CORRIDOR.maxZ], width: LEAF_OPENING, joins: ['treasury', 'corridor'] },
   { id: 'break_room', kind: 'open', axis: 'x', at: [8, CORRIDOR.maxZ], width: 1.6, joins: ['break_room', 'corridor'] },
   { id: 'server_room', kind: 'open', axis: 'z', at: [CORRIDOR.maxX, 0], width: LEAF_OPENING, joins: ['server_room', 'corridor'] },
+  { id: 'atrium', kind: 'open', axis: 'z', at: [MAIN_BUILDING.minX, 0], width: 2.4, joins: ['atrium', 'corridor'] },
+  { id: 'work_room', kind: 'open', axis: 'x', at: [-18, 2.5], width: 2, joins: ['atrium', 'work_room'] },
   { id: 'entrance', kind: 'entrance', axis: 'x', at: [-7.2, BUILDING.maxZ], width: 1.6, joins: ['lobby', 'outside'] },
 ];
 export function doorway(id: string): Doorway {
@@ -118,25 +125,32 @@ export interface WallRun {
   readonly exterior: boolean;
   /** Cut-away height in the overview, so the floor plan stays readable from the orbit camera. */
   readonly overviewHeight: number;
+  readonly height?: number;
 }
 const OUTER_FAR = 1.1, OUTER_NEAR = 0.35, INNER = 0.76;
 export const WALLS: readonly WallRun[] = [
-  { id: 'north', axis: 'x', fixed: BUILDING.minZ, from: BUILDING.minX, to: BUILDING.maxX, exterior: true, overviewHeight: OUTER_FAR },
+  { id: 'north', axis: 'x', fixed: BUILDING.minZ, from: MAIN_BUILDING.minX, to: BUILDING.maxX, exterior: true, overviewHeight: OUTER_FAR },
   { id: 'south', axis: 'x', fixed: BUILDING.maxZ, from: BUILDING.minX, to: BUILDING.maxX, exterior: true, overviewHeight: OUTER_NEAR },
-  { id: 'west', axis: 'z', fixed: BUILDING.minX, from: BUILDING.minZ, to: BUILDING.maxZ, exterior: true, overviewHeight: OUTER_FAR },
+  { id: 'west', axis: 'z', fixed: MAIN_BUILDING.minX, from: BUILDING.minZ, to: BUILDING.maxZ, exterior: false, overviewHeight: OUTER_FAR },
   { id: 'east', axis: 'z', fixed: BUILDING.maxX, from: BUILDING.minZ, to: BUILDING.maxZ, exterior: true, overviewHeight: OUTER_NEAR },
-  { id: 'corridor-north', axis: 'x', fixed: CORRIDOR.minZ, from: BUILDING.minX, to: BUILDING.maxX, exterior: false, overviewHeight: INNER },
-  { id: 'corridor-south', axis: 'x', fixed: CORRIDOR.maxZ, from: BUILDING.minX, to: BUILDING.maxX, exterior: false, overviewHeight: INNER },
+  { id: 'corridor-north', axis: 'x', fixed: CORRIDOR.minZ, from: MAIN_BUILDING.minX, to: BUILDING.maxX, exterior: false, overviewHeight: INNER },
+  { id: 'corridor-south', axis: 'x', fixed: CORRIDOR.maxZ, from: MAIN_BUILDING.minX, to: BUILDING.maxX, exterior: false, overviewHeight: INNER },
   ...[-6, 0, 6].flatMap(x => [
     { id: `partition-north:${x}`, axis: 'z' as const, fixed: x, from: NORTH.minZ, to: NORTH.maxZ, exterior: false, overviewHeight: INNER },
     { id: `partition-south:${x}`, axis: 'z' as const, fixed: x, from: SOUTH.minZ, to: SOUTH.maxZ, exterior: false, overviewHeight: INNER },
   ]),
+  { id: 'wing-north', axis: 'x', fixed: BUILDING.minZ, from: BUILDING.minX, to: MAIN_BUILDING.minX, exterior: true, overviewHeight: OUTER_FAR, height: ATRIUM_HEIGHT },
+  { id: 'wing-west-atrium', axis: 'z', fixed: BUILDING.minX, from: BUILDING.minZ, to: 2.5, exterior: true, overviewHeight: OUTER_FAR, height: ATRIUM_HEIGHT },
+  { id: 'wing-west-work', axis: 'z', fixed: BUILDING.minX, from: 2.5, to: BUILDING.maxZ, exterior: true, overviewHeight: OUTER_FAR },
+  { id: 'wing-divider', axis: 'x', fixed: 2.5, from: BUILDING.minX, to: MAIN_BUILDING.minX, exterior: false, overviewHeight: INNER, height: ATRIUM_HEIGHT },
   { id: 'server', axis: 'z', fixed: CORRIDOR.maxX, from: CORRIDOR.minZ, to: CORRIDOR.maxZ, exterior: false, overviewHeight: INNER },
 ];
 
-/** A framed window in an exterior wall, centred `at` along the wall. Placed clear of wall-mounted props. */
+/** A framed window in an exterior wall or the original west glazed partition, centred `at` along the wall. Placed clear of wall-mounted props. */
 export interface WindowSpec { readonly wall: string; readonly at: number; readonly width: number; readonly space: SpaceId }
 export const WINDOWS: readonly WindowSpec[] = [
+  { wall: 'wing-west-atrium', at: -4, width: 3, space: 'atrium' },
+  { wall: 'wing-west-work', at: 5, width: 2, space: 'work_room' },
   { wall: 'west', at: -6, width: 1.6, space: 'collections' },
   { wall: 'west', at: 3, width: 1.6, space: 'lobby' },
   { wall: 'west', at: 5.6, width: 1.6, space: 'lobby' },
@@ -188,7 +202,7 @@ function wallBox(wall: WallRun, from: number, to: number, bottom: number, top: n
 export function wallPieces(mode: 'full' | 'overview'): FurniturePiece[] {
   const pieces: FurniturePiece[] = [];
   for (const wall of WALLS) {
-    const height = mode === 'full' ? WALL_HEIGHT : wall.overviewHeight;
+    const height = mode === 'full' ? (wall.height ?? WALL_HEIGHT) : wall.overviewHeight;
     const color = mode === 'overview' && !wall.exterior ? ROLES.partition : ROLES.wall;
     let cursor = wall.from;
     for (const gap of openings(wall, mode === 'overview')) {
@@ -300,6 +314,8 @@ export interface RoomSpawn { readonly position: Vec2; readonly yaw: number; read
  * corridor side of its door, facing it. Kept clear of every collider (see layout.test.ts).
  */
 export const ROOM_SPAWNS: Readonly<Record<SpaceId, RoomSpawn>> = {
+  atrium: { position: [-13.2, 0], yaw: Math.PI / 2, space: 'atrium' },
+  work_room: { position: [-18, 3.3], yaw: Math.PI, space: 'work_room' },
   corridor: { position: [-9, 0.6], yaw: 0, space: 'corridor' },
   lobby: { position: [-7.2, 6.7], yaw: 0, space: 'lobby' },
   collections: { position: [-9, -2.3], yaw: 0, space: 'collections' },

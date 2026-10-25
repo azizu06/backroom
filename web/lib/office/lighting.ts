@@ -5,7 +5,7 @@
  */
 import { ROLES } from "./palette";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { roomPoint } from "./layout";
+import { BUILDING, roomPoint } from "./layout";
 
 export type Vec3 = [number, number, number];
 
@@ -63,7 +63,7 @@ export const OFFICE_LIGHTING: OfficeLighting = {
   hemisphere: { skyColor: ROLES.ceiling, groundColor: ROLES.shadow, intensity: 1.5 },
   // Room pads reach y=0.045 (FLOOR_PAD_TOP), so the shadow plane sits just above them. near=-0.04 lets the upward
   // depth pass also see faces from y=0.01 (avatar feet) while still skipping pad undersides (y<=0.005).
-  contactShadows: { position: [0, 0.05, 0], near: -0.04, scale: [24.5, 15.5], resolution: 512, blur: 2.5, opacity: 0.35, far: 2.5, color: ROLES.shadow },
+  contactShadows: { position: [(BUILDING.minX + BUILDING.maxX) / 2, 0.05, 0], near: -0.04, scale: [BUILDING.maxX - BUILDING.minX + 0.5, BUILDING.maxZ - BUILDING.minZ + 0.5], resolution: 512, blur: 2.5, opacity: 0.35, far: 2.5, color: ROLES.shadow },
   base: { roughness: 0.9 },
   screen: { roughness: 0.2, metalness: 0.1, emissiveIntensity: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15 },
   vault: { color: ROLES.frame, roughness: 0.45, metalness: 0.3 },

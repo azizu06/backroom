@@ -106,7 +106,8 @@ describe('office lighting', () => {
     const { position, near, scale } = OFFICE_LIGHTING.contactShadows;
     expect(position[1]).toBeGreaterThan(FLOOR_PAD_TOP);
     expect(position[1] + near).toBeGreaterThan(FLOOR_PAD_BOTTOM);
-    // Covers the whole building floor (24 x 15) with a small margin.
+    // Covers the expanded building floor, centred on its footprint, with a small margin.
+    expect(position[0]).toBe((BUILDING.minX + BUILDING.maxX) / 2);
     expect(scale[0]).toBeGreaterThanOrEqual(BUILDING.maxX - BUILDING.minX);
     expect(scale[1]).toBeGreaterThanOrEqual(BUILDING.maxZ - BUILDING.minZ);
   });
