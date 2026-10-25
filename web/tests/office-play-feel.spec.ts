@@ -120,8 +120,10 @@ test('walking eases the FOV out and back, and the player keeps moving', async ({
 
 test('the Play settings turn FOV kick off and remember it', async ({ page }) => {
   const errors = await startPlay(page);
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Settings' }).focus();
+  await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog', { name: 'Play settings' });
+  await dialog.locator('summary').filter({ hasText: 'Movement Feel' }).click();
   await expect(dialog.getByRole('checkbox', { name: 'Smooth movement' })).toBeChecked();
   await expect(dialog.getByRole('checkbox', { name: 'Head bob' })).toBeChecked();
   await dialog.getByRole('checkbox', { name: 'Field-of-view kick' }).uncheck();

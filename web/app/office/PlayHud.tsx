@@ -83,7 +83,6 @@ function PlaySettingsDialog({ settings, change, close, tryWalking }: {
 }) {
   const headingId = useId();
   const motionNoteId = useId();
-  const first = useRef<HTMLInputElement>(null);
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia(REDUCED_MOTION_QUERY).matches);
   useEffect(() => {
     const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -93,11 +92,29 @@ function PlaySettingsDialog({ settings, change, close, tryWalking }: {
     return () => query.removeEventListener('change', update);
   }, []);
   const motionBlocked = reducedMotion && !settings.useMotionAnyway;
-  useEffect(() => { first.current?.focus(); }, []);
+  const [groups, setGroups] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('backroom.office.play-settings-groups.v1') ?? '{}');
+      return { controls: saved?.controls !== false, feel: saved?.feel === true };
+    } catch { return { controls: true, feel: false }; }
+  });
+  const rememberGroup = (group: 'controls' | 'feel', open: boolean) => {
+    setGroups(previous => previous[group] === open ? previous : { ...previous, [group]: open });
+  };
+  useEffect(() => {
+    try { localStorage.setItem('backroom.office.play-settings-groups.v1', JSON.stringify(groups)); } catch { /* Storage is optional. */ }
+  }, [groups]);
+  const first = useRef<HTMLInputElement>(null);
+  const controlsSummary = useRef<HTMLElement>(null);
+  useEffect(() => {
+    (first.current?.getClientRects().length ? first.current : controlsSummary.current)?.focus();
+  }, []);
   return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <header><h2 id={headingId}>Play Settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
+    <details className='play-setting-group' open={groups.controls} onToggle={event => rememberGroup('controls', event.currentTarget.open)}>
+      <summary ref={controlsSummary}>Controls</summary>
     <label className='play-setting'><span>Look sensitivity <output>{formatMultiplier(settings.sensitivity)}</output></span>
       <input ref={first} aria-label='Look sensitivity' type='range' min={SENSITIVITY_RANGE.min} max={SENSITIVITY_RANGE.max} step={SENSITIVITY_RANGE.step} value={settings.sensitivity}
         onChange={event => change({ ...settings, sensitivity: Number(event.target.value) })} />
@@ -109,10 +126,14 @@ function PlaySettingsDialog({ settings, change, close, tryWalking }: {
     <label className='play-setting play-setting-check'>
       <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked }, `Invert Y ${event.target.checked ? 'on' : 'off'}`)} /> Invert Y (look)
     </label>
-    <fieldset className='play-setting-group'><legend>Movement Feel</legend>
-      <p id={motionNoteId} className='play-settings-note' aria-live='polite'>{motionBlocked
-        ? 'Reduced motion is on in your system, so these are off'
-        : reducedMotion ? 'Reduced motion is on in your system. Motion is enabled for this office only.' : 'Motion applies while walking.'}</p>
+    </details>
+    <details className='play-setting-group' open={groups.feel} onToggle={event => rememberGroup('feel', event.currentTarget.open)}>
+      <summary aria-labelledby={`${headingId}-feel`} aria-describedby={motionNoteId}>
+        <span id={`${headingId}-feel`}>Movement Feel</span>
+        <span id={motionNoteId} className='play-settings-note' aria-live='polite'>{motionBlocked
+          ? 'Reduced motion is on in your system, so these are off'
+          : reducedMotion ? 'Reduced motion is on in your system. Motion is enabled for this office only.' : 'Motion applies while walking.'}</span>
+      </summary>
       <label className='play-setting play-setting-check'>
         <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked }, `Smooth movement ${event.target.checked ? 'on' : 'off'}`)} /> Smooth movement
       </label>
@@ -130,7 +151,7 @@ function PlaySettingsDialog({ settings, change, close, tryWalking }: {
         <input type='checkbox' role='switch' checked={settings.useMotionAnyway} onChange={event => change({ ...settings, useMotionAnyway: event.target.checked }, `Use motion anyway ${event.target.checked ? 'on' : 'off'}`)} /> Use motion anyway
       </label>
       <p className='play-settings-note'>Overrides your system preference for this office only.</p>
-    </fieldset>
+    </details>
     <button onClick={tryWalking}>Try walking</button>
     <p className='play-settings-note'>Use W A S D to feel your changes with this panel open.</p>
     <p className='play-settings-note'>Saved in this browser only.</p>
