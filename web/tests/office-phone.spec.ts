@@ -85,7 +85,8 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await dialog.getByTestId('phone-request').click();
   await expect(dialog.getByTestId('phone-request-result')).toHaveText('Scripted call: no call placed');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-request.png' });
-  expect(calls.filter(({ url, type }) => /call/i.test(url) && !['document', 'script', 'stylesheet', 'font', 'image'].includes(type))).toEqual([]);
+  // Next's RSC prefetch of the nav's /calls page (`?_rsc=`) is navigation, not a call request.
+  expect(calls.filter(({ url, type }) => /call/i.test(url) && !new URL(url).searchParams.has('_rsc') && !['document', 'script', 'stylesheet', 'font', 'image'].includes(type))).toEqual([]);
 });
 
 test('phone stays idle without the mock query', async ({ page }) => {
