@@ -33,6 +33,7 @@ async function openBaked(page: Page) {
 }
 
 async function enterPlay(page: Page) {
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   const surface = page.getByRole('application', { name: /First-person office/ });
   await expect(surface).toBeFocused();

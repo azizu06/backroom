@@ -64,3 +64,13 @@ Commands run from `web/` unless marked repo root:
 
 The first office run failed on the retired mount assertion and forbidden Python
 subprocess spawning; both were resolved before the passing final run above.
+
+## Phase 1 test bake (orchestrator, GX10, 2026-10-25)
+Sandbox: `tools/bake/run-gx10.sh` (bwrap --unshare-net/--unshare-pid, nice 19, timeout 1800, CPU Cycles; GPU bakes are not possible: Blender 4.0.2 Cycles kernels do not support the GB10's sm_121). Inputs: hall.py, exterior.py, hall.layout.json exported from the current 24 x 15 m layout.
+
+| Script | Args | Wall time | Outputs |
+|---|---|---|---|
+| hall.py | size 2048, samples 256, threads 8 | 249 s | hall.glb 1,396,132 B; hall_lightmap.png 4,781,149 B; hall.colliders.json 585 B |
+| exterior.py | size 2048, samples 128, threads 8 | (see GX10 ~/bake/hall1/run-exterior/timing.txt) | exterior.glb 466,644 B; exterior_lightmap.png 1,054,658 B; exterior.bounds.json 183 B |
+
+Both exited 0. These are pipeline-proof outputs for the current layout and are not committed; phase 2 re-exports the square-room layout, rebakes (thread cap 16 while the box is idle) and commits the final GLBs.

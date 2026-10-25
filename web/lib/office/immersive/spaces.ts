@@ -5,6 +5,7 @@
  */
 import { roomAt } from '../room-entry';
 import { FLOOR } from '../play';
+import { spaceAt as layoutSpaceAt, type SpaceId } from '../layout';
 import type { AnchorId, FloorPosition } from '../state';
 import type { FloorType } from './footsteps';
 
@@ -36,6 +37,8 @@ export const WINDOW_REACH = 1.6;
 export const WINDOW_BIRDS = 0.7;
 
 export function spaceForRoom(room: AnchorId | null): Space { return room ? ROOM_SPACES[room] : 'aisle'; }
+/** Rooms with no desk agent (./layout) and how they sound. */
+const SHARED_SPACES: Partial<Record<SpaceId, Space>> = { meeting: 'work', work_room: 'work', break_room: 'break', atrium: 'lobby', server_room: 'vault' };
 export function floorFor(space: Space): FloorType { return SPACE_FLOORS[space]; }
 
 function outside([x, z]: FloorPosition) { return x < FLOOR.minX || x > FLOOR.maxX || z < FLOOR.minZ || z > FLOOR.maxZ; }
@@ -52,7 +55,8 @@ export interface SpaceReading { readonly room: AnchorId | null; readonly space: 
 export function spaceAt(position: FloorPosition, current: AnchorId | null, rooms: readonly AnchorId[]): SpaceReading {
   if (position.every(Number.isFinite) && outside(position)) return { room: null, space: 'outdoor' };
   const room = roomAt(position, current, rooms);
-  return { room, space: spaceForRoom(room) };
+  const shared = room ? undefined : SHARED_SPACES[layoutSpaceAt(position) ?? 'corridor'];
+  return { room, space: shared ?? spaceForRoom(room) };
 }
 
 /** One layer's target level: the space's mix, with birds raised near the windows. */

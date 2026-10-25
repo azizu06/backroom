@@ -38,7 +38,7 @@ describe('call state', () => {
     expect(fetch).toHaveBeenCalledWith('/api/calls/request', expect.objectContaining({ method: 'POST', body: '{"line":"collections"}' }));
     await expect(requestCall()).resolves.toEqual({ ok: false, reason: 'locked', message: 'Calls are locked.' });
     vi.stubGlobal('window', { location: { search: '?calls=mock' } });
-    await expect(requestCall()).resolves.toEqual({ ok: false, reason: 'unavailable', message: 'Mock preview: no call placed' });
+    await expect(requestCall()).resolves.toEqual({ ok: false, reason: 'unavailable', message: 'Scripted call: no call placed' });
     expect(fetch).toHaveBeenCalledTimes(2);
     vi.unstubAllGlobals();
   });

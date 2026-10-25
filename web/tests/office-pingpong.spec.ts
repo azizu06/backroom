@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 for (const reducedMotion of ['reduce', 'no-preference'] as const) {
   test(`E starts ping pong, mouse and A/D move the paddle, Escape restores first person (${reducedMotion})`, async ({ page }) => {
@@ -6,12 +7,13 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
-    await page.goto('/office?playSpawn=9.5,4');
+    await page.goto('/office?playSpawn=9.5,4&view=overview');
     await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+    await openMenu(page);
     await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
     const surface = page.getByRole('application', { name: /First-person office/ });
     await expect(surface).toBeFocused();
-    await expect(page.locator('.play-prompt')).toHaveText('E · Play ping pong');
+    await expect(page.locator('.play-prompt')).toHaveText('E · Play ping pong', { timeout: 15_000 });
     const pose = await surface.evaluate(el => ({ ...((el as HTMLElement).dataset) }));
     const score = page.getByTestId('pingpong-score');
     await page.keyboard.press('e');
@@ -54,14 +56,17 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
 test('score card hides behind a wall in first person and returns in overview', async ({ page }) => {
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office?playSpawn=9,0');
+  await page.goto('/office?playSpawn=9,0&view=overview');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const score = page.getByTestId('pingpong-score');
   await expect(score).toHaveCSS('visibility', 'visible');
+  await openMenu(page);
   await view.selectOption({ label: 'Play (first person)' });
   await expect(page.getByRole('application', { name: /First-person office/ })).toHaveAttribute('data-player-x', '9.000');
   await expect(score).toHaveCSS('visibility', 'hidden');
-  await view.selectOption({ label: 'Orbit camera' });
+  // First person hides the corner menu; O returns to the overview camera.
+  await page.keyboard.press('o');
+  await expect(view).not.toHaveValue('play');
   await expect(score).toHaveCSS('visibility', 'visible');
 });
