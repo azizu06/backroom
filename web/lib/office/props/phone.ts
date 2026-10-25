@@ -3,12 +3,8 @@ import { callStore, precallStore } from '../calls';
 import { OFFICE_ANCHORS, visibleRooms } from '../state';
 import type { OfficePropInteraction } from './interact';
 
-/**
- * Rail on the desk's aisle-side corner. A right strafe anywhere between the collections doorway and the
- * desk front stops with the player centre 0.86 m right of the desk centre, in front of the handset.
- * DeskPhone draws this same footprint.
- */
-export const PHONE_STAND = { x: OFFICE_ANCHORS.collections.center[0] + 1.22, z: OFFICE_ANCHORS.collections.center[1] + 1.04, width: 0.16, depth: 1.42 } as const;
+/** Floor-supported phone rail stays underneath the desk, clear of the adjacent seat and aisle. */
+export const PHONE_STAND = { x: OFFICE_ANCHORS.collections.center[0] + 0.95, z: OFFICE_ANCHORS.collections.center[1], width: 0.16, depth: 0.8 } as const;
 /** Collections phone sits aisle-side on the desk at local x .85, z .3; floor y is omitted. */
 export const PHONE_INTERACTION: OfficePropInteraction = {
   // Cover the handset itself at the aisle stop; the desk target's wider footprint otherwise wins

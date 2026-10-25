@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { STORY_CHAPTERS, storyCameraPose, storyChapterAt, storyChapters, storyProgress, storyTotalMs } from './story';
+import { STORY_CHAPTERS, interpolateStoryPose, storyCameraPose, storyChapterAt, storyChapters, storyProgress, storyTotalMs } from './story';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
-import { EYE_HEIGHT, PLAYER_RADIUS, insideAny, officeColliders } from './play';
-import { interpolateIntroPose, playIntroProgress } from './play-intro';
+import { EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, insideAny, officeColliders } from './play';
+import { playIntroProgress } from './play-intro';
 
 describe('judge story timing', () => {
   it('has seven short chapters and advances at dwell boundaries', () => {
@@ -36,6 +36,11 @@ describe('judge story timing', () => {
       expect(height).toBe(EYE_HEIGHT);
       expect(insideAny([x, z], colliders, PLAYER_RADIUS)).toBe(false);
       const yaw = 2 * Math.atan2(pose.quaternion[1], pose.quaternion[3]);
+      if (anchor === 'lobby') {
+        expect([x, z]).toEqual(SPAWN.position);
+        expect(yaw).toBe(0);
+        continue;
+      }
       const [cx, cz] = OFFICE_ANCHORS[anchor].center;
       expect(-Math.sin(yaw)).toBeCloseTo((cx - x) / Math.hypot(cx - x, cz - z));
       expect(-Math.cos(yaw)).toBeCloseTo((cz - z) / Math.hypot(cx - x, cz - z));
@@ -43,7 +48,7 @@ describe('judge story timing', () => {
   });
   it('follows relocated room anchors rather than storing layout coordinates in stops', () => {
     const anchors = Object.fromEntries(Object.entries(OFFICE_ANCHORS).map(([id, room]) => [id, {
-      position: [room.position[0] + 20, room.position[1] + 10] as const,
+      position: [storyCameraPose(id as AnchorId).position[0] + 20, storyCameraPose(id as AnchorId).position[2] + 10] as const,
       center: [room.center[0] + 20, room.center[1] + 10] as const,
     }])) as Record<AnchorId, { position: readonly [number, number]; center: readonly [number, number] }>;
     for (const { anchor } of STORY_CHAPTERS) {
@@ -54,7 +59,24 @@ describe('judge story timing', () => {
   });
   it('eases between stops and cuts directly to the named destination with reduced motion', () => {
     const from = storyCameraPose('lobby'), to = storyCameraPose('collections');
-    expect(interpolateIntroPose(from, to, playIntroProgress(100, false))).not.toEqual(to);
-    expect(interpolateIntroPose(from, to, playIntroProgress(0, true))).toEqual(to);
+    expect(interpolateStoryPose(from, to, playIntroProgress(100, false))).not.toEqual(to);
+    expect(interpolateStoryPose(from, to, playIntroProgress(0, true))).toEqual(to);
+  });
+  it('keeps the camera and walking body clear on every chapter jump, including Dana → Treasury', () => {
+    const colliders = officeColliders(Object.keys(OFFICE_ANCHORS) as AnchorId[], [SERVER_ROOM_BOX]);
+    const stops = STORY_CHAPTERS.map(({ anchor }) => storyCameraPose(anchor));
+    const spawn = { ...stops[0]!, position: [SPAWN.position[0], EYE_HEIGHT, SPAWN.position[1]] as const };
+    // Include interruptions so Skip/resume cannot leave the walking rig in furniture.
+    const interrupted = [0.2, 0.5, 0.8].map(t => interpolateStoryPose(storyCameraPose('dana'), storyCameraPose('treasury'), t));
+    for (const from of [spawn, ...stops, ...interrupted]) for (const to of stops) {
+      expect(interpolateStoryPose(from, to, 0)).toEqual(from);
+      expect(interpolateStoryPose(from, to, 1)).toEqual(to);
+      for (let step = 0; step <= 200; step++) {
+        const pose = interpolateStoryPose(from, to, step / 200);
+        expect(pose.position[1]).toBe(EYE_HEIGHT);
+        expect(insideAny([pose.position[0], pose.position[2]], colliders, PLAYER_RADIUS),
+          `${from.position} → ${to.position} at ${step / 200}: ${pose.position}`).toBe(false);
+      }
+    }
   });
 });

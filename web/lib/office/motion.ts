@@ -1,5 +1,5 @@
 import { OFFICE_ANCHORS, isAnchorId, type FloorPosition, type OfficeAgent } from "./state";
-import { CORRIDOR_Z } from "./layout";
+import { workspaceRoute } from "./layout";
 
 /** Visual interpolation only. Reaching a desk never triggers a business event. */
 export class WalkMotion {
@@ -34,8 +34,8 @@ export class WalkMotion {
       this.moving = false;
       return;
     }
-    // The corridor keeps walks clear of the room furniture footprints; every room door opens on it in line with its spot.
-    this.route = [[this.position[0], CORRIDOR_Z], [destination[0], CORRIDOR_Z], destination];
+    // North-facing seats reach the main aisle around their pod, never through its desks.
+    this.route = workspaceRoute(this.position, destination).slice(1);
     this.moving = true;
   }
 

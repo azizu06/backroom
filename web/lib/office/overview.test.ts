@@ -19,7 +19,11 @@ describe('overview helpers', () => {
     expect(yawToward([0, 0], [0, -1])).toBeCloseTo(0);
     expect(facing([0, 0], yawToward([0, 0], [3, 2]), [3, 2])).toBeCloseTo(0);
   });
-  it('maps points to room cells', () => {
+  it('maps points to square destination cells, including at the perimeter', () => {
+    for (const room of ALL) {
+      const rect = roomRect(room);
+      expect(rect.maxX - rect.minX).toBeCloseTo(rect.maxZ - rect.minZ);
+    }
     expect(roomAtPoint(OFFICE_ANCHORS.collections.center)).toBe('collections');
     expect(roomAtPoint(OFFICE_ANCHORS.dana.center)).toBe('dana');
     expect(roomAtPoint([0, 0.3])).toBeNull();
@@ -76,7 +80,7 @@ describe('jumping into a room', () => {
       const entry = roomEntry(room, colliders, avoid);
       expect(standable(entry.position, colliders)).toBe(true);
       for (const other of avoid) expect(Math.hypot(entry.position[0] - other[0], entry.position[1] - other[1])).toBeGreaterThanOrEqual(AGENT_CLEARANCE);
-      if (room === 'treasury') expect(roomAtPoint(entry.position)).not.toBe('treasury');
+      if (room === 'treasury') expect(roomAtPoint(entry.position)).toBe('treasury');
       else {
         const rect = roomRect(room);
         expect(entry.position[0]).toBeGreaterThan(rect.minX);
