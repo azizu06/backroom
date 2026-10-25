@@ -7,7 +7,7 @@ import { requestSceneFrame } from '../../../lib/office/frame';
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, type Handoff, type HandoffAgentId } from '../../../lib/office/handoffs';
 import { createMockHandoffFeed, type HandoffFeed } from '../../../lib/office/handoff-mock';
 import { HandoffStage } from '../../../lib/office/handoff-plan';
-import { HandoffVoice, createAudioPlayer, voiceCues } from '../../../lib/office/handoff-voice';
+import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, voiceCues } from '../../../lib/office/handoff-voice';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { HandoffEntries } from './HandoffLog';
 import './handoffs.css';
@@ -44,14 +44,15 @@ function useHandoffs(snapshot: OfficeSnapshot) {
   return { stage, rows };
 }
 /**
- * Optional voices for the handoff bubbles (#133). Off until the viewer turns them on in this visit;
+ * Voices for the handoff bubbles (#133). On by default after the first office gesture;
  * any proxy or playback error silences them and the visuals carry on.
  */
 function useHandoffVoice(stage: HandoffStage | null, rows: readonly Handoff[]) {
   const [, rerender] = useReducer((count: number) => count + 1, 0);
   const [player] = useState(createAudioPlayer);
   const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), player.play, rerender));
-  useEffect(() => () => voice.setEnabled(false), [voice]);
+  useEffect(() => unlockOnFirstGesture(window, player.unlock), [player]);
+  useEffect(() => () => voice.stop(), [voice]);
   useEffect(() => {
     if (!stage || !voice.enabled || voice.failed) return;
     const now = Date.now();
