@@ -4,6 +4,7 @@ import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHeal
   northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, recordSignals, signalsFromCrs, signalsFromHealth,
   type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
+import { environmentHealthRow } from '../../../tools/demo/env';
 import type { PrecallEvidence } from '../calls/precall';
 
 const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
@@ -112,7 +113,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       });
     },
     async health(): Promise<HealthRow[]> {
-      const rows: HealthRow[] = [{ name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present in web host; not a call-readiness test' : 'missing in web host' }];
+      const rows: HealthRow[] = [environmentHealthRow('web + seats', env),
+        { name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present in web host; not a call-readiness test' : 'missing in web host' }];
       if (!live) return [...rows, { name: 'Nessie', ok: false, detail: 'unused: web host uses mock bank' },
         { name: 'GX10 router', ok: false, detail: 'unused: rehearsal defaults OFF' },
         { name: 'Cloud fallback', ok: false, detail: 'unused: rehearsal defaults OFF' },
