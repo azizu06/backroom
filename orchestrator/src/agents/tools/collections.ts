@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { DEFAULT_POLICY, evaluate, type Decision } from '@backroom/policy';
 import { runPreCall, type CallPlan, type PreCallDependencies, type PreCallInput, type PreCallResult } from '../../collections';
 import type { DialInput } from '../../voice';
+import type { EmailFollowUpInput, EmailOutbox } from '../../collections/email';
 import type { DomainTool, Json, ToolContext } from '../contracts';
 
 /** Trusted case state, rebuilt from the store on every read. Never model input. */
@@ -11,6 +12,8 @@ export interface CollectionsCase {
   invoice: { amountCents: number; currency: string; daysPastDue: number };
   precall: PreCallInput;
   dial: DialInput;
+  /** Server-owned contact and verified-link state. Never accepted as model/tool arguments. */
+  emailContact?: { address?: string; identityVerified?: boolean; payLink?: EmailFollowUpInput['payLink'] };
 }
 export interface CollectionsCases { load(caseId: string): Promise<CollectionsCase> }
 /** Voice layer port. The real adapter wraps dialCollectionCall; tests mock it. */
@@ -19,6 +22,8 @@ export interface CollectionsToolDeps {
   cases: CollectionsCases;
   voice: CallStarter;
   precall: PreCallDependencies;
+  /** Shared simulated preview outbox. Absent preserves call-only planner behavior. */
+  emailFollowUp?: { outbox: EmailOutbox };
   now?: () => number;
 }
 interface ActivationState { ready?: Extract<PreCallResult, { status: 'ready' }>; started?: { sessionId: string; callId: string } }

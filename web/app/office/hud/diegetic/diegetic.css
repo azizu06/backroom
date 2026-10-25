@@ -4,7 +4,13 @@
  * card pinned over the agent. On screen: crosshair, the E prompt, a quiet control cluster and the
  * real-vs-sim disclosure line. Colours come from the --office-* tokens (lobby.css, mirrors palette.ts).
  */
-:root { --office-mint: #CDF2DC; --office-butter: #FFF0B3; }
+/* Butter/mint accents sit on the shared pastels (web/app/theme.css via office-tokens.css). */
+.office-shell { --office-mint: var(--pastel-aqua); --office-butter: var(--pastel-yellow); }
+/* Pastel fills keep navy ink in dark mode too (cream --ink on a pastel fails AA). */
+:root[data-theme='dark'] .office-shell :is(.office-mode-chip, .overview-menu [role='menuitem']:is(:hover, :focus-visible),
+  [data-overview] .desk-label:is(:hover, :focus-visible, [aria-expanded='true']), .office-corner-panel .office-tools > button:hover,
+  .office-corner-panel .room-navigation button:hover, .office-map-button:not([aria-expanded='true']), .office-corner-controls .mock-controls button,
+  .agent-tag:has(.agent-tag-pick:is(:hover, :focus-visible, [aria-expanded='true']))) { color: var(--on-pastel); }
 
 /* The scene takes the whole window; the toolbar and the dashboard strip stay in the page, covered. */
 html body .office-shell[data-hud='diegetic'] .office-viewport { position: fixed; inset: 0; z-index: 60; height: auto; min-height: 0; flex: none; }

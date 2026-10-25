@@ -14,7 +14,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 # ---- cozy pastel palette ----------------------------------------------------------------------------------------
 # These mirror web/lib/office/palette.ts (Blender's Python cannot import the TS module, so keep the two in sync).
@@ -40,7 +40,7 @@ def arg(name, default):
 
 
 OUT = arg("--out", os.path.join(os.getcwd(), "out"))
-SIZE = int(arg("--size", "2048"))
+SIZE = min(int(arg("--size", "2048")), 2048)  # one lightmap, never above 2048 px
 SAMPLES = int(arg("--samples", "256"))
 THREADS = int(arg("--threads", "0"))  # 0 = Blender decides
 os.makedirs(OUT, exist_ok=True)
@@ -95,6 +95,49 @@ def mix(a, b, t):
     return tuple(x + (y - x) * t for x, y in zip(a, b))
 
 
+def fogged(c, t):
+    """Aerial perspective: pull a colour towards the warm haze by t (0 = near, 1 = lost in the haze)."""
+    return mix(c, FOG, t)
+
+
+# Warm haze between aqua sky and cream, nudged towards butter; derived only from palette colours.
+FOG = mix(mix(hexlin(AQUA), hexlin(CREAM), 0.5), hexlin(BUTTER), 0.3)
+TREE = mix(hexlin(MINT), hexlin(SLATE), 0.3)
+TREE_DARK = mix(hexlin(MINT), hexlin(NAVY), 0.45)
+SKY_TOP_Y = 12.0  # three.js y where the sky gradient reaches its top colour
+
+
+def sky_material():
+    """Self-lit sky with a vertical gradient: warm blush-butter at the treeline, cream, then soft aqua overhead.
+    Uses the object's Z (three.js y); every part is joined into one object at the origin before the bake."""
+    horizon = mix(hexlin(BUTTER), hexlin(BLUSH), 0.35)
+    low = mix(hexlin(BUTTER), hexlin(CREAM), 0.5)
+    high = mix(hexlin(CREAM), hexlin(AQUA), 0.45)
+    top = mix(hexlin(AQUA), hexlin(CREAM), 0.2)
+    mat = make_material("sky", low, 1.0, emit=0.6)
+    nt = mat.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    scale = nt.nodes.new("ShaderNodeMath")
+    scale.operation = "MULTIPLY"
+    scale.use_clamp = True
+    scale.inputs[1].default_value = 1.0 / SKY_TOP_Y
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    elems = ramp.color_ramp.elements
+    elems[0].position, elems[0].color = 0.0, (*horizon, 1.0)
+    elems[1].position, elems[1].color = 1.0, (*top, 1.0)
+    for pos, col in ((0.36, low), (0.68, high)):
+        e = elems.new(pos)
+        e.color = (*col, 1.0)
+    nt.links.new(coord.outputs["Object"], sep.inputs[0])
+    nt.links.new(sep.outputs["Z"], scale.inputs[0])
+    nt.links.new(scale.outputs["Value"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Emission Color"])
+    return mat
+
+
 MATS = {
     # Peach planks; alternate rows and the seams lean towards slate so the floor reads against cream walls.
     "floor": make_material("floor", hexlin(PEACH), 0.55,
@@ -115,10 +158,27 @@ MATS = {
     "frame": make_material("frame", mix(hexlin(PEACH), hexlin(SLATE), 0.35), 0.45),
     "sill": make_material("sill", hexlin(CREAM), 0.5),
     "grass": make_material("grass", mix(hexlin(MINT), hexlin(SLATE), 0.15), 1.0),
-    "tree": make_material("tree", mix(hexlin(MINT), hexlin(SLATE), 0.3), 0.9),
-    "tree_dark": make_material("tree_dark", mix(hexlin(MINT), hexlin(NAVY), 0.45), 0.9),
+    "tree": make_material("tree", TREE, 0.9),
+    "tree_dark": make_material("tree_dark", TREE_DARK, 0.9),
     "trunk": make_material("trunk", mix(hexlin(PEACH), hexlin(NAVY), 0.5), 0.9),
-    "sky": make_material("sky", mix(hexlin(AQUA), hexlin(CREAM), 0.35), 1.0, emit=0.55),
+    # Forest r2: depth comes from aerial perspective. Each band further out leans towards a warm haze (FOG) and
+    # glows a little more, so the rings read as distance rather than as one flat wall.
+    "bush": make_material("bush", mix(hexlin(MINT), hexlin(SLATE), 0.18), 0.95),
+    "tree_mid": make_material("tree_mid", fogged(mix(TREE, TREE_DARK, 0.5), 0.32), 0.95, emit=0.08),
+    "trunk_mid": make_material("trunk_mid", fogged(mix(hexlin(PEACH), hexlin(NAVY), 0.5), 0.35), 0.95),
+    "tree_far": make_material("tree_far", fogged(TREE_DARK, 0.55), 1.0, emit=0.18),
+    "tree_haze": make_material("tree_haze", fogged(TREE_DARK, 0.74), 1.0, emit=0.3),
+    "hill": make_material("hill", fogged(mix(hexlin(MINT), hexlin(SLATE), 0.15), 0.82), 1.0, emit=0.36),
+    "mist": make_material("mist", FOG, 1.0, emit=0.45),
+    "grass_mid": make_material("grass_mid", fogged(mix(hexlin(MINT), hexlin(SLATE), 0.15), 0.35), 1.0),
+    "grass_far": make_material("grass_far", fogged(mix(hexlin(MINT), hexlin(SLATE), 0.15), 0.62), 1.0, emit=0.15),
+    # Outermost ground band: nearly lost in the haze, so the disc edge feathers out instead of ending as a slab.
+    "ground_haze": make_material("ground_haze", fogged(mix(hexlin(MINT), hexlin(SLATE), 0.15), 0.88), 1.0, emit=0.35),
+    # Lobe rim: the haze faded halfway to the cream page background, so the outline melts into the overview.
+    "ground_edge": make_material("ground_edge", mix(FOG, hexlin(CREAM), 0.5), 1.0, emit=0.4),
+    "sky": sky_material(),
+    # No glass glints: hairline strips get sub-texel lightmap islands that sample their neighbours and read as
+    # dark scratches, so the panes stay clear.
     "machine": make_material("machine", hexlin(NAVY), 0.35),
     "metal": make_material("metal", hexlin(SLATE), 0.3),
     "mug": make_material("mug", hexlin(CREAM), 0.4),
@@ -131,6 +191,18 @@ MATS = {
     "art_a": make_material("art_a", hexlin(AQUA), 0.9),
     "art_b": make_material("art_b", hexlin(BLUSH), 0.9),
     "shade": make_material("shade", hexlin(BUTTER), 0.6, emit=0.6),
+    # Lobby detail r2: second plant tone, clock face, ceiling lights (the ceiling-light materials join the
+    # "ceiling" node so they hide with it in the overview, see GROUP_OF).
+    "plant_dark": make_material("plant_dark", mix(hexlin(MINT), hexlin(SLATE), 0.22), 0.9),
+    "clock_face": make_material("clock_face", hexlin(CREAM), 0.35),
+    "downlight": make_material("downlight", hexlin(BUTTER), 0.4, emit=0.8),
+    "lamp_rim": make_material("lamp_rim", hexlin(CREAM), 0.4),
+    "pendant": make_material("pendant", mix(hexlin(BUTTER), hexlin(PEACH), 0.3), 0.5, emit=0.12),
+    # Coffee corner r3: counter top and a backsplash pulled from cream towards a peach mid-tone, so the corner
+    # reads warm instead of clipping where the pendants, a downlight and the bounce all land.
+    "counter": make_material("counter", mix(hexlin(CREAM), mix(hexlin(PEACH), hexlin(SLATE), 0.2), 0.45), 0.5),
+    "backsplash": make_material("backsplash", mix(hexlin(CREAM), hexlin(PEACH), 0.55), 0.8),
+    "cord": make_material("cord", hexlin(NAVY), 0.6),
 }
 
 # ---- geometry -------------------------------------------------------------------------------------------------
@@ -138,15 +210,25 @@ scene = bpy.context.scene
 parts = []
 
 
-def box(mat, cx, cy, cz, sx, sy, sz, bevel=0.0, rot_y=0.0):
-    """Axis-aligned box in three.js coordinates, optionally rotated about Y (radians)."""
+def _rotate(bm, rot_x=0.0, rot_y=0.0, rot_z=0.0):
+    """Rotate about the origin by three.js-axis angles (x, then z, then y). B() is a proper rotation, so a
+    three.js axis a maps to Blender axis B(a): x -> X, y -> Z, z -> -Y."""
+    if rot_x:
+        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(rot_x, 3, "X"), verts=bm.verts)
+    if rot_z:
+        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(-rot_z, 3, "Y"), verts=bm.verts)
+    if rot_y:
+        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(rot_y, 3, "Z"), verts=bm.verts)
+
+
+def box(mat, cx, cy, cz, sx, sy, sz, bevel=0.0, rot_y=0.0, rot_x=0.0, rot_z=0.0):
+    """Box in three.js coordinates, optionally rotated about three.js x, z, then y (radians)."""
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bmesh.ops.scale(bm, vec=(sx, sz, sy), verts=bm.verts)  # Blender axes: x, y(=three z), z(=three y)
     if bevel > 0:
         bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, segments=2, affect="EDGES")
-    if rot_y:
-        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(rot_y, 3, "Z"), verts=bm.verts)
+    _rotate(bm, rot_x, rot_y, rot_z)
     bmesh.ops.translate(bm, vec=B(cx, cy, cz), verts=bm.verts)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh = bpy.data.meshes.new(f"m_{mat}")
@@ -161,8 +243,9 @@ def box(mat, cx, cy, cz, sx, sy, sz, bevel=0.0, rot_y=0.0):
     return obj
 
 
-def _link(bm, mat):
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+def _link(bm, mat, recalc=True, smooth=True):
+    if recalc:  # closed solids only; open cards keep the winding set by _face_towards
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh = bpy.data.meshes.new(f"m_{mat}")
     bm.to_mesh(mesh)
     bm.free()
@@ -170,16 +253,22 @@ def _link(bm, mat):
     obj = bpy.data.objects.new(f"p_{mat}", mesh)
     scene.collection.objects.link(obj)
     for poly in mesh.polygons:
-        poly.use_smooth = True
+        poly.use_smooth = smooth
     parts.append(obj)
     return obj
 
 
-def cyl(mat, cx, cy, cz, r, h, segs=16, r_top=None):
-    """Vertical cylinder (or cone with r_top) standing centred at (cx, cy, cz) in three.js coordinates."""
+def cyl(mat, cx, cy, cz, r, h, segs=16, r_top=None, axis="y", rot_x=0.0, rot_z=0.0):
+    """Cylinder (or cone with r_top) centred at (cx, cy, cz) in three.js coordinates. axis "y" stands it up,
+    "z" points it out of a north/south wall, "x" out of an east/west wall; rot_x/rot_z tilt a standing one."""
     bm = bmesh.new()
     bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segs, radius1=r,
                           radius2=r if r_top is None else r_top, depth=h)
+    if axis == "z":
+        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"), verts=bm.verts)
+    elif axis == "x":
+        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "Y"), verts=bm.verts)
+    _rotate(bm, rot_x, 0.0, rot_z)
     bmesh.ops.translate(bm, vec=B(cx, cy, cz), verts=bm.verts)
     return _link(bm, mat)
 
@@ -192,6 +281,15 @@ def ball(mat, cx, cy, cz, r, squash=1.0, segs=12):
     return _link(bm, mat)
 
 
+def _face_towards(bm, target):
+    """Wind every face of an open card so its front (the side three.js draws) faces target (three.js)."""
+    bm.normal_update()
+    t = Vector(B(*target))
+    flip = [f for f in bm.faces if f.normal.dot(t - f.calc_center_median()) < 0]
+    if flip:
+        bmesh.ops.reverse_faces(bm, faces=flip)
+
+
 # Footprints (three.js x/z min/max) of baked props the player should not walk through; written next to the GLB.
 COLLIDERS = []
 
@@ -202,6 +300,9 @@ def solid(name, cx, cz, sx, sz):
 
 
 SILL_Y, HEAD_Y = 0.95, 2.35
+DOWNLIGHTS = ((-7.35, 1.85), (-7.35, 4.95), (-2.95, 1.9), (-2.95, 3.3))
+PENDANTS = ((-3.8, 4.85), (-3.0, 4.85))
+PENDANT_Y = 2.08  # bottom of the shade sits above a standing player's eye
 WINDOWS = ((1.8, 3.15), (3.45, 4.9))   # z spans of the two west windows
 
 
@@ -225,23 +326,191 @@ def west_wall_with_windows(cz, d):
         box("sill", X0 + 0.07, SILL_Y - 0.02, zm, 0.2, 0.04, z1 - z0 + 0.2, bevel=0.01)
 
 
-def tree(x, z, h, dark=False):
-    cyl("trunk", x, h * 0.12, z, 0.07 + h * 0.01, h * 0.24, segs=8)
-    m = "tree_dark" if dark else "tree"
-    for i, (r, y) in enumerate(((0.75, 0.42), (0.58, 0.62), (0.4, 0.8))):
-        cyl(m, x, h * y, z, r * h / 3.2, h * 0.32, segs=10, r_top=0.02)
+# ---- forest (r2): layered rings around a centre west of the lobby, so every window angle sees depth ----------
+FOREST_C = (-6.0, 3.4)        # ring centre (three.js x, z), on the lobby's mid line
+FOREST_EYE = (-5.0, 1.5, 3.4)  # cards and the sky face this point (inside the lobby)
+OUTSIDE_X = X0 - WALL_T - 0.1  # nothing of the forest comes closer than this to the west wall
+
+
+def jit(i, k):
+    """Deterministic 0..1 jitter (no random module): a hashed sine."""
+    v = math.sin(i * 12.9898 + k * 78.233) * 43758.5453
+    return v - math.floor(v)
+
+
+def polar(r, a):
+    """Ring point: a = 0 is due west of FOREST_C, positive a towards +z (south)."""
+    return FOREST_C[0] - r * math.cos(a), FOREST_C[1] + r * math.sin(a)
+
+
+def max_angle(r, clear):
+    """Largest ring angle at radius r that keeps a point `clear` metres west of the wall."""
+    c = (FOREST_C[0] - OUTSIDE_X + clear) / r
+    return min(math.radians(60), math.acos(min(1.0, c)))
+
+
+def arc_grid(mat, a0, a1, segs, rows):
+    """Open curved surface: rows(i) -> [(r, y), ...] bottom to top for column i, faced towards FOREST_EYE."""
+    bm = bmesh.new()
+    cols = []
+    for i in range(segs + 1):
+        a = a0 + (a1 - a0) * i / segs
+        col = []
+        for r, y in rows(i):
+            x, z = polar(r, a)
+            col.append(bm.verts.new(B(x, y, z)))
+        cols.append(col)
+    for c0, c1 in zip(cols, cols[1:]):
+        for j in range(len(c0) - 1):
+            bm.faces.new((c0[j], c1[j], c1[j + 1], c0[j + 1]))
+    _face_towards(bm, FOREST_EYE)
+    return _link(bm, mat, recalc=False, smooth=False)
+
+
+def fir_card(mat, r, a, w, h):
+    """Flat two-tier fir silhouette standing on the ring at angle a, for the far treeline."""
+    x, z = polar(r, a)
+    tx, tz = math.sin(a), math.cos(a)  # ring tangent
+    outline = ((-0.5, 0.0), (0.5, 0.0), (0.22, 0.45), (0.36, 0.45), (0.0, 1.0), (-0.36, 0.45), (-0.22, 0.45))
+    bm = bmesh.new()
+    verts = [bm.verts.new(B(x + tx * u * w, v * h, z + tz * u * w)) for u, v in outline]
+    bm.faces.new(verts)
+    _face_towards(bm, FOREST_EYE)
+    return _link(bm, mat, recalc=False, smooth=False)
+
+
+def fir(x, z, h, mat, trunk="trunk", segs=10, tiers=3):
+    """Low-poly cone tree: a trunk and stacked tapering tiers."""
+    cyl(trunk, x, h * 0.12, z, 0.07 + h * 0.01, h * 0.24, segs=max(5, segs - 2))
+    rings = ((0.75, 0.42, 0.32), (0.58, 0.62, 0.32), (0.4, 0.8, 0.32)) if tiers == 3 else ((0.7, 0.45, 0.42), (0.45, 0.72, 0.42))
+    for r, y, d in rings:
+        cyl(mat, x, h * y, z, r * h / 3.2, h * d, segs=segs, r_top=0.02)
+
+
+def round_tree(x, z, h, mat, trunk="trunk"):
+    """Deciduous accent: trunk and two soft canopy balls."""
+    cyl(trunk, x, h * 0.2, z, 0.08, h * 0.4, segs=8)
+    ball(mat, x, h * 0.58, z, h * 0.26, squash=0.9, segs=10)
+    ball(mat, x + 0.12, h * 0.78, z - 0.05, h * 0.18, squash=0.9, segs=10)
+
+
+WALL_OUT_X = X0 - WALL_T    # outer face of the west wall
+CLEARING = 0.6              # open grass between that face and the nearest canopy
+
+
+def ring(n, r0, r1, clear, seed, reach=0.0):
+    """n jittered (x, z, t) spots between radii r0..r1 that stay `clear` metres off the wall; t in 0..1.
+    A spot whose canopy (`reach` metres round its centre) would come within CLEARING of the wall slides outward
+    along its own ray, so the trees in the middle of the window view keep their places."""
+    spots = []
+    x_lim = WALL_OUT_X - CLEARING - reach
+    for i in range(n):
+        r = r0 + (r1 - r0) * jit(i, seed)
+        amax = max_angle(r, clear)
+        a = -amax + 2 * amax * (i + 0.2 + 0.6 * jit(i, seed + 1)) / n
+        x, z = polar(r, a)
+        if x > x_lim:
+            r = (FOREST_C[0] - x_lim) / math.cos(a)
+            x, z = polar(r, a)
+        spots.append((x, z, jit(i, seed + 2)))
+    return spots
+
+
+def end_taper(i, segs, frac=0.1, floor=0.08):
+    """1 across the middle of an arc, easing down to `floor` over its last `frac` at each end, so the far cards
+    finish in a curve instead of a straight vertical cut when the overview looks along them."""
+    e = min(1.0, min(i, segs - i) / max(1e-6, segs * frac))
+    return floor + (1.0 - floor) * e * e * (3 - 2 * e)
+
+
+HILL_R = 10.6  # the ground stops under the hills; nothing past them is visible from inside
+# Ground lobe: a half-ellipse centred on the wall line (so it meets the building along the wall, never past it),
+# big enough to sit under the hills and the foot of the sky, with a wobbly outline instead of radial cuts.
+LOBE_C = (WALL_OUT_X, FOREST_C[1])
+LOBE_RX, LOBE_RZ = 9.8, 10.9
+LOBE_SEGS = 72
+
+
+def lobe_wobble(i):
+    """Outline radius factor for column i, 0.97..1.08: two slow waves plus a little per-vertex jitter."""
+    th = math.pi * i / LOBE_SEGS
+    return 1.025 + 0.03 * math.sin(5 * th + 1.3) + 0.018 * math.sin(11 * th + 0.4) + 0.016 * (jit(i, 81) - 0.5)
+
+
+def lobe_point(i, s, y):
+    th = math.pi * i / LOBE_SEGS  # 0 = north end on the wall line, pi/2 = due west, pi = south end
+    k = s * lobe_wobble(i)
+    return B(LOBE_C[0] - LOBE_RX * k * math.sin(th), y, LOBE_C[1] - LOBE_RZ * k * math.cos(th))
+
+
+def ground_band(mat, s0, s1, y):
+    """Flat band of the ground lobe between outline scales s0..s1 (0 = the wall-line centre, 1 = the outline)."""
+    bm = bmesh.new()
+    outer = [bm.verts.new(lobe_point(i, s1, y)) for i in range(LOBE_SEGS + 1)]
+    if s0 <= 0:
+        hub = bm.verts.new(B(LOBE_C[0], y, LOBE_C[1]))
+        for a, b in zip(outer, outer[1:]):
+            bm.faces.new((hub, a, b))
+    else:
+        inner = [bm.verts.new(lobe_point(i, s0, y)) for i in range(LOBE_SEGS + 1)]
+        for j in range(LOBE_SEGS):
+            bm.faces.new((inner[j], outer[j], outer[j + 1], inner[j + 1]))
+    _face_towards(bm, FOREST_EYE)
+    return _link(bm, mat, recalc=False, smooth=False)
 
 
 def forest():
-    """A stylized forest outside the west windows: grass, a few rings of cone trees, a soft sky wall."""
-    box("grass", -13.5, -0.02, 3.4, 11.0, 0.04, 16.0)
-    trees = [(-9.6, 2.2, 3.0, False), (-10.2, 4.3, 3.6, True), (-9.4, 5.6, 2.6, False), (-10.8, 1.0, 3.3, False),
-             (-11.4, 3.2, 4.2, False), (-12.0, 5.2, 3.8, True), (-11.6, -0.6, 3.9, True), (-12.8, 1.9, 4.6, True),
-             (-13.4, 4.1, 4.4, False), (-13.9, 6.6, 4.0, True), (-14.6, 0.4, 4.8, False), (-15.2, 2.9, 5.0, True),
-             (-15.6, 5.4, 4.6, False), (-10.6, 7.0, 3.4, False), (-12.6, -1.8, 4.2, False)]
-    for x, z, h, dark in trees:
-        tree(x, z, h, dark)
-    box("sky", -17.5, 3.0, 3.4, 0.1, 7.0, 18.0)
+    """A stylized forest beyond the west windows with real depth: graded ground, a near band of detailed trees
+    and bushes, a mid band, a far band, a flat treeline and hills lost in warm haze, mist banks, a sky dome."""
+    # Ground: nested bands of one wobbly half-ellipse lobe off the wall, each band fogged a little more; the last
+    # two are nearly haze and then haze faded towards the cream page, so from above the forest floor feathers out
+    # in an organic outline rather than ending in straight cuts.
+    for mat, s0, s1, y in (("grass", 0.0, 0.4, -0.02), ("grass_mid", 0.4, 0.57, -0.025),
+                           ("grass_far", 0.57, 0.76, -0.03), ("ground_haze", 0.76, 0.9, -0.035),
+                           ("ground_edge", 0.9, 1.0, -0.04)):
+        ground_band(mat, s0, s1, y)
+    # Band 1 (near, ~1.5-3 m past the glass): bushes along the front, detailed firs and round trees, all with a
+    # CLEARING of open grass between their canopies and the west wall.
+    for i, (x, z, t) in enumerate(ring(9, 3.3, 3.7, 0.55, 11, reach=0.5)):
+        ball("bush", x, 0.22, z, 0.32 + 0.18 * t, squash=0.7, segs=10)
+    for i, (x, z, t) in enumerate(ring(8, 4.3, 5.2, 0.95, 21, reach=0.9)):
+        h = 2.6 + 1.2 * t
+        if i % 3 == 1:
+            round_tree(x, z, h * 0.9, "tree")
+        else:
+            fir(x, z, h, "tree_dark" if i % 2 else "tree")
+    # Band 2 (mid): fewer segments, first step of haze.
+    for i, (x, z, t) in enumerate(ring(10, 5.9, 6.6, 1.0, 31, reach=1.05)):
+        fir(x, z, 3.2 + 1.2 * t, "tree_mid", trunk="trunk_mid", segs=8)
+    # Band 3 (far, thinned): two-tier firs, more haze and a little glow.
+    for i, (x, z, t) in enumerate(ring(9, 7.5, 8.2, 1.0, 41, reach=1.0)):
+        fir(x, z, 3.4 + 1.2 * t, "tree_far", trunk="tree_far", segs=6, tiers=2)
+    # Low mist bank between bands 2 and 3, veiling the far trunks.
+    a3 = max_angle(7.15, CLEARING + 0.1)
+    arc_grid("mist", -a3, a3, 16, lambda i: ((7.15, -0.02), (7.15, (0.35 + 0.25 * jit(i, 51)) * end_taper(i, 16, 0.15))))
+    # Band 4: flat fir silhouettes on two staggered radii (no coplanar overlap) over a continuous body strip.
+    # Every far layer eases down at its two ends (end_taper) so the overview sees curved ends, not vertical cuts;
+    # the tapers start past ~48 deg, wider than any view out of the windows.
+    a4 = max_angle(9.4, 1.1)
+    n4 = 18
+    for i in range(n4):
+        a = -a4 + 2 * a4 * (i + 0.5) / n4
+        hf = end_taper(2 * i + 1, 2 * n4, 0.12, 0.25)
+        fir_card("tree_haze", 9.4 + 0.14 * (i % 2), a, 1.4 + 0.5 * jit(i, 61), (3.0 + 1.6 * jit(i, 62)) * hf)
+    arc_grid("tree_haze", -a4, a4, 30, lambda i: ((9.75, -0.02), (9.75, (1.2 + 0.35 * jit(i, 63)) * end_taper(i, 30, 0.12))))
+    # Band 5: rolling hills just in front of the sky.
+    a5 = max_angle(HILL_R, 0.5)
+    arc_grid("hill", -a5, a5, 40, lambda i: ((HILL_R, -0.02),
+                                             (HILL_R, (2.0 + 0.8 * math.sin(i * 0.36) + 0.5 * jit(i, 71)) * end_taper(i, 40, 0.12))))
+    # Sky dome: curved and leaning in at the top so even a glance up through the glass stays inside the gradient;
+    # at its ends both the height and the lean ease out, so it settles onto the hills instead of ending as a wall.
+    a6 = max_angle(11.4, 0.3)
+    sky_rows = ((11.4, -0.05), (11.3, 4.0), (10.3, 8.0), (8.3, SKY_TOP_Y))
+
+    def sky_col(i):
+        f = end_taper(i, 40, 0.1, 0.06)
+        return tuple((11.4 - (11.4 - r) * f, y if y <= 0 else y * f) for r, y in sky_rows)
+    arc_grid("sky", -a6, a6, 40, sky_col)
 
 
 def props():
@@ -250,7 +519,8 @@ def props():
     # Coffee corner against the south wall, east side: cabinet, machine, mugs.
     cab_x, cab_z = -3.35, 5.18
     box("wood", cab_x, 0.45, cab_z, 1.3, 0.86, 0.5, bevel=0.03)
-    box("sill", cab_x, 0.9, cab_z, 1.36, 0.04, 0.56, bevel=0.012)
+    box("counter", cab_x, 0.9, cab_z, 1.36, 0.04, 0.56, bevel=0.012)
+    box("backsplash", cab_x, 1.45, Z1 - 0.012, 1.5, 1.06, 0.02, bevel=0.006)                 # warm wall panel
     for dx in (-0.32, 0.32):
         box("frame", cab_x + dx, 0.6, cab_z - 0.255, 0.18, 0.025, 0.01, bevel=0.005)          # handles
     mx = cab_x - 0.3
@@ -311,6 +581,73 @@ def props():
         box("rug", -7.55, 0.6, z, 0.16, 0.34, 0.38, bevel=0.07, rot_y=0.15)
     solid("sofa", -7.5, 3.25, 0.85, 1.9)
     solid("coffee_table", -6.55, 2.45, 0.72, 0.52)
+    detail_props()
+
+
+def detail_props():
+    """Lobby detail r2: coat and umbrella stands by the doorway, a magazine table and a plant cluster on the east
+    wall, a wall clock over the bookshelf. Floor pieces get colliders; all stay off the doorway walk."""
+    # Coat stand just west of the doorway: weighted base, pole, hooks, a hanging coat and a hat.
+    sx, sz = -6.08, 1.62
+    cyl("frame", sx, FLOOR_TOP + 0.02, sz, 0.17, 0.04, segs=16)
+    cyl("wood", sx, 0.9, sz, 0.025, 1.7, segs=10)
+    ball("wood", sx, 1.77, sz, 0.045, segs=10)
+    for k in range(4):
+        a = k * math.pi / 2 + 0.4
+        box("frame", sx + 0.08 * math.cos(a), 1.62, sz + 0.08 * math.sin(a), 0.14, 0.022, 0.022,
+            bevel=0.008, rot_y=-a, rot_z=0.5)  # tilt the outer end up, then spin round
+    box("sofa", sx + 0.02, 1.22, sz + 0.12, 0.3, 0.72, 0.1, bevel=0.04, rot_x=0.08)       # coat
+    box("sofa", sx + 0.02, 1.53, sz + 0.12, 0.2, 0.08, 0.13, bevel=0.03)                  # collar
+    cyl("book_a", sx - 0.09, 1.66, sz - 0.04, 0.11, 0.015, segs=16, rot_z=0.35)          # hat brim
+    ball("book_a", sx - 0.095, 1.7, sz - 0.04, 0.07, squash=0.75, segs=12)                 # hat crown
+    solid("coat_stand", sx, sz, 0.4, 0.4)
+    # Umbrella stand beside it: an aqua tub with two closed umbrellas.
+    ux, uz = -6.62, 1.52
+    cyl("cooler", ux, 0.27, uz, 0.12, 0.44, segs=16)
+    cyl("sill", ux, 0.49, uz, 0.13, 0.025, segs=16)
+    for (dx, dz, m, tilt) in ((-0.03, 0.02, "book_d", 0.12), (0.04, -0.02, "rug", -0.1)):
+        cyl(m, ux + dx, 0.62, uz + dz, 0.035, 0.6, segs=8, r_top=0.012, rot_z=tilt)
+        hx = ux + dx - math.sin(tilt) * 0.33  # the tilted shaft's top
+        cyl("trim", hx, 0.98, uz + dz, 0.01, 0.12, segs=6, rot_z=tilt)
+        box("trim", hx + 0.03, 1.04, uz + dz, 0.07, 0.018, 0.018, bevel=0.006)
+    solid("umbrella_stand", ux, uz, 0.3, 0.3)
+    # Round magazine table against the east wall with a fan of magazines and a little vase.
+    tx, tz = -2.95, 3.3
+    cyl("frame", tx, FLOOR_TOP + 0.015, tz, 0.18, 0.03, segs=16)
+    cyl("frame", tx, 0.28, tz, 0.03, 0.48, segs=10)
+    cyl("wood", tx, 0.52, tz, 0.27, 0.035, segs=24)
+    for k, (m, a) in enumerate((("book_b", 0.2), ("book_a", -0.35), ("book_c", 0.75))):
+        box(m, tx - 0.04 + 0.03 * k, 0.545 + 0.009 * k, tz - 0.03 + 0.02 * k, 0.2, 0.008, 0.27, bevel=0.002, rot_y=a)
+    cyl("cooler", tx + 0.12, 0.6, tz + 0.1, 0.035, 0.12, segs=10, r_top=0.025)
+    ball("plant", tx + 0.12, 0.69, tz + 0.1, 0.05, segs=8)
+    solid("magazine_table", tx, tz, 0.56, 0.56)
+    # Reception plant cluster in the south-east corner: a tall snake plant, a leafy pot and a small one.
+    px, pz = -2.88, 4.36
+    cyl("pot", px, 0.2, pz - 0.08, 0.17, 0.38, segs=16, r_top=0.2)
+    for k in range(7):
+        a = k * 2.4
+        dx, dz = 0.08 * math.cos(a), 0.08 * math.sin(a)
+        cyl("plant_dark" if k % 2 else "plant", px + dx, 0.6 + 0.04 * (k % 3), pz - 0.08 + dz,
+            0.035, 0.5 + 0.08 * (k % 3), segs=6, r_top=0.004, rot_x=0.18 * math.sin(a), rot_z=-0.18 * math.cos(a))
+    cyl("sill", px - 0.17, 0.14, pz + 0.22, 0.13, 0.26, segs=16, r_top=0.15)
+    for (dx, dy, dz, r) in ((0, 0.38, 0, 0.17), (0.08, 0.5, 0.04, 0.12), (-0.07, 0.48, -0.03, 0.11)):
+        ball("plant", px - 0.17 + dx, dy, pz + 0.22 + dz, r, squash=0.85, segs=10)
+    cyl("cooler", px + 0.12, 0.09, pz + 0.24, 0.09, 0.16, segs=14, r_top=0.1)
+    ball("plant_dark", px + 0.12, 0.23, pz + 0.24, 0.1, squash=0.8, segs=10)
+    solid("plant_cluster", px - 0.06, pz + 0.06, 0.6, 0.7)
+    # Framed wall clock over the bookshelf, hands at ten past ten.
+    cx, cy, cz = -3.35, 2.22, Z0 + 0.03
+    cyl("trim", cx, cy, cz, 0.2, 0.05, segs=28, axis="z")
+    cyl("clock_face", cx, cy, cz + 0.022, 0.17, 0.012, segs=28, axis="z")
+    for k in range(12):
+        a = k * math.pi / 6
+        big = k % 3 == 0
+        box("trim", cx + 0.145 * math.sin(a), cy + 0.145 * math.cos(a), cz + 0.03,
+            0.012 if big else 0.007, 0.03 if big else 0.018, 0.006, rot_z=-a)
+    for (a, length, width) in ((math.radians(305), 0.09, 0.016), (math.radians(60), 0.13, 0.01)):
+        box("trim", cx + length / 2 * math.sin(a), cy + length / 2 * math.cos(a), cz + 0.034,
+            width, length, 0.006, rot_z=-a)
+    cyl("trim", cx, cy, cz + 0.036, 0.014, 0.01, segs=10, axis="z")
 
 
 def build():
@@ -361,6 +698,20 @@ def build():
     # Ceiling light panels (emissive in the bake) and the ceiling lamps' housings.
     for px in (-6.4, -4.1):
         box("panel", px, WALL_H - 0.02, 3.4, 0.9, 0.04, 1.5, bevel=0.01)
+    # Recessed downlights in the corners the panels miss, and two pendants over the coffee corner.
+    for (lx, lz) in DOWNLIGHTS:
+        cyl("lamp_rim", lx, WALL_H - 0.004, lz, 0.12, 0.008, segs=20)
+        cyl("downlight", lx, WALL_H - 0.009, lz, 0.085, 0.006, segs=20)
+    for lx, lz in PENDANTS:
+        cyl("cord", lx, WALL_H - 0.33, lz, 0.008, 0.66, segs=6)
+        cyl("lamp_rim", lx, WALL_H - 0.01, lz, 0.05, 0.02, segs=12)
+        cyl("pendant", lx, PENDANT_Y + 0.08, lz, 0.05, 0.16, segs=20, r_top=0.022)
+        ball("pendant", lx, PENDANT_Y, lz, 0.13, squash=0.55, segs=16)
+    # Skirting boards on the north (both sides of the doorway), south and east walls (west has one above).
+    box("trim", (X0 + DOOR_X[0]) / 2 - 0.03, FLOOR_TOP + 0.07, Z0 + 0.03, DOOR_X[0] - X0 - 0.1, 0.14, 0.06, bevel=0.015)
+    box("trim", (DOOR_X[1] + X1) / 2 + 0.03, FLOOR_TOP + 0.07, Z0 + 0.03, X1 - DOOR_X[1] - 0.1, 0.14, 0.06, bevel=0.015)
+    box("trim", cx, FLOOR_TOP + 0.07, Z1 - 0.03, w, 0.14, 0.06, bevel=0.015)
+    box("trim", X1 - 0.03, FLOOR_TOP + 0.07, cz, 0.06, 0.14, d, bevel=0.015)
     forest()
     props()
 
@@ -382,6 +733,78 @@ mesh.uv_layers.active = mesh.uv_layers["lightmap"]
 bpy.ops.object.mode_set(mode="EDIT")
 bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
+bpy.ops.object.mode_set(mode="OBJECT")
+
+# The forest and sky are big but soft and far, so they get less of the one lightmap than the room does: shrink
+# their UV islands in place (no overlaps can appear), then repack so the room's islands grow into the space.
+UV_WEIGHT = {
+    "tree": 0.45, "tree_dark": 0.45, "bush": 0.45, "trunk": 0.4, "grass": 0.3,
+    "tree_mid": 0.3, "trunk_mid": 0.25, "grass_mid": 0.2, "tree_far": 0.22, "mist": 0.2, "ground_haze": 0.1, "ground_edge": 0.08,
+    "tree_haze": 0.18, "hill": 0.16, "grass_far": 0.12, "sky": 0.15,
+}
+
+
+def weight_uv_islands(mesh, weights):
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    uv = bm.loops.layers.uv["lightmap"]
+    bm.faces.ensure_lookup_table()
+    parent = list(range(len(bm.faces)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def loop_of(face, vert):
+        for lp in face.loops:
+            if lp.vert is vert:
+                return lp
+        return None
+
+    # Faces sharing an edge whose UVs also coincide on both ends belong to one island.
+    for e in bm.edges:
+        if len(e.link_faces) != 2:
+            continue
+        f1, f2 = e.link_faces
+        same = True
+        for v in e.verts:
+            l1, l2 = loop_of(f1, v), loop_of(f2, v)
+            if l1 is None or l2 is None or (l1[uv].uv - l2[uv].uv).length > 1e-6:
+                same = False
+                break
+        if same:
+            parent[find(f1.index)] = find(f2.index)
+    islands = {}
+    for f in bm.faces:
+        islands.setdefault(find(f.index), []).append(f)
+    names = [m.name if m else "" for m in mesh.materials]
+    shrunk = 0
+    for faces in islands.values():
+        k = weights.get(names[faces[0].material_index] if faces[0].material_index < len(names) else "")
+        if not k:
+            continue
+        loops = [lp for f in faces for lp in f.loops]
+        us = [lp[uv].uv.x for lp in loops]
+        vs = [lp[uv].uv.y for lp in loops]
+        c = Vector(((min(us) + max(us)) / 2, (min(vs) + max(vs)) / 2))
+        for lp in loops:
+            lp[uv].uv = c + (lp[uv].uv - c) * k
+        shrunk += 1
+    bm.to_mesh(mesh)
+    bm.free()
+    return shrunk
+
+
+print("UV_WEIGHTED", weight_uv_islands(mesh, UV_WEIGHT))
+scene.tool_settings.use_uv_select_sync = True  # pack every face without needing UV-editor selection state
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+try:
+    bpy.ops.uv.pack_islands(rotate=True, margin=0.004)
+except (RuntimeError, TypeError) as err:  # the smart-project layout is still valid, only less balanced
+    print("UV_PACK_SKIPPED", err)
 bpy.ops.object.mode_set(mode="OBJECT")
 
 # ---- bake target + one image node in every material ----------------------------------------------------------
@@ -418,8 +841,10 @@ def area(name, loc, size, energy, color, rot=(0, 0, 0), shape="RECTANGLE", size_
 # Warm butter key: the two ceiling panels, pointing down. Area lights face -Z by default (down in Blender).
 for px in (-6.4, -4.1):
     area(f"key_{px}", (px, WALL_H - 0.06, 3.4), 0.9, 45, hexlin(BUTTER), size_y=1.5)
-# Cool aqua fill at low strength: a big soft light low in the south-east corner, aimed across the room.
-area("fill", (-3.0, 1.9, 5.0), 2.0, 26, hexlin(AQUA), rot=(math.radians(-60), 0, math.radians(135)), size_y=2.0)
+# Cool aqua fill at low strength, high on the east side and aimed west and down across the room. (r3: it used to sit
+# in the south-east corner with rot z +135 deg, which aims at +x/-z in three.js, i.e. into the east wall 0.45 m
+# away: that hot spot, not the pendants, clipped the coffee corner and the wall behind it to white.)
+area("fill", (-3.25, 2.4, 3.4), 1.2, 18, hexlin(AQUA), rot=(math.radians(-60), 0, math.radians(-90)), size_y=1.2)
 # Warm window light: a soft butter sun from the forest side, through the west windows (blender-r1).
 sun = bpy.data.lights.new("window_sun", "SUN")
 sun.energy, sun.color, sun.angle = 1.1, hexlin(BUTTER), math.radians(8)
@@ -429,6 +854,14 @@ scene.collection.objects.link(sun_obj)
 for zm in [sum(span) / 2 for span in WINDOWS]:
     area(f"window_{zm}", (X0 - 0.3, (SILL_Y + HEAD_Y) / 2, zm), 1.3, 18, hexlin(BUTTER),
          rot=(0, math.radians(-90), 0), size_y=1.3)
+# Small warm point lights inside the two pendants over the coffee corner (lobby detail r2).
+for i, (lx, lz) in enumerate(PENDANTS):
+    pl = bpy.data.lights.new(f"pendant_{i}", "POINT")
+    # 0.9 W, not 7: at 7 W the shades sit ~1 m over the cabinet and clip the corner and wall to white.
+    pl.energy, pl.color, pl.shadow_soft_size = 0.9, mix(hexlin(BUTTER), hexlin(PEACH), 0.35), 0.15
+    pl_obj = bpy.data.objects.new(f"pendant_{i}", pl)
+    pl_obj.location = B(lx, PENDANT_Y - 0.06, lz)
+    scene.collection.objects.link(pl_obj)
 # A narrow warm accent over the door so the corridor edge has a gradient.
 area("door_glow", (-5.0, 2.2, Z0 + 0.4), 1.2, 12, hexlin(BUTTER), rot=(math.radians(180), 0, 0), size_y=0.3)
 
@@ -479,22 +912,24 @@ ftex = fnt.nodes.new("ShaderNodeTexImage")
 ftex.image = img
 fnt.links.new(ftex.outputs["Color"], fbsdf.inputs["Base Color"])
 
-group_of = {"wall_far": "wall_far", "wall_near": "wall_near", "ceiling": "ceiling"}
-objs = [o for o in bpy.data.objects if o.type == "MESH"]
-keep = {}
-for o in objs:
+# Nodes the web layer toggles, by source material. Ceiling lights travel with the ceiling so the overview
+# (which hides "ceiling") does not show them floating over the room.
+GROUP_OF = {"wall_far": "wall_far", "wall_near": "wall_near", "ceiling": "ceiling", "panel": "ceiling",
+            "downlight": "ceiling", "lamp_rim": "ceiling", "pendant": "ceiling", "cord": "ceiling"}
+groups = {}
+for o in [o for o in bpy.data.objects if o.type == "MESH"]:
     # Separated objects may keep the full slot list, so read the material of the first face.
     slot_name = o.material_slots[o.data.polygons[0].material_index].material.name
-    o.name = group_of.get(slot_name, "shell_" + slot_name)
-    keep[o.name] = o
-# Merge every non-toggled piece back into one "shell" node so the GLB has few draws.
-shell_parts = [o for n, o in keep.items() if n.startswith("shell_")]
-bpy.ops.object.select_all(action="DESELECT")
-for o in shell_parts:
-    o.select_set(True)
-bpy.context.view_layer.objects.active = shell_parts[0]
-bpy.ops.object.join()
-bpy.context.view_layer.objects.active.name = "shell"
+    groups.setdefault(GROUP_OF.get(slot_name, "shell"), []).append(o)
+# Join each group into one node ("shell" holds every non-toggled piece) so the GLB has few draws.
+for node_name, members in groups.items():
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in members:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = members[0]
+    if len(members) > 1:
+        bpy.ops.object.join()
+    bpy.context.view_layer.objects.active.name = node_name
 for o in [o for o in bpy.data.objects if o.type == "MESH"]:
     o.data.materials.clear()
     o.data.materials.append(final)

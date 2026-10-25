@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { operatorActions, type OperatorAction } from '../../lib/operator/catalog';
 import ControllerQr from './ControllerQr';
 import PaymentStep from './PaymentStep';
-import '../office/lobby.css';
 import { signInOperator } from '../../lib/operator/sign-in-client';
 import styles from './operator.module.css';
 
@@ -87,16 +86,15 @@ export default function OperatorPage() {
   }
   const controllerUrl = links.publicUrl ? `${links.publicUrl}/controller` : '';
   return <main className={styles.page}><div className={styles.content}>
-    <header><a href='/office'>Backroom office</a><span className={styles.pill}>Demo · synthetic company · sandbox money</span><a href='/real-vs-sim'>What is real?</a></header>
     <h1>Demo operator</h1>
-    <p className={styles.lede}>Run the demo top to bottom. Every action is audited; approvals still need Dana&rsquo;s passkey.</p>
+    <p className={styles.lede}>Run the demo top to bottom. Every action is audited.</p>
     {error && <p role='alert' className={styles.error}>{error}</p>}
-    {!authorized ? <><section className={styles.card}><h2>Operator sign-in</h2><p>One sign-in for the whole demo: this console, the office desk phone&rsquo;s Request call, the audit wall and the policy editor. It expires after eight hours. It never approves a payment; approvals still need Dana&rsquo;s passkey.</p>
+    {!authorized ? <><section className={styles.card}><h2>Operator sign-in</h2><p>Also unlocks the desk phone, audit wall and policy editor for eight hours. It never approves a payment.</p>
       <form className={styles.row} onSubmit={e => { e.preventDefault(); void signIn(); }}>
         <label>Operator code <input type='password' autoComplete='off' required value={code} onChange={e => setCode(e.target.value)} /></label>
         <button className={styles.primary} disabled={!!busy || !code}>{busy === 'session' ? 'Signing in…' : 'Sign in'}</button>
       </form></section>
-      <section className={styles.card}><h2>On the host itself</h2><p>At the demo host&rsquo;s numeric loopback address you can unlock this console without the code.</p>
+      <section className={styles.card}><h2>On the host itself</h2><p>On the demo host&rsquo;s loopback address, unlock without the code.</p>
       <button disabled={!!busy} onClick={() => void unlock()}>Unlock local operator session</button></section></> : <>
       <div className={styles.session}><p role='status'>{busy ? `${operatorActions[busy as OperatorAction]?.[0] || 'Working'}…` : offBusy ? 'Turning models OFF…' : 'Operator session active.'}</p>
         <button disabled={!!busy || offBusy} onClick={() => { void fetch('/api/operator/logout', { method: 'POST' }).then(response => { if (response.ok) setAuthorized(false); }); }}>Lock console</button></div>
@@ -124,7 +122,7 @@ export default function OperatorPage() {
             {links.payPath && <a href={`${links.publicUrl || ''}${links.payPath}`}>Current seeded payment</a>}</p>}
           {links.stateStore && <p className={styles.muted}>State: {links.stateStore} · Bank: {links.bank} · LLM {links.llmEnabled ? 'ON' : 'OFF'}</p>}
         </section>
-        <section><h2>Scenarios and proof</h2><p className={styles.muted}>These runs are isolated from the office. Synthetic calls, bank effects and software authenticators remain labeled in the output.</p>
+        <section><h2>Scenarios and proof</h2><p className={styles.muted}>Runs apart from the office.</p>
           {(['core', 'eval', 'metrics', 'scoreboard', 'burst_plan'] as const).map(button)}</section>
         <section><h2>Model controls</h2>{(['llm_off', 'llm_on', 'warm', 'burst'] as const).map(button)}</section>
         <section><h2>Other views</h2><nav aria-label='Other views' className={styles.row}><a href='/controller'>Controller inbox</a><a href='/policy'>Policy editor</a></nav></section>

@@ -17,12 +17,11 @@ export default function CallUnlock() {
   return <main className={styles.page}><div className={styles.sheet}>
     <p className={styles.status}>Operator setup</p>
     <h1>Unlock the<br />desk phone.</h1>
-    <p className={styles.intro}>Once unlocked, Request call on the office desk phone rings the one approved demo phone. The AI says it is an AI before anything else, and the number stays on the server.</p>
+    <p className={styles.intro}>Request call on the office desk phone then rings the approved demo phone. The agent says it is an AI before anything else.</p>
     {result && <p className={result.ok ? styles.status : styles.error} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
     {result?.ok ? <p className={styles.section}><a href="/office">Back to the office</a></p>
       : <form className={styles.section} onSubmit={e => { e.preventDefault(); void unlock(); }}>
         <div className={styles.fields}><label>Operator code<input type="password" autoComplete="off" required value={code} onChange={e => setCode(e.target.value)} /></label></div>
-        <p className={styles.note}>One sign-in for the whole demo: it also opens the operator console, audit wall and policy editor.</p>
         <p><button className={styles.primary} disabled={busy || !code}>{busy ? 'Unlocking…' : 'Unlock office calls'}</button></p>
       </form>}
     <footer className={styles.footer}>Northfield Studio · Office calls</footer>

@@ -23,6 +23,7 @@ import { StoryMode } from './StoryMode';
 import { useStoryMode } from './useStoryMode';
 import type { StoryChapter } from '../../lib/office/story';
 import { SoundToggle } from './SoundToggle';
+import { ThemeToggle } from './ThemeToggle';
 import { PresenceChip } from './PresenceChip';
 import { usePresence } from './usePresence';
 import { useProximityChat } from './useProximityChat';
@@ -48,6 +49,7 @@ import { SERVER_ROOM_BOX, officeColliders, type PlayEntry } from '../../lib/offi
 import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
 import { bakedArtRequested } from '../../lib/office/baked-art';
 import { interactionStore } from '../../lib/office/interactions';
+import './office-tokens.css';
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -286,6 +288,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           <div className='office-tools'>
             <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
             <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Take the tour</button>
+            <ThemeToggle className='theme-toggle office-theme-toggle' />
             <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
             <OfficeAdvanced replay={snapshot.connection === 'replay'}
               connection={snapshot.connection === 'preview' ? 'Preview · simulated state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}

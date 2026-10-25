@@ -1,7 +1,7 @@
 import { createBankChangeRiskCheck, assessBankChangeRisk } from '../vendor/crs';
 import { x402Payables, X402_LABEL, type X402Label } from '../x402';
 import { createHash } from 'node:crypto';
-import { evaluate, type APInvoice, type Context, type Decision, type LineItem } from '@backroom/policy';
+import { evaluate, type APInvoice, type Context, type Decision, type LineItem, type RuleId } from '@backroom/policy';
 import { audit, domain, hold } from './decisions';
 import { invoiceSchema, sourceSchema } from './schemas';
 import type { FinanceRepository, InboxSource, InvoiceFields, InvoiceRecord, PayablesClient, SeatOptions, SeatResult } from './types';
@@ -9,12 +9,15 @@ export type * from './types';
 export { MemoryFinanceRepository } from './repository';
 export { controllerForLease } from './decisions';
 export * from './northfield';
-export { nessiePayables } from './payments';
+export { nessieDebitPayables, nessiePayables } from './payments';
 
 function items(lines: readonly LineItem[]) {
   return JSON.stringify(lines.map(item => [item.description.trim().toLowerCase().replace(/\s+/g, ' '), item.quantity, item.unitPriceCents])
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
 }
+const CONTROLLER_OVERRIDABLE = new Set<RuleId>(['NO_PO', 'OVER_LIMIT']);
+const sameRules = (left: readonly string[], right: readonly string[]) =>
+  [...left].sort().join('\n') === [...right].sort().join('\n');
 export class PayablesSeat {
   private readonly payment?: PayablesClient;
   private readonly rail: 'nessie' | 'x402';
@@ -100,6 +103,25 @@ export class PayablesSeat {
       }
       // An unrelated sender domain cannot be authenticated by a model's vendor ID.
       if (decision.kind === 'ALLOW' && vendor && domain(source.senderDomain) !== domain(vendor.domain)) decision = hold('PAYEE_NOT_IN_MASTER');
+      let approvedEscalation: Awaited<ReturnType<SeatOptions['state']['getEscalation']>>;
+      if (decision.kind === 'ESCALATE' && prior?.fingerprint === fingerprint && !prior.paymentAttempted && prior.result.escalationId &&
+          decision.ruleIds.length > 0 && decision.ruleIds.every(rule => CONTROLLER_OVERRIDABLE.has(rule))) {
+        const now = (this.options.now ?? Date.now)();
+        await this.options.state.expireEscalations(now);
+        const approval = await this.options.state.getEscalation(prior.result.escalationId);
+        const evidenceSource = prior.source?.id ?? source.id;
+        const bound = approval?.id === prior.result.escalationId && approval.status === 'approved' &&
+          approval.toHuman === decision.toHuman && approval.policyVersion === decision.policyVersion &&
+          approval.evidenceRefs.includes(evidenceSource) && approval.evidenceRefs.includes(fields.invoiceId) &&
+          sameRules(approval.ruleIds, decision.ruleIds);
+        const passkey = approval?.method === 'passkey' && typeof approval.credentialId === 'string' && !!approval.credentialId &&
+          typeof approval.decidedAt === 'number' && Number.isFinite(approval.decidedAt) &&
+          approval.decidedAt >= approval.createdAt && approval.decidedAt < approval.expiresAt && approval.decision?.kind === 'Approve';
+        if (bound && passkey) {
+          approvedEscalation = approval;
+          decision = { kind: 'ALLOW', ruleIds: [...decision.ruleIds], policyVersion: decision.policyVersion };
+        }
+      }
       if (decision.kind === 'ALLOW' && !this.payment) decision = hold('INVALID_INPUT');
       const duplicate = decision.ruleIds.includes('DUPLICATE_INVOICE') ? history.find(row =>
         evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, { ...context, priorInvoices: [row.policyInvoice] }).ruleIds.includes('DUPLICATE_INVOICE')) ?? prior : undefined;
@@ -113,8 +135,17 @@ export class PayablesSeat {
         senderDomain: domain(source.senderDomain), vendorDomain: vendor?.domain,
         relatedInvoiceId: duplicate?.fields.invoiceId, amountDelta: duplicate ? (fields.amountCents - duplicate.fields.amountCents) / 100 : undefined,
       });
+      if (approvedEscalation && decision.kind === 'ALLOW') {
+        await this.options.state.appendAudit({ ts: (this.options.now ?? Date.now)(), actor: 'human', seat: 'payables',
+          action: 'pay_invoice_approval_applied', decision: 'ALLOW', ruleIds: [...approvedEscalation.ruleIds],
+          policyVersion: approvedEscalation.policyVersion, refs: [source.id, fields.invoiceId, approvedEscalation.id],
+          route: 'passkey', latencyMs: 0, costUsd: 0,
+          inputs: { method: approvedEscalation.method, credentialId: approvedEscalation.credentialId,
+            escalationId: approvedEscalation.id, controllerDecision: approvedEscalation.status } });
+      }
       if (decision.kind !== 'ALLOW') {
-        if (decision.kind === 'ESCALATE') result.escalationId = await this.options.controller.request(decision, refs);
+        if (decision.kind === 'ESCALATE') result.escalationId = prior?.fingerprint === fingerprint && prior.result.escalationId
+          ? prior.result.escalationId : await this.options.controller.request(decision, refs);
         // Conflicting replays never overwrite an original receipt or its fingerprint.
         if (!prior || canReevaluate) await repo.saveInvoice(row);
         return result;
@@ -145,6 +176,17 @@ export class PayablesSeat {
           sourceAccount: policyInvoice.account, destinationAccountId: vendor!.accountId });
         if (typeof receipt.id === 'string' && receipt.id) result.receiptId = receipt.id;
         if (receipt.status !== 'completed' || typeof receipt.id !== 'string' || !receipt.id) throw new Error('PAYMENT_UNCONFIRMED');
+        if (receipt.reconciliation) {
+          result.reconciliation = receipt.reconciliation;
+          const exact = receipt.reconciliation.match === 'EXACT';
+          await this.options.state.appendAudit({ ts: (this.options.now ?? Date.now)(), actor: 'code', seat: 'payables', action: 'reconcile',
+            decision: exact ? 'ALLOW' : 'ESCALATE', ruleIds: [exact ? 'EXACT_PAYMENT_MATCH' : 'RECON_MISMATCH'],
+            policyVersion: decision.policyVersion, refs: [source.id, fields.invoiceId, receipt.id], route: 'code', latencyMs: 0, costUsd: 0,
+            inputs: { transactionKind: 'withdrawal', match: receipt.reconciliation.match, debitId: receipt.reconciliation.debitId,
+              transactionId: receipt.reconciliation.transactionId, invoiceId: fields.invoiceId, vendorId: fields.vendorId, amountCents: fields.amountCents,
+              reason: receipt.reconciliation.reason } });
+          if (!exact) throw new Error('NESSIE_DEBIT_RECONCILIATION_MISMATCH');
+        }
         result.status = 'paid'; result.receiptId = receipt.id; result.decision = decision;
       } catch {
         const uncertain = hold('INVALID_INPUT');

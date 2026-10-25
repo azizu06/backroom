@@ -27,6 +27,14 @@ or `office_call_refused` with the relay's code. Unauthenticated refusals are
 coalesced to one row per code per 10 s. The relay's own gate (pre-call `ready`,
 one call on the line) is described in `orchestrator/src/voice/README.md`.
 
+For an authenticated `PRECALL_BLOCKED` or `CALL_DENIED`, the demo bootstrap asks
+its existing agent host to rebuild the trusted pre-call case. Consumer, DNC and
+missing-consent cases run through the production Collections planner and may queue
+one `SIMULATED: email preview, not sent` per invoice/UTC day. The button result says
+`Email preview (simulated, not sent)` only after that queue reports queued or
+duplicate. The shared audit records only the recipient domain; no delivery provider
+is configured. Other refusal reasons keep the normal no-call response.
+
 `active` projects `GatewayStore.latestVoiceCall()` plus provider lifecycle
 (`lifecycle.ts`, pushed by the relay over the host's loopback). Status: no
 `call_started` and no gateway audit is `ringing` (90 s, then "No answer"); started
