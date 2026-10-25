@@ -1,0 +1,16 @@
+.play-minimap-wrap { position: absolute; z-index: 4; top: 12px; left: 12px; width: 184px; pointer-events: none; }
+.play-minimap { display: block; width: 100%; aspect-ratio: 1; overflow: visible; background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 12px; box-shadow: var(--office-plate-shadow); }
+.minimap-bg { fill: var(--office-cream); }
+.minimap-room rect { fill: var(--office-peach); stroke: var(--office-lavender); stroke-width: 1; }
+.minimap-room text { fill: var(--office-navy); font: 600 5.5px system-ui, sans-serif; text-anchor: middle; pointer-events: none; }
+.minimap-door circle { fill: var(--office-aqua); stroke: var(--office-navy); stroke-width: 1.5; }
+.minimap-server circle { fill: var(--office-lavender); stroke: var(--office-navy); stroke-width: 1.5; }
+.minimap-kiosk circle { fill: var(--office-blush); stroke: var(--office-navy); stroke-width: 1.5; }
+.minimap-agent circle { fill: var(--agent-color); stroke: var(--office-navy); stroke-width: 1; }
+.minimap-agent.is-alert circle { animation: minimap-pulse 1.2s ease-in-out infinite alternate; }
+.minimap-player path { fill: var(--office-navy); stroke: var(--office-cream); stroke-width: 1; }
+.office-shell .play-minimap-toggle { position: absolute; top: 5px; right: 5px; padding: 2px 6px; color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-peach); border-radius: 8px; font-size: 10px; pointer-events: auto; }
+.office-shell .play-minimap-toggle:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
+@keyframes minimap-pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .minimap-agent.is-alert circle { animation: none; } }
+@media (max-width: 760px) { .play-minimap-wrap { top: 8px; left: 8px; width: 140px; } }

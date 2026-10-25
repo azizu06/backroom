@@ -1,7 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
-const HINT = 'Click to look · WASD move · ←/→ turn · E interact · Esc exit';
+const HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
@@ -161,6 +162,103 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   expect(errors).toEqual([]);
 });
 
+test('play mode walks to the GX10 server room and reads live telemetry read-only', async ({ page }) => {
+  // Longest walk in the suite; headless software WebGL renders slowly.
+  test.setTimeout(60_000);
+  const methods: string[] = [];
+  await page.route('**/api/gx10', async route => {
+    methods.push(route.request().method());
+    const now = new Date().toISOString();
+    const status: Gx10Status = {
+      measuredAt: now, reachable: true, models: ['qwen2.5:7b'], gpuUtilization: null,
+      telemetry: {
+        scope: 'process-local, last 200 HTTP attempts', totalCalls: 4, localCalls: 3, localShare: 0.75,
+        pricedLocalCalls: 3, estimatedSavingsUsd: 0.0012, comparisonModel: 'claude-haiku-4-5',
+        recent: { at: now, latencyMs: 900, tokensPerSecond: 42.5 },
+      },
+    };
+    await route.fulfill({ json: status });
+  });
+  const errors = await startPlay(page);
+
+  // Around the partitions and door posts: lobby aisle, along z 0.45, then in front of the server.
+  await walkTo(page, -4.6, 0.45);
+  await walkTo(page, 5, 0.45);
+  await walkTo(page, 7.1, 0.4);
+  await face(page, 7.1, -0.8);
+  const prompt = page.getByText('E · Check GX10 server');
+  await expect(prompt).toBeVisible();
+  const at = await player(page);
+  // The server box (z -1.325..-0.275) is solid: the player stays in front of its face.
+  expect(at.z).toBeGreaterThan(-0.275);
+
+  await page.keyboard.press('e');
+  const dialog = page.getByRole('dialog', { name: 'GX10 server' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Close/ })).toBeFocused();
+  await expect(dialog.getByTestId('play-gx10-speed')).toHaveText('42.5 tok/s');
+  await expect(dialog).toContainText('Online');
+  await expect(dialog).toContainText('qwen2.5:7b');
+  await expect(dialog).toContainText('0.90 s');
+  await expect(dialog).toContainText('75%');
+  await expect(dialog).toContainText('3/4 attempts local');
+  await expect(dialog).toContainText('Read-only');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
+  expect(methods.length).toBeGreaterThan(0);
+  expect(methods.every(method => method === 'GET')).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('play mode walks with a gamepad left stick and A does nothing when facing nothing', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  // Resource 401s from unauthenticated app endpoints are unrelated to the pad; script errors count.
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) consoleErrors.push(message.text()); });
+  await page.addInitScript(() => {
+    const pad = {
+      id: 'Fake standard pad', index: 0, connected: true, mapping: 'standard', timestamp: 0,
+      axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    };
+    const fake = window as unknown as { __pad: typeof pad; __padConnected: boolean };
+    fake.__pad = pad;
+    fake.__padConnected = false;
+    Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value: () => (fake.__padConnected ? [fake.__pad] : []) });
+  });
+  const errors = await startPlay(page);
+  const start = await player(page);
+  await page.evaluate(() => {
+    (window as unknown as { __padConnected: boolean }).__padConnected = true;
+    window.dispatchEvent(new Event('gamepadconnected'));
+  });
+
+  await page.evaluate(() => { (window as unknown as { __pad: { axes: number[] } }).__pad.axes[1] = -1; });
+  await page.waitForFunction(z => Number(document.querySelector<HTMLElement>('[data-player-z]')?.dataset.playerZ) < z - 0.1, start.z, { polling: 'raf' });
+  await page.evaluate(() => { (window as unknown as { __pad: { axes: number[] } }).__pad.axes[1] = 0; });
+  const moved = await player(page);
+  expect(moved.z).toBeLessThan(start.z - 0.1);
+  expect(Math.abs(moved.x - start.x)).toBeLessThan(0.05);
+  // Stick released: the player stops.
+  await page.waitForTimeout(300);
+  const stopped = await player(page);
+  await page.waitForTimeout(300);
+  expect((await player(page)).z).toBe(stopped.z);
+
+  const prompt = page.getByTestId('office-viewport').locator('.play-prompt');
+  await expect(prompt).toHaveText('');
+  const setA = (pressed: boolean) => page.evaluate(value => {
+    (window as unknown as { __pad: { buttons: { pressed: boolean }[] } }).__pad.buttons[0]!.pressed = value;
+  }, pressed);
+  await setA(true);
+  await page.waitForTimeout(300);
+  await setA(false);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(surface(page)).toBeVisible();
+  expect(errors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
 test.describe('play mode on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -184,4 +282,44 @@ test.describe('play mode on a phone', () => {
     await expect(page.locator('.play-touch-hint')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+});
+
+test('play settings change speed and invert Y, persist per viewer and return focus to the play surface', async ({ page }) => {
+  const errors = await startPlay(page);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Play settings' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("slider", { name: /Look sensitivity/ })).toBeFocused();
+  await expect(dialog).toContainText('Movement speed 1×');
+
+  await dialog.getByRole("slider", { name: /Movement speed/ }).fill('2');
+  await dialog.getByRole("checkbox", { name: /Invert Y/ }).check();
+  await expect(dialog).toContainText('Movement speed 2×');
+  const stored = await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'));
+  expect(JSON.parse(stored ?? '{}')).toMatchObject({ sensitivity: 1, invertY: true, speed: 2 });
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(surface(page)).toBeFocused();
+
+  // Walking still works after closing the panel (speed scaling itself is covered by the unit test).
+  const start = await player(page);
+  await page.keyboard.down('w');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('w');
+  const moved = await player(page);
+  expect(start.z - moved.z).toBeGreaterThan(0.3);
+
+  // Leaving and re-entering Play keeps the saved values.
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await expect(surface(page)).toBeFocused();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(dialog).toContainText('Movement speed 2×');
+  await expect(dialog.getByRole("checkbox", { name: /Invert Y/ })).toBeChecked();
+  await dialog.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(dialog).toContainText('Movement speed 1×');
+  expect(await page.evaluate(() => localStorage.getItem('backroom.office.play-settings.v1'))).toBeNull();
+  expect(errors).toEqual([]);
 });

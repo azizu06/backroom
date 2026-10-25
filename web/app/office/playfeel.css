@@ -1,0 +1,12 @@
+/* Play crosshair states and the movement-feel settings group. State comes from lib/office/playFeel.ts (crosshairView). */
+.play-crosshair { opacity: 0.7; transition: transform 0.12s ease-out, opacity 0.12s ease-out, box-shadow 0.12s ease-out; border-radius: 50%; }
+.play-crosshair[data-state='target'] { opacity: 1; transform: translate(-50%, -50%) scale(1.4); box-shadow: 0 0 0 2px var(--office-aqua), 0 0 0 3px var(--office-navy); }
+.play-crosshair[data-state='target']::before, .play-crosshair[data-state='target']::after { background: var(--office-navy); }
+.play-prompt:not(:empty) { animation: play-prompt-in 0.12s ease-out; }
+@keyframes play-prompt-in { from { opacity: 0; transform: translate(-50%, 3px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.play-setting-group { border: 0; margin: 0; padding: 0; }
+.play-setting-group legend { padding: 0; font-size: 13px; font-weight: 600; color: var(--office-navy); }
+@media (prefers-reduced-motion: reduce) {
+  .play-crosshair { transition: none; }
+  .play-prompt:not(:empty) { animation: none; }
+}

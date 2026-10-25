@@ -1,8 +1,10 @@
 import { resolve } from 'node:path';
-import { FileClaims, NessieClient, seedNorthfield } from '@backroom/nessie';
-import { createCrsClientFromEnv, createCrsFixtureClient, createPreCallHealthCheck, APIFY_DEMO_COMPANY,
-  northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
+import { FileClaims, MemoryBalanceDisplayCache, NessieClient, seedNorthfield } from '@backroom/nessie';
+import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHealthCheck, APIFY_DEMO_COMPANY,
+  northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, recordSignals, signalsFromCrs, signalsFromHealth,
+  type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
+import type { PrecallEvidence } from '../calls/precall';
 
 const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
 /** Safe server-only observation for the real-vs-sim route; never initiates a probe. */
@@ -16,8 +18,9 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   if (live && !env.NESSIE_API_KEY) throw new Error('DEMO_NESSIE_KEY_REQUIRED');
   const claims = new FileClaims(resolve(env.NESSIE_CLAIMS_DIR || '.nessie-state/claims'));
   const deposits: unknown[] = [], mockClaims = new Set<string>();
-  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, claims, fetch: http, readAttempts: 1, timeoutMs: 5000 } : {
-    apiKey: 'mock-no-network', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } },
+  const displayCache = new MemoryBalanceDisplayCache();
+  const bank = new NessieClient(live ? { apiKey: env.NESSIE_API_KEY!, surface: 'nessie_sandbox', claims, fetch: http, readAttempts: 1, timeoutMs: 5000, displayCache } : {
+    apiKey: 'mock-no-network', surface: 'mock', claims: { async claim(key) { if (mockClaims.has(key)) return false; mockClaims.add(key); return true; } }, displayCache,
     fetch: async (url, init) => {
       if (init?.method === 'POST') {
         const row = { ...JSON.parse(String(init.body)), _id: `mock-deposit-${deposits.length + 1}` };
@@ -27,12 +30,17 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
     },
   });
   const accountId = live ? env.NESSIE_ACCOUNT_ID || (await seedNorthfield(bank, claims)).account._id : 'mock-northfield';
-  const realCrs = live ? createCrsClientFromEnv(env, http) : undefined;
+  // Default under .demo so a live host caches without a new env var. Offline never builds this client.
+  const crsCacheFile = env.CRS_CACHE_FILE?.trim() || resolve('.demo/crs-evidence-cache.json');
+  const realCrs = live ? createCachedCrsClientFromEnv({ ...env, CRS_CACHE_FILE: crsCacheFile }, http) : undefined;
   const crs = realCrs ?? createCrsFixtureClient();
+  // The pre-call decision stays on the uncached client. Cached evidence is wall/audit only and cannot turn a hold into a pass.
   const credit = createPreCallCreditCheck({ ...env, PRECALL_CRS: realCrs ? 'live' : 'fake' }, http);
-  const healthCheck = createPreCallHealthCheck({ ...env, PRECALL_APIFY: live ? 'live' : 'fake' }, http);
+  // DEMO_LIVE still probes Apify once. An explicit fake label keeps the fixture checker, with no Actor call.
+  const apifyLive = live && env.PRECALL_APIFY !== 'fake';
+  const healthCheck = createPreCallHealthCheck({ ...env, PRECALL_APIFY: apifyLive ? 'live' : 'fake' }, http);
   let preflight: Promise<void> | undefined;
-  let apify: { mode: string; status: string; runId?: string } = { mode: live ? 'live' : 'FAKE', status: 'not_probed' };
+  let apify: { mode: string; status: string; runId?: string } = { mode: apifyLive ? 'live' : 'FAKE', status: 'not_probed' };
   let crsStatus = 'not_probed';
   let preCall: PreCallResult | undefined;
   let evidence: { health?: HealthResult; crs?: unknown[] } = {};
@@ -44,8 +52,8 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
           try {
             const result = await healthCheck.check(APIFY_DEMO_COMPANY, AbortSignal.timeout(40000));
             evidence.health = result;
-            apify = { mode: live ? 'live' : 'FAKE', status: live && !result.apifyRunId ? 'pending' : 'complete', ...(result.apifyRunId ? { runId: result.apifyRunId } : {}) };
-          } catch { apify = { mode: live ? 'live' : 'FAKE', status: 'unavailable_no_retry' }; }
+            apify = { mode: apifyLive ? 'live' : 'FAKE', status: apifyLive && !result.apifyRunId ? 'pending' : 'complete', ...(result.apifyRunId ? { runId: result.apifyRunId } : {}) };
+          } catch { apify = { mode: apifyLive ? 'live' : 'FAKE', status: 'unavailable_no_retry' }; }
         })(),
         (async () => {
           try {
@@ -58,10 +66,15 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
     })();
   }
   const status = () => ({ live, bank: live ? 'nessie_sandbox' as const : 'mock' as const,
-    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
+    services: { preCall: preCall ? { status: preCall.status, ...(preCall.status === 'blocked' ? { reason: preCall.reason } : {}),
+      ...(preCall.status === 'ready' ? { signals: preCall.signals } : {}) } : { status: 'not_prepared' }, model: { mode: live ? 'GX10_then_Anthropic' : 'OFF', cloud: preCall?.status === 'ready' && preCall.route === 'cloud' ? 'inference_observed' : env.ANTHROPIC_API_KEY ? 'configured_not_probed' : 'missing' },
       nessie: { mode: live ? 'sandbox' : 'mock' }, apify: { ...apify },
       crs: { mode: realCrs ? 'sandbox' : 'FAKE', status: crsStatus, products: ['publicRecords', 'fraudRisk'], ofac: 'unavailable', businessCredit: 'unavailable' } } });
-  return { bank, accountId, status,
+  // The same Apify rows prepare() records, rebuilt from its cached evidence.
+  const precall = (): PrecallEvidence => ({ preCall: { ...status().services.preCall,
+    ...(preCall?.status === 'ready' && preCall.warnings ? { warnings: preCall.warnings } : {}) },
+    signals: evidence.health ? signalsFromHealth('1042', evidence.health, healthCheck.label ?? 'provided') : [] });
+  return { bank, accountId, status, precall,
     async prepare(state: StateStore) {
       if (!live) return;
       await prepare();
@@ -72,6 +85,17 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
       const client = northfield.clients.find(row => row.id === invoice.clientId)!;
       if (client.type !== 'business' && client.type !== 'consumer') throw new Error('DEMO_CLIENT_TYPE');
+      // Rows describe evidence already fetched. A store miss must not change the pre-call result below.
+      try {
+        const rows = [
+          ...(evidence.crs ?? []).flatMap(item => signalsFromCrs(invoice.id, item as Parameters<typeof signalsFromCrs>[1])),
+          ...(evidence.health ? signalsFromHealth(invoice.id, evidence.health, healthCheck.label ?? 'provided') : []),
+        ];
+        const counts = await recordSignals(state as unknown as Parameters<typeof recordSignals>[0], rows);
+        if (counts.failed > 0) console.error('demo signal recording failed', { failed: counts.failed });
+      } catch (error) {
+        console.error('demo signal recording failed', error);
+      }
       // Scripted pre-call only: synthetic consent and an explicitly logged weekend override.
       // The separate preverified gateway rehearsal is not evidence of a live dial permit.
       preCall = await runPreCall({ clientId: client.id, invoiceId: invoice.id, testIdentityId: 7,

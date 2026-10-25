@@ -24,6 +24,21 @@ async function fixture() {
   return { handle, gateway, event, tool };
 }
 describe('voice HTTP boundary with the actual tool gateway', () => {
+  it('closes the gateway call when the provider call ends, and retries if that close fails', async () => {
+    const journal = new VoiceJournal();
+    const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, userReply: '', stopped: false, deliveries: {} };
+    await journal.register(session);
+    const event = (handle: ReturnType<typeof createVoiceHandler>, id: string) => handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
+      body: JSON.stringify({ type: 'call_completed', call_id: 'ac-1', webhook_request_id: id }) }));
+    const failing = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway: async () => Response.json({}),
+      onCallEnded: async () => { throw new Error('close failed'); } });
+    expect((await event(failing, 'done')).status).toBe(500);
+    const ended: string[] = [];
+    const handle = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway: async () => Response.json({}),
+      onCallEnded: async id => { ended.push(id); } });
+    expect((await event(handle, 'done')).status).toBe(200);
+    expect(ended).toEqual(['session-1']);
+  });
   it('keeps invoice data unavailable through interrupted disclosure and unconfirmed identity', async () => {
     const f = await fixture();
     await f.event('turn-1', { role: 'assistant', text: welcome, was_interrupted: true });
@@ -34,6 +49,32 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     const unknown = await f.tool('get_invoice_context', blocked.body.next_delivery_nonce);
     expect(unknown.body).toMatchObject({ rule_ids: ['IDENTITY_REQUIRED'] });
     expect(unknown.body).not.toHaveProperty('amount_cents');
+  });
+  it('accepts an uninterrupted disclosure with a preamble and a dropped leading Hi', async () => {
+    const f = await fixture();
+    await f.event('background', { role: 'user', text: 'Yes.', was_interrupted: false });
+    const spoken = `Thanks for picking up. ${welcome.replace(/^Hi,\s*/, '')}`;
+    await f.event('preamble', { role: 'assistant', text: spoken, was_interrupted: false });
+    const claimed = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    const context = await f.tool('get_invoice_context', claimed.body.next_delivery_nonce);
+    expect(context.body.rule_ids).toEqual(['IDENTITY_REQUIRED']);
+    expect(context.body).not.toHaveProperty('amount_cents');
+  });
+  it('rejects a disclosure truncated before the end of the welcome', async () => {
+    const f = await fixture();
+    const truncated = welcome.replace(/ Am I speaking with Jordan\?$/, '');
+    await f.event('short', { role: 'assistant', text: truncated, was_interrupted: false });
+    const blocked = await f.tool('get_invoice_context', 'nonce-1');
+    expect(blocked.body.rule_ids).toEqual(['DISCLOSURE_REQUIRED']);
+    expect(f.gateway).not.toHaveBeenCalled();
+  });
+  it('rejects an interrupted full welcome and still accepts the exact welcome', async () => {
+    const interrupted = await fixture();
+    await interrupted.event('cut-off', { role: 'assistant', text: welcome, was_interrupted: true });
+    expect((await interrupted.tool('get_invoice_context', 'nonce-1')).body.rule_ids).toEqual(['DISCLOSURE_REQUIRED']);
+    const exact = await fixture();
+    await exact.event('exact', { role: 'assistant', text: welcome, was_interrupted: false });
+    expect((await exact.tool('get_invoice_context', 'nonce-1')).body.rule_ids).toEqual(['IDENTITY_REQUIRED']);
   });
   it('uses actual natural identity evidence and allows only a policy-authorized plan/link', async () => {
     const f = await fixture();

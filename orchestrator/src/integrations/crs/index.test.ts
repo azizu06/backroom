@@ -102,7 +102,8 @@ it('coalesces refresh for simultaneous expired requests and bounds each product 
 it('does not follow redirects or reveal network errors', async () => {
   const network = vi.fn<typeof fetch>().mockRejectedValue(new Error('PII inside URL'));
   const client = new CrsClient({ username: 'u', password: 'p', fetch: network });
-  await expect(client.login()).rejects.toThrow('CRS AUTH');
+  // A network failure is an outage (retryable), not a rejected login; the provider error never leaks.
+  await expect(client.login()).rejects.toThrow(/^CRS TRANSPORT$/);
   expect(network.mock.calls[0]?.[1]).toMatchObject({ redirect: 'error', signal: expect.any(AbortSignal) });
 });
 

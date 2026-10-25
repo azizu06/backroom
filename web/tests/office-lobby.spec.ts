@@ -1,4 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { DENY_MOMENT_MS } from '../lib/office/props/treasuryDeny';
+import { ROLES } from '../lib/office/palette';
 
 // Run via test:office:browser after building the web app.
 const code = process.env.OFFICE_LOBBY_OPERATOR_CODE ?? 'local-audit-test-only';
@@ -42,6 +44,56 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(errors).toEqual([]);
 });
 
+test('office demo guide and keyboard shortcuts help open and restore focus', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  const guideButton = page.getByRole('button', { name: 'Demo guide' });
+  await guideButton.click();
+  const guide = page.getByRole('dialog', { name: 'Try this' });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('Treasury');
+  await page.keyboard.press('Escape');
+  await expect(guide).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+  await guideButton.focus();
+  await page.keyboard.press('?');
+  const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(shortcuts).toBeVisible();
+  await expect(shortcuts).toContainText('Interact');
+  // Native modal dialogs keep sequential focus inside while the background is inert.
+  const close = shortcuts.getByRole('button', { name: 'Close' });
+  for (let index = 0; index < 3; index++) {
+    await page.keyboard.press('Tab');
+    await expect(shortcuts).toContainText('Keyboard shortcuts');
+    await expect(shortcuts).toContainText('Interact');
+    expect(await page.evaluate(() => document.activeElement?.closest('dialog')?.classList.contains('office-shortcuts'))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+  await page.getByLabel('Office view').selectOption('play');
+  await page.locator('.play-surface').press('?');
+  await expect(shortcuts).toBeVisible();
+  for (let index = 0; index < 3; index++) {
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement?.closest('dialog')?.classList.contains('office-shortcuts'))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toHaveCount(0);
+  await expect(page.locator('.play-surface')).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('office shows the lobby summary and agent roster without page errors', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/office');
+  await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+  await expect(page.locator('.lobby-v2-roster > li').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('office ask-why pauses on a broken chain and resumes when verified', async ({ page }) => {
   let valid = false;
   await page.route('**/api/audit/entries', route => route.fulfill({ json: {
@@ -67,9 +119,12 @@ test('office ask-why pauses on a broken chain and resumes when verified', async 
   await expect(ask.getByRole('alert')).toContainText('AUDIT_CHAIN_BROKEN');
 });
 
-/** Screen position of a world point under the scene's Payables focus camera (orthographic, target + (13, 15, 17), zoom min(w/10, h/8)). */
-function projectPayablesFocus([px, py, pz]: readonly [number, number, number], width: number, height: number): [number, number] {
-  const [tx, ty, tz] = [0, 0.2, -3], zoom = Math.min(width / 10, height / 8);
+/** Room centres (OFFICE_ANCHORS[room].center) the focus camera targets. */
+const PAYABLES = [0, -3] as const, COLLECTIONS = [-5, -3] as const;
+
+/** Screen position of a world point under the scene's room focus camera (orthographic, target + (13, 15, 17), zoom min(w/10, h/8)). */
+function projectFocus([px, py, pz]: readonly [number, number, number], width: number, height: number, [cx, cz]: readonly [number, number] = PAYABLES): [number, number] {
+  const [tx, ty, tz] = [cx, 0.2, cz], zoom = Math.min(width / 10, height / 8);
   const len = Math.hypot(13, 15, 17), forward = [-13 / len, -15 / len, -17 / len] as const;
   const rightLen = Math.hypot(17, 13), right = [17 / rightLen, 0, -13 / rightLen] as const;
   const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]] as const;
@@ -78,22 +133,95 @@ function projectPayablesFocus([px, py, pz]: readonly [number, number, number], w
   return [width / 2 + zoom * dot(right), height / 2 - zoom * dot(up)];
 }
 
-/** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
-async function patchBrightness(page: Page, canvas: Locator, point: readonly [number, number, number]): Promise<number> {
+type Point = readonly [number, number, number];
+
+/**
+ * RGBA pixels of a 6x6 patch around each world point projected under a room's focus camera, all from one screenshot.
+ * Page layout or a click can scroll the page, so scroll the canvas back into view first and fail
+ * clearly if a patch is not inside both the canvas and the viewport. One screenshot per call keeps
+ * sampling cheap while the scene animates, when every page round trip slows down.
+ */
+async function samplePatches(page: Page, canvas: Locator, points: readonly Point[], focus: readonly [number, number]): Promise<number[][]> {
+  await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
-  const [x, y] = projectPayablesFocus(point, box.width, box.height);
-  const png = await page.screenshot({ clip: { x: box.x + x - 3, y: box.y + y - 3, width: 6, height: 6 } });
-  return page.evaluate(async src => {
+  const view = page.viewportSize()!;
+  const corners = points.map(point => {
+    const [x, y] = projectFocus(point, box.width, box.height, focus);
+    const left = Math.round(box.x + x - 3), top = Math.round(box.y + y - 3);
+    const where = `world (${point.join(', ')}) -> patch (${left}, ${top}); canvas box (${box.x.toFixed(1)}, ${box.y.toFixed(1)}, ${box.width.toFixed(1)} x ${box.height.toFixed(1)}); viewport ${view.width} x ${view.height}`;
+    expect(x >= 3 && y >= 3 && x <= box.width - 3 && y <= box.height - 3, `sample patch is outside the canvas: ${where}`).toBe(true);
+    expect(left >= 0 && top >= 0 && left + 6 <= view.width && top + 6 <= view.height, `sample patch is outside the viewport: ${where}`).toBe(true);
+    return [left, top] as const;
+  });
+  const left = Math.min(...corners.map(([x]) => x)), top = Math.min(...corners.map(([, y]) => y));
+  const width = Math.max(...corners.map(([x]) => x)) + 6 - left, height = Math.max(...corners.map(([, y]) => y)) + 6 - top;
+  const png = await page.screenshot({ clip: { x: left, y: top, width, height } });
+  return page.evaluate(async ({ src, patches }) => {
     const image = new Image();
     image.src = src;
     await image.decode();
-    const ctx = document.createElement('canvas').getContext('2d')!;
+    const surface = document.createElement('canvas');
+    surface.width = image.width;
+    surface.height = image.height;
+    const ctx = surface.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
-    const { data } = ctx.getImageData(0, 0, image.width, image.height);
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) sum += Math.min(data[i]!, data[i + 1]!, data[i + 2]!);
-    return sum / (data.length / 4);
-  }, `data:image/png;base64,${png.toString('base64')}`);
+    return patches.map(([x, y]) => Array.from(ctx.getImageData(x, y, 6, 6).data));
+  }, { src: `data:image/png;base64,${png.toString('base64')}`, patches: corners.map(([x, y]) => [x - left, y - top] as const) });
+}
+
+/** Mean of the darkest RGB channel in a 6x6 screenshot patch around a projected world point (0 black, 255 white). */
+async function patchBrightness(page: Page, canvas: Locator, point: Point, focus: readonly [number, number] = PAYABLES): Promise<number> {
+  const [data] = await samplePatches(page, canvas, [point], focus);
+  let sum = 0;
+  for (let i = 0; i < data!.length; i += 4) sum += Math.min(data![i]!, data![i + 1]!, data![i + 2]!);
+  return sum / (data!.length / 4);
+}
+
+/** Mean RGB of a 6x6 screenshot patch around a projected world point. */
+async function patchColor(page: Page, canvas: Locator, point: Point, focus: readonly [number, number] = PAYABLES): Promise<number[]> {
+  const [data] = await samplePatches(page, canvas, [point], focus);
+  return [0, 1, 2].map(c => { let sum = 0; for (let i = c; i < data!.length; i += 4) sum += data![i]!; return sum / (data!.length / 4); });
+}
+
+/** The scene clears to the palette's cream background; a lit surface differs from it by at least a few levels per channel. */
+const BACKGROUND = [1, 3, 5].map(i => parseInt(ROLES.background.slice(i, i + 2), 16));
+const offBackground = (rgb: readonly number[]) => Math.max(...rgb.map((v, i) => Math.abs(v - BACKGROUND[i]!)));
+/** A blank part of the Payables board (right of the empty-audit note) and a point just above it, which is background. */
+const PAYABLES_BOARD: Point = [1.74, 1.47, -5.349], ABOVE_PAYABLES_BOARD: Point = [1.74, 3.3, -5.349];
+/** Bright board pixels that are not the cream background: the focus camera settled and the board drew. */
+async function payablesBoardDrawn(page: Page, canvas: Locator): Promise<number> {
+  const color = await patchColor(page, canvas, PAYABLES_BOARD);
+  return Math.min(...color) > 170 ? offBackground(color) : 0;
+}
+
+/** Mean (red minus blue) of a 6x6 screenshot patch: positive on warm peach, negative on aqua. */
+async function patchWarmth(page: Page, canvas: Locator, point: Point, focus: readonly [number, number] = PAYABLES): Promise<number> {
+  const [data] = await samplePatches(page, canvas, [point], focus);
+  let sum = 0;
+  for (let i = 0; i < data!.length; i += 4) sum += data![i]! - data![i + 2]!;
+  return sum / (data!.length / 4);
+}
+
+const TREASURY = [5, 3.4] as const;
+
+/** How far the mean red channel of RGBA pixels stands above the other two (the DENY sign's #ed6252 is about 140). */
+function redness(data: readonly number[]): number {
+  const sum = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c]! += data[i + c]!;
+  const n = data.length / 4;
+  return (sum[0]! - Math.max(sum[1]!, sum[2]!)) / n;
+}
+
+/**
+ * Red margins of the DENY sign board (centred (6.35, 1.1, 0.55), 1.6 x 0.72, facing +z), right half only:
+ * clear of the 'DENIED' and rule text, whose position on screen shifts with the canvas size, and of the door ring and flash.
+ */
+// Red board spots with no ink on the taller two-line DENY sign: between the rule rows, between header and rules, and the bottom strip.
+const SIGN_MARGINS = [[6.95, 1.04, 0.56], [7.05, 1.44, 0.56], [5.75, 1.04, 0.56], [6.35, 0.63, 0.56]] as const;
+
+/** Redness at every sign margin point under the Treasury focus camera. */
+async function signRedness(page: Page, canvas: Locator): Promise<number[]> {
+  return (await samplePatches(page, canvas, SIGN_MARGINS, TREASURY)).map(redness);
 }
 
 test('office props render in the 3D scene', async ({ page }) => {
@@ -107,11 +235,52 @@ test('office props render in the 3D scene', async ({ page }) => {
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
-  // A blank part of the board (right of the empty-audit note) turns cream once the focus camera settles; just above it is background.
-  await expect.poll(() => patchBrightness(page, canvas, [1.74, 1.47, -5.349]), { timeout: 10_000 }).toBeGreaterThan(170);
-  expect(await patchBrightness(page, canvas, [1.74, 3.3, -5.349])).toBeLessThan(90);
+  // The blank board turns bright once the focus camera settles; just above it is the cream scene background.
+  await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
+  expect(offBackground(await patchColor(page, canvas, ABOVE_PAYABLES_BOARD))).toBeLessThan(6);
   // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
   // (The Canvas keeps a hidden '3D unavailable' fallback inside <canvas>; only a visible one means failure.)
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
+  await expect(viewport.locator('.floor-plan')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('office desk monitors survive the Collections escalation preview', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
+  await page.goto('/office');
+  const viewport = page.getByTestId('office-viewport');
+  const canvas = viewport.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Preview escalation' }).click();
+  await expect(page.getByRole('button', { name: 'Return to Collections' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Collections', exact: true }).click();
+  // Once the focus camera settles, the empty right strip of the Collections screen shows the aqua panel (blue above red),
+  // while the lit peach desk top beside it stays bright and warm (red above blue).
+  await expect.poll(() => patchBrightness(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(120);
+  await expect.poll(() => patchWarmth(page, canvas, [-5.6, 0.912, -2.65], COLLECTIONS), { timeout: 10_000 }).toBeGreaterThan(15);
+  await expect.poll(() => patchWarmth(page, canvas, [-5.074, 1.135, -3.171], COLLECTIONS), { timeout: 10_000 }).toBeLessThan(-15);
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
+  await expect(viewport.locator('.floor-plan')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('office ambience renders a still scene under reduced motion', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/office');
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+  const viewport = page.getByTestId('office-viewport');
+  const canvas = viewport.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
+  // With the ambient ticker off, the static pose still has to reach the screen: the focused Payables board draws.
+  await page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: 'Payables', exact: true }).click();
+  await expect.poll(() => payablesBoardDrawn(page, canvas), { timeout: 10_000 }).toBeGreaterThan(12);
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -195,4 +364,42 @@ test('office judge tour started with the native select arrow keys', async ({ pag
   await expect(view).toHaveValue('tour');
   await page.keyboard.press('Tab');
   await expect(view).toHaveValue('tween');
+});
+
+test('office Treasury denial preview plays the door moment without breaking the scene', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) errors.push(message.text()); });
+  await page.goto('/office');
+  const viewport = page.getByTestId('office-viewport');
+  const canvas = viewport.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
+  const treasury = page.getByRole('navigation', { name: 'Room camera presets' }).getByRole('button', { name: /^Treasury/ });
+  await treasury.click();
+  await expect(treasury).toHaveAttribute('aria-pressed', 'true');
+  // The margin points must fit the focus view for both the lobby's canvas (1440 x 580) and a taller one (1440 x 1000).
+  for (const [width, height] of [[1440, 580], [1440, 1000]] as const) {
+    for (const point of SIGN_MARGINS) {
+      const [x, y] = projectFocus(point, width, height, TREASURY);
+      expect(x >= 3 && y >= 3 && x <= width - 3 && y <= height - 3, `sign point (${point.join(', ')}) projects to (${x.toFixed(1)}, ${y.toFixed(1)}), outside a ${width} x ${height} canvas`).toBe(true);
+    }
+  }
+  // Let the focus camera settle: no sign margin point is red before the denial.
+  await page.waitForTimeout(2500);
+  const before = await signRedness(page, canvas);
+  expect(Math.max(...before), `redness before the preview: ${before.join(', ')}`).toBeLessThan(40);
+  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  // The preview button sits below the scene, so clicking it can scroll the canvas out of view.
+  await canvas.scrollIntoViewIfNeeded();
+  // Poll rather than sample at a fixed time: under load the first frame of the moment can land late.
+  const maxRedness = async () => Math.max(...await signRedness(page, canvas));
+  await expect.poll(maxRedness, { message: 'max sign redness during the moment', timeout: DENY_MOMENT_MS - 500, intervals: [100] }).toBeGreaterThan(80);
+  await expect.poll(maxRedness, { message: 'max sign redness after the moment', timeout: DENY_MOMENT_MS + 4000 }).toBeLessThan(40);
+  // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
+  await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
+  await expect(viewport.locator('.floor-plan')).toHaveCount(0);
+  await page.getByLabel('Office view').selectOption('plan');
+  await expect(page.locator('.floor-plan .denial-text')).toHaveText('Entry denied');
+  expect(errors).toEqual([]);
 });

@@ -3,6 +3,8 @@ import type { VerifiedApproval } from './approvals/verified';
 import type { Action, Badge, Context, Decision, Policy } from '@backroom/policy';
 import type { ChainStatus } from './audit';
 
+/** How the owner authenticated a policy save; recorded on its audit row. */
+export type PolicySaveMethod = 'demo_pin' | 'operator_session';
 export interface PolicyLimits {
   maxInstallments: number; minFirstPct: number; maxPlanDays: number; maxPaymentCents: number;
 }
@@ -29,7 +31,7 @@ export interface Task extends NewTask {
 export interface Lease extends Task { leaseOwner: string; leaseExpiresAt: number }
 export interface Escalation {
   id: string; taskId: string; fromAgent: string; toHuman: string; ruleIds: string[];
-  evidenceRefs: string[]; status: 'pending' | 'approved' | 'denied' | 'counter' | 'pending_owner';
+  evidenceRefs: string[]; status: 'pending' | 'approved' | 'denied' | 'counter' | 'pending_owner' | 'expired';
   createdAt: number; expiresAt: number; policyVersion: number;
   quote: { sentenceId: string; text: string };
   callId?: string; invoiceId?: string; amountCents?: number; currency?: string;
@@ -61,7 +63,7 @@ export interface StateStore {
   getPolicy(version?: number): Promise<Policy>;
   /** Trusted owner transport only. Atomically compare version, append snapshot + human audit.
    * Never expose this reducer through agent/voice tool schemas. */
-  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number): Promise<Policy>;
+  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number, method?: PolicySaveMethod): Promise<Policy>;
   /** Global model gate; adapters map to runtime_control[global] in #15. */
   readonly llmEnabled: boolean;
   /** Aborted on OFF; a new signal on ON fences results from the old generation. */
@@ -85,7 +87,8 @@ export interface StateStore {
   getEscalation(id: string): Promise<Escalation | undefined>;
   createCallEscalation(input: CallEscalation, now: number): Promise<Escalation>;
   decideEscalation(approval: VerifiedApproval, now: number): Promise<Escalation>;
-  expireEscalations(now: number): Promise<void>;
+  /** Closes due rows. Pass callId when that live call has ended so its rows close immediately. An already-expired row still records pending_owner once. */
+  expireEscalations(now: number, callId?: string): Promise<void>;
   // Approval writes belong to the controller/passkey service, not to workers.
   appendAudit(entry: AuditInput): Promise<AuditEntry>;
   /** Atomic batch: either every entry is appended in order or none are. */

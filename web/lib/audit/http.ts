@@ -1,43 +1,25 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createAskWhyHandler, verifyChain, type AuditEntry, type StateStore,
   type WhyAuditEntry, type WhyOptions } from '@backroom/orchestrator';
+import { operatorSignedIn } from '../operator/sign-in';
 
-const COOKIE = 'backroom_audit';
-const SESSION_MS = 8 * 60 * 60 * 1000;
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
-const equal = (a: string, b: string) => {
-  const left = Buffer.from(a), right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-};
 
-/** Read permission only. This cookie cannot authorize an approval or a tool. */
+/** Read permission only, from the shared operator sign-in (`/api/session`). This cookie cannot authorize an approval or a tool. */
 export function createAuditHTTP(options: {
   store: () => StateStore; secret: () => string | undefined; origin: () => string | undefined;
+  /** Host office `http://127.0.0.1:<DEMO_PORT>`, accepted beside `origin`. No other localhost. */
+  loopbackOrigin?: () => string | undefined;
   whyOptions?: WhyOptions; now?: () => number;
 }) {
   const now = options.now ?? Date.now;
   return async (action: string, request: Request): Promise<Response> => {
     const secret = options.secret(), origin = options.origin();
     if (!secret || !origin) return json({ error: 'Audit access is not configured.' }, 503);
-    const sign = (expires: string) => createHmac('sha256', secret).update(`audit-read:${expires}`).digest('hex');
-    const cookieFlags = `Path=/api/audit; HttpOnly; SameSite=Strict${origin.startsWith('https:') ? '; Secure' : ''}`;
-    if (request.method === 'POST' && request.headers.get('origin') !== origin) return json({ error: 'Origin rejected.' }, 403);
-    if (action === 'session' && request.method === 'POST') {
-      if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ error: 'JSON required.' }, 415);
-      const raw = await request.text();
-      if (raw.length > 4096) return json({ error: 'Request too large.' }, 413);
-      let body: { code?: unknown };
-      try { body = JSON.parse(raw); } catch { return json({ error: 'Invalid JSON.' }, 400); }
-      if (!body || typeof body.code !== 'string' || !equal(body.code, secret)) return json({ error: 'Operator code rejected.' }, 403);
-      const expires = String(now() + SESSION_MS);
-      return json({ authorized: true }, 200, { 'Set-Cookie': `${COOKIE}=${expires}.${sign(expires)}; ${cookieFlags}; Max-Age=${SESSION_MS / 1000}` });
-    }
-    const token = request.headers.get('cookie')?.split(';').map(part => part.trim()).find(part => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
-    const [expires = '', signature = ''] = token?.split('.') ?? [];
-    if (!/^\d+$/.test(expires) || Number(expires) <= now() || Number(expires) > now() + SESSION_MS || !equal(signature, sign(expires))) {
-      return json({ error: 'Open the audit wall with your operator code.' }, 401);
-    }
+    const requestOrigin = request.headers.get('origin');
+    const loopback = options.loopbackOrigin?.();
+    if (request.method === 'POST' && requestOrigin !== origin && requestOrigin !== loopback) return json({ error: 'Origin rejected.' }, 403);
+    if (!operatorSignedIn(request, secret, now())) return json({ error: 'Sign in with the operator code to open the audit wall.' }, 401);
     try {
       const store = options.store();
       if (action === 'entries' && request.method === 'GET') {

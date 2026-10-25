@@ -178,7 +178,17 @@ export function createRouter(options: RouterOptions = {}) {
     catch (error) { throw new ModelFailure('schema', error instanceof Error ? error.message : 'Invalid task output'); }
   }
   async function route<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>): Promise<RouteResult<T> | LlmOffResult> {
-    const signal = state().llmSignal;
+    return run(taskType, input, schema, false);
+  }
+  /** Cloud-only call for a caller that already observed a local outage on this request. Same OFF,
+   * confidence, usage and cost checks as route(); never retries GX10. Text tasks only. */
+  async function fallback<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>, options: { signal?: AbortSignal } = {}): Promise<RouteResult<T> | LlmOffResult> {
+    if (!Object.hasOwn(TASK_ROUTES, taskType) || TASK_ROUTES[taskType] !== 'local' || taskType === 'document_extraction') throw new Error(`Cloud fallback unsupported for task type: ${taskType}`);
+    return run(taskType, input, schema, true, options.signal);
+  }
+  async function run<T>(taskType: TaskType, input: unknown, schema: OutputSchema<T> | undefined, skipLocal: boolean, caller?: AbortSignal): Promise<RouteResult<T> | LlmOffResult> {
+    // A caller's signal (e.g. a cancelled case) stops requests like the global OFF switch does.
+    const signal = caller ? AbortSignal.any([state().llmSignal, caller]) : state().llmSignal;
     if (!state().llmEnabled || signal.aborted) return llmOff();
     if (!Object.hasOwn(TASK_ROUTES, taskType)) throw new Error(`Unsupported task type: ${taskType}; in-call speech belongs to Cartesia`);
     const start = now();
@@ -187,7 +197,7 @@ export function createRouter(options: RouterOptions = {}) {
     if (vision) documentMessages(input);
     // Vision never skips local attempts due to text latency; offline documents stay held.
     if (vision && !enabled) throw new Error('LOCAL_VISION_DISABLED');
-    if (preferredLocal && (available || vision)) {
+    if (preferredLocal && !skipLocal && (available || vision)) {
       let previousFailure: RouterFailureKind | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         let response: Completion;
@@ -229,7 +239,7 @@ export function createRouter(options: RouterOptions = {}) {
     return {output:result.output,route:preferredLocal ? 'cloud_fallback' : 'cloud',model:response.model ?? cloudModel,latencyMs:now()-start,costUsd};
   }
   return {
-    route, healthPing, telemetry: telemetry.snapshot,
+    route, fallback, healthPing, telemetry: telemetry.snapshot,
     health: () => ({localAvailable:available, localEnabled:enabled, healthyPings, p50LatencyMs:median(), checkedAt}),
     /** Link-kill demo seam; does not change the shared server. */
     setLocalBaseUrl: (url: string) => { localBaseUrl = url; },
@@ -249,4 +259,9 @@ export function getRouterTelemetry() {
 export function route<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>) {
   if (!singleton) { singleton = createRouter(); singleton.start(); }
   return singleton.route(taskType, input, schema);
+}
+/** Cloud-only fallback through the process router after a caller's own local attempt failed. */
+export function routeCloudFallback<T = unknown>(taskType: TaskType, input: unknown, schema?: OutputSchema<T>, options?: { signal?: AbortSignal }) {
+  if (!singleton) { singleton = createRouter(); singleton.start(); }
+  return singleton.fallback(taskType, input, schema, options);
 }

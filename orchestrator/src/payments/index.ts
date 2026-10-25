@@ -6,7 +6,8 @@ export interface AuthorizedPaymentLink {
   id: string; invoiceId: string; planId: string; auditId: string; policyVersion: number;
   installment: number; amountCents: number; totalCents: number; currency: 'USD';
 }
-export type PaymentBank = Pick<NessieClient, 'deposit' | 'listDeposits' | 'readBalanceWithPostedDeposits'>;
+export type PaymentBank = Pick<NessieClient, 'deposit' | 'listDeposits' | 'readBalanceWithPostedDeposits' | 'surfaceCopy'>
+  & Partial<Pick<NessieClient, 'readBalanceDisplay'>>;
 export interface PaymentRecord {
   linkId: string; invoiceId: string; installment: number; amountCents: number; depositId: string;
   status: 'pending_reconciliation' | 'partially_paid' | 'paid' | 'exception';
@@ -35,6 +36,7 @@ export class PaymentService {
   private records = new Map<string, PaymentRecord>();
   private issues = new Map<string, PaymentException>();
   private tail: Promise<unknown> = Promise.resolve();
+  private retrying?: Promise<{ linkId: string; ok: boolean }[]>;
   constructor(private readonly options: Options) {}
   private serial<T>(work: () => Promise<T>): Promise<T> {
     const run = this.tail.then(work); this.tail = run.catch(() => undefined); return run;
@@ -52,8 +54,12 @@ export class PaymentService {
     const link = await this.link(id);
     return { linkId: link.id, invoiceId: link.invoiceId, installment: link.installment, amountCents: link.amountCents,
       currency: link.currency, payment: structuredClone(this.records.get(id)),
-      balance: await this.options.bank.readBalanceWithPostedDeposits(this.options.accountId) };
+      balance: await (this.options.bank.readBalanceDisplay
+        ? this.options.bank.readBalanceDisplay(this.options.accountId)
+        : this.options.bank.readBalanceWithPostedDeposits(this.options.accountId)) };
   }
+  /** Disclosure for the adapter this service was constructed with. */
+  bankDisclosure() { return this.options.bank.surfaceCopy(); }
   async pay(id: string): Promise<PaymentRecord> {
     const posted = await this.serial(async () => {
       const link = await this.link(id);
@@ -78,7 +84,53 @@ export class PaymentService {
     }
     return structuredClone(this.records.get(id)!);
   }
+  /** Rebuild the process-local view from bank evidence and reducer receipts without writing either. */
+  recover(linkIds: readonly string[], store: Pick<StateStore, 'getPayment'>): Promise<{ restored: PaymentRecord[]; skipped: { linkId: string; reason: string }[] }> {
+    return this.serial(async () => {
+      const feed = await this.options.bank.listDeposits(this.options.accountId);
+      const restored: PaymentRecord[] = [];
+      const skipped: { linkId: string; reason: string }[] = [];
+      for (const linkId of linkIds) {
+        if (this.records.has(linkId)) { skipped.push({ linkId, reason: 'ALREADY_TRACKED' }); continue; }
+        let link: AuthorizedPaymentLink;
+        try { link = await this.link(linkId); }
+        catch (error) {
+          if (!(error instanceof PaymentError)) throw error;
+          skipped.push({ linkId, reason: error.code }); continue;
+        }
+        const evidence = inspectPaymentEvidence({ linkId, memo: paymentMemo(link), amountCents: link.amountCents }, feed);
+        if (evidence.ruleId) {
+          skipped.push({ linkId, reason: evidence.ruleId === 'RECON_UNMATCHED' ? 'NOT_POSTED' : evidence.ruleId }); continue;
+        }
+        const depositId = evidence.deposit!._id;
+        const receipt = await store.getPayment(`ar:${link.invoiceId}:${link.installment}`);
+        if (receipt && receipt.fingerprint !== `${depositId}:${link.amountCents}`) {
+          skipped.push({ linkId, reason: 'RECON_RECEIPT_CONFLICT' }); continue;
+        }
+        const record: PaymentRecord = { linkId, invoiceId: link.invoiceId, installment: link.installment,
+          amountCents: link.amountCents, depositId,
+          status: receipt ? receipt.result.invoiceState as 'paid' | 'partially_paid' : 'pending_reconciliation' };
+        this.records.set(linkId, record); restored.push(structuredClone(record));
+      }
+      return { restored, skipped };
+    });
+  }
   pendingPayments() { return structuredClone([...this.records.values()].filter(row => row.status === 'pending_reconciliation')); }
+  retryPending(): Promise<{ linkId: string; ok: boolean }[]> {
+    if (this.retrying) return this.retrying;
+    const onPosted = this.options.onPosted;
+    if (!onPosted) return Promise.resolve([]);
+    this.retrying = Promise.resolve().then(async () => {
+      const results: { linkId: string; ok: boolean }[] = [];
+      for (const row of [...this.records.values()]) {
+        if (row.status !== 'pending_reconciliation') continue;
+        try { await onPosted(row.linkId); results.push({ linkId: row.linkId, ok: true }); }
+        catch { results.push({ linkId: row.linkId, ok: false }); }
+      }
+      return results;
+    }).finally(() => { this.retrying = undefined; });
+    return this.retrying;
+  }
   exceptions() { return structuredClone([...this.issues.values()]); }
   private exception(link: AuthorizedPaymentLink, ruleId: string, depositIds: string[]) {
     const issue: PaymentException = { id: `${link.id}:${ruleId}`, linkId: link.id, invoiceId: link.invoiceId, ruleId, depositIds,
@@ -147,6 +199,7 @@ export function matchRemittance(expected: { amountCents: number; memo: string },
 }
 export type PaymentView = Awaited<ReturnType<PaymentService['view']>>;
 export type { PostedDepositsDisplay };
+export { mirrorBankFeed } from './bank-feed';
 
 export type BankEvidence = Transaction & { paymentLinkRef?: string };
 /** A trusted imported link reference can identify exceptions; it can never substitute
