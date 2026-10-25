@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 test('mobile sandbox pay page uses fixed ALLOW amount, posts once, and reloads its receipt', async ({ page }, testInfo) => {
   await page.goto('/pay/payment-demo-1042');
-  await expect(page.getByRole('button', { name: 'Pay $2,475.00', exact: true })).toBeVisible();
+  // The fixture bank already holds an earlier reset's invoice 1042 deposit; it must not block this link.
+  await expect(page.getByRole('button', { name: 'Pay $2,475.00', exact: true })).toBeEnabled();
+  await expect(page.getByText(/Deposit needs review/)).toHaveCount(0);
   await expect(page.getByText('Offline bank; no card is charged.', { exact: true })).toBeVisible();
   await expect(page.locator('input')).toHaveCount(0);
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);
@@ -10,7 +12,7 @@ test('mobile sandbox pay page uses fixed ALLOW amount, posts once, and reloads i
   await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
   await expect(page.getByRole('heading', { name: 'Offline bank balance + posted deposits' })).toBeVisible();
-  await expect(page.getByText('Deposit reference: fake-deposit-1')).toBeVisible();
+  await expect(page.getByText('Deposit reference: fake-deposit-2')).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
   await page.screenshot({ path: testInfo.outputPath('pay-mobile-after.png'), fullPage: true });

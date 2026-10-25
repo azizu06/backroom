@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { isReplayPage } from '../../../../lib/replay/mode';
 import { serverRoomReadout, type Gx10Status } from '../../../../lib/gx10/server-room';
 
 /** GX10 / model router readout (moved out of the 3D scene). Polls only while the Advanced section is open. */
@@ -8,7 +9,7 @@ function Gx10Readout({ replay }: { replay: boolean }) {
   const [status, setStatus] = useState<Gx10Status | null>(null);
   useEffect(() => {
     // Replay is a recorded projection: never read live telemetry or arm its timer.
-    if (replay) return;
+    if (replay || isReplayPage()) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {

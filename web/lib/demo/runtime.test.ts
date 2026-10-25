@@ -150,7 +150,7 @@ it('keeps booting when payment recovery throws', async () => {
   expect(runtime.status().workersHealthy).toBe(true);
 });
 
-it('does not give a new pay link a deposit that already existed for invoice 1042 installment 1', async () => {
+it('ignores a deposit an earlier company reset left for invoice 1042 installment 1', async () => {
   const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
   const deposit = { _id: 'old-deposit', amount: 2475, description: paymentMemo({ invoiceId: '1042', installment: 1 }),
     status: 'completed', medium: 'balance', transaction_date: '2026-10-24' };
@@ -158,7 +158,7 @@ it('does not give a new pay link a deposit that already existed for invoice 1042
   runtime = await createDemoRuntime();
   const linkId = runtime.status().payPath!.split('/').at(-1)!;
   expect((await getPaymentService().view(linkId)).payment).toBeUndefined();
-  expect(logged).toHaveBeenCalledWith('demo payment recovery skipped', { linkId, reason: 'NEW_LINK_EXISTING_DEPOSIT' });
+  expect(logged).not.toHaveBeenCalledWith('demo payment recovery skipped', expect.anything());
 });
 
 it('turns Nessie Verified from the live sandbox deposit that reconciled as EXACT_PAYMENT_MATCH', async () => {
