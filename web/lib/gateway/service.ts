@@ -8,6 +8,7 @@ import {
   type GatewayPolicyDecision,
 } from "./policy-adapter";
 import { firstPaymentCents } from "../../../policy/src/index";
+import { paymentSchedule } from "@backroom/orchestrator/payment-schedule";
 import type { AuditEntry, Escalation, GatewayCall, PlanTerms, ToolResult } from "./store";
 
 const dollars = (cents: number) =>
@@ -53,6 +54,9 @@ function authorizePlan(
   const totalCents =
     Math.round(call.receivable.principalCents * (1 - terms.discountPct / 100)) +
     (terms.waiveFee ? 0 : call.receivable.lateFeeCents);
+  const authorizedAt = Date.now();
+  const schedule = paymentSchedule({ totalCents, firstPaymentPct: terms.firstPaymentPct,
+    installments: terms.installments, durationDays: terms.durationDays, startAt: authorizedAt });
   const plan = {
     ...terms,
     id: randomUUID(),
@@ -60,6 +64,9 @@ function authorizePlan(
     totalCents,
     firstPaymentCents: firstPaymentCents(totalCents, terms.firstPaymentPct, terms.installments),
   };
+  // The ALLOW row carries the authorized plan into the shared audit chain (StateStore), so it outlives this call.
+  entry.paymentPlan = { planId: plan.id, invoiceId: call.invoiceId, totalCents, installments: terms.installments,
+    firstPaymentPct: terms.firstPaymentPct, durationDays: terms.durationDays, authorizedAt, schedule };
   const first = `The first payment is ${dollars(plan.firstPaymentCents)}.`;
   call.plans.push(plan);
   return {

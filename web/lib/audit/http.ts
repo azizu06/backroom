@@ -1,6 +1,8 @@
 import { createAskWhyHandler, verifyChain, type AuditEntry, type StateStore,
   type WhyAuditEntry, type WhyOptions } from '@backroom/orchestrator';
 import { operatorSignedIn } from '../operator/sign-in';
+import { latestCaseBalance } from './balance';
+import { currentRun } from './stories';
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -27,6 +29,10 @@ export function createAuditHTTP(options: {
         // Verify exactly the complete snapshot sent to the wall, including old rows.
         const entries = await store.listAudit();
         return json({ entries, chain: verifyChain(entries), measuredAt: new Date(now()).toISOString() });
+      }
+      if (action === 'balance' && request.method === 'GET') {
+        // Read-only: the latest authorized plan in this run and its exact matched payments.
+        return json({ balance: latestCaseBalance(currentRun(await store.listAudit())) ?? null });
       }
       if (action === 'why' && request.method === 'POST') {
         const entries = await store.listAudit();

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { NessieClient, paymentMemo, type Transaction } from '@backroom/nessie';
-import { PaymentService, paymentLinkMemo, type AuthorizedPaymentLink } from './index';
+import { PaymentService, balanceLine, paymentLinkMemo, paymentSchedule, type AuthorizedPaymentLink } from './index';
 const link: AuthorizedPaymentLink = { id: 'link-1042', invoiceId: '1042', planId: 'plan-1042', auditId: 'allow-1042',
   policyVersion: 1, installment: 1, amountCents: 247500, totalCents: 495000, currency: 'USD' };
 function setup() {
@@ -116,3 +116,21 @@ it('refuses fractional sandbox dollars before issuing a bank deposit', async () 
   await expect(service.pay(link.id)).rejects.toThrow('SANDBOX_WHOLE_DOLLARS_REQUIRED');
   expect(await bank.listDeposits('mock')).toHaveLength(0);
 });
+it('shows the remaining balance and plan schedule only from the exact reconciled match', async () => {
+  const schedule = paymentSchedule({ totalCents: 495000, firstPaymentPct: 50, installments: 2, durationDays: 30, startAt: Date.UTC(2026, 9, 25) });
+  const planned = { ...link, schedule };
+  const bank = new (await import('../core-demo/bank')).FakeDemoBank();
+  const service = new PaymentService({ bank, accountId: 'mock', lookup: async () => planned });
+  const { store, lease } = await job();
+  expect((await service.view(link.id)).plan).toMatchObject({ paidCents: 0, remainingCents: 495000 });
+  await service.pay(link.id);
+  expect((await service.view(link.id)).plan).toMatchObject({ paidCents: 0, remainingCents: 495000 });
+  await service.reconcile(link.id, store, lease, 'promised');
+  const { plan } = await service.view(link.id);
+  expect(plan).toEqual({ totalCents: 495000, paidCents: 247500, remainingCents: 247500, schedule: [
+    { installment: 1, amountCents: 247500, dueDate: '2026-10-25', status: 'paid' },
+    { installment: 2, amountCents: 247500, dueDate: '2026-11-24', status: 'upcoming' }] });
+  expect(balanceLine(plan!)).toBe('Paid $2,475.00 of $4,950.00 · Remaining $2,475.00');
+  expect((await store.listAudit()).find(row => row.ruleIds.includes('EXACT_PAYMENT_MATCH'))?.inputs).toMatchObject({ installment: 1 });
+  expect((await new PaymentService({ bank, accountId: 'mock', lookup: async () => link }).view(link.id)).plan).toBeUndefined();
+}, 15_000);

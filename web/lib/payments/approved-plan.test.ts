@@ -12,6 +12,8 @@ import { getGatewayStore, installGatewayStore } from '../gateway/runtime';
 import { MemoryGatewayStore } from '../gateway/store';
 import { authorizedPaymentLink } from './authorization';
 import { paymentHttp } from './http';
+import { caseBalance, latestCaseBalance } from '../audit/balance';
+import { auditStories } from '../audit/stories';
 
 const origin = 'http://127.0.0.1:3300';
 const danaOrigin = 'http://localhost:3020';
@@ -51,7 +53,7 @@ async function liveCall() {
     const call = await store.findPaymentCall(id); return call && authorizedPaymentLink(call, id);
   } });
   const pay = paymentHttp(() => payments);
-  return { store, tool, approve, pay };
+  return { store, state, tool, approve, pay, payments };
 }
 
 async function delivered(call: Awaited<ReturnType<typeof liveCall>>, sent: { short_code: string; link_path: string; amount_cents: number }) {
@@ -119,5 +121,50 @@ describe('a payment link minted after Dana approves the plan', () => {
       row.plan = { ...row.plan!, installments: 8 };
     });
     expect(await authorized()).toBeUndefined();
+  });
+});
+
+describe('the authorized plan persists with its ALLOW and shows the remaining balance after payment', () => {
+  it('Dana-approved 8 x 10% over 240 days: audit chain plan, pay page balance and the case story', async () => {
+    const call = await liveCall();
+    const escalated = await call.tool('propose_plan', { installments: 8, first_payment_pct: 10, duration_days: 240, waive_fee: false, discount_pct: 0 });
+    expect(escalated).toMatchObject({ kind: 'ESCALATE', rule_ids: ['MAX_INSTALLMENTS'] });
+    expect((await call.approve(escalated.escalation_id)).status).toBe(200);
+    const approved = await call.tool('check_approval', { escalation_id: escalated.escalation_id });
+    expect(approved).toMatchObject({ kind: 'ALLOW', rule_ids: ['MAX_INSTALLMENTS', 'DANA_APPROVED'] });
+    // The voice tool result keeps its shape; the schedule lives on the audit row.
+    expect(approved.plan).not.toHaveProperty('schedule');
+    const persisted = (await call.state.getAudit(approved.audit_id))!;
+    expect(persisted).toMatchObject({ action: 'check_approval', decision: 'ALLOW' });
+    const plan = persisted.inputs!.paymentPlan as { schedule: { amountCents: number }[] };
+    expect(persisted.inputs!.paymentPlan).toMatchObject({ planId: approved.plan_id, invoiceId: '1042', totalCents: 495000,
+      installments: 8, firstPaymentPct: 10, durationDays: 240 });
+    expect(plan.schedule.map(row => row.amountCents)).toEqual([49500, 63600, 63600, 63600, 63600, 63600, 63600, 63900]);
+    // Only the plan-authorizing ALLOW carries it.
+    expect((await call.state.listAudit()).filter(row => row.inputs?.paymentPlan)).toHaveLength(1);
+
+    const sent = await call.tool('send_payment_link', { plan_id: approved.plan_id });
+    expect(sent).toMatchObject({ kind: 'RECORDED', amount_cents: 49500 });
+    const id = sent.link_path.split('/').pop()!;
+    const view = async () => (await call.pay(new Request(`${origin}/api/pay/${id}`), id)).json();
+    expect((await view()).plan).toMatchObject({ paidCents: 0, remainingCents: 495000 });
+    await call.pay(new Request(`${origin}/api/pay/${id}`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: '{}' }), id);
+    await call.state.registerAgent('bookkeeper', 'collections', Date.now());
+    await call.state.insertInvoice({ id: '1042', kind: 'ar', state: 'promised' });
+    await call.state.enqueueTask({ id: 'reconcile-1042', seatId: 'collections', refs: ['1042'], idempotencyKey: 'ar:1042:1', steps: [] });
+    const lease = (await call.state.claimTask('bookkeeper', Date.now(), 12000))!;
+    expect(await call.payments.reconcile(id, call.state, lease, 'promised')).toMatchObject({ status: 'partially_paid' });
+
+    const after = await view();
+    expect(after.plan).toMatchObject({ totalCents: 495000, paidCents: 49500, remainingCents: 445500 });
+    expect(after.plan.schedule.map((row: { status: string }) => row.status)).toEqual(['paid', ...Array(7).fill('upcoming')]);
+    const entries = await call.state.listAudit();
+    const fromAudit = caseBalance(entries, approved.audit_id)!;
+    expect(fromAudit).toMatchObject({ invoiceId: '1042', paidCents: 49500, remainingCents: 445500 });
+    expect(fromAudit.schedule).toEqual(after.plan.schedule);
+    expect(latestCaseBalance(entries)).toEqual(fromAudit);
+    const stories = auditStories(entries);
+    expect(stories.find(story => story.kind === 'payment')?.balance).toEqual(fromAudit);
+    expect(stories.find(story => story.kind === 'call')?.balance).toEqual(fromAudit);
   });
 });
