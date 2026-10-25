@@ -1,6 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openMenu } from './office-menu';
 
+// Keep browser verification local, including stylesheets that reference hosted fonts.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/*', route => {
+    const host = new URL(route.request().url()).hostname;
+    return host === 'localhost' || host === '127.0.0.1' ? route.continue() : route.abort();
+  });
+});
+
 // Run via test:office:browser after building the web app. Needs WebGL for the first-person Play view.
 // Runtime budget for the opt-in desk kit (?art=baked): turning in Play with the kit loaded must cost about the same
 // draw calls and frame CPU as the same build with the kit missing (procedural props), measured in the same page setup.
@@ -22,7 +30,7 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   const onConsole = (message: { type(): string; text(): string }) => { if (message.type() === 'warning') warnings.push(message.text()); };
   page.on('pageerror', onError);
   page.on('console', onConsole);
-  await page.unrouteAll();
+  await page.unroute('**/office-art/deskkit.glb');
   if (!kit) await page.route('**/office-art/deskkit.glb', route => route.fulfill({ status: 404, body: 'missing' }));
   await page.goto('/office?view=overview&art=baked&perf=1'); // Skip the Enter splash, as office-play.spec.ts does.
   const available = await page.evaluate(() => {

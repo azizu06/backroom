@@ -1,8 +1,16 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openMenu } from './office-menu';
 
+// Keep browser verification local, including stylesheets that reference hosted fonts.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/*', route => {
+    const host = new URL(route.request().url()).hostname;
+    return host === 'localhost' || host === '127.0.0.1' ? route.continue() : route.abort();
+  });
+});
+
 // Run via test:office:browser after building the web app. Needs WebGL for the first-person Play view.
-const WARNING = 'Baked art /office-art/lobby.glb failed to load; using the procedural scene.';
+const WARNING = 'Desk kit /office-art/deskkit.glb failed to load; using the procedural props.';
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
@@ -22,9 +30,9 @@ async function openBaked(page: Page) {
   const viewport = page.getByTestId('office-viewport');
   await expect(viewport.locator('canvas')).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
-  // Preview controls sit in the corner menu (closed by default); a pick closes it again.
-  await page.getByRole('button', { name: 'Backroom menu' }).click();
-  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
+  await page.getByRole('button', { name: 'Full Floor', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await page.getByRole('button', { name: 'Close Today at Backroom' }).click();
   await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
   return { warnings, errors };
 }
@@ -36,8 +44,8 @@ async function enterPlay(page: Page) {
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
 }
 
-test('a missing baked lobby keeps the procedural audit board, stamp and colliders in Play', async ({ page }) => {
-  await page.route('**/office-art/lobby.glb', route => route.fulfill({ status: 404, body: 'missing' }));
+test('a missing desk kit keeps the procedural audit board and stamp in Play', async ({ page }) => {
+  await page.route('**/office-art/deskkit.glb', route => route.fulfill({ status: 404, body: 'missing' }));
   const { warnings, errors } = await openBaked(page);
   await expect.poll(() => warnings.some(text => text.startsWith(WARNING))).toBe(true);
   await enterPlay(page);
@@ -50,13 +58,16 @@ test('a missing baked lobby keeps the procedural audit board, stamp and collider
   expect(errors).toEqual([]);
 });
 
-test('a loaded baked lobby replaces the procedural audit board and stamp in Play', async ({ page }) => {
-  const loaded = page.waitForResponse(response => response.url().endsWith('/office-art/lobby.glb') && response.ok());
+test('a loaded desk kit retains the procedural audit board and stamp in the open office', async ({ page }) => {
+  // Main retired the incompatible baked lobby shell; the kit must not bring it back.
+  const lobbyRequests: string[] = [];
+  page.on('request', request => { if (request.url().endsWith('/office-art/lobby.glb')) lobbyRequests.push(request.url()); });
   const { warnings, errors } = await openBaked(page);
-  await loaded;
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toHaveAttribute('data-deskkit', 'ready', { timeout: 30_000 });
   await enterPlay(page);
-  await expect(page.locator('[data-lobby-audit-board]')).toHaveAttribute('data-lobby-audit-board', 'baked');
-  await expect(page.getByTestId('lobby-deny-stamp')).toHaveCount(0);
-  expect(warnings.filter(text => text.startsWith('Baked art'))).toEqual([]);
+  await expect(page.locator('[data-lobby-audit-board]')).toHaveAttribute('data-lobby-audit-board', 'shown');
+  await expect(page.getByTestId('lobby-deny-stamp')).toContainText('DENIED · NOT_IN_BADGE');
+  expect(lobbyRequests).toEqual([]);
+  expect(warnings.filter(text => text.startsWith('Desk kit'))).toEqual([]);
   expect(errors).toEqual([]);
 });
