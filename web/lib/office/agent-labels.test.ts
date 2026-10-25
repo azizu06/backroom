@@ -12,3 +12,13 @@ describe('office display labels', () => {
     expect(agentState('Reviewing invoice 1042')).toBe('Reviewing invoice 1042');
   });
 });
+
+it('hides legacy idle seats while role handoffs are active, preserving escalations', async () => {
+  const { visibleSeatAgents } = await import('./agent-labels');
+  const { INITIAL_OFFICE } = await import('./state');
+  const agent = { id: 'alex', name: 'Alex', state: 'Idle', seatId: 'collections' as const, targetAnchor: 'collections' as const, pos: [0, 0] as const };
+  const handoffs = [{ status: 'accepted' }] as import('./handoffs').Handoff[];
+  expect(visibleSeatAgents({ ...INITIAL_OFFICE, agents: [agent], handoffs })).toEqual([]);
+  expect(visibleSeatAgents({ ...INITIAL_OFFICE, agents: [agent] })).toEqual([agent]);
+  expect(visibleSeatAgents({ ...INITIAL_OFFICE, agents: [{ ...agent, escalationId: 'review:1' }], handoffs })).toHaveLength(1);
+});

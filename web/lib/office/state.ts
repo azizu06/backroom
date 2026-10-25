@@ -39,6 +39,7 @@ export interface OfficeBadge {
   readonly limits: Readonly<Record<string, unknown>>;
 }
 export interface OfficeAudit {
+  readonly refs?: readonly string[];
   readonly id: string;
   readonly agentId: string;
   readonly seatId: string;

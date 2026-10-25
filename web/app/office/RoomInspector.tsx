@@ -3,10 +3,7 @@
 import { useId, type ReactNode } from 'react';
 import { useModal } from './useModal';
 import { OFFICE_ANCHORS, matchingDenial, type AnchorId, type OfficeSnapshot } from '../../lib/office/state';
-
-function valueText(value: unknown): string {
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
-}
+import { badgeLimit, plainWords } from '../../lib/office/display';
 /** Display exact values from subscribed badge rows, never infer permission from the room. */
 export function RoomInspector({ room, snapshot, close, inboxTray, openSheet }: {
   room: AnchorId; snapshot: OfficeSnapshot; close: () => void; inboxTray?: ReactNode; openSheet?: (sheet: 'inbox' | 'audit') => void;
@@ -21,15 +18,15 @@ export function RoomInspector({ room, snapshot, close, inboxTray, openSheet }: {
     <div>
     {badge ? <>
       <p>Policy version {badge.policyVersion}</p>
-      <dl>{Object.entries(badge.limits).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{valueText(value)}</dd></div>)}</dl>
-      <p><strong>Allowed rooms</strong><br />{badge.rooms.join(', ')}</p>
-      <details><summary>Allowed Actions ({badge.actions.length})</summary><ul>{badge.actions.map(action => <li key={action}>{action}</li>)}</ul></details>
+      <dl>{Object.entries(badge.limits).map(([key, value]) => <div key={key}><dt>{badgeLimit(key, value)[0]}</dt><dd>{badgeLimit(key, value)[1]}</dd></div>)}</dl>
+      <p><strong>Allowed rooms</strong><br />{badge.rooms.map(plainWords).join(', ')}</p>
+      <details><summary>Allowed Actions ({badge.actions.length})</summary><ul>{badge.actions.map(action => <li key={action}>{plainWords(action)}</li>)}</ul></details>
       {!Object.keys(badge.limits).length && <p>No monetary authority in this badge.</p>}
     </> : room === 'treasury' ? <p>Locked · Dana only. Entry and money movement require server authorization.</p>
       : room === 'dana' ? <p>Human review. Approvals require Dana’s passkey on the approval card.</p>
       : <><h3>Audit Wall</h3><p>{openSheet ? <button type='button' onClick={() => openSheet('audit')}>Open the Audit Wall</button> : <a href='#office-audit-wall'>Open the Audit Wall below</a>}</p>
         <div data-office-mount='inbox-inspector'><h3>Inbox Tray · {snapshot.inboxCount}</h3>{openSheet ? <button type='button' onClick={() => openSheet('inbox')}>Open the inbox tray</button> : inboxTray ? <a href='#office-inbox-tray'>Open the lobby tray below</a> : <><p>Receipts on the inbox page are not synced into this scene.</p><a href='/inbox'>Open the inbox</a></>}</div></>}
-    {denial && <p className='denial-text' role='status'>Entry denied · audit {denial.auditId}</p>}
+    {denial && <p className='denial-text' role='status'>Entry denied · <a href={`/audit?entry=${encodeURIComponent(denial.auditId)}#audit-replay`}>View receipt</a></p>}
     </div>
   </section></div>;
 }

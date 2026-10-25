@@ -81,7 +81,7 @@ function bodyBehindWalls(camera: Camera, x: number, z: number): boolean {
   return BODY_SAMPLES.every(([dx, dz]) => sightBlocked(camera.position.x, camera.position.z, x + dx, z + dz));
 }
 /** Projects the avatar's current head position onto its HTML tag on frames that are already rendering. */
-function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkMotion; element: AgentTagLookup }) {
+function AgentTag({ agentId, idle, motion, element }: { agentId: string; idle: boolean; motion: WalkMotion; element: AgentTagLookup }) {
   const point = useRef(new Vector3());
   useFrame(({ camera, size }) => {
     const tag = element(agentId);
@@ -89,7 +89,7 @@ function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkM
     point.current.set(motion.position[0], 1.95, motion.position[1]).project(camera);
     const offscreen = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 || point.current.z > 1
       || behindWall(camera, motion.position[0], motion.position[1]);
-    tag.style.visibility = offscreen ? 'hidden' : 'visible';
+    tag.style.visibility = offscreen || idle ? 'hidden' : 'visible';
     tag.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -100%)`;
   });
   return null;
@@ -234,7 +234,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     <ContactDynamic name='office:agents'>{snapshot.agents.map(agent => <Fragment key={agent.id}>
       <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} onPick={picking} />
-      {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
+      {agentTag && <AgentTag agentId={agent.id} idle={!agent.escalationId && /^(idle|ready|available|offline|away)$/i.test(agent.state.trim())} motion={motions.get(agent)} element={agentTag} />}
     </Fragment>)}</ContactDynamic>
     </Instances>
     {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component, moving }) => moving
