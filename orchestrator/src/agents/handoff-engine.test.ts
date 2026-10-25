@@ -15,6 +15,32 @@ const commit = (state: CaseState, claim: engine.LeaseClaim, request = offer('ven
   engine.commitHandoff(state, { ...claim, request, now: t + 2, sequence: ++seq });
 
 describe('handoff engine', () => {
+  it('speaks a short first-person handoff without changing the technical record', () => {
+    const { state, claim } = started();
+    const summary = 'Extractor -> Payables INV-4482 checking the fields (OVER_LIMIT).';
+    const { record } = commit(state, claim, { ...offer('payables'), summary });
+    const before = JSON.stringify(record);
+    const projected = engine.toPublicHandoff(state, record);
+    expect(projected.line).toBe('Hey Payables, I’m sending invoice 4482 your way, with a note about the payment limit requiring human approval.');
+    expect(projected.summary).toBe('Extractor - Payables INV-4482 checking the fields (OVER_LIMIT).');
+    expect(projected.reason).toBe('done');
+    expect(engine.handoffAudits(state, [], t + 3)[0]!.inputs).toMatchObject({
+      summary: 'Extractor - Payables INV-4482 checking the fields (OVER_LIMIT).',
+      line: 'Extractor - Payables INV-4482 checking the fields (OVER_LIMIT).', reason: 'done',
+    });
+    expect(JSON.stringify(record)).toBe(before);
+  });
+
+  it('bounds spoken expansion while preserving the summary and status', () => {
+    const { state, claim } = started();
+    const { record } = commit(state, claim, { ...offer('vendor'), summary: 'CONSENT_REQUIRED '.repeat(8) });
+    const projected = engine.toPublicHandoff(state, record);
+    expect(Array.from(projected.line).length).toBeLessThanOrEqual(240);
+    expect(projected.line).not.toContain('CONSENT_REQUIRED');
+    expect(projected.summary).toContain('CONSENT_REQUIRED');
+    expect(projected.status).toBe(record.status);
+  });
+
   it('commits atomically: closes the source, queues exactly one target, then accepts on start', () => {
     const { state, claim } = started();
     const result = commit(state, claim);
@@ -100,7 +126,11 @@ describe('handoff engine', () => {
   ])('public summary and spoken line sanitize %s', (summary, expected) => {
     const { state, claim } = started();
     const { record } = commit(state, claim, { ...offer('vendor'), summary });
-    expect(engine.toPublicHandoff(state, record)).toMatchObject({ summary: expected, line: expected });
+    const row = engine.toPublicHandoff(state, record);
+    expect(row.summary).toBe(expected);
+    expect(row.line.startsWith('Hey Vendor Desk, I’m handing this over:')).toBe(true);
+    expect(row.line).not.toMatch(/••|https?:|123456789|1234[._/ -]5678/);
+    for (const suffix of expected.matchAll(/••(\d+)/g)) expect(row.line).toContain(`ending in ${suffix[1]}`);
   });
 
   it('public projection is allowlisted, redacted and Cartesia-safe', () => {
@@ -110,9 +140,10 @@ describe('handoff engine', () => {
     expect(Object.keys(row).sort()).toEqual(['caseDisplayId', 'correction', 'createdAt', 'decisionRef', 'fromAgentId', 'fromRole', 'fromVoiceRole',
       'handoffId', 'line', 'reason', 'sequence', 'status', 'summary', 'toAgentId', 'toRole', 'toVoiceRole']);
     expect(row).toMatchObject({ fromRole: 'extractor', fromVoiceRole: 'extractor', toRole: 'vendor', toVoiceRole: 'vendor_verifier', toAgentId: 'vendor-agent' });
-    expect(row.line).toBe(row.summary); // The author’s summary stays paired with fromVoiceRole.
+    expect(row.summary).toBe('Pay script [email] acct ••6789 now');
+    expect(row.line).toBe('Hey Vendor Desk, I’m handing this over: Pay script [email] acct ending in 6789 now.');
     expect(row.line).not.toMatch(/[<>\x00-\x1f]|123456789|evil\.example/);
-    expect(row.line).toContain('••6789');
+    expect(row.line).toContain('ending in 6789');
     expect(Array.from(row.line).length).toBeLessThanOrEqual(240);
   });
 });
@@ -131,6 +162,9 @@ describe('live-call escalation to a human desk', () => {
     expect(engine.toPublicHandoff(first.state, first.record)).toMatchObject({ caseDisplayId: '1042', fromRole: 'collections',
       fromAgentId: 'collections-agent', toRole: 'human', toAgentId: 'human:Dana', fromVoiceRole: 'collections_caller',
       toVoiceRole: 'collections_caller', status: 'offered', decisionRef: 'esc-1', reason: expect.stringContaining('passkey') });
+    expect(engine.toPublicHandoff(first.state, first.record).line)
+      .toBe("Hey Dana, I need your passkey decision on the caller's request before we continue.");
+    expect(first.record.summary).toContain('MAX_INSTALLMENTS');
   });
 
   it('completes on approval, returns on denial or expiry, and never reopens a closed row', () => {

@@ -28,10 +28,10 @@ export async function readBounded(stream: ReadableStream<Uint8Array> | null, lim
   return Buffer.concat(chunks, size);
 }
 
-/** Retain each exact id, replacing punctuation with pauses rather than dropping it. */
+/** The displayed answer retains its citation links; speech reads only the prose. */
 export function spokenAnswer(answer: string): string {
-  return answer.replace(/\[entry:([A-Za-z0-9_.:-]+)\]/g, (_, id: string) =>
-    `entry ${id.replace(/[_.:-]+/g, ' ')}`);
+  return answer.replace(/\[entry:[A-Za-z0-9_.:-]+\]/g, '')
+    .replace(/\s+([.,;!?])/g, '$1').replace(/\s+/g, ' ').trim();
 }
 
 export function createCartesia(apiKey: string, fetcher: typeof fetch = fetch) {
