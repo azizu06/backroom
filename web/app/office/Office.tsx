@@ -1,17 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
 import { WorkdayPanel } from '../../components/WorkdayPanel';
 import { StartWorkdayButton } from '../../components/StartWorkdayButton';
-import { SiteNav } from '../../components/SiteNav';
+import { PAYMENT_LINK_HREF, navLinks, whatsRealLink } from '../../lib/site-nav';
+import { useActivePaymentLink } from '../../components/useActivePaymentLink';
+import { OfficeChromeIcon } from '../../components/OfficeChromeIcon';
 import { flushSync } from 'react-dom';
 import { isCloseKey } from '../../lib/office/a11y';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, PlayPanelDialog, focusAskWhy, useTouch } from './PlayHud';
-import { roomLabel, seatLabel } from '../../lib/office/a11y';
+import { seatLabel } from '../../lib/office/a11y';
 import { MotionRegistry } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, visibleRooms, type AnchorId, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
@@ -34,25 +36,70 @@ import type { CoworkerSpot } from '../../lib/office/play';
 import { FloorPlan } from './FloorPlan';
 import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
+import { DetailSheet } from './DetailSheet';
+import { HelpSheet } from './HelpSheet';
+import { RealSimDetails } from './RealSimDetails';
 import { ViewBoundary } from './ViewBoundary';
 import { PlaySplash } from './PlaySplash';
-import { COMPACT_QUERY, readStartView, saveStartView, startView } from '../../lib/office/start-mode';
+import { COMPACT_QUERY, markSplashSeen, readStartView, saveStartView, splashSeen, startView } from '../../lib/office/start-mode';
 import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
-import type { AgentTagLookup, RoomLabels } from './scene';
+import type { AgentTagLookup } from './scene';
 import '../office.css';
 import './a11y.css';
 import './lobby.css';
 import './tags.css';
 import './hud/diegetic/diegetic.css';
-import { OfficeAdvanced } from './hud/diegetic/OfficeAdvanced';
 import { OverviewMenu, type OverviewMenuItem } from './hud/diegetic/OverviewMenu';
 import { OverviewMap } from './hud/diegetic/OverviewMap';
 import { agentEntry, isOverviewKey, roomEntry, seatedAgent, type OverviewPick } from '../../lib/office/overview';
 import { SERVER_ROOM_BOX, officeColliders, type PlayEntry } from '../../lib/office/play';
-import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
-import { bakedArtRequested } from '../../lib/office/baked-art';
 import { interactionStore } from '../../lib/office/interactions';
 import './office-tokens.css';
+import './iisu.css';
+import './cozy-shell.css';
+
+const PAGE_ICONS = {
+  '/calls': 'collections', '/attack': 'attack', '/policy': 'treasury', '/controller': 'controller', '/payment-link': 'payables', '/operator': 'operator', '/real-vs-sim': 'info',
+} as const;
+type PageHref = keyof typeof PAGE_ICONS;
+type DetailSheetId = 'overview' | 'rooms' | 'inbox' | 'audit' | 'help' | PageHref;
+const SIDEBAR_PAGES = [...navLinks.filter(link => link.href in PAGE_ICONS), whatsRealLink] as { label: string; href: PageHref }[];
+const pageLabel = (href: PageHref) => SIDEBAR_PAGES.find(page => page.href === href)?.label ?? href;
+// Seven pages, grouped by the job a person is doing: four sidebar buttons, each a sheet with tabs.
+const SIDEBAR_GROUPS: readonly { id: string; label: string; icon: (typeof PAGE_ICONS)[PageHref]; hint: string; pages: readonly PageHref[] }[] = [
+  { id: 'calls', label: 'Calls', icon: 'collections', hint: 'Place a call and collect the payment', pages: ['/calls', '/payment-link'] },
+  { id: 'approvals', label: 'Approvals', icon: 'controller', hint: 'Dana’s decisions and the limits behind them', pages: ['/controller', '/policy'] },
+  { id: 'attack', label: 'Attack Lab', icon: 'attack', hint: 'Try to trick the agents', pages: ['/attack'] },
+  { id: 'setup', label: 'Setup', icon: 'operator', hint: 'Operator console and system status', pages: ['/operator', '/real-vs-sim'] },
+];
+const groupOf = (href: PageHref) => SIDEBAR_GROUPS.find(group => group.pages.includes(href))!;
+// The sidebar pages open as sheets over the office (same components as their routes), loaded on first open.
+const PAGE_SHEETS: Record<PageHref, ComponentType> = {
+  '/calls': dynamic(() => import('../calls/page')),
+  '/attack': dynamic(() => import('../../components/AttackDemoPanel').then(module => module.AttackDemoPanel)),
+  '/policy': dynamic(() => import('../policy/page')),
+  '/controller': dynamic(() => import('../controller/page')),
+  '/payment-link': dynamic(() => import('../../components/PaymentLinkPanel').then(module => function PaymentLinkSheet() {
+    return <><p className='page-lede'>The link Dana authorized on the current call. Checks for a new link every two seconds.</p><module.default payButton /></>;
+  })),
+  '/operator': dynamic(() => import('../operator/page')),
+  '/real-vs-sim': dynamic(() => import('../../components/RealVsSim').then(module => module.RealVsSim)),
+};
+const isPageSheet = (sheet: DetailSheetId | null): sheet is PageHref => !!sheet && sheet in PAGE_SHEETS;
+// A short "how this works" strip above each page sheet, so the order of steps is obvious before the form.
+const PAGE_STEPS: Partial<Record<PageHref, readonly string[]>> = {
+  '/calls': ['Enter the operator code and unlock office calls.', 'Press Request call on the Collections desk phone in the office.', 'Alex says it is an AI, then walks to Dana if the client asks for more than the badge allows.'],
+  '/attack': ['Pick a preset, or write your own malicious email or invoice.', 'Choose Scripted (no model cost) or Live.', 'Run the attack and read what each agent saw and what policy decided.'],
+  '/policy': ['Sign in with the operator code or the owner PIN.', 'Change a seat’s badge limits.', 'Save. Anything outside the new limits still goes to Dana.'],
+  '/controller': ['Open this on Dana’s phone and create her passkey once.', 'Sign in with the passkey and keep it open during the call.', 'When a request rings, check the evidence, then Approve or Deny.'],
+  '/payment-link': ['Dana approves a plan on the call.', 'The link shows up here and as “ready” in the sidebar.', 'Scan the code or press Pay; reconciliation matches the deposit.'],
+  '/operator': ['Sign in with the operator code (lasts eight hours).', 'Run each step in order.', 'Every action leaves a receipt on the Audit Wall.'],
+};
+
+function roomNote(room: AnchorId, snapshot: OfficeSnapshot) {
+  const badge = snapshot.badges.find(row => row.seatId === room);
+  return badge ? `Badge · v${badge.policyVersion}` : room === 'treasury' ? 'Locked · Dana only' : room === 'lobby' ? 'Audit wall + inbox' : 'Human approval';
+}
 
 function SceneLoading({ error }: { error?: Error | null }) {
   // next/dynamic passes load errors to this renderer; let the 3D ViewBoundary handle them.
@@ -79,6 +126,10 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const layers = viewportLayers(viewport);
   const [focus, setFocus] = useState<AnchorId | null>(null);
   const [inspecting, setInspecting] = useState<AnchorId | null>(null);
+  const [sheet, setSheet] = useState<DetailSheetId | null>(null);
+  const closeSheet = useCallback(() => setSheet(null), []);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const roomsButton = useRef<HTMLButtonElement>(null);
   const [motions] = useState(() => new MotionRegistry());
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
@@ -92,17 +143,26 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const chat = useProximityChat({ active: mode === 'play' && presence.enabled, hud: play.hud, selfId: presence.selfId, presence: presence.enabled, showCoworkers });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
-  function exitPlay() { saveStartView('overview'); setLookOnEnter(false); pickMode(prePlay.current); document.getElementById('office-view')?.focus(); }
-  // First person is the default start; the splash supplies the user gesture pointer lock and audio need.
+  function exitPlay() { saveStartView('overview'); setLookOnEnter(false); flushSync(() => pickMode(prePlay.current)); document.getElementById('office-view')?.focus(); }
+  // AJ shows the first-visit splash once per session; Enter supplies the Play gesture.
   const [splash, setSplash] = useState(false);
   const [lookOnEnter, setLookOnEnter] = useState(false);
-  function enterPlay() { setLookOnEnter(true); enterFirstPerson(play.last.current); }
+  function enterPlay() { setSplash(false); saveStartView('play'); setLookOnEnter(true); pickMode('play'); }
   function enterOverview() { setSplash(false); saveStartView('overview'); }
-  function chooseView(next: ViewMode) { saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next); }
+  function chooseView(next: ViewMode) {
+    saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next);
+  }
+  // First person has its own Play button, so the camera list holds only the overhead views; while playing it reads "First person".
+  const pickedView = VIEW_OPTIONS.some(option => option.mode === mode) ? mode : mode === 'play' ? 'play' : 'walk';
+  function viewPicker(id: string, ref?: RefObject<HTMLSelectElement | null>) {
+    return <select ref={ref} id={id} aria-label='Office view' value={pickedView} onChange={e => chooseView(e.target.value as ViewMode)}>
+      {mode === 'play' && <option value='play' disabled>First person</option>}
+      {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
+    </select>;
+  }
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
   useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
-  const labels: RoomLabels = { lobby: useRef(null), collections: useRef(null), payables: useRef(null), vendor_onboarding: useRef(null), dana: useRef(null), treasury: useRef(null) };
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
   const pickMode = useCallback((next: ViewMode) => dispatch({ type: 'pick', mode: next }), []);
@@ -153,8 +213,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
     if (!storyStart && !window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
-    if (storyStart || source.getSnapshot().connection === 'replay') return;
-    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') setSplash(true);
+    if (storyStart || source.getSnapshot().connection === 'replay' || splashSeen()) return;
+    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') { markSplashSeen(); setSplash(true); }
   // Decided once on mount; later prop changes never reopen the splash.
   }, []);
   const inspectorOpener = useRef<HTMLElement | null>(null);
@@ -162,39 +222,52 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setInspecting(null);
     inspectorOpener.current?.focus();
   }, []);
+  function onScenePick(pick: OverviewPick) {
+    const room = pick.kind === 'room' ? pick.room : snapshot.agents.find(agent => agent.id === pick.id)?.seatId;
+    if (!room || !(room in OFFICE_ANCHORS)) return;
+    inspectorOpener.current = document.getElementById('office-view');
+    setSheet(null);
+    setMapOpen(false);
+    setInspecting(room as AnchorId);
+    setFocus(room as AnchorId);
+  }
   function inspect(room: AnchorId, opener: HTMLButtonElement) {
     inspectorOpener.current = opener;
+    setSheet(null);
+    setMapOpen(false);
     setInspecting(room);
     setFocus(room);
   }
   const plan = mode === 'plan' || lostContext;
-  // Overview (HUD variant c): the overhead 3D camera (orbit or fixed) with quick actions; first person stays the main way to play.
+  // AJ's rooms dashboard uses the overhead scene; gameplay overlays belong only to Play.
   const overview = (mode === 'walk' || mode === 'tween') && !!layers.scene?.visible && !storyActive;
   const [menu, setMenu] = useState<{ pick: OverviewPick; at: { x: number; y: number }; opener: HTMLElement | null } | null>(null);
   const [talk, setTalk] = useState<{ id: string; opener: HTMLElement | null } | null>(null);
-  const overviewToggle = useRef<HTMLButtonElement>(null);
-  // The Overview map: a large 2D board of the floor over the scene. Never open in first person.
+  const mapButton = useRef<HTMLButtonElement>(null);
+  // The map remains an explicit Play tool, separate from AJ's rooms dashboard.
   const [mapOpen, setMapOpen] = useState(false);
-  useEffect(() => { if (!overview) { setMenu(null); setTalk(null); setMapOpen(false); } }, [overview]);
-  function closeMap() { setMapOpen(false); setMenu(null); requestAnimationFrame(() => cornerToggle.current?.focus()); }
+  useEffect(() => { if (mode !== 'play') { setMenu(null); setTalk(null); setMapOpen(false); } }, [mode]);
+  function closeMap() { setMapOpen(false); setMenu(null); requestAnimationFrame(() => mapButton.current?.focus()); }
   function enterFirstPerson(entry: PlayEntry | null) {
     setMenu(null);
     setTalk(null);
     setMapOpen(false);
-    setSplash(false);
-    saveStartView('play');
     play.entry.current = entry;
+    setLookOnEnter(true);
     pickMode('play');
   }
   function toOverview() {
+    document.exitPointerLock?.();
     saveStartView('overview');
     setLookOnEnter(false);
-    pickMode(prePlay.current === 'tween' ? 'tween' : 'walk');
-    setMapOpen(true);
+    setMapOpen(false);
+    setMenu(null);
+    setTalk(null);
+    pickMode('walk');
   }
   function placeColliders() {
     const rooms = visibleRooms(snapshot);
-    return officeColliders(rooms, lobbyCollisionExtras(bakedArtRequested(location.search), LOBBY_PROP_BOXES, [SERVER_ROOM_BOX]), interactionStore.getSnapshot().doors);
+    return officeColliders(rooms, [SERVER_ROOM_BOX], interactionStore.getSnapshot().doors);
   }
   function goToAgent(id: string) {
     const agent = snapshot.agents.find(row => row.id === id);
@@ -212,11 +285,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setTalk(null);
     setMenu({ pick, at: { x: point.x - (box?.left ?? 0), y: point.y - (box?.top ?? 0) }, opener });
   }
-  function onScenePick(pick: OverviewPick, at: { x: number; y: number }) {
-    if (pick.kind === 'room') { goToRoom(pick.room); return; }
-    const opener = document.querySelector<HTMLElement>(`[data-agent-tag="${CSS.escape(pick.id)}"] button`);
-    openMenu(pick, opener, at);
-  }
   const closeMenu = useCallback((restoreFocus: boolean) => {
     setMenu(current => { if (restoreFocus) current?.opener?.focus(); return null; });
   }, []);
@@ -225,7 +293,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     const fromMap = !!opener?.closest('.overview-map');
     setMenu(null);
     if (fromMap) setMapOpen(false);
-    setTalk({ id, opener: fromMap ? document.querySelector<HTMLElement>(`[data-agent-tag="${CSS.escape(id)}"] button`) ?? cornerToggle.current : opener });
+    setTalk({ id, opener: fromMap ? document.querySelector<HTMLElement>(`[data-agent-tag="${CSS.escape(id)}"] button`) ?? mapButton.current : opener });
   }
   function closeTalk() { const opener = talk?.opener; setTalk(null); opener?.focus(); }
   function menuContent(pick: OverviewPick, opener: HTMLElement | null): { title: string; subtitle?: string; items: OverviewMenuItem[] } {
@@ -248,7 +316,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   overviewKey.current = event => {
     if (!overview || event.defaultPrevented || !isOverviewKey(event) || event.repeat) return;
     const target = event.target instanceof HTMLElement ? event.target : null;
-    if (target && (target.isContentEditable || target.closest('input, textarea, select, dialog[open], [aria-modal=true], [role=dialog], [role=menu], [role=alertdialog]'))) return;
+    if (target && (target.isContentEditable || target.closest('input, textarea, select, dialog, [aria-modal=true], [role=dialog], [role=menu], [role=alertdialog]'))) return;
     event.preventDefault();
     enterFirstPerson(play.last.current);
   };
@@ -257,140 +325,225 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  // The page is just the 3D world: one corner menu (top left) and a drawer of office panels over the canvas, closed by default.
-  const [cornerOpen, setCornerOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const cornerToggle = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (mode === 'play') { setCornerOpen(false); setDrawerOpen(false); } }, [mode]);
-  // Other parts of the office (Play's "Ask why", the lobby) open the drawer before focusing something in it.
+  // Office owns its sidebar and single topbar; the root layout yields navigation on office routes.
+  const { link: paymentLink } = useActivePaymentLink({ enabled: snapshot.connection !== 'replay', intervalMs: 5000 });
+  // Full screen hides the sidebar and topbar so the 3D room fills the screen; edge overlays keep the exit and key status.
+  const shellRef = useRef<HTMLElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => {
-    const open = () => flushSync(() => setDrawerOpen(true));
+    const sync = () => { if (!document.fullscreenElement) setFullscreen(false); };
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+  // When the browser refused real full screen, Esc still leaves the layout (dialogs and Play keep their own Esc).
+  useEffect(() => {
+    if (!fullscreen || mode === 'play') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || document.fullscreenElement) return;
+      if ((event.target as HTMLElement | null)?.closest?.('dialog, [role=dialog], [role=menu], input, textarea, select')) return;
+      setFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen, mode]);
+  function toggleFullscreen() {
+    if (fullscreen) {
+      setFullscreen(false);
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      return;
+    }
+    setFullscreen(true);
+    // Browser full screen is best effort: the layout still fills the window when it is refused.
+    void shellRef.current?.requestFullscreen?.().catch(() => {});
+  }
+  const escalations = snapshot.agents.filter(agent => agent.escalationId);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (mode === 'play' || mode === 'tour' || storyActive) { setDrawerOpen(false); setSheet(null); setInspecting(null); } }, [mode, storyActive]);
+  // Ask why queries its field immediately after this event; mount the active view's audit surface synchronously.
+  useEffect(() => {
+    const open = () => flushSync(() => { setSheet(mode === 'play' ? null : 'audit'); setInspecting(null); setDrawerOpen(mode === 'play'); });
     window.addEventListener('office-drawer', open);
     return () => window.removeEventListener('office-drawer', open);
-  }, []);
-  function closeCorner() { setCornerOpen(false); cornerToggle.current?.focus(); }
-  function closeDrawer() { setDrawerOpen(false); cornerToggle.current?.focus(); }
-  return <HandoffPresentation value={presentation}><section className='office-shell' aria-label='Backroom office' data-connection={snapshot.connection} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
-    {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio back office</h1>}
+  }, [mode]);
+  function closeDrawer() { setDrawerOpen(false); drawerToggle.current?.focus(); }
+  function openSheet(next: DetailSheetId) {
+    if (mode === 'play') { document.exitPointerLock?.(); chooseView('walk'); }
+    setInspecting(null);
+    setMapOpen(false);
+    setMenu(null);
+    setTalk(null);
+    setDrawerOpen(false);
+    setSheet(next);
+  }
+  const seatStatuses = (<ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
+      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
+        <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}
+      </div>)}</div>
+      </ViewBoundary>);
+  const auditContent = (<section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
+        <ViewBoundary name='Audit wall' resetKey={snapshot} fallback={<p role='status'>Audit wall unavailable · open the full audit page for receipts.</p>}>
+        {typeof auditWall === 'function' ? auditWall(snapshot, anchor => { setSheet(null); setDrawerOpen(false); setFocus(anchor); }) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
+        </ViewBoundary>
+      </section>);
+  const previewReceipts = (<>{auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Local audit receipts'>
+        <ViewBoundary name='Receipts' resetKey={snapshot} fallback={<p role='status'>Receipts unavailable · a received row could not be displayed.</p>}>
+          <ReceiptList snapshot={snapshot} title='Office receipts' />
+        </ViewBoundary>
+      </section>}</>);
+  const workdayContent = snapshot.connection !== 'replay' && <WorkdayPanel />;
+  const handoffContent = (<ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>);
+  const inboxContent = (<>{inboxTray ? <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby Inbox Tray · {snapshot.inboxCount}</h2>
+        <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
+      </section> : <div className='detail-sheet-empty'>
+        <p>Receipts on the inbox page are not synced into this scene.</p>
+        <a className='detail-sheet-cta' href='/inbox'>Open the inbox</a>
+      </div>}</>);
+  return <HandoffPresentation value={presentation}><section ref={shellRef} className='office-shell' aria-label='Backroom office' data-fullscreen={fullscreen || undefined} data-office-mode={mode === 'play' ? 'play' : touring || storyActive ? 'tour' : 'overview'} data-connection={snapshot.connection} data-theme={theme} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
+    {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio Back Office</h1>}
+    <aside className='office-sidebar' aria-label='Office navigation'>
+      <a className='office-sidebar-logo' href='/office' aria-label='Backrooms office home'><img src='/icon.png' alt='' /><span>Backrooms</span></a>
+      <nav className='room-navigation' aria-label='Office shortcuts'>
+        <button type='button' aria-pressed={focus === null} onClick={() => { setFocus(null); openSheet('overview'); }}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='house' /></span>Full Floor</button>
+        <button ref={roomsButton} type='button' aria-haspopup='dialog' aria-pressed={focus !== null} data-focus={focus ?? undefined} onClick={() => openSheet('rooms')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='rooms' /></span>Rooms</button>
+        <button type='button' aria-pressed={sheet === 'inbox'} onClick={() => openSheet('inbox')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='inbox' /></span>Inbox · {snapshot.inboxCount}</button>
+        <button type='button' aria-pressed={sheet === 'audit'} onClick={() => openSheet('audit')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='audit' /></span>Audit Wall</button>
+      </nav>
+      <nav className='office-sidebar-links' aria-label='Site pages'>
+        {SIDEBAR_GROUPS.map(group => {
+          const ready = group.pages.includes(PAYMENT_LINK_HREF) && !!paymentLink;
+          return <button key={group.id} type='button' aria-haspopup='dialog' aria-pressed={isPageSheet(sheet) && group.pages.includes(sheet)} data-group={group.id} data-ready={ready || undefined}
+            title={group.hint} onClick={() => openSheet(ready ? PAYMENT_LINK_HREF : group.pages[0]!)}>
+            <span className='room-icon' aria-hidden='true'><OfficeChromeIcon name={group.icon} /></span>{group.label}{ready && <span className='office-sidebar-ready'> · Pay Ready</span>}
+          </button>;
+        })}
+      </nav>
+      <nav className='office-sidebar-help' aria-label='Help'>
+        <button type='button' aria-haspopup='dialog' aria-pressed={sheet === 'help'} onClick={() => openSheet('help')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='help' /></span>Help</button>
+      </nav>
+    </aside>
+    <div className='office-main'>
+    <div className='office-topbar-row'>
+    <header className='office-toolbar' data-testid='office-topbar'>
+      <div className='office-tools'>
+        {mode !== 'play' && <button type='button' className='office-enter-play' onClick={enterPlay}>Play (First Person)</button>}
+        <label htmlFor='office-view'>View {viewPicker('office-view', viewSelect)}</label>
+        <button type='button' onClick={() => { if (storyActive) closeStory(); else startStory(); }}>Story Mode</button>
+        {mode === 'play' && <>
+          <button type='button' className='overview-toggle' aria-keyshortcuts='O' onClick={toOverview}>Rooms / Overview</button>
+          <button ref={mapButton} type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => { document.exitPointerLock?.(); if (mapOpen) closeMap(); else setMapOpen(true); }}>Map</button>
+        </>}
+        <OfficeHelp />
+        {snapshot.connection !== 'replay' && <StartWorkdayButton />}
+        <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Local State' : snapshot.connection === 'replay' ? 'REPLAY · Recorded State' : snapshot.connection === 'live' ? 'State Connected' : `State ${snapshot.connection}`}</span>
+        <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
+        <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
+          <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
+        </fieldset>
+      </div>
+    </header>
+    <ThemeToggle onThemeChange={setTheme} />
+    </div>
     <div ref={element => { viewportRef.current = element; viewportBox.current = element; }} className='office-viewport' data-testid='office-viewport' data-overview={overview || undefined}>
-      {/* One small corner menu, closed by default: every office control lives in it (O and Esc still work from the keyboard). */}
-      <header className='office-toolbar office-corner' data-open={cornerOpen || undefined} onKeyDown={event => {
-        if (cornerOpen && isCloseKey(event.key) && !(event.target instanceof HTMLSelectElement) && !(event.target as HTMLElement).closest('dialog, [role=dialog]')) { event.preventDefault(); event.stopPropagation(); closeCorner(); }
-      }}>
-        <div className='office-corner-row'>
-          <button ref={cornerToggle} type='button' className='office-corner-toggle' aria-expanded={cornerOpen} aria-controls='office-corner-panel' onClick={() => setCornerOpen(open => !open)}>
-            <strong>Backroom</strong><span aria-hidden='true'>{cornerOpen ? '▴' : '▾'}</span><span className='visually-hidden'> menu</span>
-          </button>
-        </div>
-        {/* Closed, the panel is visibility-hidden rather than display:none so the guide and shortcuts dialogs it hosts can still open. */}
-        <div id='office-corner-panel' className='office-corner-panel' data-open={cornerOpen || undefined}>
-          <div className='office-corner-quick'>
-            <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select disabled={storyActive} ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
-              {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
-            </select></label>
-            {overview && <button type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => { if (mapOpen) closeMap(); else { setCornerOpen(false); setMapOpen(true); } }}>Overview</button>}
-            {mode !== 'play' && <button ref={overviewToggle} type='button' className='overview-toggle' aria-keyshortcuts={overview ? 'O' : undefined} onClick={enterPlay}>
-              Enter first person{overview && <> <kbd>O</kbd></>}
-            </button>}
-            <OfficeHelp />
-            <SoundToggle snapshot={snapshot} />
-            <button type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => { setCornerOpen(false); setDrawerOpen(open => !open); }}>
-              Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
-            </button>
-          </div>
-          <SiteNav placement='office' />
-          <div className='office-tools'>
-            {snapshot.connection !== 'replay' && <StartWorkdayButton />}
-            <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>{storyActive ? 'Skip tour' : 'Take the tour'}</button>
-            <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Camera tour</button>
-            <ThemeToggle className='theme-toggle office-theme-toggle' />
-            <RainToggle />
-            <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
-            <OfficeAdvanced replay={snapshot.connection === 'replay'}
-              connection={snapshot.connection === 'preview' ? 'Local state' : snapshot.connection === 'replay' ? 'REPLAY · recorded state' : snapshot.connection === 'live' ? 'State connected' : `State ${snapshot.connection}`}
-              llm={<fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
-                <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
-              </fieldset>} />
-          </div>
-          <nav className='room-navigation' aria-label='Room camera presets'>
-            <button aria-pressed={focus === null} onClick={() => { setFocus(null); setInspecting(null); setCornerOpen(false); }}>Full floor</button>
-            {visibleRooms(snapshot).map(room => <button key={room} aria-pressed={focus === room} onClick={() => { setFocus(room); setInspecting(null); setCornerOpen(false); }}>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</button>)}
-          </nav>
-          {/* Scenario controls (local state only): a pick closes the menu so the scene shows the result. */}
-          {controls && <div className='office-corner-controls' onClick={event => { if ((event.target as HTMLElement).closest('button')) setCornerOpen(false); }}>{controls}</div>}
-        </div>
-      </header>
-      <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
+      <div className='office-view-controls'>
+        <SoundToggle snapshot={snapshot} />
+        <button type='button' className='office-fullscreen-toggle' aria-pressed={fullscreen} aria-label={fullscreen ? 'Exit Full Screen' : 'Full Screen'} title={fullscreen ? 'Exit Full Screen (Esc)' : 'Full Screen'} onClick={toggleFullscreen}>
+          <svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'>
+            {fullscreen ? <path d='M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' /> : <path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5' />}
+          </svg>
+        </button>
+      </div>
+      {fullscreen && <div className='office-fullscreen-hud' role='group' aria-label='Full screen status'>
+        <span className='office-fullscreen-views'>
+          <label htmlFor='office-view-fullscreen' className='visually-hidden'>Camera</label>{viewPicker('office-view-fullscreen')}
+          {mode === 'play' ? <button type='button' onClick={() => { document.exitPointerLock?.(); chooseView('walk'); }}>Overview</button> : <button type='button' onClick={enterPlay}>Play (First Person)</button>}
+        </span>
+        <span className='office-fullscreen-chip'>{snapshot.connection === 'preview' ? 'Local State' : snapshot.connection === 'replay' ? 'REPLAY' : snapshot.connection === 'live' ? 'Live' : `State ${snapshot.connection}`}</span>
+        <button type='button' className='office-fullscreen-chip' onClick={() => openSheet('inbox')}>Inbox · {snapshot.inboxCount}</button>
+        {escalations.map(agent => <span key={agent.id} className='office-fullscreen-chip' data-tone='alert'>▱ {agent.name} → {anchorLabel(agent.targetAnchor)}</span>)}
+        {paymentLink && <button type='button' className='office-fullscreen-chip' data-tone='ready' onClick={() => openSheet(PAYMENT_LINK_HREF)}>Payment link ready</button>}
+      </div>}
+      {mode !== 'play' && !storyActive && <RealSimDetails />}
+      {mode === 'play' && <button ref={drawerToggle} type='button' className='office-drawer-toggle' aria-expanded={drawerOpen} aria-controls='office-drawer' onClick={() => setDrawerOpen(open => !open)}>
+        Office panels{snapshot.inboxCount ? ` · ${snapshot.inboxCount}` : ''}
+      </button>}
+      <p className='visually-hidden'>3D office view. Click a room, or use Rooms in the sidebar, to inspect badges and limits.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? { ...play, story: storyChapter } : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? { ...play, story: storyChapter } : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
           </div>
-          {/* In Overview each tag is a quick-action button (Tab through them). Elsewhere the footer seat statuses already
-              announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
-          {!layers.floorPlan && <div className='agent-tags' aria-hidden={overview ? undefined : 'true'}>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
+          {/* The Full Floor summary announces every name and state (seatLabel). */}
+          {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
             ref={element => { if (!element) return; tagElements.current.set(agent.id, element); return () => { if (tagElements.current.get(agent.id) === element) tagElements.current.delete(agent.id); }; }}>
-            {overview ? <button type='button' className='agent-tag-pick' aria-haspopup='menu' aria-expanded={menu?.pick.kind === 'agent' && menu.pick.id === agent.id}
-              aria-label={`${agent.name}, ${agent.state}. Quick actions: go here or talk`} onClick={event => openMenu({ kind: 'agent', id: agent.id }, event.currentTarget)}>
-              <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
-            </button> : <><strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span></>}
+            <strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span>
           </div>)}</div>}
           {!layers.floorPlan && <HandoffTags />}
-          {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
-            const badge = snapshot.badges.find(row => row.seatId === room);
-            return <div key={room} ref={labels[room]} className='scene-label'>
-              <button className='desk-label' aria-haspopup={overview ? 'menu' : undefined} aria-expanded={overview ? menu?.pick.kind === 'room' && menu.pick.room === room : undefined}
-                onClick={event => overview ? openMenu({ kind: 'room', room }, event.currentTarget) : inspect(room, event.currentTarget)} aria-label={roomLabel(room, snapshot)}>
-                {OFFICE_ANCHORS[room].name}<span>{badge ? `Badge · v${badge.policyVersion}` : room === 'treasury' ? 'Locked · Dana only' : room === 'lobby' ? 'Audit wall + inbox' : 'Human approval'}</span>
-              </button>
-            </div>;
-          })}
+          {layers.floorPlan && <FloorPlan snapshot={snapshot} motions={motions} select={inspect} />}
         </>}
       </ViewBoundary>
       {mode === 'play' && layers.scene?.visible && (storyActive
         ? <div ref={play.hud} data-testid='story-camera' aria-hidden='true' />
-        : <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} onOverview={toOverview} lookOnStart={lookOnEnter} chat={chat} keyOwners={{ story: storyActive, menu: !!menu }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />)}
-      {overview && <OverviewMap snapshot={snapshot} motions={motions} open={mapOpen} onPick={(pick, opener) => openMenu(pick, opener)} onFirstPerson={() => enterFirstPerson(play.last.current)} onClose={closeMap} />}
-      {overview && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
-      {overview && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
-      {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      {/* The overview shows no hint strip: the world is the page. */}
-      {!overview && <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Overview · click someone for quick actions · click a room to jump in' : 'Overview · drag to look · click someone for quick actions · click a room to jump in'}</div>}
+        : <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} lookOnStart={lookOnEnter} onOverview={toOverview} chat={chat} keyOwners={{ story: storyActive, menu: !!menu || mapOpen || !!talk }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />)}
+      {mode === 'play' && <OverviewMap snapshot={snapshot} motions={motions} open={mapOpen} onPick={(pick, opener) => openMenu(pick, opener)} onFirstPerson={() => enterFirstPerson(play.last.current)} onClose={closeMap} />}
+      {mode === 'play' && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
+      {mode === 'play' && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
       <PaymentToast snapshot={snapshot} />
-      {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     </div>
-    <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {
+    </div>
+    {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} openSheet={openSheet} />}
+    {sheet && sheet !== 'rooms' && sheet !== 'help' && !isPageSheet(sheet) && <DetailSheet icon={sheet === 'overview' ? 'house' : sheet} title={sheet === 'overview' ? 'Today at Backroom' : sheet === 'audit' ? 'Audit Wall' : `Inbox · ${snapshot.inboxCount}`} onClose={closeSheet}>
+      {sheet === 'overview' ? <>{seatStatuses}{workdayContent}{handoffContent}{previewReceipts}{controls}</> : sheet === 'audit' ? auditContent : inboxContent}
+    </DetailSheet>}
+    {isPageSheet(sheet) && (() => {
+      const Page = PAGE_SHEETS[sheet];
+      const group = groupOf(sheet);
+      const title = pageLabel(sheet);
+      const steps = PAGE_STEPS[sheet];
+      const tabbed = group.pages.length > 1;
+      // Keyed by group: switching tabs keeps the dialog (and focus) instead of reopening it.
+      return <DetailSheet key={group.id} title={group.label} icon={group.icon} size='wide' page={sheet.slice(1)} onClose={closeSheet} href={sheet}>
+        {tabbed && <div className='sheet-tabs' role='tablist' aria-label={group.label}>
+          {group.pages.map(href => <button key={href} type='button' role='tab' id={`sheet-tab-${href.slice(1)}`} aria-selected={href === sheet} aria-controls='sheet-tab-panel'
+            data-ready={(href === PAYMENT_LINK_HREF && !!paymentLink) || undefined} onClick={() => setSheet(href)}>
+            <OfficeChromeIcon name={PAGE_ICONS[href]} />{pageLabel(href)}{href === PAYMENT_LINK_HREF && paymentLink && <span className='office-sidebar-ready'> · Ready</span>}
+          </button>)}
+        </div>}
+        <div id='sheet-tab-panel' className='sheet-tab-panel' role={tabbed ? 'tabpanel' : undefined} aria-labelledby={tabbed ? `sheet-tab-${sheet.slice(1)}` : undefined}>
+          {steps && <ol className='sheet-steps' aria-label='How this works'>{steps.map(step => <li key={step}>{step}</li>)}</ol>}
+          <ViewBoundary name={title} resetKey={sheet} fallback={<p role='status'>{title} could not be displayed here. <a href={sheet}>Open the full page</a>.</p>}><Page /></ViewBoundary>
+        </div>
+      </DetailSheet>;
+    })()}
+    {sheet === 'help' && <DetailSheet title='Help' icon='help' size='wide' page='help' onClose={closeSheet}><HelpSheet /></DetailSheet>}
+    {sheet === 'rooms' && <DetailSheet title='Rooms' icon='rooms' onClose={closeSheet}>
+      <p className='room-picker-intro'>Pick a room to fly the camera there and see its badge, limits and who is working.</p>
+      <nav className='room-picker' aria-label='Room camera presets'>
+        {visibleRooms(snapshot).map(room => {
+          return <button key={room} type='button' data-room={room} aria-pressed={focus === room} aria-label={`${OFFICE_ANCHORS[room].name}${room === 'treasury' ? ' · Locked' : ''}`}
+            onClick={() => { setSheet(null); if (roomsButton.current) inspect(room, roomsButton.current); }}>
+            <span className='room-icon' aria-hidden='true'><OfficeChromeIcon name={room} /></span>
+            <span className='room-picker-text'><strong>{OFFICE_ANCHORS[room].name}{room === 'treasury' ? ' · Locked' : ''}</strong><small>{roomNote(room, snapshot)}</small></span>
+            <OfficeChromeIcon name='caret-right' className='room-picker-caret' />
+          </button>;
+        })}
+      </nav>
+    </DetailSheet>}
+    {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
+    {mode === 'play' && <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {
       const target = event.target as HTMLElement;
       if (isCloseKey(event.key) && !event.defaultPrevented && !target.closest('input, textarea, select, dialog, [role=dialog]')) { event.preventDefault(); closeDrawer(); }
     }}>
-      <header className='office-drawer-head'><h2>Office panels</h2><button type='button' onClick={closeDrawer} aria-label='Close office panels'>Close</button></header>
-      <ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
-      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
-        <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}
-      </div>)}</div>
-      </ViewBoundary>
-      <section id='office-audit-wall' className={auditWall ? 'office-lobby' : 'office-audit'} aria-label='Office audit receipts' data-office-mount='audit-wall'>
-        <ViewBoundary name='Audit wall' resetKey={snapshot} fallback={<p role='status'>Audit wall unavailable · open the full audit page for receipts.</p>}>
-        {typeof auditWall === 'function' ? auditWall(snapshot, setFocus) : auditWall ?? <ReceiptList snapshot={snapshot} title='Lobby audit wall' />}
-        </ViewBoundary>
-      </section>
-      {auditWall && (snapshot.connection === 'preview' || snapshot.connection === 'replay') && <section id='office-preview-receipts' className='office-audit' aria-label='Local audit receipts'>
-        <ViewBoundary name='Receipts' resetKey={snapshot} fallback={<p role='status'>Receipts unavailable · a received row could not be displayed.</p>}>
-          <ReceiptList snapshot={snapshot} title='Office receipts' />
-        </ViewBoundary>
-      </section>}
-      {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
-        <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
-      </section>}
-      {snapshot.connection !== 'replay' && <WorkdayPanel />}
-      <ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>
-    </footer>
+      <header className='office-drawer-head'><h2>Office Panels</h2><button type='button' onClick={closeDrawer} aria-label='Close office panels'>Close</button></header>
+      {!sheet && <>{seatStatuses}{auditContent}{previewReceipts}{inboxContent}{workdayContent}{handoffContent}</>}
+    </footer>}
   </section></HandoffPresentation>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */

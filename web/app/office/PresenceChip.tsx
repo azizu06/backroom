@@ -9,7 +9,7 @@ export function PresenceChip({ enabled, setEnabled, peers, selfName, mode }: {
 }) {
   const viewers = [{ name: selfName, mode: modeLabel(mode) }, ...peers.map(peer => ({ name: peer.name, mode: modeLabel(peer.mode) }))];
   return <>
-    <label className='presence-toggle'><input type='checkbox' checked={enabled} onChange={event => setEnabled(event.target.checked)} />Show viewers</label>
+    <label className='presence-toggle'><input type='checkbox' checked={enabled} onChange={event => setEnabled(event.target.checked)} />Show Viewers</label>
     {enabled && <span className='presence-chip' aria-label={`${viewers.length} viewing: ${viewers.map(viewer => `${viewer.name} (${viewer.mode})`).join(', ')}`} title={viewers.map(viewer => `${viewer.name} (${viewer.mode})`).join(', ')}>{viewers.length} viewing</span>}
   </>;
 }

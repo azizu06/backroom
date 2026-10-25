@@ -5,7 +5,7 @@ html body .office-shell .office-main .office-viewport.office-viewport {
   inset: auto;
   z-index: auto;
 }
-.office-shell .office-main > .office-toolbar {
+.office-shell .office-main .office-topbar-row > .office-toolbar {
   position: relative;
   inset: auto;
   z-index: 12;
@@ -21,7 +21,7 @@ html body .office-shell .office-main .office-viewport.office-viewport {
 /* The source Info tile owns the bottom-right corner; keep the integrated tour exit clear of it. */
 .office-shell .office-viewport > .tour-stop { top: 14px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); z-index: 7; }
 /* The source toolbar is shared by all views; obsolete corner visibility cannot hide it. */
-.office-shell[data-hud='diegetic'] .office-main > .office-toolbar { visibility: visible; }
+.office-shell[data-hud='diegetic'] .office-main .office-topbar-row > .office-toolbar { visibility: visible; }
 /* Keep integrated gameplay controls readable and reachable inside the framed scene. */
 html body .office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle, .play-overview),
 html body .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { opacity: 1 !important; }

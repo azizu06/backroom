@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, type AnchorId, type OfficeAgent, type OfficeAudit, type OfficeSnapshot } from '../state';
-import { MONITOR_DESKS, MONITOR_LINE_MAX, monitorInteraction, monitorOverview, monitorScreen, monitorScreenKey } from './monitors';
+import { MONITOR_DESKS, monitorInteraction, monitorOverview, monitorScreen, monitorScreenKey } from './monitors';
 import { OFFICE_PROP_INTERACTIONS, propInteractions } from './index';
 
 const agent = (patch: Partial<OfficeAgent> = {}): OfficeAgent => ({
@@ -36,11 +36,12 @@ describe('monitorScreen', () => {
     expect(screen.status).toBeNull();
   });
 
-  it('truncates long lines with an ellipsis', () => {
+  it('preserves full task text for measured wrapping on the canvas', () => {
     const [first] = monitorScreen(snapshot({ agents: [agent()] }), 'collections').lines;
-    expect(first!.text.length).toBeLessThanOrEqual(MONITOR_LINE_MAX);
-    expect(first!.text.endsWith('…')).toBe(true);
-    expect('Alex · Reviewing invoice 1042'.startsWith(first!.text.slice(0, -1))).toBe(true);
+    expect(first!.text).toBe('Alex · Reviewing invoice 1042');
+    const jules = agent({ name: 'Jules', state: 'Checking vendor evidence' });
+    expect(monitorScreen(snapshot({ agents: [jules] }), 'collections').lines[0]!.text)
+      .toBe('Jules · Checking vendor evidence');
   });
 
   it('adds an arrow line for an agent away from its seat and a folder line when escalating', () => {
@@ -65,8 +66,7 @@ describe('monitorScreen', () => {
     expect(screen.heading).toBe(OFFICE_ANCHORS.dana.name);
     expect(screen.lines[0]).toEqual({ kind: 'awaiting', text: 'Awaiting you: 2' });
     expect(screen.lines[1]!.kind).toBe('escalation');
-    expect(screen.lines[1]!.text.endsWith('…')).toBe(true);
-    expect('Invoice 1042 · four installments → Dana'.startsWith(screen.lines[1]!.text.slice(0, -1))).toBe(true);
+    expect(screen.lines[1]!.text).toBe('Invoice 1042 · four installments → Dana');
     expect(screen.status).toEqual({ decision: 'ESCALATE', key: 'escalate' });
   });
 
@@ -97,7 +97,8 @@ describe('monitorInteraction', () => {
 
   it('stands in front of each screen, near its desk', () => {
     const [cx, cz] = monitorInteraction('collections').position, [dx, dz] = monitorInteraction('dana').position;
-    expect([cx, cz, dx, dz].map(value => Math.round(value * 100) / 100)).toEqual([-9.35, -4.15, -3.15, 4.05]);
+    expect([cx, cz]).toEqual([OFFICE_ANCHORS.collections.center[0] - 0.35, OFFICE_ANCHORS.collections.center[1] + 1.65]);
+    expect([dx, dz]).toEqual([OFFICE_ANCHORS.dana.center[0] + 0.35, OFFICE_ANCHORS.dana.center[1] - 1.65]);
     for (const room of MONITOR_DESKS) {
       const [x, z] = monitorInteraction(room).position, [cx, cz] = OFFICE_ANCHORS[room].center;
       expect(Math.hypot(x - cx, z - cz)).toBeLessThan(monitorInteraction(room).radius);

@@ -15,7 +15,7 @@ test('CRS fraud receipt visibly holds a high-risk bank change with its score and
   const receipt = page.getByRole('region', { name: 'Decision receipt' });
   await expect(receipt.getByText('held', { exact: true })).toBeVisible();
   await expect(receipt.getByText('FRAUD_RISK_HOLD', { exact: true })).toBeVisible();
-  await expect(receipt.getByText('CRS fraud score', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('CRS Fraud Score', { exact: true })).toBeVisible();
   await expect(receipt.getByText('88 / 100 · checked 18:05 UTC', { exact: true })).toBeVisible();
   await expect(receipt.getByText('Full receipt')).toBeVisible();
 });

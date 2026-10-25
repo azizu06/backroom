@@ -5,6 +5,7 @@ import {
 } from '../../../lib/office/agent-motion';
 import { bearPhase } from '../../../lib/office/bear';
 import type { BearRig } from './Bear';
+import { BEAR_SEAT_LIFT, SEATED_TORSO_FORWARD_M, SIT_HIP_RAD, easeSeat, seatAtApproach, stepSeatBlend, type DeskSeat } from '../../../lib/office/baked-seat';
 
 /** What the owner's useFrame knows about the agent this frame (reused, never reallocated). */
 export interface AnimateInput {
@@ -37,6 +38,10 @@ export class AgentAnimator {
   readonly pose = createAgentPose();
   mode: AgentMode = 'idle';
   private headYaw = 0;
+  private seatBlend = 0;
+  private seat: DeskSeat | null = null;
+  /** Shared with the baked clone so a seat tween never looks like walking. */
+  private readonly motion = { x: 0, z: 0, moving: false, seated: 0, mode: 'idle' as AgentMode };
   private readonly phase: number;
   /** Mode-change cross-fade: what was applied last frame, captured when the mode changes. */
   private changedAt = -Infinity;
@@ -58,21 +63,32 @@ export class AgentAnimator {
     const { input, rig, pose } = this;
     const now = performance.now();
     const cue = agentCues.get(this.key);
-    const atDesk = Number.isFinite(input.desk);
-    const mode = agentMode(input.moving, atDesk, cue, now);
+    const station = !input.moving ? seatAtApproach(input.x, input.z) : null;
+    const atDesk = !!station || Number.isFinite(input.desk);
+    const mode = agentMode(input.moving, atDesk && rig.carry !== 'front', cue, now);
+    if (station) this.seat = station;
+    const seated = !!station && !facesPlayer(mode) && rig.carry !== 'front';
+    this.seatBlend = stepSeatBlend(this.seatBlend, seated, Math.min(delta, 0.1), input.reduced);
+    const sit = easeSeat(this.seatBlend);
+    const seat = this.seat;
+    body.position.x = input.x + (seat ? seat.x - input.x : 0) * sit;
+    body.position.z = input.z + (seat ? seat.z - input.z : 0) * sit;
+    this.motion.x = input.x; this.motion.z = input.z; this.motion.moving = input.moving;
+    this.motion.seated = sit; this.motion.mode = mode;
+    body.userData.agentMotion = this.motion;
     if (mode !== this.mode) { this.mode = mode; this.changedAt = now; this.from.set(this.last); }
     const blend = input.reduced ? 1 : smooth((now - this.changedAt) / BLEND_MS);
     const firstPerson = isFirstPerson(state.camera);
     const px = firstPerson ? state.camera.position.x : NaN, pz = firstPerson ? state.camera.position.z : NaN;
 
     // Body: face the player for a conversation, the desk while typing, else the walk heading.
-    const facing = facesPlayer(mode) && firstPerson ? Math.atan2(px - input.x, pz - input.z) : mode === 'type' ? input.desk : input.heading;
+    const facing = facesPlayer(mode) && firstPerson ? Math.atan2(px - input.x, pz - input.z) : seated ? station!.heading : input.heading;
     const turn = angleDelta(body.rotation.y, facing);
     body.rotation.y = input.reduced ? facing : body.rotation.y + turn * (1 - Math.exp(-(input.moving ? 12 : 7) * Math.min(delta, 0.1)));
     const turning = !input.reduced && Math.abs(turn) > 0.01;
 
     // Head: look at a nearby first-person player (relative to where the body points now).
-    const wanted = lookYaw(body.rotation.y, input.x, input.z, px, pz);
+    const wanted = seated ? 0 : lookYaw(body.rotation.y, body.position.x, body.position.z, px, pz);
     this.headYaw = input.reduced ? wanted : damp(this.headYaw, wanted, 6, delta);
     const looking = !input.reduced && Math.abs(wanted - this.headYaw) > 0.005;
 
@@ -81,9 +97,18 @@ export class AgentAnimator {
     this.blend = blend;
     const mix = this.mix;
     if (rig.root) {
-      rig.root.position.y = mix(0, pose.bob);
+      rig.root.position.y = mix(0, pose.bob) * (1 - sit) + BEAR_SEAT_LIFT * sit;
       rig.root.rotation.x = mix(1, pose.lean);
       rig.root.rotation.z = mix(2, pose.sway);
+    }
+    rig.legs?.children.forEach(leg => {
+      leg.rotation.x = leg.rotation.x * (1 - sit) - SIT_HIP_RAD * sit;
+      const shin = leg.getObjectByName('shin');
+      if (shin) shin.rotation.x = SIT_HIP_RAD * sit;
+    });
+    // Upper-body reach is local +z, so it follows either workstation heading without moving the hips.
+    for (const part of [rig.chest, rig.head, rig.arms]) {
+      if (part) part.position.z = SEATED_TORSO_FORWARD_M * sit;
     }
     if (rig.chest) { rig.chest.scale.x = 1 + pose.breath; rig.chest.scale.z = 1 + pose.breath; }
     if (rig.head) rig.head.rotation.set(mix(3, pose.headPitch), this.headYaw, mix(4, pose.headTilt));
@@ -94,7 +119,7 @@ export class AgentAnimator {
       rotation.x = mix(5 + i * 2, arm.active ? arm.pitch : rotation.x);
       rotation.z = mix(6 + i * 2, arm.active ? arm.roll : rotation.z);
     }
-    if (transientMode(mode) || blend < 1 || turning || looking) state.invalidate();
+    if (transientMode(mode) || blend < 1 || turning || looking || this.seatBlend !== (seated ? 1 : 0)) state.invalidate();
   }
 }
 

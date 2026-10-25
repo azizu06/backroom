@@ -25,57 +25,11 @@ describe('local interior doors', () => {
     }
   });
 
-  it('blocks a closed doorway, releases it when open and blocks again when closed', () => {
-    for (const room of INTERIOR_DOORS) {
-      const [x, door] = doorPosition(room);
-      const closedState = toggleDoor(OPEN_DOORS, room);
-      const closed = officeColliders(rooms, [], closedState);
-      const open = officeColliders(rooms, [], toggleDoor(closedState, room));
-      expect(officeColliders(rooms)).toEqual(open);
-      expect(movePlayer([x, door + 1.05], [0, -1.7], closed)[1]).toBeCloseTo(door + 0.06 + PLAYER_RADIUS, 3);
-      expect(movePlayer([x, door + 1.05], [0, -1.7], open)[1]).toBeCloseTo(door - 0.65);
-      expect(movePlayer([x, door - 0.65], [0, 1.7], closed)[1]).toBeCloseTo(door - 0.06 - PLAYER_RADIUS, 3);
-    }
-  });
-
-  it('never opens the Treasury barrier when every interior door is open', () => {
-    const colliders = officeColliders(rooms, [], OPEN_DOORS);
-    const [x, z] = TREASURY_DOOR;
-    expect(movePlayer([x, z - 1.1], [0, 3], colliders)[1]).toBeCloseTo(z - WALL_THICKNESS / 2 - PLAYER_RADIUS, 3);
-  });
-
-  it('lets a player stopped on either side reopen a closed door with an agent behind it', () => {
-    interactionStore.toggleDoor('payables');
-    try {
-      const candidates = interactCandidates([{ id: 'sam', position: [X, D - 1.15] }], rooms);
-      for (const z of [D + 0.34, D - 0.34]) {
-        const yaw = Math.atan2(-0.15, -(D - z));
-        expect(pickTarget([X - 0.15, z], yaw, candidates)).toEqual({ kind: 'door', room: 'payables' });
-      }
-      // Targets on the player's side still win when they are nearer than the closed leaf.
-      const nearer = interactCandidates([{ id: 'near', position: [X, D + 0.75] }], rooms);
-      expect(pickTarget([X, D + 1.05], 0, nearer)).toEqual({ kind: 'agent', id: 'near' });
-    } finally {
-      interactionStore.toggleDoor('payables');
-    }
-  });
-
-  it('targets the closed leaf away from its centre on both sides instead of an agent behind it', () => {
-    interactionStore.toggleDoor('payables');
-    try {
-      const candidates = interactCandidates([{ id: 'sam', position: [X, D - 1.15] }], rooms);
-      // The crosshair is on the leaf 0.35 left of its centre, outside the old centre-only aim cone.
-      expect(pickTarget([X - 0.35, D + 0.34], 0, candidates)).toEqual({ kind: 'door', room: 'payables' });
-      expect(pickTarget([X - 0.35, D - 0.34], Math.PI, candidates)).toEqual({ kind: 'door', room: 'payables' });
-    } finally {
-      interactionStore.toggleDoor('payables');
-    }
-    const open = interactCandidates([{ id: 'sam', position: [X, D - 1.15] }], rooms);
-    // The open leaf lies beside the frame at (X - 0.65, D + 0.65).
-    for (const dz of [0, -1.05, -0.31, -0.99]) {
-      const yaw = Math.atan2(0.5, dz);
-      expect(pickTarget([X - 0.15, D + 0.65 + dz], yaw, open)).toEqual({ kind: 'door', room: 'payables' });
-    }
+  it('does not restore removed doors or blockers when old local door state changes', () => {
+    const open = officeColliders(rooms);
+    const closed = officeColliders(rooms, [], { collections: false, payables: false, vendor_onboarding: false });
+    expect(closed).toEqual(open);
+    expect(interactCandidates([], rooms).some(candidate => candidate.target.kind === 'door')).toBe(false);
   });
 
   it('animates in both directions and snaps immediately under reduced motion', () => {

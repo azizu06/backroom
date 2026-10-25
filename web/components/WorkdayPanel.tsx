@@ -30,7 +30,7 @@ export function WorkdayPanel() {
   return <section className='office-audit' aria-label='Workday'>
     <h2>Workday <span>{stale ? 'Connection lost · last received state' : status}</span></h2>
     <p>Intake → Extractor → Vendor → Payables → Auditor. Payments stay held.</p>
-    {!cases.length && <p>Start the workday from the corner menu or Inbox.</p>}
+    {!cases.length && <p>Start the workday from the top bar or Inbox.</p>}
     <ol>{cases.map(row => <li key={row.label}>
       <strong>{row.attack ? 'Bank-change email' : row.label}</strong>{' · '}
       {ROLE_WORK[row.role]?.name ?? row.role}: {row.status === 'held' ? 'held for review' : row.status === 'done' ? 'completed' : ROLE_WORK[row.role]?.job ?? row.status}

@@ -37,7 +37,7 @@ export function StartWorkdayButton() {
     finally { setBusy(false); }
   }
   return <span className='workday-control' style={{ display: 'inline-block', marginBlock: 12 }}>
-    <button type='button' disabled={busy} onClick={() => { void start(); }} title='Three seeded invoices and a bank-change attack through real agents. No payments.'>Start the workday</button>
+    <button type='button' disabled={busy} onClick={() => { void start(); }} title='Three seeded invoices and a bank-change attack through real agents. No payments.'>Start the Workday</button>
     {message && <small role='status' style={{ display: 'block', maxWidth: '32rem' }}>{message}</small>}
   </span>;
 }

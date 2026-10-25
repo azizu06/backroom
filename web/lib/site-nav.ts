@@ -3,11 +3,11 @@ export const navLinks = [
   { label: 'Office', href: '/office' },
   { label: 'Calls', href: '/calls' },
   { label: 'Inbox', href: '/inbox' },
-  { label: 'Audit wall', href: '/audit' },
-  { label: 'Attack lab', href: '/attack' },
+  { label: 'Audit Wall', href: '/audit' },
+  { label: 'Attack Lab', href: '/attack' },
   { label: 'Policy', href: '/policy' },
   { label: 'Controller', href: '/controller' },
-  { label: 'Payment link', href: '/payment-link' },
+  { label: 'Payment Link', href: '/payment-link' },
   { label: 'Operator', href: '/operator' },
 ] as const;
 export const PAYMENT_LINK_HREF = '/payment-link';

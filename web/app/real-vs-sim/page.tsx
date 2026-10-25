@@ -1,6 +1,6 @@
 import { RealVsSim } from '../../components/RealVsSim';
 
-export const metadata = { title: 'System status · Backroom' };
+export const metadata = { title: 'System Status · Backrooms' };
 
 export default function RealVsSimPage() {
   return <main className='page-frame'>

@@ -6,7 +6,7 @@ import { loadReplay } from '../../lib/replay/load';
 import { ReplaySession, ReplayUnavailable } from '../../components/ReplaySession';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Office · Backroom' };
+export const metadata = { title: 'Backrooms' };
 export default async function OfficePage({ searchParams }: { searchParams: Promise<{ replay?: string | string[]; demo?: string | string[] }> }) {
   const { replay, demo } = await searchParams;
   if (replay !== undefined) {
