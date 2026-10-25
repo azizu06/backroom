@@ -5,7 +5,7 @@ export const OFFICE_ANCHORS = {
   collections: { name: "Collections", position: [-5, -1.8] as const, center: [-5, -3] as const, color: "#a9bc8f" },
   payables: { name: "Payables", position: [0, -1.8] as const, center: [0, -3] as const, color: "#bdac89" },
   vendor_onboarding: { name: "Vendor Desk", position: [5, -1.8] as const, center: [5, -3] as const, color: "#b2a3bb" },
-  dana: { name: "Dana’s desk", position: [0, 2.2] as const, center: [0, 3.4] as const, color: "#cc9c7d" },
+  dana: { name: "Dana’s Desk", position: [0, 2.2] as const, center: [0, 3.4] as const, color: "#cc9c7d" },
   treasury: { name: "Treasury", position: [5, 0.6] as const, center: [5, 3.4] as const, color: "#788b85" },
 } as const;
 export type AnchorId = keyof typeof OFFICE_ANCHORS;

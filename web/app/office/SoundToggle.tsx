@@ -58,6 +58,6 @@ export function SoundToggle({ snapshot }: { snapshot: OfficeSnapshot }) {
 
   return <button type='button' className='office-sound-toggle' aria-pressed={enabled} onClick={toggle} disabled={!ready}
     title='Quiet office sounds. After reload, sound resumes on your next click.'>
-    {enabled ? 'Sound on' : 'Sound off'}
+    {enabled ? 'Sound On' : 'Sound Off'}
   </button>;
 }

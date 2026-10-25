@@ -1,0 +1,341 @@
+/* Local experiment (branch local/iisu-frontend, never pushed): iiSU-style bubbly shell around the office.
+   Palette: butter yellow #FFF3A6, pastel aqua #A9F6FF, ink navy #19213B. The 3D scene colours (lib/office/palette.ts) are untouched. */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap');
+
+.office-shell {
+  --pastel-yellow: #FFF3A6;
+  --pastel-aqua: #A9F6FF;
+  --ink: #19213B;
+  --ink-soft: #4B5577;
+  --paper: #FFFDF4;
+  /* Re-point the office tokens the other stylesheets already use. */
+  --office-navy: var(--ink);
+  --office-slate: var(--ink-soft);
+  --office-aqua: var(--pastel-aqua);
+  --office-cream: var(--paper);
+  --office-peach: var(--pastel-yellow);
+  --office-lavender: #D6F0F5;
+  --bubble-radius: 30px;
+  --bubble-border: 3px solid #ffffff;
+  --bubble-glass: rgba(255, 255, 255, 0.78);
+  --bubble-shadow: 0 8px 24px rgba(25, 33, 59, 0.12), inset 0 1px 0 #ffffff;
+  color-scheme: light;
+  /* One screen, always: the office never scrolls off; only the sidebar may scroll. */
+  box-sizing: border-box;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden;
+  flex-direction: row;
+  gap: 16px;
+  padding: 16px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 8%, #ffffffcc 0 6%, transparent 28%),
+    radial-gradient(circle at 92% 4%, var(--pastel-yellow) 0, transparent 38%),
+    radial-gradient(circle at 70% 100%, #ffffffaa 0, transparent 40%),
+    linear-gradient(165deg, var(--pastel-aqua) 0%, #d8fbff 50%, var(--pastel-yellow) 100%);
+  font: 700 14px/1.45 'Nunito', ui-rounded, 'Avenir Next', system-ui, sans-serif;
+}
+
+/* ---------- Sidebar ---------- */
+.office-shell .office-sidebar {
+  flex: 0 0 168px;
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 10px;
+  background: var(--bubble-glass);
+  border: var(--bubble-border);
+  border-radius: var(--bubble-radius);
+  box-shadow: var(--bubble-shadow);
+  backdrop-filter: blur(10px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pastel-aqua) transparent;
+}
+.office-shell .office-sidebar-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 10px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  border-bottom: 3px dotted var(--pastel-aqua);
+}
+.office-shell .office-sidebar-logo img { width: 40px; height: 40px; border-radius: 14px; }
+.office-shell .room-navigation,
+.office-shell .office-sidebar-links { display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; }
+.office-shell .office-sidebar-links { margin-top: auto; padding-top: 8px; border-top: 3px dotted var(--pastel-aqua); }
+.office-shell .room-navigation button,
+.office-shell .office-sidebar-links :is(a, button) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 4px 6px;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 22px;
+  box-shadow: none;
+  font-weight: 800;
+  font-size: 12px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.office-shell .room-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  font-size: 22px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 2px solid var(--pastel-aqua);
+  border-radius: 50%;
+  box-shadow: 0 3px 8px rgba(25, 33, 59, 0.12);
+}
+.office-shell .room-navigation button:hover,
+.office-shell .office-sidebar-links :is(a, button):hover { background: #ffffffd9; transform: translateY(-1px) scale(1.02); }
+.office-shell .room-navigation button[aria-pressed=true],
+.office-shell .office-sidebar-links button[aria-pressed=true] {
+  background: var(--pastel-yellow);
+  border-color: #ffffff;
+  box-shadow: 0 4px 14px rgba(25, 33, 59, 0.16);
+}
+.office-shell :is(.room-navigation, .office-sidebar-links) button[aria-pressed=true] .room-icon { background: var(--pastel-aqua); border-color: #ffffff; }
+
+/* ---------- Main column ---------- */
+.office-shell .office-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.office-shell .office-toolbar { flex: none; }
+.office-shell .office-toolbar {
+  min-height: 0;
+  padding: 10px 14px 10px 24px;
+  background: var(--bubble-glass);
+  border: var(--bubble-border);
+  border-radius: 999px;
+  box-shadow: var(--bubble-shadow);
+  backdrop-filter: blur(10px);
+}
+/* The header scrolls on its own when it has more than fits; the page never does. */
+.office-shell .office-toolbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--pastel-aqua) transparent; }
+.office-shell .office-toolbar > div:first-child { flex: none; white-space: nowrap; }
+.office-shell .office-tools { flex: 1 0 auto; flex-wrap: nowrap; justify-content: flex-end; }
+.office-shell .office-tools > * { flex: none; white-space: nowrap; }
+.office-shell .theme-toggle { position: sticky; right: 0; z-index: 1; box-shadow: -10px 0 12px -4px var(--bubble-glass), 0 3px 8px rgba(25, 33, 59, 0.15); flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 22px; background: var(--pastel-yellow); border-color: #ffffff; }
+.office-shell .office-toolbar strong { font-weight: 900; font-size: 22px; }
+.office-shell .toolbar-divider { color: var(--ink-soft); }
+.office-shell .office-tools a { color: var(--ink); font-weight: 800; }
+.office-shell .connection-status { padding: 4px 12px; color: var(--ink); background: var(--pastel-yellow); border-radius: 999px; font-size: 12px; font-weight: 800; }
+.office-shell select,
+.office-shell button {
+  color: var(--ink);
+  background: #ffffff;
+  border: 2px solid var(--pastel-aqua);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 800;
+}
+.office-shell button:hover { background: var(--pastel-yellow); }
+.office-shell :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.office-shell .office-viewport {
+  flex: 1 1 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  border: var(--bubble-border);
+  border-radius: var(--bubble-radius);
+  box-shadow: var(--bubble-shadow);
+  background: var(--paper);
+}
+
+/* GX10 readout card floats in the scene with inline styles; restyle it from here so scene files stay untouched. */
+.office-shell [data-testid=gx10-readout] {
+  color: var(--ink) !important;
+  background: var(--bubble-glass) !important;
+  border: var(--bubble-border) !important;
+  border-radius: 22px !important;
+  box-shadow: var(--bubble-shadow);
+  backdrop-filter: blur(10px);
+  font: 700 12px/1.5 'Nunito', ui-rounded, system-ui, sans-serif !important;
+}
+.office-shell [data-testid=gx10-readout] * { color: var(--ink) !important; }
+
+/* ---------- Detail sheets (sidebar modals) ---------- */
+.office-shell .detail-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px 24px 24px 200px;
+  background: rgba(25, 33, 59, 0.22);
+  backdrop-filter: blur(4px);
+  animation: sheet-fade 0.18s ease-out;
+}
+.office-shell .detail-sheet,
+.office-shell .detail-sheet-backdrop .room-inspector {
+  position: relative;
+  inset: auto;
+  width: min(1080px, 100%);
+  max-height: min(86dvh, 920px);
+  overflow: auto;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  border: 4px solid #ffffff;
+  border-radius: 34px;
+  box-shadow: 0 18px 48px rgba(25, 33, 59, 0.25);
+  animation: sheet-pop 0.22s cubic-bezier(.2, 1.4, .4, 1);
+}
+.office-shell .detail-sheet-backdrop .room-inspector { width: min(620px, 100%); padding: 24px 28px; font-size: 15px; }
+.office-shell .detail-sheet-backdrop .room-inspector header { margin: -24px -28px 16px; padding: 16px 20px 16px 28px; background: var(--pastel-yellow); }
+.office-shell .detail-sheet-backdrop .room-inspector h2 { font-size: 24px; font-weight: 900; }
+.office-shell .detail-sheet-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 14px 20px;
+  background: var(--pastel-yellow);
+  border-bottom: 3px solid #ffffff;
+}
+.office-shell .detail-sheet-header h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.3px; }
+.office-shell .detail-sheet-close { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 18px; }
+.office-shell .detail-sheet-body { padding: 20px 24px 28px; }
+.office-shell .detail-sheet-empty { display: grid; gap: 6px; justify-items: start; font-size: 15px; }
+.office-shell .detail-sheet-cta { margin-top: 8px; padding: 10px 18px; color: var(--ink); background: var(--pastel-aqua); border: 3px solid #ffffff; border-radius: 999px; font-weight: 900; text-decoration: none; box-shadow: 0 4px 12px rgba(25, 33, 59, 0.15); }
+@keyframes sheet-fade { from { opacity: 0; } }
+@keyframes sheet-pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .office-shell .detail-sheet-backdrop, .office-shell .detail-sheet, .office-shell .detail-sheet-backdrop .room-inspector { animation: none; } }
+
+/* Content inside sheets: white bubbles instead of dark slabs. */
+.office-shell .detail-sheet .seat-statuses { display: flex; gap: 12px; margin-bottom: 16px; }
+.office-shell .seat-statuses > div { flex: 1; min-width: 0; padding: 12px 16px; background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 22px; }
+.office-shell .seat-statuses strong, .office-shell .seat-statuses span { display: block; }
+.office-shell .seat-statuses span, .office-shell .office-audit p, .office-shell .office-audit code, .office-shell .mock-controls span { color: var(--ink-soft); }
+.office-shell .seat-statuses .folder-status { color: #C2410C; }
+.office-shell .lobby-v2-panel,
+.office-shell .office-lobby .audit-wall,
+.office-shell .lobby-v2-panel section {
+  color: var(--ink);
+  background: #ffffff;
+  border: 2px solid var(--pastel-aqua);
+  border-radius: 24px;
+  box-shadow: 0 3px 10px rgba(25, 33, 59, 0.08);
+}
+.office-shell .lobby-v2-panel section { background: var(--paper); box-shadow: none; }
+.office-shell .lobby-v2-stats > div,
+.office-shell .lobby-v2-roster > li,
+.office-shell .office-lobby-ask {
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--pastel-aqua);
+  border-radius: 20px;
+}
+.office-shell .lobby-v2-stats > div:nth-child(odd) { background: #FFFBDD; border-color: var(--pastel-yellow); }
+.office-shell :is(.lobby-v2-panel, .office-lobby .audit-wall, .lobby-v2-stats, .lobby-v2-roster, .office-lobby-ask) :is(h2, h3, h4, h5, p, span, strong, b, dt, dd, li, small, label, a, code) { color: var(--ink); }
+.office-shell .office-lobby-pay > section {
+  color: var(--ink) !important;
+  background: #ffffff !important;
+  border: 2px solid var(--pastel-aqua) !important;
+  border-radius: 24px !important;
+  font-family: 'Nunito', ui-rounded, system-ui, sans-serif !important;
+}
+.office-shell .office-lobby-pay > section * { color: var(--ink) !important; }
+.office-shell .detail-sheet :is(input, textarea) { color: var(--ink); background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 999px; padding: 6px 12px; }
+.office-shell .detail-sheet .denial-text, .office-shell .detail-sheet .audit-error { color: #B42318 !important; background: transparent; }
+.office-shell .detail-sheet .audit-error button { color: var(--ink); background: var(--pastel-yellow); }
+
+/* Real vs. simulated drawer (rendered beside the shell). */
+body:has(.office-shell) .real-sim {
+  color-scheme: light;
+  color: #19213B;
+  background: rgba(255, 255, 255, 0.92);
+  border: 3px solid #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 6px 20px rgba(25, 33, 59, 0.18);
+  font-family: 'Nunito', ui-rounded, system-ui, sans-serif;
+}
+body:has(.office-shell) .real-sim * { color: #19213B; }
+body:has(.office-shell) .real-sim-toggle { background: #A9F6FF; border: 0; border-radius: 999px; font-weight: 800; }
+/* Keep the drawer floating (never docked into the page flow), so the office stays one screen. */
+body:has(.office-shell) .real-sim-overlay.real-sim-docked {
+  position: fixed !important;
+  left: auto;
+  right: 12px;
+  bottom: 12px;
+  width: min(420px, calc(100% - 24px)) !important;
+  z-index: 40;
+  padding: 10px 14px !important;
+  border: 3px solid #ffffff !important;
+  border-radius: 22px !important;
+}
+
+/* ---------- Dark mode: same palette and shapes, a night-sky background. ---------- */
+.office-shell[data-theme=dark] {
+  --ink: #FFF8DC;
+  --ink-soft: #C7CEE6;
+  --paper: #222C4E;
+  --office-lavender: #34406A;
+  --bubble-glass: rgba(25, 33, 59, 0.82);
+  --bubble-border: 3px solid #2E3A63;
+  --bubble-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(169, 246, 255, 0.16) 0 6%, transparent 30%),
+    radial-gradient(circle at 90% 6%, rgba(255, 243, 166, 0.14) 0, transparent 36%),
+    linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%);
+}
+.office-shell[data-theme=dark] :is(.room-icon, select, button, .seat-statuses > div, .lobby-v2-panel, .office-lobby .audit-wall, .detail-sheet :is(input, textarea)) { background-color: #2B3660; border-color: #3B4A7E; }
+.office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) :is(a, button) { background: transparent; border-color: transparent; }
+.office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) :is(a, button):hover { background: rgba(169, 246, 255, 0.12); }
+/* Yellow and aqua surfaces keep dark ink in both modes. */
+.office-shell[data-theme=dark] :is(.connection-status, .theme-toggle, .detail-sheet-header, .detail-sheet-backdrop .room-inspector header, .detail-sheet-cta,
+  .room-navigation button[aria-pressed=true], .office-sidebar-links button[aria-pressed=true]) { color: #19213B; }
+.office-shell[data-theme=dark] :is(.room-navigation button[aria-pressed=true], .office-sidebar-links button[aria-pressed=true]) { background: var(--pastel-yellow); border-color: #2E3A63; }
+.office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) button[aria-pressed=true] .room-icon { color: #19213B; background: var(--pastel-aqua); }
+.office-shell[data-theme=dark] .office-toolbar button.theme-toggle.theme-toggle { color: #19213B; background-color: var(--pastel-yellow); border-color: #2E3A63; box-shadow: -10px 0 12px -4px var(--bubble-glass); }
+.office-shell[data-theme=dark] :is(.detail-sheet-header, .detail-sheet-backdrop .room-inspector header) :is(h2, button) { color: #19213B; }
+.office-shell[data-theme=dark] .detail-sheet-close { background: #ffffff; }
+.office-shell[data-theme=dark] :is(.lobby-v2-stats > div, .lobby-v2-roster > li, .office-lobby-ask) { background: #26315A; border-color: #3B4A7E; }
+.office-shell[data-theme=dark] .lobby-v2-stats > div:nth-child(odd) { background: #2F3A5E; border-color: #5E5A3A; }
+.office-shell[data-theme=dark] .office-lobby-pay > section { background: #26315A !important; border-color: #3B4A7E !important; }
+.office-shell[data-theme=dark] .office-lobby-pay > section * { color: var(--ink) !important; }
+.office-shell[data-theme=dark] [data-testid=gx10-readout] { background: rgba(25, 33, 59, 0.9) !important; border-color: #2E3A63 !important; }
+.office-shell[data-theme=dark] .seat-statuses .folder-status { color: #FFB27A; }
+.office-shell[data-theme=dark] .detail-sheet .denial-text, .office-shell[data-theme=dark] .detail-sheet .audit-error { color: #FF9C8F !important; }
+.office-shell[data-theme=dark] .detail-sheet-backdrop { background: rgba(5, 8, 20, 0.5); }
+body:has(.office-shell[data-theme=dark]) .real-sim { color: #FFF8DC; background: rgba(25, 33, 59, 0.94); border-color: #2E3A63; }
+body:has(.office-shell[data-theme=dark]) .real-sim * { color: #FFF8DC; }
+body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !important; }
+
+/* ---------- Narrow screens: the sidebar becomes a scrolling pill row; sheets go full width. ---------- */
+@media (max-width: 900px) {
+  .office-shell { flex-direction: column; padding: 10px; gap: 10px; }
+  .office-shell .office-toolbar { padding: 8px 12px; gap: 8px; }
+  .office-shell .office-sidebar { scrollbar-width: thin; }
+  .office-shell .office-sidebar { position: static; max-height: none; flex: none; flex-direction: row; align-items: center; overflow-x: auto; padding: 8px; border-radius: 999px; }
+  .office-shell .office-sidebar-logo { flex-direction: row; padding: 0 8px; border: 0; }
+  .office-shell .office-sidebar-logo span { display: none; }
+  .office-shell .office-sidebar-logo img { width: 34px; height: 34px; }
+  .office-shell .room-navigation, .office-shell .office-sidebar-links { flex: none; flex-direction: row; flex-wrap: nowrap; margin: 0; padding: 0; border: 0; }
+  .office-shell .room-navigation button, .office-shell .office-sidebar-links :is(a, button) { width: auto; min-width: 76px; font-size: 11px; }
+  .office-shell .room-icon { width: 32px; height: 32px; font-size: 18px; }
+  .office-shell .office-toolbar { border-radius: var(--bubble-radius); }
+  .office-shell .detail-sheet-backdrop { padding: 10px; align-items: end; }
+  .office-shell .detail-sheet, .office-shell .detail-sheet-backdrop .room-inspector { max-height: 88dvh; border-radius: 28px 28px 20px 20px; }
+  .office-shell .detail-sheet .seat-statuses { flex-direction: column; }
+  .office-shell [data-testid=gx10-readout] { width: 168px !important; padding: 8px !important; font-size: 10px !important; }
+  .office-shell [data-testid=gx10-readout] strong { font-size: 12px !important; }
+}
