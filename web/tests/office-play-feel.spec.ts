@@ -136,7 +136,7 @@ test('the Play settings turn FOV kick off and remember it', async ({ page }) => 
 });
 
 test('reduced motion keeps the FOV fixed while walking still works', async ({ browser }) => {
-  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 }, baseURL: 'http://localhost:3035' });
+  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 }, baseURL: `http://localhost:${Number(process.env.OFFICE_TEST_PORT) || 3035}` });
   const page = await context.newPage();
   try {
     const errors = await startPlay(page);
