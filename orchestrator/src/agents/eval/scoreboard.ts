@@ -14,6 +14,7 @@ import { runCallButton } from './call-button';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
+import { runDurableRecoveryPreflight } from './durable-recovery';
 import { runBadgeAttack } from './badge-attack';
 import { evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
@@ -113,6 +114,7 @@ for (const invoice of northfield.arInvoices) {
   if (expected && expected !== actual) gaps.push({ id: scenario.id, detail: `Reconciler expected ${expected}, got ${actual}.` });
 }
 const legacy = await runEval({ persona: scriptedPersona });
+const durableRecovery = await runDurableRecoveryPreflight();
 const recoveryRuns = [];
 for (const variant of [{ lateCancel: false }, { lateCancel: true }, { checkpoint: 'before_provider' as const }]) {
   const run = await runRecovery(variant);
@@ -176,6 +178,10 @@ for (const row of legacy.reports) {
   if (row.id === 'C17' && conversations.find(run => run.id === 'phone_mismatch')?.match) continue;
   // C13: the desk-phone gate withholds Request call, the office request is refused, and a direct dial is rejected before the provider.
   if (row.id === 'C13' && callButton.checks.noConsent && precallStops.find(run => run.id === 'C13')?.match) continue;
+  if (row.id === 'P11' && row.seams.includes('integration:not_executed')) {
+    gaps.push({ id: row.id, detail: `${durableRecovery.scope} Frozen integrationOutcome: ${key.payables.P11.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}.` });
+    continue;
+  }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 const inboxTeam = await runInboxTeam();
@@ -218,7 +224,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -236,6 +242,7 @@ const report = {
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
     payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.',
     recovery: recoveryRuns[0]!.scope,
+    durableRecovery: durableRecovery.scope,
     arConversations: conversations[0]?.scope ?? 'not run',
     judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
@@ -253,6 +260,7 @@ const report = {
     historicalMockDebits: invoiceRuns.filter(row => row.historical).reduce((sum, row) => sum + row.mockDebits, 0) },
   rates, ap: invoiceRuns, gradedAP, permits, receivables,
   recovery: recoveryRuns,
+  durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },

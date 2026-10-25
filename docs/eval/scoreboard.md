@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `8d844cad4e15f988120435b5a71f19449d6e6d26`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `3fb1160b0f0be261eebe618437712db6101973db`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -50,6 +50,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **fraudDefinition**: Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.
 - **payablesDefinition**: Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.
 - **recovery**: Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.
+- **durableRecovery**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.
 - **arConversations**: Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.
 - **judgeCalls**: Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, paid_then_invented, invented_then_paid, opt_out. The opt-out control must not escalate.
 - **gx10Failover**: Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.
@@ -72,7 +73,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **AR_RUNTIME**: 10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.
 - **P01**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P07**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
-- **P11**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
+- **P11**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open. Frozen integrationOutcome: kill_after_provider_debit_before_complete_then_expire_lease_and_restart.
 - **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
 - **C05**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C08**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
