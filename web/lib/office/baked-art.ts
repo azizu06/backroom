@@ -44,3 +44,30 @@ export function withoutHiddenAuditBoard<T extends { minX: number; maxX: number; 
   const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
   return boxes.filter(b => !(near(b.minX, x - width / 2) && near(b.maxX, x + width / 2) && near(b.minZ, z - depth / 2) && near(b.maxZ, z + depth / 2)));
 }
+
+/**
+ * Baked pieces actually in the scene. A piece is ready only after its GLB is added to the scene graph, and goes back
+ * to not ready on a load failure or unmount, so every procedural replacement keys off a loaded room, never the query alone.
+ */
+const readyPieces = new Set<string>();
+const readyListeners = new Set<() => void>();
+
+export function setBakedPieceReady(piece: string, ready: boolean): void {
+  if (readyPieces.has(piece) === ready) return;
+  if (ready) readyPieces.add(piece); else readyPieces.delete(piece);
+  readyListeners.forEach(listener => listener());
+}
+
+export function bakedPieceReady(piece: string): boolean {
+  return readyPieces.has(piece);
+}
+
+export function subscribeBakedReady(listener: () => void): () => void {
+  readyListeners.add(listener);
+  return () => { readyListeners.delete(listener); };
+}
+
+/** True when `?art=baked` is on and the piece is loaded: the only condition under which procedural pieces give way. */
+export function bakedPieceActive(search: string, piece: string): boolean {
+  return bakedArtRequested(search) && bakedPieceReady(piece);
+}

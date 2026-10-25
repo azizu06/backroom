@@ -1,9 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PolicyLimits } from '@backroom/orchestrator';
 import type { Policy } from '../../../policy/src/index';
 import { BadgeEditor } from '../../components/BadgeEditor';
 import { jsonObject, NETWORK_MESSAGE, outageMessage, serverError } from '../../lib/http/response';
+import { signInOperator } from '../../lib/operator/sign-in-client';
 import styles from './policy.module.css';
 
 const messages: Record<string, string> = {
@@ -14,16 +15,32 @@ const messages: Record<string, string> = {
   INVALID_LIMITS: 'Check each numeric limit. Counts, days, and cents must be whole numbers; the percentage must be between 0 and 100.',
 };
 export default function PolicyPage() {
-  const [pin, setPin] = useState(''), [policy, setPolicy] = useState<Policy>();
+  const [pin, setPin] = useState(''), [code, setCode] = useState(''), [policy, setPolicy] = useState<Policy>();
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  // A signed-in operator opens the editor straight away; otherwise stay quietly locked.
+  async function probe() {
+    const res = await fetch('/api/policy', { cache: 'no-store' }).catch(() => undefined);
+    const saved = res?.ok ? (await jsonObject(res))?.policy as Policy | undefined : undefined;
+    if (saved && typeof saved.policyVersion === 'number') { setPolicy(saved); setRevision(value => value + 1); return true; }
+    return false;
+  }
+  useEffect(() => { void probe(); }, []);
+  async function signIn() {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await signInOperator(code); setCode('');
+      if (!await probe()) throw new Error('Signed in, but the policy could not be loaded. Try again.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Sign-in failed. Try again.'); }
+    finally { setBusy(false); }
+  }
   async function request(body?: { expectedVersion: number; limits: PolicyLimits }) {
     setBusy(true); setError(''); setNotice('');
     try {
       let res: Response;
       try {
         res = await fetch('/api/policy', { method: body ? 'POST' : 'GET', cache: 'no-store',
-          headers: { 'x-policy-demo-pin': pin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+          headers: { ...(pin ? { 'x-policy-demo-pin': pin } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
           ...(body ? { body: JSON.stringify(body) } : {}) });
       } catch { throw new Error(NETWORK_MESSAGE); }
       const data = await jsonObject(res);
@@ -42,13 +59,19 @@ export default function PolicyPage() {
     <header><a href="/office">Backroom</a><a href="/audit">Audit wall</a></header>
     <h1>Owner policy</h1>
     <p className={styles.intro}>Set the limits each seat may accept. Requests outside a badge still go to Dana.</p>
-    <p className={styles.auth}>Demo PIN protection · Owner only. Policy editing is unavailable to agents and voice tools.</p>
+    <p className={styles.auth}>Operator sign-in or owner demo PIN · Policy editing is unavailable to agents and voice tools.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.notice} role="status">{notice}</p>}
-    {!policy ? <form className={styles.unlock} onSubmit={e => { e.preventDefault(); void request(); }}>
-      <label>Owner demo PIN<input type="password" autoComplete="off" required value={pin} onChange={e => setPin(e.target.value)} /></label>
-      <button disabled={busy || !pin}>{busy ? 'Checking…' : 'Unlock policy'}</button>
-    </form> : <>
+    {!policy ? <>
+      <form className={styles.unlock} onSubmit={e => { e.preventDefault(); void signIn(); }}>
+        <label>Operator code<input type="password" autoComplete="off" required value={code} onChange={e => setCode(e.target.value)} /></label>
+        <button disabled={busy || !code}>{busy ? 'Checking…' : 'Sign in'}</button>
+      </form>
+      <form className={styles.unlock} onSubmit={e => { e.preventDefault(); void request(); }}>
+        <label>Owner demo PIN<input type="password" autoComplete="off" required value={pin} onChange={e => setPin(e.target.value)} /></label>
+        <button disabled={busy || !pin}>{busy ? 'Checking…' : 'Unlock policy'}</button>
+      </form>
+    </> : <>
       <div className={styles.toolbar}><strong>Saved policy v{policy.policyVersion}</strong>
         <button disabled={busy} onClick={() => void request()}>Reload saved policy</button>
         <button disabled={busy} onClick={() => { setPin(''); setPolicy(undefined); setNotice(''); setError(''); }}>Lock editor</button></div>

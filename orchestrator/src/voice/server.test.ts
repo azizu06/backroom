@@ -50,6 +50,32 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     expect(unknown.body).toMatchObject({ rule_ids: ['IDENTITY_REQUIRED'] });
     expect(unknown.body).not.toHaveProperty('amount_cents');
   });
+  it('accepts an uninterrupted disclosure with a preamble and a dropped leading Hi', async () => {
+    const f = await fixture();
+    await f.event('background', { role: 'user', text: 'Yes.', was_interrupted: false });
+    const spoken = `Thanks for picking up. ${welcome.replace(/^Hi,\s*/, '')}`;
+    await f.event('preamble', { role: 'assistant', text: spoken, was_interrupted: false });
+    const claimed = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+    const context = await f.tool('get_invoice_context', claimed.body.next_delivery_nonce);
+    expect(context.body.rule_ids).toEqual(['IDENTITY_REQUIRED']);
+    expect(context.body).not.toHaveProperty('amount_cents');
+  });
+  it('rejects a disclosure truncated before the end of the welcome', async () => {
+    const f = await fixture();
+    const truncated = welcome.replace(/ Am I speaking with Jordan\?$/, '');
+    await f.event('short', { role: 'assistant', text: truncated, was_interrupted: false });
+    const blocked = await f.tool('get_invoice_context', 'nonce-1');
+    expect(blocked.body.rule_ids).toEqual(['DISCLOSURE_REQUIRED']);
+    expect(f.gateway).not.toHaveBeenCalled();
+  });
+  it('rejects an interrupted full welcome and still accepts the exact welcome', async () => {
+    const interrupted = await fixture();
+    await interrupted.event('cut-off', { role: 'assistant', text: welcome, was_interrupted: true });
+    expect((await interrupted.tool('get_invoice_context', 'nonce-1')).body.rule_ids).toEqual(['DISCLOSURE_REQUIRED']);
+    const exact = await fixture();
+    await exact.event('exact', { role: 'assistant', text: welcome, was_interrupted: false });
+    expect((await exact.tool('get_invoice_context', 'nonce-1')).body.rule_ids).toEqual(['IDENTITY_REQUIRED']);
+  });
   it('uses actual natural identity evidence and allows only a policy-authorized plan/link', async () => {
     const f = await fixture();
     await f.event('background', { role: 'user', text: 'Yes.', was_interrupted: false });

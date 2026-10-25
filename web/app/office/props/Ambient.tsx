@@ -13,7 +13,7 @@ import {
 } from '../../../lib/office/props/ambient';
 import { monitorScreen } from '../../../lib/office/props/monitors';
 import { bakedReplacesAuditBoard } from '../../../lib/office/baked-art';
-import { useBakedArtRequested } from '../mounts/BakedArt';
+import { useBakedLobbyReady } from '../mounts/BakedArt';
 import { useCanvasTexture } from './useCanvasTexture';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
@@ -135,7 +135,7 @@ export function Ambient({ snapshot }: { snapshot: OfficeSnapshot }) {
   const [shared] = useState(createShared);
   useEffect(() => () => { for (const resource of Object.values(shared)) resource.dispose(); }, [shared]);
   const glowMap = useCanvasTexture(GLOW_TEX, GLOW_TEX, drawGlow, []);
-  const baked = useBakedArtRequested();
+  const baked = useBakedLobbyReady();
   const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
   useEffect(() => {
     invalidate();
