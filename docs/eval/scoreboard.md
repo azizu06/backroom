@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `042013fef06b3b9a9d35b612558b09a4ac0562e5`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `f2088af4a8e5e48c78776829540323fb932b1a11`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -24,6 +24,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 | Authoritative AP decision rule agreement | 9/9 (100%) |
 | Collections pre-call permit agreement | 8/8 (100%) |
 | Keyed bank-feed reconciliation agreement | 4/4 (100%) |
+| P01 AP withdrawal + reconciliation through the Dispatcher (synthetic bank HTTP, once per invoice) | 1/1 (100%) |
 | P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | 3/3 (100%) |
 | C14 simulated email fallback through the Dispatcher (trusted contact, daily dedupe, no amount or dial) | 1/1 (100%) |
 | AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | 10/10 (100%) |
@@ -50,6 +51,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **providers**: Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.
 - **fraudDefinition**: Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.
 - **payablesDefinition**: Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.
+- **apDebit**: Production Dispatcher + ClaudeAgentRuntime scripted QueryFn -> Payables request_payment -> PayablesSeat -> nessieDebitPayables -> NessieClient.withdraw/reconcileWithdrawal. Bank HTTP responses and claims are synthetic; no network, live sandbox debit, paid model call or durable restart. Two fresh dispatcher cases share the trusted finance repository and bank claim store and produce one withdrawal.
 - **recovery**: Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.
 - **durableRecovery**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.
 - **emailDispatcher**: Production createRoleRegistry collectionsPlanner role -> Dispatcher -> ClaudeAgentRuntime with scripted QueryFn. Product runCollectionsPlanner invokes the policy-checked email fallback on trusted case data and a shared MemoryEmailOutbox; a second dispatcher case proves invoice/day dedupe. No manual eval invocation of runEmailFollowUp, no network or live delivery. A host must opt into the planner role and supply its trusted contact/outbox; office/UI binding is not measured.
@@ -73,7 +75,6 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 ## Disagreements and unexecuted evidence
 
 - **AR_RUNTIME**: 10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.
-- **P01**: Frozen integrationOutcome: pay_and_reconcile; requires Nessie debit ID, matched bank transaction, IN_BADGE. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ALLOW but request_payment returns held/ESCALATE [INVALID_INPUT], with 0 debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open.
 - **P07**: Frozen integrationOutcome: map_available_CRS_sanctions_test_identity_and_record_actual_response. The production agent chain catches the synthetic fixture OFAC_STOP and does not pay; that is not a CRS sanctions response. Committed sandbox receipt docs/evidence/crs/live-run.json records fraudRisk, publicRecords, not OFAC. Replaying its public-records identity #6 through the production adapter yields OFAC=unknown (not available in sandbox); it is not mapped to the sanctioned vendor. Live OFAC identity/response remains unexecuted; keep P07 open.
 - **P11**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open. Frozen integrationOutcome: kill_after_provider_debit_before_complete_then_expire_lease_and_restart.
 - **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
@@ -82,6 +83,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **C09**: Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.
 - **C15**: Frozen integrationOutcome: use_actual_CRS_OFAC_test_identity_if_available_label_sandbox_no_dial. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: 0, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open.
 - **C21**: Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (true), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.
+- **P01:scope**: The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.
 
 ## Keyed AP items
 

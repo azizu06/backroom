@@ -4,10 +4,10 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "042013fef06b3b9a9d35b612558b09a4ac0562e5",
+    "baseCommit": "f2088af4a8e5e48c78776829540323fb932b1a11",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.",
     "evaluatorSources": {
-      "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
+      "orchestrator/src/agents/eval/chain.ts": "299fc6fb3b300b4793c2ac785cd4a292b9efcefc8be185631f9303cb5392d065",
       "orchestrator/src/agents/eval/conversation.ts": "2923b6c6d14e00bdb5035405d1024534b44e381e6f6db7f1bd7b9f706bfbc889",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
@@ -21,11 +21,12 @@
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
       "orchestrator/src/agents/eval/durable-recovery.ts": "b7ecc566b2d562ec87e4f59ca6c67b7f2c3351b9160c024a6ba7670b2823da35",
       "orchestrator/src/agents/eval/crs-availability.ts": "976ec0b27819e5d0816af752d08e020528e84af8d8caa198c6240a5d74e738f0",
+      "orchestrator/src/agents/eval/ap-debit.ts": "c2a40b752f39c7af07f8a4a75a8b5f8a297f2c53dc9acf0b97b8a6230049547f",
       "orchestrator/src/agents/eval/email-dispatcher.ts": "23c65d4c5595816587633a76dcc33180240eb40de93c7b8c89aef0235392bc45",
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "f83e9635a318a5be99a8b154d069f0cefef91c4c0cf46982179cb9889028286c",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "2565a734d3b566b43f7e23b8f14e8b2144bff7c17a40a1a918d71da58d3344e3"
+      "orchestrator/src/agents/eval/scoreboard.ts": "4da42ad40a950e248ca7d85b5b1284f460f1b737328d67110692bcdac16945c8"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -37,6 +38,12 @@
     },
     "crsRuntimeSources": {
       "orchestrator/src/collections/crs.ts": "210a1a7e30b6efea4f1e538293eaac8ca189b88955c700962b78f1ccc51fb6e4"
+    },
+    "apDebitRuntimeSources": {
+      "integrations/nessie/src/index.ts": "c93e8a817504bd6cca15113a40765a2bb3318e20d460e4c3e272a6e9c138329b",
+      "orchestrator/src/payables/payments.ts": "42f93c24275055ed013622437649d78e48c80065d4d35bb01332ba47c5811a2b",
+      "orchestrator/src/payables/index.ts": "9d3b0bc246b852d798dcf6b02940f63d0b7ca3356f1fde6cfbcfcefca9c0db28",
+      "orchestrator/src/agents/tools/payables.ts": "f9f104532a5531eab8f0e982d8c3c6bc0d3a57ad764416874502d5d44a874f56"
     },
     "emailRuntimeSources": {
       "orchestrator/src/agents/roles/collections.ts": "da20dae59c67c2a416495721808ed1a545f629a065d158f7589a1008dc042485",
@@ -78,6 +85,7 @@
     "providers": "Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.",
     "fraudDefinition": "Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.",
     "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.",
+    "apDebit": "Production Dispatcher + ClaudeAgentRuntime scripted QueryFn -> Payables request_payment -> PayablesSeat -> nessieDebitPayables -> NessieClient.withdraw/reconcileWithdrawal. Bank HTTP responses and claims are synthetic; no network, live sandbox debit, paid model call or durable restart. Two fresh dispatcher cases share the trusted finance repository and bank claim store and produce one withdrawal.",
     "recovery": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.",
     "durableRecovery": "Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.",
     "emailDispatcher": "Production createRoleRegistry collectionsPlanner role -> Dispatcher -> ClaudeAgentRuntime with scripted QueryFn. Product runCollectionsPlanner invokes the policy-checked email fallback on trusted case data and a shared MemoryEmailOutbox; a second dispatcher case proves invoice/day dedupe. No manual eval invocation of runEmailFollowUp, no network or live delivery. A host must opt into the planner role and supply its trusted contact/outbox; office/UI binding is not measured.",
@@ -100,6 +108,11 @@
     "historicalMockDebits": 0
   },
   "rates": {
+    "dispatcherApDebit": {
+      "numerator": 1,
+      "denominator": 1,
+      "percent": 100
+    },
     "extractionMockFieldFidelity": {
       "numerator": 664,
       "denominator": 664,
@@ -13184,6 +13197,257 @@
       "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
     }
   ],
+  "apDebit": {
+    "id": "P01",
+    "mode": "exact",
+    "match": true,
+    "checks": {
+      "dispatcherDone": true,
+      "productionRoles": true,
+      "allowedInBadge": true,
+      "paid": true,
+      "exactWithdrawal": true,
+      "paidOnce": true,
+      "reconciledAudit": true,
+      "auditChain": true
+    },
+    "posts": 1,
+    "first": {
+      "result": {
+        "status": "paid",
+        "verdict": "ALLOW",
+        "ruleIds": [
+          "IN_BADGE"
+        ],
+        "policyVersion": 1,
+        "policySentence": "Collections may read accounts receivable and manage client collections, Payables may read invoices and purchase orders and pay eligible invoices, and Vendor onboarding may run CRS and Apify checks and propose vendors or bank changes.",
+        "rail": "nessie",
+        "receiptId": "offline:P01:withdrawal",
+        "reconciliation": {
+          "match": "EXACT",
+          "debitId": "offline:P01:withdrawal",
+          "transactionId": "offline:P01:withdrawal",
+          "amountCents": 64000
+        },
+        "evidenceRefs": [
+          "seed-inbox:4401",
+          "4401"
+        ]
+      },
+      "assessment": {
+        "invoice": {
+          "invoiceId": "4401",
+          "vendorId": "papertrail",
+          "poId": "PO-4401",
+          "amountCents": 64000,
+          "currency": "USD",
+          "lineItems": [
+            {
+              "description": "Papertrail Print Co - 09/2026 service delivery",
+              "quantity": 1,
+              "unitPriceCents": 64000
+            }
+          ]
+        },
+        "verdict": "ALLOW",
+        "ruleIds": [
+          "IN_BADGE"
+        ],
+        "policyVersion": 1,
+        "policySentence": "Collections may read accounts receivable and manage client collections, Payables may read invoices and purchase orders and pay eligible invoices, and Vendor onboarding may run CRS and Apify checks and propose vendors or bank changes.",
+        "bankDetailsChanged": false,
+        "poMatched": true,
+        "senderDomain": "papertrail.example",
+        "duplicateOfInvoiceIds": []
+      },
+      "runtime": {
+        "status": "done",
+        "activations": [
+          {
+            "role": "intake",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "extractor",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "vendor",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "payables",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "auditor",
+            "kind": "done",
+            "model": "claude-haiku-5-5"
+          }
+        ],
+        "handoffs": [
+          {
+            "from": "intake",
+            "to": "extractor",
+            "status": "offered"
+          },
+          {
+            "from": "extractor",
+            "to": "vendor",
+            "status": "offered"
+          },
+          {
+            "from": "vendor",
+            "to": "payables",
+            "status": "offered"
+          },
+          {
+            "from": "payables",
+            "to": "auditor",
+            "status": "offered"
+          }
+        ],
+        "syntheticCostUsd": 0.0000049999999999999996,
+        "syntheticLedger": {
+          "spentUsd": 0.0000049999999999999996,
+          "reservedUsd": 0,
+          "unknownSettlements": 0,
+          "warn": false
+        }
+      }
+    },
+    "repeat": {
+      "result": {
+        "status": "paid",
+        "verdict": "ALLOW",
+        "ruleIds": [
+          "IN_BADGE"
+        ],
+        "policyVersion": 1,
+        "policySentence": "Collections may read accounts receivable and manage client collections, Payables may read invoices and purchase orders and pay eligible invoices, and Vendor onboarding may run CRS and Apify checks and propose vendors or bank changes.",
+        "rail": "nessie",
+        "receiptId": "offline:P01:withdrawal",
+        "reconciliation": {
+          "match": "EXACT",
+          "debitId": "offline:P01:withdrawal",
+          "transactionId": "offline:P01:withdrawal",
+          "amountCents": 64000
+        },
+        "evidenceRefs": [
+          "seed-inbox:4401",
+          "4401"
+        ]
+      },
+      "assessment": {
+        "invoice": {
+          "invoiceId": "4401",
+          "vendorId": "papertrail",
+          "poId": "PO-4401",
+          "amountCents": 64000,
+          "currency": "USD",
+          "lineItems": [
+            {
+              "description": "Papertrail Print Co - 09/2026 service delivery",
+              "quantity": 1,
+              "unitPriceCents": 64000
+            }
+          ]
+        },
+        "verdict": "ESCALATE",
+        "ruleIds": [
+          "DUPLICATE_INVOICE"
+        ],
+        "policyVersion": 1,
+        "policySentence": "Hold for Dana any invoice with the same vendor and line items as a prior invoice whose total differs by no more than five percent or $100.",
+        "bankDetailsChanged": false,
+        "poMatched": true,
+        "senderDomain": "papertrail.example",
+        "duplicateOfInvoiceIds": []
+      },
+      "runtime": {
+        "status": "done",
+        "activations": [
+          {
+            "role": "intake",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "extractor",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "vendor",
+            "kind": "handoff",
+            "model": "claude-haiku-5-5"
+          },
+          {
+            "role": "payables",
+            "kind": "handoff",
+            "model": "claude-sonnet-5-5"
+          },
+          {
+            "role": "auditor",
+            "kind": "done",
+            "model": "claude-haiku-5-5"
+          }
+        ],
+        "handoffs": [
+          {
+            "from": "intake",
+            "to": "extractor",
+            "status": "offered"
+          },
+          {
+            "from": "extractor",
+            "to": "vendor",
+            "status": "offered"
+          },
+          {
+            "from": "vendor",
+            "to": "payables",
+            "status": "offered"
+          },
+          {
+            "from": "payables",
+            "to": "auditor",
+            "status": "offered"
+          }
+        ],
+        "syntheticCostUsd": 0.0000049999999999999996,
+        "syntheticLedger": {
+          "spentUsd": 0.0000049999999999999996,
+          "reservedUsd": 0,
+          "unknownSettlements": 0,
+          "warn": false
+        }
+      }
+    },
+    "reconciliations": [
+      {
+        "action": "reconcile",
+        "decision": "ALLOW",
+        "ruleIds": [
+          "EXACT_PAYMENT_MATCH"
+        ],
+        "inputs": {
+          "amountCents": 64000,
+          "debitId": "offline:P01:withdrawal",
+          "invoiceId": "4401",
+          "match": "EXACT",
+          "transactionId": "offline:P01:withdrawal",
+          "transactionKind": "withdrawal",
+          "vendorId": "papertrail"
+        }
+      }
+    ],
+    "scope": "Production Dispatcher + ClaudeAgentRuntime scripted QueryFn -> Payables request_payment -> PayablesSeat -> nessieDebitPayables -> NessieClient.withdraw/reconcileWithdrawal. Bank HTTP responses and claims are synthetic; no network, live sandbox debit, paid model call or durable restart. Two fresh dispatcher cases share the trusted finance repository and bank claim store and produce one withdrawal."
+  },
   "crsRecordedCoverage": {
     "receiptPath": "docs/evidence/crs/live-run.json",
     "receiptSha256": "d75e85c27a1d66c8ad9c6d16a14f0a63fa6035f584c809d5271b1657fe23d488",
@@ -15852,10 +16116,6 @@
       "detail": "10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     },
     {
-      "id": "P01",
-      "detail": "Frozen integrationOutcome: pay_and_reconcile; requires Nessie debit ID, matched bank transaction, IN_BADGE. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ALLOW but request_payment returns held/ESCALATE [INVALID_INPUT], with 0 debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open."
-    },
-    {
       "id": "P07",
       "detail": "Frozen integrationOutcome: map_available_CRS_sanctions_test_identity_and_record_actual_response. The production agent chain catches the synthetic fixture OFAC_STOP and does not pay; that is not a CRS sanctions response. Committed sandbox receipt docs/evidence/crs/live-run.json records fraudRisk, publicRecords, not OFAC. Replaying its public-records identity #6 through the production adapter yields OFAC=unknown (not available in sandbox); it is not mapped to the sanctioned vendor. Live OFAC identity/response remains unexecuted; keep P07 open."
     },
@@ -15886,6 +16146,10 @@
     {
       "id": "C21",
       "detail": "Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (true), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open."
+    },
+    {
+      "id": "P01:scope",
+      "detail": "The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate."
     }
   ]
 }
