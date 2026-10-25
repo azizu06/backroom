@@ -182,6 +182,11 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `${durableRecovery.scope} Frozen integrationOutcome: ${key.payables.P11.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}.` });
     continue;
   }
+  if (row.id === 'C09' && row.seams.includes('integration:not_executed')) {
+    const run = conversations.find(run => run.scenarioId === 'C09');
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher run queues ${run?.humanFollowup?.queuedRequests ?? 0} request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has ${run?.humanFollowup?.gatewayReviewRecipients.length ?? 0} review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.` });
+    continue;
+  }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 const inboxTeam = await runInboxTeam();

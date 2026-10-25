@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `3fb1160b0f0be261eebe618437712db6101973db`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `895e1806cc67f9a5d6bdc175e41c12742af43270`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -77,7 +77,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
 - **C05**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C08**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
-- **C09**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
+- **C09**: Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.
 - **C15**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C21**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 

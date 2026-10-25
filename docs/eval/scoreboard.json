@@ -4,11 +4,11 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "3fb1160b0f0be261eebe618437712db6101973db",
+    "baseCommit": "895e1806cc67f9a5d6bdc175e41c12742af43270",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "c4cd8e828a12e5dc782ad6ffc7162ef9661d19fd98c0591132236c1b88ca7b60",
+      "orchestrator/src/agents/eval/conversation.ts": "da9c07828c6c2e9d120dcf5b427928e5a2422a3720d982aeba9a6f3b9cf9d86c",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -23,7 +23,7 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "5bb5ab8f8a4fb079145b8ada74a0c3faadd4cc743da2450ded7a4ae32e93ef55"
+      "orchestrator/src/agents/eval/scoreboard.ts": "af1680adb8da40bfcb4271749141c810b1d28daa13fe5a0ae3f8f5ffa389e4d4"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -14242,6 +14242,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
+        "humanFollowupQueued": true,
+        "humanEscalationMirrored": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -14254,6 +14256,34 @@
       ],
       "cleared": false,
       "reconRules": [],
+      "humanFollowup": {
+        "queuedRequests": 1,
+        "gatewayEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "REQUEST_HUMAN"
+            ]
+          }
+        ],
+        "mirroredEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "REQUEST_HUMAN"
+            ]
+          }
+        ],
+        "postcallEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "CALL_HUMAN_REQUESTED"
+            ]
+          }
+        ],
+        "gatewayReviewRecipients": []
+      },
       "gatewayTools": [
         "verify_identity_result:RECORDED",
         "get_invoice_context:CONTEXT",
@@ -15535,7 +15565,7 @@
     },
     {
       "id": "C09",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open."
     },
     {
       "id": "C15",
