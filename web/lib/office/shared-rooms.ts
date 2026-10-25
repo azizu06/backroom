@@ -13,6 +13,14 @@ const cylinder = (at: DetailPiece['at'], size: DetailPiece['size'], color: strin
 const footprint = (x: number, z: number, width: number, depth: number): Rect =>
   ({ minX: x - width / 2, maxX: x + width / 2, minZ: z - depth / 2, maxZ: z + depth / 2 });
 
+const PLANTS = [[6.55, -6.95], [11.45, -6.95], [11.4, 6.85]] as const;
+const plants: DetailPiece[] = PLANTS.flatMap(([x, z]) => [
+  cylinder([x, 0.2, z], [0.42, 0.4, 0.42], PALETTE.blush),
+  cylinder([x, 0.41, z], [0.34, 0.03, 0.34], ROLES.shadow),
+  cylinder([x, 0.7, z], [0.05, 0.6, 0.05], ROLES.frame),
+  ...[-1, 0, 1].map(side => box([x + side * 0.13, 0.9 + side * 0.1, z], [0.25, 0.45, 0.25], ROLES.plant, [0, 0, side * -0.45])),
+]);
+
 /** Meeting room (x 6..12, z -7.5..-1.5): a six-seat table facing a wall screen, and a low credenza. */
 const MEETING_TABLE = { x: 9, z: -4.8, width: 3, depth: 1.3 } as const;
 const MEETING_CHAIRS = [8, 9, 10].flatMap(x => [-1, 1].map(side => ({ x, z: MEETING_TABLE.z + side * 1.05, side })));
@@ -31,12 +39,16 @@ const meeting: DetailPiece[] = [
   // Wall screen between the two north windows.
   box([9, 1.55, -7.39], [1.8, 1.05, 0.05], ROLES.frame),
   box([9, 1.55, -7.36], [1.68, 0.93, 0.01], OUTDOOR.screen),
-  box([8.65, 1.7, -7.353], [0.7, 0.08, 0.004], PALETTE.aqua),
-  box([9.2, 1.45, -7.353], [0.9, 0.06, 0.004], PALETTE.mint),
+  // Whiteboard on the west partition; its drawn face is supplied by SharedRooms.
+  box([6.13, 1.65, -4.8], [0.06, 1.1, 2.1], ROLES.frame),
+  box([6.17, 1.65, -4.8], [0.02, 1, 2], PALETTE.cream),
+  box([6.23, 1.07, -4.8], [0.18, 0.04, 2.1], ROLES.frame),
   // Credenza under the east windows, with a jug and two cups.
   box([11.62, 0.4, -4.5], [0.5, 0.8, 2], ROLES.desk),
   box([11.36, 0.4, -4.5], [0.02, 0.6, 1.8], ROLES.partition),
   cylinder([11.62, 0.92, -4.1], [0.14, 0.24, 0.14], PALETTE.aqua),
+  cylinder([11.62, 1.065, -4.1], [0.08, 0.05, 0.08], PALETTE.aqua),
+  box([11.62, 0.95, -3.99], [0.04, 0.12, 0.12], ROLES.frame),
   cylinder([11.62, 0.85, -4.6], [0.09, 0.1, 0.09], PALETTE.cream),
   cylinder([11.62, 0.85, -4.85], [0.09, 0.1, 0.09], PALETTE.blush),
 ];
@@ -53,6 +65,8 @@ const breakRoom: DetailPiece[] = [
   box([6.51, 2.05, COUNTER.z], [0.01, 0.65, 3.1], PALETTE.cream),
   box([COUNTER.x + 0.03, 0.935, 3.5], [0.42, 0.015, 0.55], ROLES.shadow),
   cylinder([COUNTER.x - 0.15, 1.05, 3.5], [0.04, 0.25, 0.04], ROLES.frame),
+  box([COUNTER.x - 0.06, 1.17, 3.5], [0.2, 0.04, 0.04], ROLES.frame),
+  box([COUNTER.x + 0.03, 0.946, 3.5], [0.32, 0.01, 0.43], PALETTE.aqua),
   box([COUNTER.x, 1.13, 5.6], [0.32, 0.4, 0.3], ROLES.frame),
   box([COUNTER.x + 0.1, 1.0, 5.6], [0.14, 0.03, 0.18], ROLES.shadow),
   cylinder([COUNTER.x + 0.12, 0.98, 5.95], [0.09, 0.1, 0.09], PALETTE.blush),
@@ -62,16 +76,38 @@ const breakRoom: DetailPiece[] = [
   box([6.81, 1.25, 6.75], [0.03, 0.5, 0.04], ROLES.shadow),
   box([6.81, 0.55, 6.75], [0.03, 0.3, 0.04], ROLES.shadow),
   box([6.805, 1.0, 6.95], [0.005, 0.01, 0.68], ROLES.shadow),
-  // Round table with four stools.
+  // Round table with four chairs, backs facing away from the table.
   cylinder([TABLE.x, 0.74, TABLE.z], [1.2, 0.05, 1.2], ROLES.desk),
   cylinder([TABLE.x, 0.37, TABLE.z], [0.1, 0.72, 0.1], ROLES.frame),
   cylinder([TABLE.x, 0.02, TABLE.z], [0.55, 0.04, 0.55], ROLES.frame),
   ...STOOLS.flatMap(([x, z], i) => [
     cylinder([x, 0.47, z], [0.38, 0.06, 0.38], [PALETTE.blush, PALETTE.mint, PALETTE.butter, PALETTE.lavender][i]!),
     cylinder([x, 0.22, z], [0.06, 0.44, 0.06], ROLES.frame),
+    box([x + (x - TABLE.x) * 0.25, 0.72, z + (z - TABLE.z) * 0.25], [0.38, 0.46, 0.06], PALETTE.lavender,
+      [0, -Math.atan2(z - TABLE.z, x - TABLE.x) + Math.PI / 2, 0]),
   ]),
   cylinder([TABLE.x - 0.2, 0.82, TABLE.z + 0.1], [0.1, 0.1, 0.1], PALETTE.aqua),
   box([TABLE.x + 0.15, 0.775, TABLE.z - 0.15], [0.3, 0.02, 0.22], PALETTE.cream),
+  // Shallow bowl and low-poly fruit.
+  cylinder([TABLE.x, 0.8, TABLE.z], [0.38, 0.08, 0.38], PALETTE.cream),
+  ...[PALETTE.coral, PALETTE.butter, PALETTE.mint].map((color, i) => cylinder(
+    [TABLE.x + (i - 1) * 0.09, 0.88, TABLE.z + (i % 2) * 0.06], [0.13, 0.13, 0.13], color)),
+  // Notice board on the corridor partition, away from the door.
+  box([10.5, 1.7, 1.62], [1.5, 0.95, 0.05], ROLES.frame),
+  box([10.5, 1.7, 1.655], [1.4, 0.85, 0.02], PALETTE.peach),
+  ...[-1, 1].flatMap(side => [
+    box([10.5 + side * 0.32, 1.72, 1.675], [0.4, 0.5, 0.01], side < 0 ? PALETTE.butter : PALETTE.mint),
+    box([10.5 + side * 0.32, 1.91, 1.685], [0.04, 0.04, 0.01], PALETTE.coral),
+    ...[0, 1, 2].map(i => box([10.5 + side * 0.32, 1.8 - i * 0.1, 1.685], [0.26, 0.018, 0.01], ROLES.text)),
+  ]),
+  // Clock face on the west wall above the fridge, past the end of the upper cupboard (z 6.1) so it never hides the face.
+  { ...cylinder([6.13, 2.35, 7.0], [0.55, 0.05, 0.55], ROLES.frame), rotation: [0, 0, Math.PI / 2] },
+  { ...cylinder([6.165, 2.35, 7.0], [0.48, 0.02, 0.48], PALETTE.cream), rotation: [0, 0, Math.PI / 2] },
+  box([6.18, 2.43, 7.0], [0.01, 0.18, 0.025], ROLES.text),
+  box([6.18, 2.35, 7.06], [0.01, 0.025, 0.14], ROLES.text),
+  // Pendant cable and shade; the emissive underside is mounted in SharedRooms.
+  cylinder([TABLE.x, 2.7, TABLE.z], [0.025, 0.6, 0.025], ROLES.frame),
+  cylinder([TABLE.x, 2.36, TABLE.z], [0.55, 0.2, 0.55], PALETTE.butter),
   // Sofa under the east windows, a low coffee table and a rug.
   box([11.5, 0.22, 4.5], [0.78, 0.44, 2.1], OUTDOOR.sofa),
   box([11.82, 0.62, 4.5], [0.16, 0.42, 2.1], OUTDOOR.sofa),
@@ -93,7 +129,7 @@ const server: DetailPiece[] = [
   box([10.9, 2.7, -0.8], [1.2, 0.06, 0.4], ROLES.shadow),
 ];
 
-export const SHARED_ROOM_PIECES: readonly DetailPiece[] = [...meeting, ...breakRoom, ...server];
+export const SHARED_ROOM_PIECES: readonly DetailPiece[] = [...meeting, ...breakRoom, ...server, ...plants];
 
 export const SHARED_ROOM_COLLIDERS: readonly Rect[] = [
   footprint(MEETING_TABLE.x, MEETING_TABLE.z, MEETING_TABLE.width, MEETING_TABLE.depth),
@@ -102,6 +138,8 @@ export const SHARED_ROOM_COLLIDERS: readonly Rect[] = [
   footprint(COUNTER.x, COUNTER.z, COUNTER.width, COUNTER.depth),
   footprint(6.45, 6.95, 0.7, 0.7),
   footprint(TABLE.x, TABLE.z, 1.2, 1.2),
+  ...STOOLS.map(([x, z]) => footprint(x, z, 0.7, 0.7)),
+  ...PLANTS.map(([x, z]) => footprint(x, z, 0.5, 0.5)),
   footprint(11.5, 4.5, 0.8, 2.2),
   footprint(10.5, 4.5, 0.55, 1),
   footprint(11.62, 1.95, 0.4, 0.4),

@@ -18,6 +18,7 @@ import { InboxTrayMount } from './InboxTrayMount';
 import { LobbyCounter } from './LobbyCounter';
 import { Plants } from './Plants';
 import { RoomDetail } from './RoomDetail';
+import { RoomProps } from './RoomProps';
 import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
@@ -39,6 +40,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'treasury-vault', instanced: true, Component: TreasuryVault },
   { id: 'plants', instanced: true, Component: Plants },
   { id: 'room-detail', instanced: false, Component: RoomDetail },
+  { id: 'room-props', instanced: false, Component: RoomProps },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'baked-art', instanced: false, Component: BakedArt },
   { id: 'baked-characters', instanced: false, moving: true, Component: BakedCharacters },
