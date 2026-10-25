@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ANCHOR_IDS, ANCHOR_LAYOUT, BUILDING, CORRIDOR, DOORWAYS, LEAF_OPENING, LOBBY_BOARD, ROOM_SPAWNS, SPACES, SPACE_IDS, WALLS, WALL_HEIGHT, WINDOWS,
+  ANCHOR_IDS, ANCHOR_LAYOUT, ATRIUM_HEIGHT, BUILDING, MAIN_BUILDING, CORRIDOR, DOORWAYS, LEAF_OPENING, LOBBY_BOARD, ROOM_SPAWNS, SPACES, SPACE_IDS, WALLS, WALL_HEIGHT, WINDOWS,
   WINDOW_FRAME, WINDOW_HEAD, WINDOW_SILL, sightBlocked, spaceAt, wallColliders, wallPieces, windowPieces, type Rect, type Vec2,
 } from './layout';
 import { BUSHES, HILLS, PATH, PLAZA, SUN_DIRECTION, TREES, groundClear } from './outdoors';
@@ -8,7 +8,7 @@ import { OFFICE_LIGHTING } from './lighting';
 import { OUTDOOR, PALETTE, ROLES } from './palette';
 import { FLOOR, PAYLINK_KIOSK, PLAYER_RADIUS, SERVER_ROOM_BOX, insideAny, officeColliders } from './play';
 import { AUDIT_WALL } from './props/auditWall';
-import { CLOCK_INTERACTION } from './props/clock';
+import { CLOCK_INTERACTION, CLOCK_MOUNT } from './props/clock';
 import { ROOM_DETAILS } from './props/roomDetail';
 import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { SHARED_ROOM_COLLIDERS, SHARED_ROOM_PIECES } from './shared-rooms';
@@ -23,10 +23,9 @@ const rooms = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const colliders = officeColliders(rooms, [...dressingColliders(rooms), SERVER_ROOM_BOX]);
 
 describe('floor plan data', () => {
-  it('is about twice the old 16 x 11 floor, and every space lies inside the building', () => {
-    const total = area(BUILDING);
-    expect(total / (16 * 11)).toBeGreaterThan(1.8);
-    expect(total / (16 * 11)).toBeLessThan(2.4);
+  it('adds a 180 square metre wing and keeps every space inside the building', () => {
+    expect(area(MAIN_BUILDING)).toBe(24 * 15);
+    expect(area(BUILDING)).toBe(area(MAIN_BUILDING) + 180);
     for (const id of SPACE_IDS) {
       const { rect } = SPACES[id];
       expect(rect.minX >= BUILDING.minX && rect.maxX <= BUILDING.maxX && rect.minZ >= BUILDING.minZ && rect.maxZ <= BUILDING.maxZ, id).toBe(true);
@@ -68,10 +67,12 @@ describe('floor plan data', () => {
         && (door.axis === 'x' ? x : z) - door.width / 2 > w.from && (door.axis === 'x' ? x : z) + door.width / 2 < w.to);
       expect(wall, door.id).toBeDefined();
     }
-    // Every room is reachable from the corridor through some doorway.
-    for (const id of SPACE_IDS.filter(id => id !== 'corridor')) {
-      expect(DOORWAYS.some(door => door.joins.includes(id) && door.joins.includes('corridor')), id).toBe(true);
+    // Reachability follows the doorway graph, including the work room through the atrium.
+    const reachable = new Set<string>(['corridor']);
+    for (let pass = 0; pass < SPACE_IDS.length; pass++) for (const door of DOORWAYS) {
+      if (door.joins.some(id => reachable.has(id))) door.joins.forEach(id => reachable.add(id));
     }
+    for (const id of SPACE_IDS) expect(reachable.has(id), id).toBe(true);
     // The cosmetic interior doors hang in their leaf doorways.
     for (const room of INTERIOR_DOORS) {
       const door = DOORWAYS.find(d => d.id === room)!;
@@ -97,22 +98,28 @@ describe('floor plan data', () => {
 describe('building shell', () => {
   const full = wallPieces('full'), overview = wallPieces('overview');
   it('builds full-height walls in first person and lower cut-away walls for the overview', () => {
-    for (const piece of full) expect(piece.at[1] + piece.size[1] / 2).toBeLessThanOrEqual(WALL_HEIGHT + 1e-9);
-    expect(Math.max(...full.map(piece => piece.at[1] + piece.size[1] / 2))).toBeCloseTo(WALL_HEIGHT);
+    for (const piece of full) expect(piece.at[1] + piece.size[1] / 2).toBeLessThanOrEqual(ATRIUM_HEIGHT + 1e-9);
+    expect(Math.max(...full.map(piece => piece.at[1] + piece.size[1] / 2))).toBeCloseTo(ATRIUM_HEIGHT);
     expect(Math.max(...overview.map(piece => piece.at[1] + piece.size[1] / 2))).toBeLessThanOrEqual(1.1 + 1e-9);
     for (const piece of [...full, ...overview]) expect(piece.size.every(size => size > 0), String(piece.at)).toBe(true);
-    // Every side of the building has a perimeter wall.
-    expect(WALLS.filter(wall => wall.exterior).map(wall => wall.id).sort()).toEqual(['east', 'north', 'south', 'west']);
+    // Exterior runs cover the entire perimeter; the old west windows become a glazed partition.
+    const exterior = WALLS.filter(wall => wall.exterior);
+    const perimeter = exterior.reduce((sum, wall) => sum + wall.to - wall.from, 0);
+    expect(perimeter).toBe(2 * (BUILDING.maxX - BUILDING.minX + BUILDING.maxZ - BUILDING.minZ));
+    for (const wall of exterior) expect(wall.axis === 'x'
+      ? [BUILDING.minZ, BUILDING.maxZ].includes(wall.fixed)
+      : [BUILDING.minX, BUILDING.maxX].includes(wall.fixed), wall.id).toBe(true);
+    expect(full.some(piece => piece.at[1] + piece.size[1] / 2 === WALL_HEIGHT)).toBe(true);
   });
 
-  it('frames every window in an exterior wall of its own space, clear of doorways and other windows', () => {
+  it('frames every window in an exterior wall or the original glazed partition of its own space, clear of doorways and other windows', () => {
     const { frames, glass } = windowPieces();
     expect(glass).toHaveLength(WINDOWS.length);
     expect(frames.length).toBe(WINDOWS.length * 6);
     expect(WINDOW_HEAD - WINDOW_SILL).toBeGreaterThan(1.2);
     for (const win of WINDOWS) {
       const wall = WALLS.find(w => w.id === win.wall)!;
-      expect(wall.exterior, win.wall).toBe(true);
+      expect(wall.exterior, win.wall).toBe(win.wall !== 'west');
       const point: Vec2 = wall.axis === 'x' ? [win.at, wall.fixed + (wall.fixed < 0 ? 0.3 : -0.3)] : [wall.fixed + (wall.fixed < 0 ? 0.3 : -0.3), win.at];
       expect(spaceAt(point), `${win.wall} ${win.at}`).toBe(win.space);
       const span = (at: number, width: number) => [at - width / 2, at + width / 2] as const;
@@ -286,8 +293,10 @@ describe('wall-mounted props', () => {
   const props: Mounted[] = [
     span('whiteboard', wx - WHITEBOARD.width / 2, wx + WHITEBOARD.width / 2, BUILDING.minZ, BUILDING.minZ + 0.33, WHITEBOARD.bottom, WHITEBOARD.bottom + WHITEBOARD.height),
     span('audit wall', AUDIT_WALL.x - 0.1, AUDIT_WALL.x + 0.1, AUDIT_WALL.z - AUDIT_WALL.width / 2, AUDIT_WALL.z + AUDIT_WALL.width / 2, AUDIT_WALL.bottom, AUDIT_WALL.bottom + AUDIT_WALL.height),
-    // WallClock.tsx: 0.52 m bracket off the west wall, face radius 0.65, centred 1.75 m up.
-    span('clock', BUILDING.minX, BUILDING.minX + 0.1 + 0.52 + 0.65, CLOCK_INTERACTION.position[1] - 0.65, CLOCK_INTERACTION.position[1] + 0.65, 1.1, 2.4),
+    // Conservative bounds for the tilted clock face and its bracket off the corridor's north wall.
+    span('clock', CLOCK_MOUNT.position[0] - CLOCK_MOUNT.radius, CLOCK_MOUNT.position[0] + CLOCK_MOUNT.radius,
+      CORRIDOR.minZ, CLOCK_MOUNT.position[2] + CLOCK_MOUNT.bracketLength + CLOCK_MOUNT.radius,
+      CLOCK_MOUNT.position[1] - CLOCK_MOUNT.radius, CLOCK_MOUNT.position[1] + CLOCK_MOUNT.radius),
     // LobbyCounter.tsx / Ambient.tsx: 2 x 1.45 board centred 1.25 m up.
     span('decision board', LOBBY_BOARD[0] - 1, LOBBY_BOARD[0] + 1, LOBBY_BOARD[1] - 0.2, LOBBY_BOARD[1] + 0.2, 1.25 - 0.725, 1.25 + 0.725),
     ...art,
@@ -302,6 +311,26 @@ describe('wall-mounted props', () => {
     return { id: `${win.wall}@${win.at}`, rect, bottom: WINDOW_SILL - WINDOW_FRAME, top: WINDOW_HEAD + WINDOW_FRAME };
   });
   const hits = (a: Rect, b: Rect) => a.minX < b.maxX && b.minX < a.maxX && a.minZ < b.maxZ && b.minZ < a.maxZ;
+
+  it('mounts the clock on solid corridor wall within a metre of its reachable interaction point', () => {
+    const { position: [x, y, z], radius, bracketLength } = CLOCK_MOUNT;
+    const [ix, iz] = CLOCK_INTERACTION.position;
+    expect(Math.hypot(x - ix, z + bracketLength - iz)).toBeLessThan(1);
+    expect(Math.hypot(x - ix, z - iz)).toBeLessThan(1);
+    expect(spaceAt([ix, iz])).toBe('corridor');
+    expect(insideAny([ix, iz], colliders, PLAYER_RADIUS)).toBe(false);
+    expect(Math.abs(z - CORRIDOR.minZ)).toBeLessThan(0.11);
+    // A single drawn wall segment must support the entire face, rather than a doorway/header.
+    expect(wallPieces('full').some(piece =>
+      Math.abs(piece.at[2] - CORRIDOR.minZ) < 1e-9
+      && piece.at[0] - piece.size[0] / 2 <= x - radius
+      && piece.at[0] + piece.size[0] / 2 >= x + radius
+      && piece.at[1] - piece.size[1] / 2 <= y - radius
+      && piece.at[1] + piece.size[1] / 2 >= y + radius)).toBe(true);
+    for (const door of DOORWAYS.filter(door => door.axis === 'x' && door.at[1] === CORRIDOR.minZ)) {
+      expect(x + radius < door.at[0] - door.width / 2 || x - radius > door.at[0] + door.width / 2, door.id).toBe(true);
+    }
+  });
 
   it('keeps the whiteboard, audit wall, clock, decision board and wall art clear of every window opening and frame', () => {
     expect(art.length).toBeGreaterThan(0);

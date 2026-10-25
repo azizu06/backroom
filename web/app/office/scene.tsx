@@ -112,7 +112,7 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
   const destination = useRef(new Vector3(13, 15, 17));
   const tourMove = useRef<TourMove>({ startedAt: null, position: new Vector3(), target: new Vector3(), zoom: 1 });
   useEffect(() => {
-    const center = focus ? OFFICE_ANCHORS[focus].center : [0, 0];
+    const center = focus ? OFFICE_ANCHORS[focus].center : [(BUILDING.minX + BUILDING.maxX) / 2, 0];
     target.current.set(center[0]!, 0.2, center[1]!);
     destination.current.copy(target.current).add(new Vector3(13, 15, 17));
     tourMove.current.startedAt = null;
@@ -123,7 +123,7 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
     if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
     state.invalidate();
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 33, size.height / 22);
+    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 44, size.height / 29);
     if (tour) {
       const move = tourMove.current;
       if (move.startedAt === null) {
@@ -183,7 +183,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     <Instances limit={240} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
     {/* Floor slab, a cream pad per room (tinted while focused) and a blush corridor runner; walls, windows and the ceiling are the WorldShell mount. */}
-    <Block at={[0, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
+    <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
     <Block at={[(CORRIDOR.minX + CORRIDOR.maxX) / 2, 0.01, CORRIDOR_Z]} size={[CORRIDOR.maxX - CORRIDOR.minX - 0.5, 0.02, 1.3]} color={ROLES.aisle} />
     {SPACE_IDS.filter(id => SPACES[id].kind === 'room' && !isAnchorId(id)).map(id => <RoomPad key={id} id={id} color={ROLES.roomPad} />)}
     {visibleRooms(snapshot).map(room => {

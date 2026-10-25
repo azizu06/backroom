@@ -50,7 +50,7 @@ describe("collisions", () => {
   });
 
   it("stops at the outer walls and clamps to the floor bounds", () => {
-    expect(walk([-10, -0.5], [-1, 0], 5)[0]).toBeCloseTo(BUILDING.minX + wallFace + PLAYER_RADIUS, 3);
+    expect(walk([-21, -0.5], [-1, 0], 5)[0]).toBeCloseTo(BUILDING.minX + wallFace + PLAYER_RADIUS, 3);
     expect(walk([-0.8, 6], [0, 1], 5)[1]).toBeCloseTo(BUILDING.maxZ - wallFace - PLAYER_RADIUS, 3);
     expect(movePlayer([0, 0.5], [0, 20], [], PLAYER_RADIUS)).toEqual([0, BUILDING.maxZ - wallFace - PLAYER_RADIUS]);
   });

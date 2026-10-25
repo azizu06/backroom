@@ -5,7 +5,7 @@
  */
 import { ROLES } from "./palette";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { roomPoint } from "./layout";
+import { BUILDING, roomPoint } from "./layout";
 
 export type Vec3 = [number, number, number];
 
@@ -56,14 +56,14 @@ export const OFFICE_LIGHTING: OfficeLighting = {
     // A late-afternoon sun low in the south-east (about 27 degrees up), so its disc shows through the windows.
     position: [15, 10, 13],
     castShadow: true,
-    // near/far bound the light's throw across the 24 x 15 building, so the bias stays ~0.01 world units.
-    shadow: { mapSize: 1024, bias: -0.0004, near: 1, far: 50, left: -17, right: 17, top: 14, bottom: -14 },
+    // Cover the expanded 36 x 15 building and 7 m atrium, keeping depth bias below 0.02 world units.
+    shadow: { mapSize: 1024, bias: -0.0003, near: 1, far: 55, left: -26, right: 26, top: 24, bottom: -24 },
   },
   fill: { color: ROLES.fillLight, intensity: 0.45, position: [-8, 7, 8], castShadow: false },
   hemisphere: { skyColor: ROLES.ceiling, groundColor: ROLES.shadow, intensity: 1.5 },
   // Room pads reach y=0.045 (FLOOR_PAD_TOP), so the shadow plane sits just above them. near=-0.04 lets the upward
   // depth pass also see faces from y=0.01 (avatar feet) while still skipping pad undersides (y<=0.005).
-  contactShadows: { position: [0, 0.05, 0], near: -0.04, scale: [24.5, 15.5], resolution: 512, blur: 2.5, opacity: 0.35, far: 2.5, color: ROLES.shadow },
+  contactShadows: { position: [(BUILDING.minX + BUILDING.maxX) / 2, 0.05, 0], near: -0.04, scale: [BUILDING.maxX - BUILDING.minX + 0.5, BUILDING.maxZ - BUILDING.minZ + 0.5], resolution: 512, blur: 2.5, opacity: 0.35, far: 2.5, color: ROLES.shadow },
   base: { roughness: 0.9 },
   screen: { roughness: 0.2, metalness: 0.1, emissiveIntensity: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15 },
   vault: { color: ROLES.frame, roughness: 0.45, metalness: 0.3 },
