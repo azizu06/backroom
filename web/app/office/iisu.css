@@ -606,8 +606,6 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 .office-shell .sheet-steps li { counter-increment: step; position: relative; padding: 10px 12px 10px 46px; color: var(--ink); background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 18px; font-size: 13px; line-height: 1.35; }
 .office-shell .sheet-steps li::before { content: counter(step); position: absolute; left: 10px; top: 10px; display: grid; place-items: center; width: 26px; height: 26px; color: #19213B; background: var(--pastel-yellow); border-radius: 50%; font-weight: 900; }
 .office-shell[data-theme=dark] .sheet-steps li { background: #26315A; border-color: #3B4A7E; }
-.office-shell .detail-sheet-open { padding: 6px 14px; color: #19213B; background: #ffffff; border: 2px solid #ffffff; border-radius: 999px; font-size: 13px; font-weight: 800; text-decoration: none; white-space: nowrap; }
-.office-shell .detail-sheet-open:hover { background: var(--pastel-aqua); }
 .office-shell .office-sidebar-links .office-sidebar-ready { color: #0F766E; font-weight: 900; }
 .office-shell .office-sidebar-links button[data-ready] .room-icon { background: var(--pastel-aqua); border-color: #ffffff; box-shadow: 0 0 0 3px rgba(169, 246, 255, 0.6); }
 .office-shell[data-theme=dark] .office-sidebar-links .office-sidebar-ready { color: var(--pastel-aqua); }
@@ -653,7 +651,7 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 /* ---------- Grouped page sheets: tabs under the header ---------- */
 .office-shell .detail-sheet[data-size='wide'] { transition: width 0.28s cubic-bezier(.22, 1, .36, 1); }
 .office-shell .sheet-tab-panel { display: grid; gap: 18px; }
-.office-shell .sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 5px; background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 999px; justify-self: start; }
+.office-shell .sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 5px; background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 999px; justify-self: center; justify-content: center; }
 html body .office-shell .detail-sheet .sheet-tabs button[role='tab'] { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; color: var(--ink); background: transparent; border: 0; box-shadow: none; border-radius: 999px; font-size: 14px; font-weight: 800; transform: none; }
 html body .office-shell .detail-sheet .sheet-tabs button[role='tab']:hover { background: #FFFBDD; }
 html body .office-shell .detail-sheet .sheet-tabs button[role='tab'][aria-selected='true'] { color: #19213B; background: var(--pastel-yellow); box-shadow: 0 2px 8px rgba(25, 33, 59, 0.14); }
