@@ -40,6 +40,7 @@ import { FloorPlan } from './FloorPlan';
 import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
 import { DetailSheet } from './DetailSheet';
+import { FullFloor } from './panels/FullFloor';
 import { HelpSheet } from './HelpSheet';
 import { InboxTray } from '../../components/InboxTray';
 import type { InboxPreset } from '../../lib/inbox/types';
@@ -560,8 +561,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     </div>
     </div>
     {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} openSheet={openSheet} />}
-    {sheet && sheet !== 'rooms' && sheet !== 'help' && !isPageSheet(sheet) && <DetailSheet icon={sheet === 'overview' ? 'house' : sheet} title={sheet === 'overview' ? 'Today at Backroom' : sheet === 'audit' ? 'Audit Wall' : `Inbox · ${snapshot.inboxCount}`} onClose={closeSheet}>
-      {sheet === 'overview' ? <>{seatStatuses}{workdayContent}{handoffContent}{previewReceipts}{controls}</> : sheet === 'audit' ? auditContent : inboxContent}
+    {sheet && sheet !== 'rooms' && sheet !== 'help' && !isPageSheet(sheet) && <DetailSheet page={sheet === 'overview' ? 'full-floor' : undefined} icon={sheet === 'overview' ? 'house' : sheet} title={sheet === 'overview' ? 'Full Floor' : sheet === 'audit' ? 'Audit Wall' : `Inbox · ${snapshot.inboxCount}`} onClose={closeSheet}>
+      {sheet === 'overview' ? <FullFloor snapshot={snapshot} workday={workdayContent} handoffs={handoffContent} receipts={<ReceiptList snapshot={snapshot} title='Office receipts' />} controls={controls} /> : sheet === 'audit' ? auditContent : inboxContent}
     </DetailSheet>}
     {isPageSheet(sheet) && (() => {
       const Page = PAGE_SHEETS[sheet];

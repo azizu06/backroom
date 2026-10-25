@@ -17,7 +17,7 @@ const SHEET_BUTTON: Record<OfficeSheet, string | RegExp> = {
 };
 
 const SHEET_DIALOG: Record<OfficeSheet, string | RegExp> = {
-  overview: 'Today at Backroom',
+  overview: 'Full Floor',
   rooms: 'Rooms',
   inbox: /^Inbox/,
   audit: 'Audit Wall',
