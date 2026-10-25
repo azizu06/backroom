@@ -246,7 +246,7 @@ external pre-call checks remain simulated. A failed deposit/feed check exits non
 API-derived label documented above; an unchanged account balance is not settlement evidence. The T4 balance gate is independently
 tracked; a fake-bank pass does not establish it. Do not use `--live` in unit tests.
 
-## Cartesia: setup, features and limitations
+## Cartesia setup features and limitations
 
 Cartesia Managed Agents provide the collections conversation and server-gated
 webhook tools; role-specific TTS makes responsibility handoffs audible. Code
@@ -268,6 +268,16 @@ nor a successful tool round trip; historical partial call receipts are scoped in
 the T1 document. A full phone-to-human-approval-to-bank flow needs its own trace.
 Narration, cached audio, or a queued link cannot establish that flow. No new
 Cartesia request was made to prepare these sections.
+
+## Apify: Best Use and Best Actor
+
+[Client Health Check](https://apify.com/azizu/client-health-check) is our public
+Actor for both Best Use of Apify and Best Actor. Its
+[source and setup README](apify/client-health-check/README.md) documents inputs,
+outputs, costs and limitations. It probes a supplied business website and can
+normalize supplied Maps observations and phone comparisons; it does not discover
+businesses or launch Maps scrapers. The [retained evidence](docs/evidence/apify/README.md)
+separates the historical website-only run from the later public-visibility check.
 
 ## Real versus simulated
 
