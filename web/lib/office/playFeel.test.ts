@@ -74,10 +74,10 @@ describe("head bob and footsteps", () => {
     for (let d = 0; d < 5; d += 0.037) expect(Math.abs(bobHeight(d, 1))).toBeLessThanOrEqual(BOB_AMPLITUDE + 1e-12);
   });
 
-  it("scales with intensity, which is clamped to 0..1.5", () => {
+  it("scales with intensity, which is clamped to 0..1", () => {
     expect(bobHeight(0.3, 0)).toBe(0);
     expect(bobHeight(0.3, 0.5)).toBeCloseTo(bobHeight(0.3, 1) / 2, 9);
-    expect(bobHeight(0.3, 5)).toBe(bobHeight(0.3, 1.5));
+    expect(bobHeight(0.3, 5)).toBe(bobHeight(0.3, 1));
     expect(bobHeight(0.3, -1)).toBe(0);
   });
 
@@ -118,7 +118,7 @@ describe("per-frame feel", () => {
   });
 
   it("keeps the kick subtle and never scales past walking speed", () => {
-    expect(FOV_KICK).toBeLessThanOrEqual(5);
+    expect(FOV_KICK).toBe(3.5);
     const fast = run(DEFAULT_FEEL, WALK_SPEED * 2, 2);
     expect(fast.last.fov).toBeLessThanOrEqual(BASE_FOV + FOV_KICK + 1e-9);
   });
@@ -164,37 +164,25 @@ describe("per-frame feel", () => {
 });
 
 describe("reduced motion and settings", () => {
-  it("honours the office override while preserving individual switches and intensity", () => {
-    const flags = { ...DEFAULT_FEEL, bob: false, useMotionAnyway: true, motionIntensity: 1.5 };
+  it("honours the office override while preserving individual switches", () => {
+    const flags = { ...DEFAULT_FEEL, bob: false, useMotionAnyway: true };
     expect(effectiveFeel(flags, true)).toEqual(flags);
     expect(effectiveFeel(flags, false)).toEqual(flags);
     expect(effectiveFeel({ ...flags, useMotionAnyway: false }, true)).toEqual(NO_FEEL);
     const walking = run(effectiveFeel(flags, true), WALK_SPEED, 2);
     expect(walking.last.bobY).toBe(0);
-    expect(walking.last.fov - BASE_FOV).toBeCloseTo(FOV_KICK * 1.5, 3);
+    expect(walking.last.fov - BASE_FOV).toBeCloseTo(FOV_KICK, 3);
   });
 
-  it("scales bob and kick at both slider endpoints, including after an override", () => {
-    const normal = run(DEFAULT_FEEL, WALK_SPEED, 2);
-    for (const motionIntensity of [0.5, 1, 1.5]) {
-      const flags = effectiveFeel({ ...DEFAULT_FEEL, useMotionAnyway: true, motionIntensity }, true);
-      const walking = run(flags, WALK_SPEED, 2);
-      expect(walking.last.bobY).toBeCloseTo(normal.last.bobY * motionIntensity, 6);
-      expect(walking.last.fov - BASE_FOV).toBeCloseTo((normal.last.fov - BASE_FOV) * motionIntensity, 6);
-    }
-    for (const motionIntensity of [NaN, Infinity]) {
-      expect(run({ ...DEFAULT_FEEL, motionIntensity }, WALK_SPEED, 2).last.bobY).toBe(normal.last.bobY);
-    }
-    expect(run({ ...DEFAULT_FEEL, motionIntensity: 9 }, WALK_SPEED, 2).state.bob).toBeCloseTo(1.5);
-    expect(run({ ...DEFAULT_FEEL, motionIntensity: -9 }, WALK_SPEED, 2).state.bob).toBeCloseTo(0.5);
-  });
-
-  it("visibly settles after the final step but flattens on the first disabled frame", () => {
+  it("uses the original release rate, stops requesting settle frames, and disables immediately", () => {
     const walking = { distance: STEP_DISTANCE, bob: 1, fov: FOV_KICK };
     const settling = run(DEFAULT_FEEL, 0, 0.1, walking);
-    expect(Math.abs(settling.last.bobY)).toBeGreaterThan(0.025);
+    expect(Math.abs(settling.last.bobY)).toBeCloseTo(0.03 * Math.exp(-9 * 0.1), 9);
+    expect(settling.state.fov).toBeCloseTo(3.5 * Math.exp(-9 * 0.1), 9);
     expect(settling.last.settling).toBe(true);
-    expect(run(DEFAULT_FEEL, 0, 2, walking).last.bobY).toBe(0);
+    const rested = run(DEFAULT_FEEL, 0, 1, walking);
+    expect(rested.last.bobY).toBe(0);
+    expect(rested.last.settling).toBe(false);
     const off = advanceFeel(walking, { speed: WALK_SPEED, travelled: 0.05, dt: 1 / 60, flags: NO_FEEL });
     expect(off.bobY).toBe(0);
     expect(off.fov).toBe(BASE_FOV);
