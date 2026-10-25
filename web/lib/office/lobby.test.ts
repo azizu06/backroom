@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { createElement, type ReactElement } from 'react';
 import { createRequire } from 'node:module';
-import { AskWhyVoice, askWhyErrorMessage } from '../../components/AskWhyVoice';
+import { AskWhyVoice, askWhyErrorMessage, askWhyTextLocked } from '../../components/AskWhyVoice';
 import { AuditWall, type AuditSnapshot } from '../../components/AuditWall';
 import { LiveOffice } from '../../app/office/LiveOffice';
 import { MockOffice, Office } from '../../app/office/Office';
@@ -218,5 +218,17 @@ describe('office lobby', () => {
 
   it('keeps the AskWhyVoice default label', () => {
     expect(renderToStaticMarkup(createElement(AskWhyVoice))).toContain('aria-label="Ask why"');
+  });
+
+  it('keeps the text question editable while voice arms or records', () => {
+    expect(askWhyTextLocked(false, 'idle')).toBe(false);
+    expect(askWhyTextLocked(false, 'arming')).toBe(false);
+    expect(askWhyTextLocked(false, 'recording')).toBe(false);
+    expect(askWhyTextLocked(false, 'thinking')).toBe(true);
+    expect(askWhyTextLocked(true, 'idle')).toBe(true);
+    expect(askWhyTextLocked(true, 'arming')).toBe(true);
+    const idle = renderToStaticMarkup(createElement(AskWhyVoice));
+    expect(idle).toMatch(/<input(?![^>]*disabled)[^>]*>/);
+    expect(idle).toContain('<button type="submit" disabled="">Ask why</button>');
   });
 });
