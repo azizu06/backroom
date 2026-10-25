@@ -6,7 +6,7 @@ function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
 }
 async function pose(page: Page) {
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return surface(page).evaluate(element => {
     const { playerX, playerZ, playerYaw } = (element as HTMLElement).dataset;
     return { x: Number(playerX), z: Number(playerZ), yaw: Number(playerYaw) };

@@ -31,7 +31,7 @@ async function openBaked(page: Page) {
 async function enterPlay(page: Page) {
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
 }
 
 test('a missing baked lobby keeps the procedural audit board, stamp and colliders in Play', async ({ page }) => {

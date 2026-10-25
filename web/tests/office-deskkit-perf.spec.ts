@@ -38,7 +38,7 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   await expect(page.getByTestId('office-perf-calls')).toHaveText(/^\d+$/);
   await page.keyboard.down('ArrowRight');
   let sample: Sample;

@@ -166,6 +166,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, changeSettings] = usePlaySettings();
   usePointerLockChrome(hud);
+  // One frame once the surface exists, so the rig reports its pose even before the first key.
+  useEffect(() => { requestSceneFrame(); }, []);
   useImmersiveAudio(hud, snapshot);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(settings);

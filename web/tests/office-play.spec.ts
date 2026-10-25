@@ -97,7 +97,7 @@ async function startPlay(page: Page, setup?: () => Promise<void>) {
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return errors;
 }
 

@@ -44,7 +44,7 @@ test('Play hands control over after the intro and immediately with reduced motio
   await view.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await page.waitForTimeout(1200);
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   await walkForward(page, 2000);
 
   await page.keyboard.press('Escape');

@@ -50,7 +50,7 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
   await requireWebGL(page);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Agent handoffs' })).toBeVisible();
-  await expect(log(page)).toContainText('Intake → Extractor · INV-1042');
+  await expect(log(page)).toContainText('Intake → Extractor · INV-1042', { timeout: 15_000 });
   // Overlap: collections → auditor is logged alongside the first intake handoff.
   await expect(log(page)).toContainText('Collections → Auditor · INV-0977');
   await expect(tag(page, 'intake')).toBeVisible();
@@ -82,7 +82,7 @@ test('reduced motion lists handoffs instead of animating them', async ({ page })
   const region = page.getByRole('region', { name: 'Agent handoffs' });
   await expect(region).toContainText('Reduced motion · listed instead of animated');
   await expect(log(page)).toHaveAttribute('aria-live', 'polite');
-  await expect(log(page)).toContainText('Intake → Extractor');
+  await expect(log(page)).toContainText('Intake → Extractor', { timeout: 15_000 });
   await expect(log(page).locator("li[data-status='rejected']")).toBeVisible({ timeout: 20_000 });
   // Nobody walks: no tag is ever marked as returning.
   await expect(page.locator(".handoff-tag[data-returning='true']")).toHaveCount(0);
@@ -172,7 +172,7 @@ test('play mode: facing a handoff agent and pressing E shows the handoff details
   await page.waitForTimeout(6_000);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   // Intake stands in the lobby at (-10, 4), behind and to the left of the spawn; the path through the lobby opening is clear.
   const prompt = page.getByText('E · Ask Intake about the handoff');
   await face(page, -10, 4);

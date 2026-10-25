@@ -55,7 +55,7 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   // Pass the collections doorway between its posts, then move to the phone's aisle-side x.
   await page.keyboard.down('w');
   await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.0);

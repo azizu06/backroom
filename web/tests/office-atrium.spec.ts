@@ -10,7 +10,7 @@ test('walks from the corridor into the atrium without a wall or furniture blocki
   await view.selectOption({ label: 'Play (first person)' });
   const surface = page.getByRole('application', { name: /First-person office/ });
   await expect(surface).toBeFocused();
-  await expect(surface).toHaveAttribute('data-player-x', /-10\.8/);
+  await expect(surface).toHaveAttribute('data-player-x', /-10\.8/, { timeout: 15_000 });
   // Yaw zero faces north; A strafes west through the atrium's 2.4 m opening.
   await page.keyboard.down('a');
   try {

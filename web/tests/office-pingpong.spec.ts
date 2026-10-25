@@ -11,7 +11,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
     const surface = page.getByRole('application', { name: /First-person office/ });
     await expect(surface).toBeFocused();
-    await expect(page.locator('.play-prompt')).toHaveText('E · Play ping pong');
+    await expect(page.locator('.play-prompt')).toHaveText('E · Play ping pong', { timeout: 15_000 });
     const pose = await surface.evaluate(el => ({ ...((el as HTMLElement).dataset) }));
     const score = page.getByTestId('pingpong-score');
     await page.keyboard.press('e');

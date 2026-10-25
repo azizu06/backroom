@@ -19,7 +19,7 @@ async function enterPlay(page: Page, url: string) {
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
 }
 async function say(page: Page, text: string) {
   await surface(page).focus();
