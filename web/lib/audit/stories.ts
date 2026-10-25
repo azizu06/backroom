@@ -1,4 +1,5 @@
 import type { AuditEntry } from '@backroom/orchestrator';
+import { caseBalance, type CaseBalance } from './balance';
 
 /** View-only grouping of the audit chain into demo stories. It never changes or filters the record itself. */
 export type StoryKind = 'startup' | 'call' | 'payment' | 'inbox' | 'other';
@@ -7,7 +8,7 @@ export type StoryLine = {
   entry: AuditEntry; who: string; text: string;
   outcome?: 'ALLOW' | 'DENY' | 'ESCALATE'; rule?: string; amount?: string; proof?: Proof;
 };
-export type Story = { id: string; kind: StoryKind; title: string; lines: StoryLine[]; total: number };
+export type Story = { id: string; kind: StoryKind; title: string; lines: StoryLine[]; total: number; balance?: CaseBalance };
 
 // Reducer and event plumbing: real evidence, but not a decision anyone needs to read in the demo.
 const PLUMBING = new Set(['record_event', 'set_llm_enabled', 'heartbeat', 'lease_expired', 'task_resumed']);
@@ -197,8 +198,19 @@ export function auditStories(entries: readonly AuditEntry[]): Story[] {
     if (action === 'create_escalation' && entry.refs[0]) owner.set(entry.refs[0], draft);
     if (action === 'office_call_refused') call = undefined;
   }
-  return drafts.map(draft => ({ id: draft.id, kind: draft.kind, title: title(draft), total: draft.entries.length,
-    lines: pick(draft.entries.map(line)) })).reverse();
+  return drafts.map(draft => {
+    const balance = storyBalance(draft, run);
+    return { id: draft.id, kind: draft.kind, title: title(draft), total: draft.entries.length,
+      lines: pick(draft.entries.map(line)), ...(balance && { balance }) };
+  }).reverse();
+}
+
+/** A call story shows the plan it authorized; a payment story shows the plan its exact match paid against. */
+function storyBalance(draft: Draft, run: readonly AuditEntry[]) {
+  const planAuditId = draft.kind === 'call' ? draft.entries.findLast(entry => entry.inputs?.paymentPlan !== undefined)?.id
+    : draft.kind === 'payment' ? draft.entries.find(entry => entry.action === 'reconcile' && entry.ruleIds.includes('EXACT_PAYMENT_MATCH'))?.refs[2]
+    : undefined;
+  return planAuditId ? caseBalance(run, planAuditId) : undefined;
 }
 
 /** A question the Ask-why retriever can ground: invoice numbers match exactly, otherwise words match the record. */

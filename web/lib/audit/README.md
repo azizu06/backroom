@@ -41,6 +41,16 @@ context. The existing ask-why module owns the shared router, LLM OFF handling,
 validated citations and deterministic fallback. The UI labels model explanations,
 code fallback and ungrounded answers separately. Cited ids open entry replay.
 
+## Plan balance
+
+The ALLOW that authorizes a payment plan (`propose_plan`, or `check_approval` with
+`DANA_APPROVED`) carries `inputs.paymentPlan`: the code-computed schedule from
+`@backroom/orchestrator/payment-schedule`. Exact `reconcile` rows cite that ALLOW id
+as `refs[2]`. `lib/audit/balance.ts` joins the two, read-only, for the call and
+payment stories and the Calls page (`GET /api/audit/balance`, same operator
+session). The pay page reads the same persisted plan through
+`authorizedPaymentLink`. Paid counts only exact matches; nothing moves money.
+
 ## Verification
 
 From the repository root:

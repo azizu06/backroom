@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { signInOperator } from '../../lib/operator/sign-in-client';
 import type { EmailOnlyScenario } from '../../lib/calls/request';
 import PaymentLinkPanel from '../../components/PaymentLinkPanel';
+import CaseBalancePanel from '../../components/CaseBalancePanel';
 import styles from '../approve/[id]/approval.module.css';
 
 type EmailOnlyResult = { ok: boolean; message: string; error?: string; email?: 'queued' | 'duplicate' };
@@ -39,6 +40,7 @@ export default function CallUnlock() {
     <p className={styles.intro}>Press Request call on the office desk phone to ring the approved number. The agent says it is an AI before anything else.</p>
     {/* Shows only while a call's payment link is live, so nobody needs to know /payment-link. */}
     <PaymentLinkPanel title="Payment link ready" payButton idle={false} />
+    <CaseBalancePanel />
     {result && <p className={result.ok ? styles.notice : styles.error} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
     {result?.ok ? <p className={styles.section}><a href="/office">Back to the office</a></p>
       : <form className={styles.section} onSubmit={e => { e.preventDefault(); void unlock(); }}>

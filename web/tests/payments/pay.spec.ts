@@ -13,8 +13,12 @@ test('mobile sandbox pay page uses fixed ALLOW amount, posts once, and reloads i
   await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
   await expect(page.getByRole('heading', { name: 'Offline bank balance + posted deposits' })).toBeVisible();
   await expect(page.getByText('Deposit reference: fake-deposit-2')).toBeVisible();
+  const plan = page.getByRole('region', { name: 'Invoice #1042 payment plan' });
+  await expect(plan.getByText('Paid $2,475.00 of $4,950.00 · Remaining $2,475.00', { exact: true })).toBeVisible();
+  await expect(plan.getByRole('row')).toHaveText([/Installment.*Amount.*Due.*Status/, /^1 of 2\$2,475\.00.*Paid$/, /^2 of 2\$2,475\.00.*Upcoming$/]);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
+  await expect(plan.getByText('Paid $2,475.00 of $4,950.00 · Remaining $2,475.00', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('pay-mobile-after.png'), fullPage: true });
   await page.getByRole('button', { name: 'Refresh payment status', exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('pay-mobile-bank-readback.png') });

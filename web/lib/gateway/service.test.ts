@@ -161,3 +161,21 @@ describe("one open escalation per call", () => {
     expect([...c.plans, ...fresh.plans]).toEqual([]);
   });
 });
+
+describe("the authorized plan's code-computed schedule rides on its ALLOW audit", () => {
+  it("records it only on the plan-authorizing ALLOW, summing to the total", () => {
+    const c = call();
+    const id = escalated(c);
+    expect(c.audits.every(a => a.paymentPlan === undefined)).toBe(true);
+    decide(c, id, { kind: "Approve" });
+    const approved = check(c, id);
+    link(c, approved.plan_id);
+    const rows = c.audits.filter(a => a.paymentPlan);
+    expect(rows.map(a => a.id)).toEqual([approved.audit_id]);
+    const plan = rows[0]!.paymentPlan!;
+    expect(plan).toMatchObject({ planId: approved.plan_id, invoiceId: "1042", totalCents: 495000, installments: 7, firstPaymentPct: 15, durationDays: 30 });
+    expect(plan.schedule[0]!.amountCents).toBe(74300);
+    expect(plan.schedule.reduce((sum, row) => sum + row.amountCents, 0)).toBe(495000);
+    expect(c.links[0]!.amountCents).toBe(plan.schedule[0]!.amountCents);
+  });
+});

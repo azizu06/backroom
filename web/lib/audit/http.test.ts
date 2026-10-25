@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MemoryStateStore } from '@backroom/orchestrator';
+import { MemoryStateStore, paymentSchedule } from '@backroom/orchestrator';
 import { createAuditHTTP } from './http';
 import { operatorSessionCookie } from '../operator/sign-in';
 
@@ -128,5 +128,24 @@ describe('verified ask-why evidence', () => {
     expect(sent).toContain('4402');
     expect(sent).not.toContain('DO NOT SEND TO MODEL');
     expect(sent).not.toContain('Recorded policy sentence.');
+  });
+});
+
+describe('operator case balance', () => {
+  it('requires sign-in and reads the latest authorized plan with its exact matched payments', async () => {
+    const { handle, cookie, store } = await setup();
+    expect((await handle('balance', request('balance'))).status).toBe(401);
+    expect(await (await handle('balance', request('balance', undefined, cookie))).json()).toEqual({ balance: null });
+    const schedule = paymentSchedule({ totalCents: 495000, firstPaymentPct: 10, installments: 8, durationDays: 240, startAt: Date.UTC(2026, 9, 25) });
+    const plan = await store.appendAudit({ ts: 2, actor: 'code', seat: 'collections', action: 'check_approval', decision: 'ALLOW',
+      inputs: { invoiceId: '1042', paymentPlan: { planId: 'plan-1', invoiceId: '1042', totalCents: 495000, installments: 8,
+        firstPaymentPct: 10, durationDays: 240, authorizedAt: Date.UTC(2026, 9, 25), schedule } },
+      ruleIds: ['MAX_INSTALLMENTS', 'DANA_APPROVED'], refs: ['call', '1042'], route: 'code', policyVersion: 1, latencyMs: 0, costUsd: 0 });
+    await store.appendAudit({ ts: 3, actor: 'code', seat: 'collections', action: 'reconcile', inputs: { amountCents: 49500, installment: 1, invoiceState: 'partially_paid' },
+      ruleIds: ['EXACT_PAYMENT_MATCH'], refs: ['1042', 'link-1', plan.id], route: 'code', policyVersion: 1, latencyMs: 0, costUsd: 0 });
+    const { balance } = await (await handle('balance', request('balance', undefined, cookie))).json();
+    expect(balance).toMatchObject({ invoiceId: '1042', planAuditId: plan.id, totalCents: 495000, paidCents: 49500, remainingCents: 445500 });
+    expect(balance.schedule[0]).toMatchObject({ installment: 1, amountCents: 49500, status: 'paid' });
+    expect(balance.schedule[1]).toMatchObject({ installment: 2, amountCents: 63600, dueDate: '2026-11-28', status: 'upcoming' });
   });
 });
