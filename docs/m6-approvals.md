@@ -44,7 +44,7 @@ the sign-in tap provides (a "Tap to turn on the request chime" button covers rel
 
 The sign-in is a passkey assertion bound to a `session` challenge. It sets an
 `HttpOnly; SameSite=Strict` cookie (`Secure` on HTTPS) scoped to `/api/controller`,
-valid 12 hours, process-local like the credential. The session only lists pending
+valid 12 hours, and persisted with the credential (below). The session only lists pending
 requests: it cannot decide one, a sign-in assertion cannot be spent as a decision,
 and every Approve/Deny/Counter still needs its own decision-bound assertion. The inbox
 lists escalations created through `createApprovalBridge` (every gateway
@@ -110,8 +110,17 @@ decision/counter terms, and are consumed before async verification. Assertions
 must match RP, origin, credential id and user verification. Credential counters
 are updated. No claimed `verified` or `method` flag grants authority.
 
-**Current persistence boundary:** all approval credentials, challenges and
-StateStore rows are process-local and lost on restart. Run one server process
+**Current persistence boundary:** the demo host (`BACKROOM_DEMO=1`, i.e.
+`demo:up`) writes Dana's public credential (id, public key, sign counter,
+transports) and SHA-256 hashes of her sign-in tokens to
+`.demo/controller-credential.json` (override with `CONTROLLER_CREDENTIAL_FILE`;
+other hosts persist only when it is set). The file is mode 0600, written by
+temp + rename after enrollment, every counter update and every sign-in, and
+carries an HMAC keyed from `CONTROLLER_ENROLLMENT_SECRET`, which is never
+written. After a restart Dana stays enrolled and signed in. A tampered file, or
+one written for another origin, RP ID or enrollment secret, is ignored with
+`CONTROLLER_CREDENTIAL_FILE_REJECTED` and Dana enrolls again, which replaces it.
+Challenges and StateStore rows remain process-local. Run one server process
 for the rehearsal. They are shared across Next route chunks/dev reloads, not
 across machines or serverless instances. `installApprovalStateStore` must run at
 trusted bootstrap before starting the controller service; it delegates to the
