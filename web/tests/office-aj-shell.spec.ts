@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { OFFICE_ANCHORS } from '../lib/office/state';
 
 // Reference: BR-AJ-SOURCE 1f5ea2be9ce6. Run against the refreshed integrated build.
 const out = '/tmp/backrooms-aj-current';
@@ -359,13 +360,14 @@ test('integrated Play, WASD/E, HUD/map, 3D, tours and baked remain reachable', a
   await overview(page);
   // Reach a real Play interaction, then hand off to the single Audit Wall question field.
   // Keep this after the tour/baked checks so a handoff regression does not mask them.
+  // Preview Alex uses this anchor; spawn one metre south, facing him at the default yaw.
+  // Map "Go here" only supplies an entry for the next rig mount, not an active Play rig.
+  const [alexX, alexZ] = OFFICE_ANCHORS.collections.position;
+  await page.goto(`/office?view=overview&playSpawn=${alexX},${alexZ + 1}`);
   await view.selectOption('play');
   await ready(page);
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
-  const map = page.getByRole('region', { name: 'Office overview', exact: true });
-  await map.getByRole('button', { name: /^Alex,.*Go here or talk$/ }).click();
-  await page.getByRole('menu', { name: /Alex/ }).getByRole('menuitem', { name: /^Go here/ }).click();
-  await expect(map).toHaveCount(0);
+  await expect(surface(page)).toHaveAttribute('data-player-x', alexX.toFixed(3));
+  await expect(surface(page)).toHaveAttribute('data-player-z', (alexZ + 1).toFixed(3));
   await expect(page.locator('.play-prompt')).toHaveText('E · Talk to Alex');
   await surface(page).focus();
   await page.keyboard.press('e');
