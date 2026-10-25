@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import type { InboxPreset, InboxReceipt } from '../lib/inbox/types';
 import '../app/office/lobby.css';
+import { crsFraudText } from '../lib/provenance';
 import './InboxTray.css';
 
 const seatName = { payables: 'Payables', vendor_onboarding: 'Vendor onboarding' };
@@ -22,14 +23,6 @@ function formatSize(bytes: number, round: (value: number) => number = Math.round
 /** The receipt shows only the first sentence of the reason; the full text and policy quote sit under Full receipt. */
 function firstSentence(text: string) {
   return text.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? text;
-}
-
-/** Score beside its provenance label. A FAKE placeholder has no real score, and a cached label already carries its time. */
-function crsFraudText(fraud: NonNullable<InboxReceipt['bankChangeFraud']>) {
-  const scored = fraud.score !== undefined && !fraud.label.startsWith('FAKE');
-  const at = fraud.checkedAt && !fraud.label.includes('(cached at') ? new Date(fraud.checkedAt) : undefined;
-  const checked = at && Number.isFinite(at.getTime()) ? ` · checked ${at.toISOString().slice(11, 16)} UTC` : '';
-  return `${scored ? `${fraud.score} / 100 · ` : ''}${fraud.label}${checked}`;
 }
 
 function attachmentProblem(file: File) {

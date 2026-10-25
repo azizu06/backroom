@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('synthetic CRS fraud receipt visibly holds a high-risk bank change with its sandbox label', async ({ page }) => {
+test('CRS fraud receipt visibly holds a high-risk bank change with its score and check time', async ({ page }) => {
   await page.route('**/api/inbox', route => route.fulfill({ json: {
     id: 'synthetic-crs-hold', scenario_source: 'judge', seat: 'vendor_onboarding', extractionSource: 'model',
     fields: { kind: 'bank_change', vendorId: 'cedar', domain: 'cedarfreight.example', bankAccountId: 'synthetic-unapproved' },
@@ -16,7 +16,7 @@ test('synthetic CRS fraud receipt visibly holds a high-risk bank change with its
   await expect(receipt.getByText('held', { exact: true })).toBeVisible();
   await expect(receipt.getByText('FRAUD_RISK_HOLD', { exact: true })).toBeVisible();
   await expect(receipt.getByText('CRS fraud score', { exact: true })).toBeVisible();
-  await expect(receipt.getByText('88 / 100 · CRS sandbox: test identity #13 (cached at 18:05 UTC)', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('88 / 100 · checked 18:05 UTC', { exact: true })).toBeVisible();
   await expect(receipt.getByText('Full receipt')).toBeVisible();
 });
 
