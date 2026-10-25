@@ -4,11 +4,11 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "fa766ca5a4fe97915cbac32d8661254e1a47381b",
+    "baseCommit": "541b33bfd2c7e9a55211541da825d2768f502c4f",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "299fc6fb3b300b4793c2ac785cd4a292b9efcefc8be185631f9303cb5392d065",
-      "orchestrator/src/agents/eval/conversation.ts": "2923b6c6d14e00bdb5035405d1024534b44e381e6f6db7f1bd7b9f706bfbc889",
+      "orchestrator/src/agents/eval/conversation.ts": "da0c786d8253ad0e35af4b3203689d6069ed8b8ae29b4a794510fcb009f14088",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -24,24 +24,30 @@
       "orchestrator/src/agents/eval/ap-debit.ts": "c2a40b752f39c7af07f8a4a75a8b5f8a297f2c53dc9acf0b97b8a6230049547f",
       "orchestrator/src/agents/eval/email-dispatcher.ts": "23c65d4c5595816587633a76dcc33180240eb40de93c7b8c89aef0235392bc45",
       "orchestrator/src/agents/eval/email-host.ts": "d5f7ab20d2e9786908dd55a3c17ff34f7186e217424400750827c38527eb0fb2",
+      "orchestrator/src/agents/eval/wrong-person.ts": "7214e0cf53ec0f83279b656a0b32c49d70f9d3adfd4efd6d880c8d3c8314df47",
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "f83e9635a318a5be99a8b154d069f0cefef91c4c0cf46982179cb9889028286c",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "b8756ca7548652d8b63d5e60133fdaf833ed6ccd6806e1caac43f4795369ad8d"
+      "orchestrator/src/agents/eval/scoreboard.ts": "d147a86b75f2c2c61d5aaf5cbd69d82ddc14fdddb440c6c8883035bd682d4d0b"
     },
     "recoveryRuntimeSources": {
-      "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
-      "orchestrator/src/agents/handoff-store.ts": "b963299b3a356a2e5dba32746af5c02f4518904196d3b5c06927bde072eeecc7",
+      "orchestrator/src/agents/handoff-engine.ts": "b3595cb164c903a47d125117032e5fd3739b40ed4439964e2c126f7d65e67d00",
+      "orchestrator/src/agents/handoff-store.ts": "833eb92485f63086ceaef7fa2f7167074a4e6d208e1bfbbb1b611e0479aa4899",
       "orchestrator/src/agents/dispatcher.ts": "64690fe5c34675e5202d715ffad9cf4fc439b29e1407892b9aca2f328c88984e"
     },
     "voicemailRuntimeSources": {
-      "orchestrator/src/voice/tools.ts": "6174fc86f7536ffe137c1f3fed9dc262c6722d6f63f7ab9a929c4b8a3ad0d342"
+      "orchestrator/src/voice/tools.ts": "1e41ca0f4f7010213aa6814a1b181929e68429130bd8769cad27b1c8cf5eb87f"
+    },
+    "wrongPersonRuntimeSources": {
+      "orchestrator/src/voice/index.ts": "f5c3e1b655a62f6e1bc1f285fbed4a633ba21eabacd820873c612dc512cbfd2a",
+      "orchestrator/src/voice/server.ts": "a6ca962e0ae23a79bf3e6724eba6e7240c236fbecb018c21cbecb00b14eefd03",
+      "orchestrator/src/voice/answer.ts": "8a0b8b8f006a56c210da92c786223a1775bad93c0a1faeb4d4215e77bf615d36"
     },
     "crsRuntimeSources": {
       "orchestrator/src/collections/crs.ts": "210a1a7e30b6efea4f1e538293eaac8ca189b88955c700962b78f1ccc51fb6e4"
     },
     "apDebitRuntimeSources": {
-      "integrations/nessie/src/index.ts": "c93e8a817504bd6cca15113a40765a2bb3318e20d460e4c3e272a6e9c138329b",
+      "integrations/nessie/src/index.ts": "14be3398415ae1943f206ba7ae233e63db6c23b47bd7ab7aabdb5836b7296e8b",
       "orchestrator/src/payables/payments.ts": "42f93c24275055ed013622437649d78e48c80065d4d35bb01332ba47c5811a2b",
       "orchestrator/src/payables/index.ts": "9d3b0bc246b852d798dcf6b02940f63d0b7ca3356f1fde6cfbcfcefca9c0db28",
       "orchestrator/src/agents/tools/payables.ts": "f9f104532a5531eab8f0e982d8c3c6bc0d3a57ad764416874502d5d44a874f56"
@@ -55,9 +61,9 @@
     "emailHostRuntimeSources": {
       "web/lib/calls/request.ts": "cc7728c6283a91e5bff2c9b6a3735d21cb6b776419be3180e8181b3502972896",
       "web/lib/calls/runtime.ts": "6c102edd033838954db364456c71dd351ac6c947790ac43a604d37beb30986dc",
-      "web/lib/demo/agents.ts": "1cc14077d5d1b0d64b20b1df2778d40f8629221d2eeb54faf9c6b70467dc1d1a",
+      "web/lib/demo/agents.ts": "cf7871bbab7df95bdaf5757764da97fd31a849d548fa0b83b33992b471439eb4",
       "web/lib/demo/services.ts": "0c7b39345054bb497e14ad5abbd1df66c4924b331ebc115d68745f2421a384d8",
-      "web/lib/demo/runtime.ts": "b20e5ba1f7404d8f6620e412bf6f4d126582fac304fe28704f414cb50d1e1396"
+      "web/lib/demo/runtime.ts": "36ce4d0c47c664e730f3fa4958df3719ffbe48f15a6e612f21bd11e16dfd0f58"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
@@ -98,6 +104,7 @@
     "durableRecovery": "Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.",
     "emailDispatcher": "Production createRoleRegistry collectionsPlanner role -> Dispatcher -> ClaudeAgentRuntime with scripted QueryFn. Product runCollectionsPlanner invokes the policy-checked email fallback on trusted case data and a shared MemoryEmailOutbox; a second dispatcher case proves invoice/day dedupe. No manual eval invocation of runEmailFollowUp, no network or live delivery. A host must opt into the planner role and supply its trusted contact/outbox; office/UI binding is not measured.",
     "emailHost": "Authenticated createCallRequestHTTP (operator sign-in, seeded consumer scenario) -> production createDemoServices.emailOnlyRefusal pre-call (offline: mock bank, FAKE CRS/Apify) -> CALL_DENIED B2B_ONLY_CALLS -> follow-up hook mapped as in web/lib/demo/runtime.ts -> production createInboxAgents.submitCallRefusal with services.collectionsPlanner -> Dispatcher + ClaudeAgentRuntime (scripted QueryFn) -> MemoryEmailOutbox. The eval pins the dedupe clock and counts voice starts. The Next route module, demo bootstrap install, browser, live host, real email delivery and Cartesia are not executed.",
+    "wrongPerson": "Production dialCollectionCall (provider HTTP stub) -> VoiceSession -> production createVoiceHandler relay -> real web tool gateway. The caller line is read by a scripted interpretAnswer (deny) in place of the Haiku reader; code maps it to wrong_person and returns the code-owned line. Without any model reading, code alone classifies this line as uncertain and re-asks. Cartesia speaking the line and the provider end-call are not executed.",
     "arConversations": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.",
     "judgeCalls": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, paid_then_invented, invented_then_paid, opt_out. The opt-out control must not escalate.",
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
@@ -190,6 +197,11 @@
       "percent": 100
     },
     "hostEmailFollowup": {
+      "numerator": 1,
+      "denominator": 1,
+      "percent": 100
+    },
+    "relayWrongPerson": {
       "numerator": 1,
       "denominator": 1,
       "percent": 100
@@ -13648,6 +13660,18 @@
     ],
     "scope": "Authenticated createCallRequestHTTP (operator sign-in, seeded consumer scenario) -> production createDemoServices.emailOnlyRefusal pre-call (offline: mock bank, FAKE CRS/Apify) -> CALL_DENIED B2B_ONLY_CALLS -> follow-up hook mapped as in web/lib/demo/runtime.ts -> production createInboxAgents.submitCallRefusal with services.collectionsPlanner -> Dispatcher + ClaudeAgentRuntime (scripted QueryFn) -> MemoryEmailOutbox. The eval pins the dedupe clock and counts voice starts. The Next route module, demo bootstrap install, browser, live host, real email delivery and Cartesia are not executed."
   },
+  "wrongPerson": {
+    "match": true,
+    "checks": {
+      "codeOwnedLine": true,
+      "businessNameAndCallback": true,
+      "noContactInvoiceOrAmount": true,
+      "accountClosedAfter": true,
+      "oneProviderDialRequest": true
+    },
+    "speak": "Sorry for the trouble. This is an AI assistant calling on behalf of Northfield Studio. If you know the right person, please ask them to call us back at 202-555-0100. Goodbye.",
+    "scope": "Production dialCollectionCall (provider HTTP stub) -> VoiceSession -> production createVoiceHandler relay -> real web tool gateway. The caller line is read by a scripted interpretAnswer (deny) in place of the Haiku reader; code maps it to wrong_person and returns the code-owned line. Without any model reading, code alone classifies this line as uncertain and re-asks. Cartesia speaking the line and the provider end-call are not executed."
+  },
   "durableRecovery": {
     "id": "P11",
     "status": "blocked",
@@ -14835,6 +14859,7 @@
         "auditChain": true,
         "humanFollowupQueued": true,
         "humanEscalationMirrored": true,
+        "danaCallbackAssigned": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -14873,7 +14898,18 @@
             ]
           }
         ],
-        "gatewayReviewRecipients": []
+        "gatewayReviewRecipients": [],
+        "danaCallback": {
+          "toHuman": "Dana",
+          "ruleIds": [
+            "REQUEST_HUMAN"
+          ],
+          "status": "pending",
+          "quote": "NF-001",
+          "inInbox": true,
+          "noMoney": true
+        },
+        "acknowledged": true
       },
       "hostileEvidence": {
         "requiredRule": "HOSTILE_ESCALATE",
@@ -14912,6 +14948,7 @@
         "auditChain": true,
         "humanFollowupQueued": true,
         "humanEscalationMirrored": true,
+        "danaCallbackAssigned": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -14950,7 +14987,18 @@
             ]
           }
         ],
-        "gatewayReviewRecipients": []
+        "gatewayReviewRecipients": [],
+        "danaCallback": {
+          "toHuman": "Dana",
+          "ruleIds": [
+            "REQUEST_HUMAN"
+          ],
+          "status": "pending",
+          "quote": "NF-001",
+          "inInbox": true,
+          "noMoney": true
+        },
+        "acknowledged": true
       },
       "gatewayTools": [
         "verify_identity_result:RECORDED",
@@ -14982,7 +15030,8 @@
         "noLeakBeforeIdentity": true,
         "auditChain": true,
         "noDetailsWithoutIdentity": true,
-        "nextCallAllowed": true
+        "nextCallAllowed": true,
+        "voicemailMessageGeneric": true
       },
       "callStatus": "active",
       "caseStatus": "held",
@@ -14998,7 +15047,9 @@
         ],
         "invoiceReadRefused": true,
         "callbackInstructionConfigured": true,
-        "speechMeasured": false,
+        "configuredMessage": "Hello, this is an AI assistant calling about a business matter. Please call back at the number this call came from. Thank you.",
+        "configuredMessageSafe": true,
+        "detectionExecuted": false,
         "messageDelivered": false
       },
       "gatewayTools": [
@@ -16239,20 +16290,20 @@
       "detail": "Frozen integrationOutcome: one_deescalation_then_end_escalate_stop_further_calls_HOSTILE_ESCALATE. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: false. One spoken de-escalation and provider end-call are not executed; keep the integration gap open."
     },
     {
-      "id": "C08",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
-      "id": "C09",
-      "detail": "Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open."
-    },
-    {
       "id": "C15",
       "detail": "Frozen integrationOutcome: use_actual_CRS_OFAC_test_identity_if_available_label_sandbox_no_dial. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: 0, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open."
     },
     {
       "id": "C21",
-      "detail": "Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (true), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open."
+      "detail": "Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. The production Cartesia agent config's fixed voicemail message is generic callback-only with no contact, invoice, amount or business name (true): \"Hello, this is an AI assistant calling about a business matter. Please call back at the number this call came from. Thank you.\". Cartesia voicemail detection firing and message delivery on a real call are not executed; keep the integration gap open."
+    },
+    {
+      "id": "C09:scope",
+      "detail": "The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway's code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed."
+    },
+    {
+      "id": "C08:scope",
+      "detail": "The wrong-person line is code-owned and graded on the production relay, with a scripted stand-in for the Haiku answer reader. Cartesia speaking it on a real call and the provider end-call are not executed."
     },
     {
       "id": "P01:scope",

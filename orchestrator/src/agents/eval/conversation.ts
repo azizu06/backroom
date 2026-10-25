@@ -14,6 +14,8 @@ import { fakeCreditCheck, fakeHealthCheck } from '../../collections/fakes';
 import { managedConfig } from '../../voice/tools';
 import { createGateway } from '../../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../../web/lib/gateway/store';
+import { createApprovalBridge } from '../../../../web/lib/approvals/gateway';
+import { inboxIds } from '../../../../web/lib/approvals/inbox';
 
 export const CONVERSATIONS = ['promise', 'dispute', 'already_paid_matched', 'already_paid_unmatched', 'wrong_number', 'opt_out',
   'hostile', 'human_request', 'voicemail', 'phone_mismatch'] as const;
@@ -135,7 +137,8 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const planned = await plan('planner', dials);
 
   // 2. Scripted conversation against the real gateway handler and store.
-  const handle = createGateway({ secret: () => 'eval-offline-secret', store: gateway });
+  // The production approval bridge, as the demo host installs it: plan escalations and C09 callbacks reach the StateStore.
+  const handle = createGateway({ secret: () => 'eval-offline-secret', store: gateway, approvalBridge: createApprovalBridge(state) });
   const transcript: { caller: string; tool?: string; result?: Record<string, Json> }[] = [];
   let planId: string | undefined;
   for (const [index, turn] of turns.entries()) {
@@ -220,12 +223,19 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const roleOrder = dispatched.activations.map(row => row.role);
   const expected = EXPECTED[name];
   const reconRules = audits.filter(row => row.action === 'agent_reconciliation').map(row => row.ruleIds[0]);
+  // The production agent config's fixed voicemail message (#309): code-owned text, so it is graded here.
+  const voicemail = managedConfig([]).system_tools.voicemail_detection;
+  const leaks = [...client.name.split(/\s+/).filter(word => word.length > 2), invoiceId, String(amountCents),
+    (amountCents / 100).toLocaleString('en-US'), '$', northfield.company.name, '{{'];
   const voicemailEvidence = name === 'voicemail' ? {
     gatewayReplyKinds: transcript.flatMap(row => row.result ? [String(row.result.kind)] : []),
     invoiceReadRefused: transcript.some(row => row.tool === 'get_invoice_context' && row.result?.kind === 'DENY' &&
       JSON.stringify(row.result.rule_ids) === JSON.stringify(['IDENTITY_REQUIRED'])),
     callbackInstructionConfigured: managedConfig([]).instructions.includes('Before ending say the callback number {{callback_number}}.'),
-    speechMeasured: false, messageDelivered: false,
+    configuredMessage: voicemail.message,
+    configuredMessageSafe: voicemail.pre_tool_speech === 'off' && /AI assistant/.test(voicemail.message)
+      && /call back/i.test(voicemail.message) && leaks.every(text => !voicemail.message.includes(text)),
+    detectionExecuted: false, messageDelivered: false,
   } : undefined;
   const humanFollowup = name === 'human_request' || name === 'hostile' ? {
     queuedRequests: call.outbox.filter(row => row.type === 'request_human').length,
@@ -235,9 +245,14 @@ export async function runConversation(name: Conversation, options: { pairing?: b
       .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
     postcallEscalations: audits.filter(row => row.action === 'collections_postcall_terminal')
       .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
-    // Read the actual record: request_human currently queues an unassigned outbox event.
-    // Plan approval recipients are not proof that a callback was assigned or delivered.
+    // Plan approval recipients on the call record; a callback is a separate StateStore row below.
     gatewayReviewRecipients: call.escalations.map(row => row.toHuman),
+    danaCallback: await (async () => {
+      const row = await state.getEscalation(`callback:${callId}`);
+      return row ? { toHuman: row.toHuman, ruleIds: row.ruleIds, status: row.status, quote: row.quote.sentenceId,
+        inInbox: inboxIds().includes(row.id), noMoney: row.amountCents === undefined && row.requestedTerms === undefined } : null;
+    })(),
+    acknowledged: transcript.some(row => row.tool === 'request_human' && String(row.result?.speak).includes('requested a human to follow up')),
   } : undefined;
   const hostileEvidence = name === 'hostile' ? {
     requiredRule: 'HOSTILE_ESCALATE',
@@ -258,6 +273,9 @@ export async function runConversation(name: Conversation, options: { pairing?: b
         humanFollowup.gatewayEscalations[0]!.decision === 'ESCALATE' && humanFollowup.mirroredEscalations[0]!.decision === 'ESCALATE' &&
         JSON.stringify(humanFollowup.mirroredEscalations[0]!.ruleIds) === JSON.stringify(['REQUEST_HUMAN']) &&
         humanFollowup.postcallEscalations[0]?.decision === 'ESCALATE',
+      danaCallbackAssigned: humanFollowup.danaCallback?.toHuman === (await state.getPolicy()).toHuman && humanFollowup.danaCallback.status === 'pending'
+        && JSON.stringify(humanFollowup.danaCallback.ruleIds) === JSON.stringify(['REQUEST_HUMAN'])
+        && humanFollowup.danaCallback.inInbox && humanFollowup.danaCallback.noMoney && humanFollowup.acknowledged,
     }),
     ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.length > 0 && reconRules.every(rule => rule === 'RECON_UNMATCHED') && !cleared }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
@@ -270,7 +288,8 @@ export async function runConversation(name: Conversation, options: { pairing?: b
       noAmountBeforeIdentity: transcript[1]?.result?.kind === 'DENY' && !revealsInvoice(transcript[1]!.result!, amountCents),
       contextAfterIdentity: transcript.at(-1)?.result?.kind === 'CONTEXT' }),
     ...(name === 'voicemail' && { noDetailsWithoutIdentity: transcript.at(-1)?.result?.kind === 'DENY' && !JSON.stringify(transcript.at(-1)?.result).includes(String(amountCents)),
-      nextCallAllowed: nextCall?.kind === 'started' && redials.length === 1 }),
+      nextCallAllowed: nextCall?.kind === 'started' && redials.length === 1,
+      voicemailMessageGeneric: voicemailEvidence?.configuredMessageSafe === true }),
     ...(name === 'opt_out' && { noOfferAfterOptOut: call.plans.length === 0, nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0
       && nextPermit?.decision === 'DENY' && JSON.stringify(nextPermit?.ruleIds) === JSON.stringify(['DNC']) }),
     ...(name === 'wrong_number' && { identityDenied: transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids ?? []).includes('IDENTITY_REQUIRED'),

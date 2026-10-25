@@ -38,12 +38,14 @@ import AckResultReducer from "./ack_result_reducer";
 import AdvanceTaskReducer from "./advance_task_reducer";
 import AgentAssertActiveReducer from "./agent_assert_active_reducer";
 import AgentCommitHandoffReducer from "./agent_commit_handoff_reducer";
+import AgentEscalateToHumanReducer from "./agent_escalate_to_human_reducer";
 import AgentFinishActivationReducer from "./agent_finish_activation_reducer";
 import AgentGetCaseReducer from "./agent_get_case_reducer";
 import AgentListPublicReducer from "./agent_list_public_reducer";
 import AgentOpenCaseReducer from "./agent_open_case_reducer";
 import AgentRecordArtifactsReducer from "./agent_record_artifacts_reducer";
 import AgentRejectHandoffReducer from "./agent_reject_handoff_reducer";
+import AgentResolveHumanEscalationReducer from "./agent_resolve_human_escalation_reducer";
 import AgentResumeCaseReducer from "./agent_resume_case_reducer";
 import AgentStartActivationReducer from "./agent_start_activation_reducer";
 import AgentStopCaseReducer from "./agent_stop_case_reducer";
@@ -87,6 +89,7 @@ import SeedCompanyReducer from "./seed_company_reducer";
 import SetAgentStateReducer from "./set_agent_state_reducer";
 import SetAgentTargetReducer from "./set_agent_target_reducer";
 import SetAgentTargetLeasedReducer from "./set_agent_target_leased_reducer";
+import SetCallPresenceReducer from "./set_call_presence_reducer";
 import SetLlmEnabledReducer from "./set_llm_enabled_reducer";
 import SubmitInboxItemReducer from "./submit_inbox_item_reducer";
 import SyncControlReducer from "./sync_control_reducer";
@@ -242,12 +245,14 @@ const reducersSchema = __reducers(
   __reducerSchema("advance_task", AdvanceTaskReducer),
   __reducerSchema("agent_assert_active", AgentAssertActiveReducer),
   __reducerSchema("agent_commit_handoff", AgentCommitHandoffReducer),
+  __reducerSchema("agent_escalate_to_human", AgentEscalateToHumanReducer),
   __reducerSchema("agent_finish_activation", AgentFinishActivationReducer),
   __reducerSchema("agent_get_case", AgentGetCaseReducer),
   __reducerSchema("agent_list_public", AgentListPublicReducer),
   __reducerSchema("agent_open_case", AgentOpenCaseReducer),
   __reducerSchema("agent_record_artifacts", AgentRecordArtifactsReducer),
   __reducerSchema("agent_reject_handoff", AgentRejectHandoffReducer),
+  __reducerSchema("agent_resolve_human_escalation", AgentResolveHumanEscalationReducer),
   __reducerSchema("agent_resume_case", AgentResumeCaseReducer),
   __reducerSchema("agent_start_activation", AgentStartActivationReducer),
   __reducerSchema("agent_stop_case", AgentStopCaseReducer),
@@ -291,6 +296,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_agent_state", SetAgentStateReducer),
   __reducerSchema("set_agent_target", SetAgentTargetReducer),
   __reducerSchema("set_agent_target_leased", SetAgentTargetLeasedReducer),
+  __reducerSchema("set_call_presence", SetCallPresenceReducer),
   __reducerSchema("set_llm_enabled", SetLlmEnabledReducer),
   __reducerSchema("submit_inbox_item", SubmitInboxItemReducer),
   __reducerSchema("sync_control", SyncControlReducer),

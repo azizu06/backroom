@@ -17,6 +17,15 @@ export interface VoiceSession {
   identity?: { question: string; replies: string[]; turns: number; failures: number; countedAt: number };
   /** Consecutive identical refused tool requests. */
   loop?: { key: string; repeats: number };
+  /** Trusted dial input for code-owned closing lines. Never an invoice, amount or contact detail. */
+  businessName?: string; callbackNumber?: string;
+}
+/** Wrong person: the business name and callback number only. No contact name, invoice or amount. */
+export function wrongPersonSpeak(session: Pick<VoiceSession, 'businessName' | 'callbackNumber'>): string {
+  const from = session.businessName ? ` on behalf of ${session.businessName}` : '';
+  const digits = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(session.callbackNumber ?? '');
+  const back = digits ? ` at ${digits[1]}-${digits[2]}-${digits[3]}` : '';
+  return `Sorry for the trouble. This is an AI assistant calling${from}. If you know the right person, please ask them to call us back${back}. Goodbye.`;
 }
 export interface DialOptions {
   apiKey: string; http?: typeof fetch; now?: Date; allowDemoOverride?: boolean;
@@ -61,7 +70,8 @@ export async function dialCollectionCall(input: DialInput, options: DialOptions)
   if (decision.kind !== 'ALLOW') throw new Error(decision.ruleIds.join(','));
   await options.audit({ action: 'CALL_PERMIT', ruleIds: decision.ruleIds, sessionId: input.sessionId, at: now.toISOString() });
   const session: VoiceSession = { id: input.sessionId, contactName: input.contactName, welcome: renderWelcome(input),
-    nonce: randomUUID(), disclosureComplete: false, stopped: false, deliveries: {} };
+    nonce: randomUUID(), disclosureComplete: false, stopped: false, deliveries: {},
+    businessName: input.businessName, callbackNumber: input.callbackNumber };
   await options.prepare(session, input);
   // No balance/principal/fee enters the model context before the identity-gated gateway.
   const dynamic_variables = {

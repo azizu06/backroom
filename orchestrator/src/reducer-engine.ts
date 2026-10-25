@@ -176,11 +176,29 @@ export class ReducerEngine {
     const liveCall = typeof input.callId === 'string' && input.callId.length > 0;
     const escalation: Escalation = { ...fields, createdAt: now, expiresAt: now + (liveCall ? approvalWindowMs() : 60_000), status: 'pending' };
     this.escalations.set(escalation.id, escalation);
-    agent.state = 'walking'; agent.targetAnchor = `${input.toHuman}_desk`;
+    // A repeat call reuses the voice agent row; its heartbeat must be this call's, not the last one's.
+    agent.state = 'walking'; agent.targetAnchor = `${input.toHuman}_desk`; agent.heartbeatAt = now;
     this.append({ ts: now, actor: 'code', seat, action: 'create_escalation', ruleIds: input.ruleIds,
       policyVersion: input.policyVersion, refs: [input.id, ...input.evidenceRefs], route: 'code',
       decision: 'ESCALATE', latencyMs: 0, costUsd: 0 });
     return copy(escalation);
+  }
+  /** Trusted call-host ingress for a live voice agent, which never holds a task lease: on_call for the
+   * call's duration (a walk to a pending escalation's desk is kept), idle when it ends. No wall audit. */
+  setCallPresence(agentId: string, seat: Seat, live: boolean, now: number) {
+    if (typeof agentId !== 'string' || !/^voice:[a-z_]{1,40}$/.test(agentId) || typeof live !== 'boolean') throw new Error('INVALID_CALL_PRESENCE');
+    const prior = this.agents.get(agentId);
+    if (prior && (prior.seatId !== seat || prior.currentTaskId)) throw new Error('INVALID_CALL_PRESENCE');
+    if (!prior && !live) return;
+    const agent: Agent = prior ?? { id: agentId, seatId: seat, state: 'on_call', room: seat, pos: { x: 0, y: 0, z: 0 }, heartbeatAt: now, modelRoute: 'code' };
+    this.agents.set(agentId, agent);
+    this.expire(now);
+    agent.heartbeatAt = now;
+    const desk = agent.targetAnchor;
+    const waiting = live && desk !== undefined && [...this.escalations.values()]
+      .some(e => e.fromAgent === agentId && e.status === 'pending' && desk === `${e.toHuman}_desk`);
+    if (waiting) { if (agent.state === 'offline') agent.state = 'walking'; return; }
+    agent.state = live ? 'on_call' : 'idle'; agent.targetAnchor = undefined;
   }
   decideEscalation(verified: ApprovalGrant, now: number): Escalation {
     this.expire(now);

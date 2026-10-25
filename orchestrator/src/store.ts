@@ -86,6 +86,8 @@ export interface StateStore {
   createEscalation(lease: Lease, decision: Extract<Decision, { kind: 'ESCALATE' }>, now: number): Promise<Escalation>;
   getEscalation(id: string): Promise<Escalation | undefined>;
   createCallEscalation(input: CallEscalation, now: number): Promise<Escalation>;
+  /** Trusted call host only: a live voice agent (`voice:<seat>`) is on_call while its call lasts, idle after. */
+  setCallPresence(agentId: string, seat: Seat, live: boolean, now: number): Promise<void>;
   decideEscalation(approval: VerifiedApproval, now: number): Promise<Escalation>;
   /** Closes due rows. Pass callId when that live call has ended so its rows close immediately. An already-expired row still records pending_owner once. */
   expireEscalations(now: number, callId?: string): Promise<void>;

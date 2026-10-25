@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_POLICY, evaluate as rawEvaluate, savePolicy, POLICY_SENTENCES, RULE_SENTENCES, type Plan } from "./index";
+import { DEFAULT_POLICY, evaluate as rawEvaluate, firstPaymentCents, savePolicy, POLICY_SENTENCES, RULE_SENTENCES, type Plan } from "./index";
 
 const evaluate: typeof rawEvaluate = (...args) => {
   const result = rawEvaluate(...args);
@@ -95,6 +95,16 @@ describe("Collections envelope", () => {
     expect(evaluate("collections", { type: "send_payment_link", plan: validPlan, amountCents: 247500 }, context).kind).toBe("ALLOW");
     expect(evaluate("collections", { type: "send_payment_link", plan: validPlan, amountCents: 240000 }, context))
       .toMatchObject({ kind: "DENY", ruleIds: ["LINK_AMOUNT"] });
+  });
+  it("rounds a fractional-dollar first payment up to the next whole dollar, never above the total", () => {
+    expect(firstPaymentCents(495000, 15, 7)).toBe(74300);
+    expect(firstPaymentCents(495000, 50, 2)).toBe(247500);
+    expect(firstPaymentCents(495050, 100, 1)).toBe(495050);
+    const context = { ...planContext, receivable: { principalCents: 480000, lateFeeCents: 15000 } };
+    const plan = { ...validPlan, firstPaymentPct: 55 };
+    const decide = (amountCents: number) => evaluate("collections", { type: "send_payment_link", plan, amountCents }, context);
+    expect(decide(272300).kind).toBe("ALLOW");
+    expect(decide(272250)).toMatchObject({ kind: "DENY", ruleIds: ["LINK_AMOUNT"] });
   });
 });
 

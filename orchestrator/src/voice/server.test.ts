@@ -9,9 +9,9 @@ const call: GatewayCall = { callId: 'session-1', invoiceId: '1042', clientId: 'c
   amountCents: 495000, receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1, identityConfirmed: false,
   status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} };
 const welcome = renderWelcome({ businessName: 'Northfield Studio', invoiceId: '1042', contactName: 'Jordan' });
-async function fixture(extra: Pick<Parameters<typeof createVoiceHandler>[0], 'interpretAnswer' | 'answerWaitMs'> = {}) {
+async function fixture(extra: Pick<Parameters<typeof createVoiceHandler>[0], 'interpretAnswer' | 'answerWaitMs'> = {}, fields: Partial<VoiceSession> = {}) {
   const journal = new VoiceJournal();
-  const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, stopped: false, deliveries: {} };
+  const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, stopped: false, deliveries: {}, ...fields };
   await journal.register(session);
   const gateway = vi.fn(createGateway({ secret: () => 'gateway-secret', store: new MemoryGatewayStore([structuredClone(call)]) }));
   const handle = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway, answerWaitMs: 0, ...extra });
@@ -199,6 +199,26 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
     expect(verified.body).toMatchObject({ identity: 'wrong_person' });
     expect((await f.tool('get_invoice_context', verified.body.next_delivery_nonce)).body.rule_ids).toEqual(['CALL_STOPPED']);
+  });
+  it('C08 wrong person gets a code-owned line with the business name and callback number only', async () => {
+    const f = await fixture({}, { businessName: 'Northfield Studio', callbackNumber: '+12025550100' });
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('no', { role: 'user', text: 'No, wrong number.', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'wrong_person' });
+    expect(verified.body).toMatchObject({ identity: 'wrong_person', next_step: 'say_and_end', can_confirm: false });
+    const speak = String(verified.body.speak);
+    expect(speak).toContain('Northfield Studio');
+    expect(speak).toContain('202-555-0100');
+    for (const detail of ['Jordan', '1042', '4,950', '495000', '$']) expect(speak).not.toContain(detail);
+    expect((await f.tool('get_invoice_context', verified.body.next_delivery_nonce)).body.rule_ids).toEqual(['CALL_STOPPED']);
+  });
+  it('a session journaled before C08 still gets a generic wrong-person line', async () => {
+    const f = await fixture();
+    await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+    await f.event('no', { role: 'user', text: 'No.', was_interrupted: false });
+    const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'wrong_person' });
+    expect(verified.body).toMatchObject({ next_step: 'say_and_end',
+      speak: 'Sorry for the trouble. This is an AI assistant calling. If you know the right person, please ask them to call us back. Goodbye.' });
   });
   it.each([['a different name', { kind: 'provide_value', value: 'Sam' }, 'uncertain'], ['the contact name', { kind: 'provide_value', value: 'Jordan Lee' }, 'confirmed'],
     ['a refusal', { kind: 'deny' }, 'wrong_person'], ['noise', { kind: 'unclear' }, 'uncertain']] as const)('maps a model reading of %s to a code decision', async (_, answer, expected) => {
