@@ -117,6 +117,25 @@ describe('collections planner specialist', () => {
     expect(outbox.sent).toHaveLength(0);
   });
 
+  it.each(['CANCELLED', 'LLM_OFF'])('does not queue when %s arrives during the final read and no synchronous store fence exists', async reason => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    const outbox = new MemoryEmailOutbox();
+    const controller = new AbortController();
+    let reads = 0;
+    h.deps.cases.load = vi.fn(async () => {
+      if (++reads === 2) controller.abort(reason);
+      return structuredClone(h.live);
+    });
+    const current = ctx({ activation: { ...ctx().activation, signal: controller.signal }, assertCurrent: async () => {
+      if (controller.signal.aborted) throw new Error(reason);
+    } });
+    expect(current.fence).toBeUndefined();
+    await expect(runCollectionsPlanner(scripted(async () => done), current, { ...h.deps, emailFollowUp: { outbox } }))
+      .rejects.toThrow(reason);
+    expect(outbox.sent).toHaveLength(0);
+  });
+
   it('prepares and starts one call through the voice layer', async () => {
     const h = harness();
     const run = await runCollectionsPlanner(happy, ctx(), h.deps);

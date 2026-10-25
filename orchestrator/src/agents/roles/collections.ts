@@ -121,6 +121,8 @@ export async function runCollectionsPlanner(runtime: AgentRuntime, ctx: ToolCont
       outbox: { async queue(message) {
         await ctx.assertCurrent();
         const current = await deps.cases.load(ctx.activation.caseId);
+        // Durable adapters may lack a synchronous lease fence; OFF/cancel must still stop this effect.
+        if (ctx.activation.signal.aborted) throw new Error(typeof ctx.activation.signal.reason === 'string' ? ctx.activation.signal.reason : 'CANCELLED');
         if (JSON.stringify(inputOf(current)) !== fingerprint) throw new Error('EMAIL_CASE_CHANGED');
         ctx.fence?.(); // no await between the ownership fence and starting the simulated queue write
         return outbox.queue(message);

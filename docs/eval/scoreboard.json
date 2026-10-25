@@ -39,7 +39,7 @@
       "orchestrator/src/collections/crs.ts": "210a1a7e30b6efea4f1e538293eaac8ca189b88955c700962b78f1ccc51fb6e4"
     },
     "emailRuntimeSources": {
-      "orchestrator/src/agents/roles/collections.ts": "e26aa0434bc252d798ef0a3f46925d7b0dcfd0f0d3847a2a55a203029cf7570c",
+      "orchestrator/src/agents/roles/collections.ts": "4a81c7f48171bd024a86a38fd31ebef0a94c2fcc13e31461d086467c04b4cb73",
       "orchestrator/src/agents/tools/collections.ts": "16e409e016232b6fe912cd48019c31c50950f1b349a463ab934837d7ac06921e",
       "orchestrator/src/agents/roles/index.ts": "fb7cf1078027a0736eae39f646c86c6dcda999aa98c920512b1271aea3030ad9",
       "orchestrator/src/collections/email.ts": "b73ddcb394b902dd85aa05951bc0c9646208fbe71882ffd6d7cc0e4210842243"
