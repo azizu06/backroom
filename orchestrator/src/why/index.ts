@@ -152,7 +152,7 @@ function fallback(entries: WhyAuditEntry[]): WhyAnswer {
   return { answer, citations: entries.map(entry => entry.id), source: "fallback" };
 }
 
-/** No state or tool dependencies. Invalid citations get one retry, then deterministic evidence. */
+/** Read-only explanation. Invalid citations or router failures get one retry, then deterministic evidence. */
 export async function askWhy(question: string, entries: readonly WhyAuditEntry[], options: WhyOptions = {}): Promise<WhyAnswer> {
   if (typeof question !== "string" || !question.trim() || question.length > 1000) throw new Error("Question must contain 1–1000 characters");
   const projected = entries.map(project).filter((entry): entry is WhyAuditEntry => !!entry);
@@ -165,7 +165,9 @@ export async function askWhy(question: string, entries: readonly WhyAuditEntry[]
   if (!state.llmEnabled || generation.aborted) return fallback(relevant);
   const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
   if (!relevant.length || (!apiKey && !process.env.ANTHROPIC_API_KEY && !options.modelRoute)) return fallback(relevant);
+  let invalidCitations = false;
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (generation.aborted || !state.llmEnabled) return fallback(relevant);
     try {
       const runRoute = options.modelRoute ?? (Object.keys(options).length ? createRouter({
         stateStore: state, cloudApiKey: apiKey, cloudBaseUrl: options.baseUrl,
@@ -175,7 +177,7 @@ export async function askWhy(question: string, entries: readonly WhyAuditEntry[]
       }).route : route);
       const response = await runRoute('ask_why', {
         question, entries: relevant,
-        ...(attempt ? { correction: 'Previous output failed citation validation. The answer string MUST include inline citations in exactly [entry:ID] syntax, using supplied entry ids. The citations array MUST contain those same ids. A citations array alone is invalid.' } : {}),
+        ...(invalidCitations ? { correction: 'Previous output failed citation validation. The answer string MUST include inline citations in exactly [entry:ID] syntax, using supplied entry ids. The citations array MUST contain those same ids. A citations array alone is invalid.' } : {}),
       }, {
         parse: (value: unknown) => value,
         jsonSchema: { type: 'object', description: systemPrompt, required: ['answer', 'citations'], additionalProperties: false,
@@ -184,7 +186,8 @@ export async function askWhy(question: string, entries: readonly WhyAuditEntry[]
       if (isLlmOff(response) || generation.aborted || !state.llmEnabled) return fallback(relevant);
       const result = validate(JSON.stringify(response.output), relevant);
       if (result) return result;
-    } catch { break; } // Never leak provider errors, keys, or response bodies.
+      invalidCitations = true;
+    } catch { /* Retry once, including cold-start transport and router failures. */ } // Never leak provider errors, keys, or response bodies.
   }
   return fallback(relevant);
 }

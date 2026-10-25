@@ -82,7 +82,7 @@ it.each([
   { overrides: { content: [{ type: 'text', text: '{"output":{}}' }] }, error: 'envelope' },
 ])('fails closed without OpenRouter failover: $error ($overrides)', async ({ overrides, error }) => {
   const network = vi.fn<typeof fetch>().mockResolvedValue(Response.json(message(overrides)));
-  await expect(createRouter({ ...keyOptions, fetch: network }).route('ask_why', {})).rejects.toThrow(error);
+  await expect(createRouter({ ...keyOptions, fetch: network }).route('call_plan', {})).rejects.toThrow(error);
   expect(network).toHaveBeenCalledTimes(1);
 });
 
