@@ -8,6 +8,8 @@ import { AGENT_RADIUS } from './targets/agent';
 import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type OfficeSnapshot } from './state';
 
 export type { PlayEntry };
+/** Keep the destination to face it again if the rendered geometry requires a nudge. */
+export interface OverviewEntry extends PlayEntry { readonly lookAt?: Vec2 }
 
 /** What an Overview click picked. Agents and desks open the quick menu; a room floor jumps straight in. */
 export type OverviewPick = { readonly kind: 'agent'; readonly id: string } | { readonly kind: 'room'; readonly room: AnchorId };
@@ -33,6 +35,30 @@ export function standable(spot: Vec2, colliders: readonly Box[]): boolean {
   return onFloor(spot) && !insideAny(spot, colliders, PLAYER_RADIUS);
 }
 
+/** Nearest clear point beside a requested entry, searching the whole floor if necessary. */
+export function clearEntry(entry: OverviewEntry, colliders: readonly Box[]): PlayEntry | null {
+  if (standable(entry.position, colliders)) return entry;
+  const [x, z] = entry.position;
+  // The nearest point outside axis-aligned boxes lies on an expanded edge (or their intersection).
+  const xs = [x, FLOOR.minX + PLAYER_RADIUS, FLOOR.maxX - PLAYER_RADIUS];
+  const zs = [z, FLOOR.minZ + PLAYER_RADIUS, FLOOR.maxZ - PLAYER_RADIUS];
+  for (const box of colliders) {
+    xs.push(box.minX - PLAYER_RADIUS, box.maxX + PLAYER_RADIUS);
+    zs.push(box.minZ - PLAYER_RADIUS, box.maxZ + PLAYER_RADIUS);
+  }
+  let nearest: Vec2 | null = null;
+  let distance = Infinity;
+  for (const nextX of xs) for (const nextZ of zs) {
+    const candidate: Vec2 = [nextX, nextZ];
+    const delta = Math.hypot(nextX - x, nextZ - z);
+    if (delta <= distance && standable(candidate, colliders)) {
+      nearest = candidate;
+      distance = delta;
+    }
+  }
+  return nearest ? { position: nearest, yaw: entry.lookAt ? yawToward(nearest, entry.lookAt) : entry.yaw } : null;
+}
+
 /** Ring offsets around a centre, nearest ring first, each ring starting from `startAngle` and alternating sides. */
 function ring(center: Vec2, radii: readonly number[], startAngle: number, steps = 16): [number, number][] {
   const spots: [number, number][] = [];
@@ -50,7 +76,7 @@ function ring(center: Vec2, radii: readonly number[], startAngle: number, steps 
  * Entering a room: its entry point (anchor `position`, by the door or the desk front), or the nearest free spot
  * inside the room, facing the room's desk. The Treasury is locked, so it lands at the vault door outside.
  */
-export function roomEntry(room: AnchorId, colliders: readonly Box[], avoid: readonly Vec2[] = []): PlayEntry {
+export function roomEntry(room: AnchorId, colliders: readonly Box[], avoid: readonly Vec2[] = []): OverviewEntry {
   const { position, center } = OFFICE_ANCHORS[room];
   const rect = roomRect(room);
   const inside = (spot: Vec2) => room === 'treasury' || (spot[0] > rect.minX && spot[0] < rect.maxX && spot[1] > rect.minZ && spot[1] < rect.maxZ);
@@ -61,7 +87,7 @@ export function roomEntry(room: AnchorId, colliders: readonly Box[], avoid: read
     .find(candidate => inside(candidate) && clear(candidate) && standable(candidate, colliders));
   if (!spot) return { position: [SPAWN.position[0], SPAWN.position[1]], yaw: SPAWN.yaw };
   const look = Math.hypot(center[0] - spot[0], center[1] - spot[1]) > 0.3 ? yawToward(spot, center) : room === 'lobby' ? Math.PI / 2 : SPAWN.yaw;
-  return { position: spot, yaw: look };
+  return { position: spot, yaw: look, lookAt: center };
 }
 
 /** Closest a room entry lands to an agent's centre. */
@@ -74,7 +100,7 @@ const AGENT_RINGS = [1.35, 1.15, 0.95] as const;
  * which the first-person pick would offer "Talk to <name>". Searches the open side (toward the room's
  * entry) first. Falls back to the room entry when nothing qualifies.
  */
-export function agentEntry(snapshot: OfficeSnapshot, agentId: string, agentPosition: Vec2, colliders: readonly Box[], rooms: readonly AnchorId[]): PlayEntry | null {
+export function agentEntry(snapshot: OfficeSnapshot, agentId: string, agentPosition: Vec2, colliders: readonly Box[], rooms: readonly AnchorId[]): OverviewEntry | null {
   const agent = snapshot.agents.find(row => row.id === agentId);
   if (!agent) return null;
   const here = roomAtPoint(agentPosition, rooms);
@@ -92,7 +118,7 @@ export function agentEntry(snapshot: OfficeSnapshot, agentId: string, agentPosit
     const yaw = yawToward(spot, agentPosition);
     const picked = pickTarget(spot, yaw, candidates);
     if (picked?.kind !== 'agent' || picked.id !== agentId) continue;
-    return { position: spot, yaw };
+    return { position: spot, yaw, lookAt: [agentPosition[0], agentPosition[1]] };
   }
   const fallback = here ?? seat;
   return fallback ? roomEntry(fallback, colliders, [agentPosition]) : null;
