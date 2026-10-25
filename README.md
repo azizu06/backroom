@@ -1,250 +1,206 @@
 <p align="center">
-  <img src="web/public/backrooms-banner.png" alt="Backrooms banner" width="752">
+  <a href="https://youtu.be/dm1FlQTZYT8"><img src="docs/assets/backrooms-office.jpg" alt="Backrooms office screenshot showing seven finance roles, invoice handoffs, Dana's passkey desk and the audit wall" width="100%"></a>
 </p>
 
 <h1 align="center">Backrooms</h1>
 
-<p align="center"><b>A 3D back office for a small business with no finance team.</b><br>
-AI agents work real finance seats, every limit is enforced on the server, and you can watch it all happen.</p>
-
 <p align="center">
-  <a href="#inspiration">Inspiration</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#highlights">Highlights</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="#getting-started">Getting started</a> ·
-  <a href="#docs">Docs</a>
+  <strong>Your back office, with every decision in view.</strong><br>
+  AI agents handle finance work for a small business. A human approves anything outside their limits.
 </p>
 
-## Inspiration
+<p align="center">
+  <img src="https://img.shields.io/badge/Cal_Hacks-13.0-394b59" alt="Cal Hacks 13.0">
+  <img src="https://img.shields.io/badge/Agents-Claude_Agent_SDK-795548" alt="Claude Agent SDK">
+  <img src="https://img.shields.io/badge/State-SpacetimeDB-37474f" alt="SpacetimeDB">
+  <img src="https://img.shields.io/badge/Payments-Sandbox_%2B_testnet-455a64" alt="Sandbox and testnet payments">
+</p>
 
-Small-business owners do their own finance. Late invoices, client calls, vendor
-bills, bank-detail changes and payment plans pile up across inboxes, spreadsheets
-and bank portals, and it is hard to see what is actually happening or what needs
-you. We wanted to make that **less overwhelming**: turn every moving part of the
-system into something you can see. Backrooms puts the work in a small 3D office.
-Each agent has a desk and a badge that limits what it may do. Every decision lands
-on an audit wall you can question. When something needs the owner, an agent walks
-to her desk.
+<p align="center">
+  <a href="https://youtu.be/dm1FlQTZYT8"><strong>Watch the demo</strong></a> ·
+  <a href="https://devpost.com/software/backrooms-h4o783">Devpost</a> ·
+  <a href="#what-you-can-do">Capabilities</a> ·
+  <a href="#the-whole-system">Architecture</a> ·
+  <a href="#run-it">Run it</a> ·
+  <a href="#the-receipts">Evidence</a>
+</p>
 
-Cal Hacks 13.0. Full product spec: [`docs/spec.md`](docs/spec.md).
+<p align="center"><sub>Real application screenshot from our <a href="https://devpost.com/software/backrooms-h4o783">Devpost gallery</a>. Company data is synthetic; bank and credit integrations use sandboxes, and x402 uses testnet.</sub></p>
 
-## Features
+---
 
-- **A 3D office you can walk through.** A react-three-fiber floor with Lobby,
-  Collections, Payables, Vendor Desk, Treasury and the owner's desk. Agents move
-  to the room that matches their current task, and a story mode replays the
-  scripted demo.
-- **Seven agents, one job each.** Intake, Extractor, Vendor, Payables,
-  Collections, Reconciler and Auditor hand a case to one another through a
-  single dispatcher ([agents](docs/agents.md)).
-- **Collections calls.** The collections agent is built to phone a late client
-  through Cartesia, give the AI disclosure, confirm identity before any amount,
-  and negotiate a payment plan only inside its badge. The offline demo uses
-  scripted call turns, and a historical call receipt is not a new dial
-  ([Cartesia limits](#cartesia-setup-features-and-limitations)).
-- **Payables that refuse fraud.** A lookalike sender domain or a risky bank
-  change is held for the owner, never paid.
-- **Server-enforced policy.** A pure TypeScript engine checks every action
-  against the agent's badge. Models write the words; code decides.
-- **Owner approval by passkey.** Anything over a limit needs a human WebAuthn
-  passkey tap. Voice and models can never approve.
-- **Pay and reconcile.** Clients pay through a link tied to the approved plan.
-  Deposits go to Capital One's Nessie sandbox, and an invoice moves only on an
-  exact deposit match. A posted deposit and a displayed balance are separate;
-  neither is settlement or proof that the balance rose
-  ([pay and reconcile](docs/m7-payments.md)).
-- **Audit wall with "ask why".** Every decision is a hash-chained audit entry.
-  Ask any agent why, and its answer must cite entry ids.
-- **LLM OFF switch.** Turn the models off and the office keeps enforcing every
-  rule with zero model calls.
-- **Live shared state.** SpacetimeDB holds the tables and reducers, and the
-  office subscribes to them. The retained
-  [Maincloud parity receipts](docs/evidence/maincloud-parity/README.md) measured
-  request-to-frame updates under one second.
+Late invoices, vendor bills and bank-detail changes pile up when a small business has no finance team. Backrooms gives that work a place: a 3D office where specialist agents pass cases between desks, ask the owner for approval and leave a record you can question.
 
-## Highlights
+Built at **Cal Hacks 13.0** by **Abduaziz Umarov, Tomiwa Aluko, Diego Mendoza and Anthony Terry**. The [published project story](https://devpost.com/software/backrooms-h4o783) and [demo video](https://youtu.be/dm1FlQTZYT8) show the team's presentation. This repository contains the implementation, setup guides and scoped test receipts.
 
-**Claude talks, code decides.** Models own language and judgment inside a box.
-Code owns the box, the money and the record. Emails, invoices and client speech
-are treated as data, never instructions.
+<a id="inspiration"></a>
 
-**The fake bank change.** Invoice 4471 arrives from a lookalike domain asking to
-change bank details. Payables holds it (`LOOKALIKE_DOMAIN`) and nothing reaches
-the bank. With the CRS sandbox enabled, a high fraud-risk score also holds a
-bank change (`FRAUD_RISK_HOLD`). The hold stands with the LLM switched off.
+## From inbox to audit wall
 
-**Negotiating inside the badge.** Asked to waive a fee, the agent is denied
-(`FEES_NON_WAIVABLE`). Asked for four installments, it escalates
-(`MAX_INSTALLMENTS`) and walks to the owner's desk mid-call. Two installments are
-allowed and produce a pay link for exactly that amount.
+A client asks to split an overdue invoice into seven payments, with 15% up front. The Collections agent can discuss the request, but it cannot grant itself a larger limit. Policy escalates the plan to Dana, the owner. Her passkey decision lets the call continue with the exact approved terms. A payment link carries that amount to the pay page; reconciliation checks the deposit against the invoice.
 
-**Legal guardrails in code.** AI disclosure, recorded consent, calling hours,
-opt-out, a bankruptcy stop (`BANKRUPTCY_STOP` from CRS public records) and
-identity before amount are enforced by the policy engine, not by a prompt.
+Meanwhile, a lookalike vendor email asks to change bank details. Payables holds it for review before any bank effect. Both stories end on the same audit wall, with the rule, decision and evidence attached. The office makes the handoff visible. It never authorizes it.
 
-**Honest about what is real.** Fixture data is labelled FAKE, sandbox data is
-labelled SANDBOX, and a cached result says when it was cached. See
-[Real versus simulated](#real-versus-simulated).
+**Claude talks, code decides.** Emails, invoices and client speech are data. Models handle language; code controls limits, approvals, payments and the record.
 
-## Architecture
+<a id="features"></a>
+
+## What you can do
+
+| Experience | How it works |
+| --- | --- |
+| **Watch the office work** | Explore the React Three Fiber office or its floor plan. Start the workday to see invoice cases move through the existing dispatcher. [Office](docs/office-view.md) · [Agent handoffs](docs/agents.md) |
+| **Negotiate within a badge** | Cartesia handles the collections conversation. Server tools enforce disclosure, consent, identity before amount, calling hours, opt-out and bankruptcy stops. [Voice setup and limits](#cartesia-setup-features-and-limitations) |
+| **Approve with a passkey** | Requests outside an agent's limits go to the owner. The server verifies a WebAuthn assertion; voice cannot approve. [Approval flow](docs/m6-approvals.md) |
+| **Inspect a suspicious invoice** | The inbox and Attack Lab expose policy holds for lookalike senders, missing POs, duplicates and bank changes. [Attack demo](docs/attack-demo.md) |
+| **Pay and reconcile** | Approved plan amounts bind the payment link. Nessie sandbox deposits require an exact match; an optional Coinbase CDP wallet pays an approved invoice using x402 on Base Sepolia. [Nessie](docs/m7-payments.md) · [x402 testnet](docs/x402.md) |
+| **Ask why** | Answers cite hash-chained audit entries. Citation validation rejects invented entries. [Audit voice](docs/ask-why-voice.md) |
+| **Switch models off** | The global OFF switch stops model work while deterministic policy checks keep enforcing holds. [LLM control](docs/llm-control.md) |
+
+<a id="architecture"></a>
+
+## The whole system
+
+**The browser shows the work. The orchestrator coordinates it. Policy and passkeys control what can happen. SpacetimeDB records the transitions.**
 
 ```mermaid
-flowchart LR
-  subgraph Browser
-    O[3D office]
-    P[Pay page]
-    A[Passkey approval]
+flowchart TB
+  subgraph Browser[Browser]
+    Office[3D office and audit wall]
+    Human[Owner passkey controller]
+    Pay[Client pay page]
   end
-  subgraph Server
-    G[Gateway + policy engine]
-    W[Seat workers + agent dispatcher]
-    R[Model router]
+  subgraph Server[Server]
+    Web[Next.js web and API routes]
+    subgraph Orchestrator[TypeScript orchestrator]
+      Agents["One dispatcher: 7 Claude Agent SDK roles<br/>Intake, Extractor, Vendor, Payables<br/>Collections, Reconciler, Auditor"]
+      Gateway[Tool gateway and finance services]
+      Policy[TypeScript policy engine]
+      Verify[WebAuthn approval verifier]
+      Router[Model router and OFF switch]
+    end
   end
-  S[(SpacetimeDB: tables, reducers, hash-chained audit)]
-  O -- subscribes --> S
-  P --> G
-  A --> G
-  G -- reducers --> S
-  W -- reducers --> S
-  W --> R
-  R --> M[Claude and GX10 local models]
-  G <--> C[Cartesia voice agent]
-  W --> X[Nessie, CRS, Apify]
+  State[(SpacetimeDB tables and reducers)]
+  Voice[Cartesia collections voice agent and role handoff TTS]
+  Cloud[Claude cloud models]
+  Local[GX10 local models via Ollama]
+  Nessie[Nessie sandbox bank]
+  CRS[CRS sandbox checks]
+  Apify[Apify Client Health Check Actor]
+  CDP[Coinbase CDP server wallet and x402]
+  Base[Base Sepolia test USDC]
+
+  Office --> Web
+  Human --> Web
+  Pay --> Web
+  State -. subscriptions .-> Office
+  Web --> Agents
+  Web --> Gateway
+  Web --> Verify
+  Agents --> Gateway
+  Agents --> Router
+  Gateway --> Policy
+  Verify --> State
+  Gateway --> State
+  Agents --> State
+  Voice <--> Gateway
+  Agents --> Voice
+  Gateway --> Nessie
+  Gateway --> CRS
+  Gateway --> Apify
+  Gateway --> CDP
+  CDP --> Base
+  Router --> Cloud
+  Router --> Local
 ```
 
-- **SpacetimeDB** owns live state and reducer-enforced transitions. The office
-  only subscribes and renders; it never decides anything.
-- **The orchestrator** runs the seat workers and agents, applies policy and is
-  the only caller of external APIs.
-- **The gateway** serves the voice agent's tools, payment links and approvals,
-  and checks each request against policy before any state changes.
-- **Models** run through one router: Claude in the cloud, and the team GX10 for
-  cheap bulk work, with a hard budget and an OFF switch
-  ([LLM control](docs/llm-control.md)).
+Seven roles share one dispatcher and one handoff store. Role tools expose only the operations that role needs. Handoffs validate their destination and evidence references before the dispatcher commits them. [Runtime and role contracts](docs/agents.md).
 
-| Path | What |
-|---|---|
-| `web/` | Next.js (App Router) + react-three-fiber office and human UI |
-| `orchestrator/` | Node TS service: seat workers, the only caller of external APIs |
-| `policy/` | Pure TS policy engine, `evaluate(badge, action, context)` |
-| `spacetime/` | SpacetimeDB module, reducers and generated client |
-| `integrations/nessie/` | Capital One Nessie sandbox client |
-| `fixtures/` | Synthetic Northfield seed, traps and signed answer key |
-| `tools/board` | CLI for the agent message board (GitHub issue #1) |
-| `AGENTS.md` | Team contract every agent follows |
+The gateway checks policy and trusted state before external effects. Approvals require the server's passkey verifier. SpacetimeDB reducers own state transitions, while the office subscribes and renders. Some gateway and finance repositories remain in memory even when the StateStore uses SpacetimeDB. [State boundaries](#spacetimedb-architecture).
 
-## Getting started
+The GX10 serves local models for routine work, including extraction. Cloud routes, fallback labels, budgets and the OFF switch remain explicit. Local inference is separate from the Cartesia phone path. [Model router](orchestrator/README.md#model-router) · [GX10 evidence](docs/t10-gx10.md).
 
-```bash
-# Node 22+, pnpm, gh (logged in: gh auth login)
-git clone https://github.com/azizu06/backrooms && cd backrooms
+<a id="getting-started"></a>
+
+## Run it
+
+You need **Node.js 22+ and pnpm**. The repository pins its package-manager version in `package.json`.
+
+```sh
+git clone https://github.com/azizu06/backrooms.git
+cd backrooms
 pnpm install
-cp .env.example .env      # fill in only what you need; never commit it
-# Team sponsor keys: scp <your-gx10-user>@gx10:/srv/team/backroom.env .env.local
-pnpm -r build && pnpm -r test
+pnpm -r build
+pnpm -r test
 ```
 
-Then pick how much of the system to run:
+### Start without credentials
 
-| Command | What you get |
-|---|---|
-| `pnpm dev:web`, then open <http://localhost:3000/office> | The 3D office in preview mode, with labelled simulated state. No database or keys needed |
-| `pnpm demo:core` | The whole server loop in the terminal: call, policy, approval, payment, reconciliation and audit, with scripted turns and no network |
-| `pnpm demo:up` | The full demo host with live SpacetimeDB state ([runbook](docs/demo-runbook.md)) |
-
-### Hook your agent up to the board (2 minutes)
-
-The board is [issue #1](https://github.com/azizu06/backroom/issues/1). Your agent reads and posts with `tools/board`; rules are in [`AGENTS.md`](AGENTS.md). Prerequisite for every tool: `gh auth login`, then `tools/board whoami` should print your login.
-
-Commands: `tools/board unread`, `read -n 20`, `post "[Name's Agent] ..."`, `wait`, `whoami`. Unread state is a per-clone cursor in `.board/` (gitignored).
-
-**Claude Code** (hooks already committed in `.claude/settings.json`): just open the repo. Session start shows unread posts and tells Claude to keep one background `tools/board wait` running; every prompt also surfaces new posts. Nothing to install. To skip the background wait (e.g. a sub-agent whose supervisor watches the board), set `BOARD_WAIT=off`; it is skipped automatically when `FM_TASK_ID` is set.
-
-**Codex, Cursor, Devin, Muse, Rovo, anything else** (they read `AGENTS.md` automatically or on request; point yours at it):
-1. Tell the agent: "Follow AGENTS.md. Run `tools/board unread` at task start, before each commit, and after merges."
-2. For a push-style wake-up, run a loop in a spare terminal and let it invoke your agent CLI whenever someone posts:
-   ```bash
-   while tools/board wait; do <your agent CLI invocation, e.g. codex exec "check the board per AGENTS.md">; done
-   ```
-   `wait` exits 0 when someone else posts and prints the post; it polls every 30 s (`--interval`, `--timeout`).
-
-Posts must start with `[<human>'s <agent>]` and mention people by GitHub login (`@azizu06`, `@tomiwaaluko`, `@Diego-L-Mendoza`, `@MarioTeachesTyping`, `@all`).
-
-## Docs
-
-| Topic | Read |
-|---|---|
-| Product spec | [spec](docs/spec.md) |
-| Running the demo | [demo runbook](docs/demo-runbook.md), [rehearsal guide](docs/test-v1.md) |
-| The office | [office view](docs/office-view.md), [replay mode](docs/replay-mode.md) |
-| Agents and models | [agent runtime](docs/agents.md), [LLM control and OFF switch](docs/llm-control.md), [GX10 measurements](docs/t10-gx10.md) |
-| Policy and approvals | [policy editor](docs/policy-editor.md), [passkey approvals](docs/m6-approvals.md) |
-| Payments | [pay and reconcile](docs/m7-payments.md), [Nessie sandbox](docs/t4-nessie.md), [payment-link delivery](docs/payment-delivery.md) |
-| State | [SpacetimeDB module](spacetime/README.md), [state evidence](docs/spacetime-state.md), [Maincloud](docs/t8-spacetime.md) |
-| Voice | [Cartesia configuration](docs/cartesia.md), [call evidence](docs/t1-cartesia.md), [ask why by voice](docs/ask-why-voice.md) |
-| Proof | [sponsor evidence checklist](docs/sponsor-deliverables.md), [offline scoreboard](docs/eval/scoreboard.md), [red team](docs/redteam.md) |
-
-## Sponsor tracks and claim boundaries
-
-The sections below are the reviewed wording of what each integration does and
-does not prove. Check the [sponsor evidence checklist](docs/sponsor-deliverables.md)
-before copying any claim into a pitch.
-
-## What is real in demo:core
-
-Run `pnpm demo:core` from the root. No browser, 3D, credentials, network, or model
-inference is needed. `pnpm test` includes the fast deterministic integration run.
-This proves the server loop with **scripted call turns**, not the teammate-phone
-checkpoint or live sponsor gates.
-
-```text
-1042 overdue -> real pre-call pipeline + canCall + envelope
- -> gateway identity guard -> identity confirmed
- -> propose_plan(4, waive fee): DENY / FEES_NON_WAIVABLE
- -> propose_plan(4, retain fee): ESCALATE / MAX_INSTALLMENTS
- -> escalation row + Dana_desk -> real WebAuthn verifier + software test authenticator denies
- -> check_approval -> propose_plan(2, 50/50): ALLOW
- -> stored $2,475 link -> real payment service + Nessie SDK (fake HTTP)
- -> exact reconciliation -> partially_paid -> hash-chain audit + two cited why answers
-4471 inbox -> Payables -> LOOKALIKE_DOMAIN -> held/escalated; zero bank effects
- -> corrected-domain defense check still BANK_CHANGE_HOLD
- -> repeat with LLM OFF: same holds, typed LLM_OFF, zero model requests
+```sh
+pnpm dev:web
 ```
 
-The policy engine returns the first failing rule. Two proposals demonstrate the
-fee denial and installment escalation; one proposal does not produce two results.
-The trap's bank-change-only check is explicitly hypothetical, after correcting the
-sender domain; it never releases the actual lookalike payment.
+Open [localhost:3000/office](http://localhost:3000/office) for the office preview with labelled simulated state. No database or provider keys are needed for this mode.
 
-| Boundary | Real in this command | Fake / remaining integration |
+<a id="what-is-real-in-democore"></a>
+
+To run the deterministic server loop in the terminal:
+
+```sh
+pnpm demo:core
+```
+
+This exercises policy, approval verification, payment matching and audit with **scripted call turns, a software test authenticator and fake bank HTTP**. It makes no model or sponsor requests. [Exact flow and adapter boundaries](docs/core-demo.md).
+
+### Connect the demo host
+
+The full host needs the SpacetimeDB CLI and its local runtime, plus the setup in the [demo runbook](docs/demo-runbook.md). `pnpm demo:up` starts owned local state by default; Maincloud is opt-in. The runbook covers ports, operator access, passkey enrollment, reset and shutdown.
+
+Copy `.env.example` to ignored `.env.local` only when configuring integrations. Keep credentials server-side. Follow each provider's guide rather than enabling every adapter at once:
+
+| Integration | Setup |
+| --- | --- |
+| State and office subscriptions | [SpacetimeDB module](spacetime/README.md) · [Host runbook](docs/demo-runbook.md) |
+| Claude and GX10 | [Model router](orchestrator/README.md#model-router) · [Agent runtime](docs/agents.md) |
+| Cartesia calls and handoff voices | [Cartesia](docs/cartesia.md) · [Call evidence](docs/t1-cartesia.md) |
+| Human approval | [Passkey setup](docs/m6-approvals.md) |
+| Sandbox payments | [Nessie](docs/t4-nessie.md) · [Pay and reconcile](docs/m7-payments.md) |
+| Coinbase testnet payments | [CDP wallet and x402](docs/x402.md#coinbase-payment-agents), with Mac Keychain credentials |
+| Public-web checks | [Apify Actor](apify/client-health-check/README.md) |
+
+A configured service is not a completed call or payment. Use only authorized test targets and keep sandbox, cached and simulated labels visible.
+
+<a id="highlights"></a>
+
+## The receipts
+
+| Evidence | What it establishes |
+| --- | --- |
+| [Published demo](https://youtu.be/dm1FlQTZYT8) and [project story](https://devpost.com/software/backrooms-h4o783) | The team's recorded presentation and description. Reproduce individual integrations with their own runbooks and receipts. |
+| [Maincloud office parity](docs/evidence/maincloud-parity/README.md) | 20/20 request-to-frame samples below one second using hosted SpacetimeDB and a Mac browser. No live phone or bank request occurred in that test. |
+| [Coinbase CDP receipt](docs/x402.md#one-shot-cdp-testnet-proof) | An approved 0.01 test USDC invoice paid through the named CDP wallet and public x402 facilitator on Base Sepolia, with independent on-chain checks. No mainnet or real-money payment. |
+| [Offline scoreboard](docs/eval/scoreboard.md) | Scripted code-path results and recorded extraction evidence. Its denominators and unexecuted operations stay separate from live-provider claims. |
+| [Core demo](docs/core-demo.md) | A reproducible network-free loop through policy, test approval verification, payment matching and hash-chain audit. |
+| [Sponsor checklist](docs/sponsor-deliverables.md) | Integration-by-integration evidence, outstanding gates and claim limits. |
+
+Backrooms is a hackathon prototype using a synthetic company. The sections below retain the integration boundaries; a passing scripted test does not establish a new phone call, human passkey tap or real settlement.
+
+<a id="docs"></a>
+
+## Inside the repo
+
+| Area | Entry point | Guide |
 | --- | --- | --- |
-| Policy, pre-call, envelope | Exported `@backroom/policy` and `collections/index.ts` pipeline (#17) | CRS/Apify use its exported fake checks; synthetic identity/company, no live sponsor evidence |
-| Call plan + router | Real planner and `createRouter().route()` with schema/policy validation | Scripted HTTP response, `model=scripted-fixture`; audit actor `system`, route `test_stub`. No inference or spend |
-| Voice (#18) | Real authenticated `web/lib/gateway` HTTP handlers, parser, policy, dedupe and transactional gateway store | Scripted turns; no Cartesia dial, speech, transcript compliance, or delivery provider |
-| State (#16) | Real `MemoryStateStore`, leases, invoice transitions, target anchors, hash-chain audit | In process; no SpacetimeDB or restart durability. Gateway audits append directly to the same state chain with their original UUIDs |
-| Controller (#20) | Real approval bridge, StateStore escalation/desk target, `ControllerApprovals` registration and signed assertion verification, then gateway `check_approval` | Exported software `TestAuthenticator` supplies P-256 signatures; no human phone/Face ID tap. The recorded human actor describes the verifier contract, not evidence of an actual Dana tap |
-| Pay page + bank (#21) | Link amount comes only from the committed ALLOW plan; real `PaymentService` and Nessie SDK | CLI click/email delivery and bank HTTP are simulated. Mobile page: see [M7 setup](docs/m7-payments.md) |
-| Reconciliation (#21) | Exported job checks unique deposit ID, exact memo, completed status, amount; reducer transitions + receipt | Balance display uses the SDK's exact API-derived label, never settlement evidence. Seed short/duplicate/already-paid tests fail closed |
-| Inbox/payables (#22) | Real `routeInboxItem`, `SeatWorker`, `evaluateStep`, escalation and Dana target | Typed #4471 fixture bypasses email/PDF extraction and the merged PayablesSeat pipeline in this command; no vendor master mutation |
-| Ask why (#23) | Real retrieval and cited deterministic templates; `audit_N` maps to StateStore `audit:N` in evidence refs | Explicit offline option; no Claude call or TTS |
-| LLM OFF (#47) | Real store switch, router `LLM_OFF`, inbox routing and policy enforcement | No model needed for either typed bank-change run; OFF never simulates a new voice call |
+| Office and human UI | `web/` | [Office view](docs/office-view.md) · [Replay](docs/replay-mode.md) |
+| Agent runtime and tools | `orchestrator/src/agents/` | [Seven roles](docs/agents.md) · [Model control](docs/llm-control.md) |
+| Policy | `policy/` | [Product spec](docs/spec.md) · [Policy editor](docs/policy-editor.md) |
+| Shared state | `spacetime/` | [Tables and reducers](spacetime/README.md) · [State evidence](docs/spacetime-state.md) |
+| Bank client | `integrations/nessie/` | [Nessie setup](docs/t4-nessie.md) |
+| Public Actor | `apify/client-health-check/` | [Inputs, outputs and limits](apify/client-health-check/README.md) |
+| Synthetic data and evaluation | `fixtures/`, `docs/eval/` | [Scoreboard](docs/eval/scoreboard.md) · [Red team](docs/redteam.md) |
+| Team coordination | `tools/board`, `AGENTS.md` | [Board setup](docs/team-board.md) · [Team contract](AGENTS.md) |
 
-`orchestrator/src/core-demo/` owns these adapters; replace each fake through the
-owning module's exported interface as its PR lands. Gateway UUIDs and audit times
-can vary across executions; assertions compare outcomes and validate each chain,
-not byte-identical logs. The command prints policy quotes, original gateway IDs,
-StateStore IDs, `prevHash`/`hash`, fake labels, and two grounded answers.
-
-Opt-in Nessie sandbox run: put
-`NESSIE_API_KEY` in root `.env.local` and run `pnpm demo:core --live`. Optionally
-set `NESSIE_ACCOUNT_ID`; otherwise the exported client seeds Northfield. It uses
-that client's durable claims in `NESSIE_CLAIMS_DIR` or gitignored `.nessie-state/claims`, and
-never adds a second HTTP SDK. Missing key/client fails explicitly. The bank is the
-only live service in this variant; the controller authenticator, voice, card and
-external pre-call checks remain simulated. A failed deposit/feed check exits nonzero. The displayed total uses the exact
-API-derived label documented above; an unchanged account balance is not settlement evidence. The T4 balance gate is independently
-tracked; a fake-bank pass does not establish it. Do not use `--live` in unit tests.
+## Integration notes
 
 ## Cartesia setup features and limitations
 
@@ -267,7 +223,7 @@ a human passkey tap. The recorder fix alone proves neither disclosure delivery
 nor a successful tool round trip; historical partial call receipts are scoped in
 the T1 document. A full phone-to-human-approval-to-bank flow needs its own trace.
 Narration, cached audio, or a queued link cannot establish that flow. No new
-Cartesia request was made to prepare these sections.
+Cartesia request was made to prepare this README.
 
 ## Apify: Best Use and Best Actor
 
@@ -312,6 +268,20 @@ business credit and OFAC were not run because those products are absent from the
 Cal Hacks sandbox. It does not establish live OFAC coverage. Integration behavior
 and any new product mapping remain with the owning stream and agreed spec.
 
+### Current CRS implementation (distinct from live evidence)
+
+Merged code consumes sandbox public records before calls and sandbox fraud risk
+for vendor changes/payments. Any bankruptcy record stops the call
+(`BANKRUPTCY_STOP`); counts do not distinguish open from discharged bankruptcy.
+Fraud risk at least 70 holds the bank change/payment for Dana
+(`FRAUD_RISK_HOLD`, NF-028). Defaults remain fake; `PRECALL_CRS` and `VENDOR_CRS`
+select opt-in sandbox clients, and OFAC stays unavailable rather than clear.
+See the [consumer contract](orchestrator/src/collections/README.md).
+The P06 client receipt linked above is not an end-to-end P07/P13 wiring run;
+that credentialed wiring receipt remains pending in the sponsor checklist.
+This documentation does not enable or change either integration.
+
+
 ## SpacetimeDB architecture
 
 SpacetimeDB owns live state and reducer-enforced transitions. The orchestrator
@@ -332,19 +302,6 @@ hosted state and a Mac browser, not proof of the GX10 web host. See
 proves a live call or human approval; the historical standalone docs above do
 not describe the current hosted-authentication status.
 
-### Current CRS implementation (distinct from live evidence)
-
-Merged code consumes sandbox public records before calls and sandbox fraud risk
-for vendor changes/payments. Any bankruptcy record stops the call
-(`BANKRUPTCY_STOP`); counts do not distinguish open from discharged bankruptcy.
-Fraud risk at least 70 holds the bank change/payment for Dana
-(`FRAUD_RISK_HOLD`, NF-028). Defaults remain fake; `PRECALL_CRS` and `VENDOR_CRS`
-select opt-in sandbox clients, and OFAC stays unavailable rather than clear.
-See the [consumer contract](orchestrator/src/collections/README.md).
-The P06 client receipt linked above is not an end-to-end P07/P13 wiring run;
-that credentialed wiring receipt remains pending in the sponsor checklist.
-This documentation does not enable or change either integration.
-
 ### Implementation and evidence index
 
 - [Seven agent roles and runtime limits](docs/agents.md)
@@ -358,11 +315,10 @@ that the whole phone, human-approval and bank flow has been live-tested.
 
 ---
 
-<p align="center">
-  Built in one weekend at <b>Cal Hacks 13.0</b> by
-  <a href="https://github.com/azizu06">Aziz</a>,
-  <a href="https://github.com/tomiwaaluko">Tomi</a>,
-  <a href="https://github.com/Diego-L-Mendoza">Diego</a> and
-  <a href="https://github.com/MarioTeachesTyping">Anthony</a>.<br>
-  <sub>Claude talks, code decides. Synthetic company data; sandbox bank and credit data only.</sub>
-</p>
+## Built by
+
+[**Abduaziz Umarov**](https://devpost.com/azizu06) · [**Tomiwa Aluko**](https://devpost.com/tomiwaaluko) · [**Diego Mendoza**](https://devpost.com/Diego-L-Mendoza) · [**Anthony Terry**](https://devpost.com/MarioTeachesTyping)
+
+Built at Cal Hacks 13.0. [Watch the demo](https://youtu.be/dm1FlQTZYT8) · [Read the project story](https://devpost.com/software/backrooms-h4o783).
+
+<p align="center"><strong>Every case has a desk. Every decision has a receipt.</strong></p>
