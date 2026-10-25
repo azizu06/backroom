@@ -1,4 +1,4 @@
-import { handoffAgentName, needsHandoffHuman, type Handoff, type HandoffAgentId, type HandoffRole } from './handoffs';
+import { handoffAgentName, needsHandoffHuman, type Handoff, type HandoffAgentId } from './handoffs';
 import type { HandoffPlan } from './handoff-plan';
 import type { OfficeSnapshot } from './state';
 
@@ -10,10 +10,11 @@ export function agentChatSource(connection: OfficeSnapshot['connection'], script
     : connection === 'replay' ? 'Replay' : 'Offline record';
 }
 
-const REVIEW: Record<HandoffRole, string> = {
+const REVIEW: Record<HandoffAgentId, string> = {
   intake: 'I’ll sort the documents.', extractor: 'I’ll check the invoice fields.', vendor: 'I’ll review the vendor documents.',
   payables: 'I’ll review the payment evidence.', collections: 'I’ll review the contact record.',
   reconciler: 'I’ll compare the records.', auditor: 'I’ll review the audit evidence.',
+  human: 'Dana will review and decide.',
 };
 
 /** Only the public display label is eligible; arbitrary case strings and free text are never echoed. */
