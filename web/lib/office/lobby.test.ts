@@ -50,6 +50,8 @@ describe('office lobby', () => {
     // Combining the splash controls and corner HUD must leave one view picker and guide.
     expect(html.match(/id="office-view"/g)).toHaveLength(1);
     expect(html.match(/class="office-guide-trigger"/g)).toHaveLength(1);
+    expect(html.match(/>Story mode<\/button>/g)).toHaveLength(1);
+    expect(html.match(/>Take the tour<\/button>/g)).toHaveLength(1);
     expect(html).toContain('Enter first person');
     expect(html).toContain('data-testid="office-viewport"');
     expect(html).toContain('class="office-footer office-drawer"');
