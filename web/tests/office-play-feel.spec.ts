@@ -190,24 +190,31 @@ test('walking sends footstep cues, and they are silent unless the sound toggle i
   expect(errors).toEqual([]);
 });
 
-test('clicking into first person locks the pointer and hides the menu; releasing it brings the menu back and walking still works', async ({ page }) => {
+test('clicking into first person locks the pointer and hides Play controls; releasing it restores them and walking still works', async ({ page }) => {
   const errors = await startPlay(page);
   const viewport = page.getByTestId('office-viewport');
   const exit = page.getByRole('button', { name: 'Exit Play' });
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  const sound = page.getByRole('button', { name: /^Sound (on|off)$/ });
   await expect(exit).toBeVisible();
+  await expect(settings).toBeVisible();
+  await expect(sound).toBeVisible();
   await surface(page).click({ position: { x: 400, y: 300 } });
   await expect(surface(page)).toBeFocused();
   // Some headless builds grant the lock, others refuse it; both must leave a usable view.
   if (await page.evaluate(() => document.pointerLockElement !== null)) {
     await expect(viewport).toHaveAttribute('data-pointer-locked', '');
     await expect(exit).toBeHidden();
-    await expect(page.getByRole('button', { name: /^Sound (on|off)$/ })).toBeHidden();
+    await expect(settings).toBeHidden();
+    // The corner menu deliberately keeps its sound toggle visible in the diegetic HUD.
+    await expect(sound).toBeVisible();
     await expect(viewport.locator('.play-crosshair')).toBeVisible();
     // What Esc does in a real browser: the lock goes and the menu returns, still in Play.
     await page.evaluate(() => document.exitPointerLock());
   }
   await expect(viewport).not.toHaveAttribute('data-pointer-locked');
   await expect(exit).toBeVisible();
+  await expect(settings).toBeVisible();
   await expect(surface(page)).toBeFocused();
   const start = await reading(page);
   await walkFor(page, 700);
