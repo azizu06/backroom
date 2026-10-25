@@ -171,7 +171,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
     </header>
     {error && <p className="audit-error" role="alert">{error} <button type="button" onClick={() => setRevision(n => n + 1)}>Retry</button></p>}
     {locked ? <form className="audit-panel audit-unlock" onSubmit={unlock}>
-      <PanelHeading>Open the decision record</PanelHeading><p>Use the private operator code provided with this demo. One sign-in also unlocks the operator console, desk phone and policy editor.</p>
+      <PanelHeading>Open the decision record</PanelHeading><p>Enter the operator code to open this run’s decisions.</p>
       <label>Operator code<input autoComplete="off" type="password" required value={code} onChange={e => setCode(e.target.value)} /></label>
       <button disabled={busy || !code}>{busy ? 'Opening…' : 'Open audit wall'}</button>
       <p className="audit-muted">Read access only. Approval decisions still require a passkey.</p>
@@ -209,7 +209,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
           <section className="audit-panel audit-records" aria-labelledby="audit-records-title">
             <div className="audit-section-heading"><PanelHeading id="audit-records-title">Recorded actions</PanelHeading><span>{entries.length} total</span></div>
             <p className="audit-muted">{recording ? 'REPLAY position' : 'Updates every 2 seconds'} · {new Date(snapshot.measuredAt).toLocaleTimeString()}</p>
-            {!entries.length && <p>No actions recorded yet. Run the core loop in the connected server to see its decisions here.</p>}
+            {!entries.length && <p>No actions recorded yet. Request a call from the office to see decisions here.</p>}
             <ol className="audit-entries">{[...entries].reverse().map(row => {
               const quote = policyQuote(row, entries);
               return <li key={row.id} data-audit-id={row.id}><button className="audit-entry" aria-pressed={selected === row.id} onClick={() => openEntry(row.id)}>
@@ -238,7 +238,7 @@ export function AuditWall({ recording, onChainChange, showAsk = true, headingLev
             </> : <p>Select an action to inspect its inputs, rules and outcome.</p>}
           </section>
         </div>
-        <p className="audit-footer">{recording ? 'REPLAY · saved audit chain, verified from the complete fixture. No live polling, model calls or effects.' : <>This server’s audit snapshot · chain integrity checks detect changed entries and broken links.<br />The reference store is process-local. A verified chain alone cannot detect a removed suffix.</>}</p>
+        <p className="audit-footer">{recording ? 'REPLAY · saved audit chain. No live polling, model calls or effects.' : 'Chain checks flag edited entries and broken links.'}</p>
       </details>
     </>}
   </section>;

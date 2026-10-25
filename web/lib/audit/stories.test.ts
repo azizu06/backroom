@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MemoryStateStore } from '@backroom/orchestrator';
 import { auditStories, currentRun, isPlumbing, whyQuestion } from './stories';
 import { demoRunSnapshot } from './testing/demoRun';
 
@@ -37,6 +38,18 @@ describe('audit stories', () => {
     expect(inbox.lines[1]).toMatchObject({ text: 'Inbox bank change refused', outcome: 'DENY', rule: 'LOOKALIKE_DOMAIN +1', proof: 'deny' });
   });
 
+  it('labels a reconciled AP withdrawal as a debit, including the invoice and exact-match proof', async () => {
+    const store = new MemoryStateStore();
+    await store.appendAudit({ ts: 1, actor: 'code', seat: 'payables', action: 'reconcile', decision: 'ALLOW',
+      ruleIds: ['EXACT_PAYMENT_MATCH'], policyVersion: 1, refs: ['judge:p01', '4401', 'nessie-debit-4401'],
+      route: 'code', latencyMs: 0, costUsd: 0, inputs: { transactionKind: 'withdrawal', match: 'EXACT',
+        debitId: 'nessie-debit-4401', transactionId: 'nessie-debit-4401', invoiceId: '4401', amountCents: 64000 } });
+    const payment = auditStories(await store.listAudit())[0]!;
+    expect(payment.title).toBe('Payment $640.00 reconciled');
+    expect(payment.lines[0]).toMatchObject({ text: 'Debit matched invoice 4401 exactly', proof: 'match',
+      rule: 'EXACT_PAYMENT_MATCH', amount: '$640.00' });
+  });
+
   it('falls back to the whole chain and an implicit call when nothing marks the run or the dial', async () => {
     const { entries } = await demoRunSnapshot();
     const gatewayOnly = entries.filter(entry => ['verify_identity_result', 'propose_plan'].includes(entry.action) && entry.refs[0] !== 'old-call');
@@ -50,5 +63,21 @@ describe('audit stories', () => {
       .toBe('Why was invoice 1042 escalated to Dana under MAX_INSTALLMENTS?');
     expect(whyQuestion(entries.find(entry => entry.action === 'judge_inbox_decision')!))
       .toBe('Why was the bank change inbox item denied under LOOKALIKE_DOMAIN?');
+  });
+
+  it('keeps the simulated email preview in the refused call story and shows only its domain', async () => {
+    const store = new MemoryStateStore();
+    const append = (action: string, inputs: Record<string, unknown>, decision?: 'ALLOW' | 'DENY') => store.appendAudit({
+      ts: Date.now(), actor: 'code', seat: 'collections', action, ruleIds: decision ? ['B2B_ONLY_CALLS'] : [],
+      policyVersion: 1, refs: ['client-02', '1042'], route: 'code', latencyMs: 0, costUsd: 0,
+      ...(decision ? { decision } : {}), inputs,
+    });
+    await append('office_call_requested', { source: 'office_button' });
+    await append('office_call_refused', { code: 'CALL_DENIED' }, 'DENY');
+    await append('email_followup_queued', { simulated: true, label: 'SIMULATED: email preview, not sent', toDomain: 'client.example' }, 'ALLOW');
+    const stories = auditStories(await store.listAudit());
+    expect(stories).toHaveLength(1);
+    expect(stories[0]!.lines.at(-1)).toMatchObject({ text: 'Email preview (simulated, not sent) · client.example', outcome: 'ALLOW' });
+    expect(JSON.stringify(stories)).not.toContain('billing@client.example');
   });
 });

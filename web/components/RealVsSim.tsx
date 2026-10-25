@@ -50,7 +50,7 @@ export function RealVsSim() {
   return (
     <section className="real-sim real-sim-detail" aria-label="Real versus simulated disclosure">
       <header className="real-sim-header"><h1>Real vs. simulated</h1></header>
-      <p className="real-sim-intro">A real integration can be offline. Status describes current evidence, not a successful end-to-end demo.</p>
+      <p className="real-sim-intro">Each status is current evidence for that service.</p>
       <div className="real-sim-groups">
         {(['real', 'sandbox'] as const).map(kind => (
           <section key={kind} aria-label={kind === 'real' ? 'Real integrations' : 'Sandbox and simulated'}>
@@ -62,7 +62,7 @@ export function RealVsSim() {
         ))}
       </div>
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
-      <p className="real-sim-note">Status refreshes every 10 seconds; service probes are cached for about 45 seconds. Verified means a fresh live probe or a committed receipt (its time is shown). Simulated means a fixture stands in for the service. Unreachable means the probe failed. Unverified means no fresh evidence is available. LLM control reflects this server process; separate processes need the shared state adapter.</p>
+      <p className="real-sim-note">Verified: live check or saved receipt. Simulated: a stand-in replaces the service. Unreachable: the check failed. Unverified: no fresh evidence. Refreshes every 10 s.</p>
     </section>
   );
 }

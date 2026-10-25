@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ControllerApprovals, createRouter, MemoryStateStore } from '@backroom/orchestrator';
 import { TestAuthenticator } from '../../../orchestrator/src/approvals/testing/authenticator';
 import { createApprovalHTTP } from '../approvals/http';
 import { createInboxHTTP } from './http';
 import { inboxPresets } from './presets';
 import { readInboxBankChange } from './proposals';
+
+const tempDirs: string[] = [];
 
 function submission(values: Record<string, string> = {}, file?: File, url = 'http://localhost/api/inbox', origin: string | null = 'http://localhost') {
   const form = new FormData();
@@ -17,7 +22,34 @@ function submission(values: Record<string, string> = {}, file?: File, url = 'htt
 
 describe('judge inbox HTTP boundary', () => {
   beforeEach(() => { vi.stubEnv('DEMO_PUBLIC_URL', 'http://localhost'); });
-  afterEach(() => { vi.unstubAllEnvs(); });
+  afterEach(async () => { vi.unstubAllEnvs(); await Promise.all(tempDirs.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
+
+  it('pays P01 in-app through the configured Nessie sandbox debit and exact withdrawal reconciliation', async () => {
+    const preset = inboxPresets.find(row => row.id === '4401')!;
+    const state = new MemoryStateStore();
+    const claims = await mkdtemp(join(tmpdir(), 'backroom-ap-claims-')); tempDirs.push(claims);
+    const withdrawals: unknown[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (url, init) => {
+      expect(new URL(String(url)).pathname).toBe('/accounts/sandbox-account/withdrawals');
+      if (init?.method === 'POST') {
+        const row = { _id: 'sandbox-debit-4401', ...JSON.parse(String(init.body)) };
+        withdrawals.push(row);
+        return Response.json({ objectCreated: row }, { status: 201 });
+      }
+      return Response.json(withdrawals);
+    });
+    const handler = createInboxHTTP({ store: () => state, fetch: fetcher, env: {
+      DEMO_LIVE: '1', NESSIE_API_KEY: 'private-test-key', NESSIE_ACCOUNT_ID: 'sandbox-account', NESSIE_CLAIMS_DIR: claims,
+    } });
+    const result = await (await handler(submission({ ...preset, presetId: preset.id }))).json();
+
+    expect(result).toMatchObject({ status: 'paid', paymentRail: 'nessie', receiptId: 'sandbox-debit-4401',
+      reconciliation: { match: 'EXACT', debitId: 'sandbox-debit-4401', transactionId: 'sandbox-debit-4401' } });
+    expect(result.notice).toContain('Nessie sandbox debit matched exactly');
+    expect((await state.listAudit()).find(row => row.action === 'reconcile')).toMatchObject({
+      ruleIds: ['EXACT_PAYMENT_MATCH'], inputs: { transactionKind: 'withdrawal', invoiceId: '4401', amountCents: 64000 },
+    });
+  });
 
   it('a narration failure cannot replace the recorded inbox response', async () => {
     const state = new MemoryStateStore();
@@ -134,6 +166,16 @@ describe('judge inbox HTTP boundary', () => {
     expect((await loopback(submission({}, undefined, 'http://localhost:34721/api/inbox', 'https://untrusted.example'))).status).toBe(403);
     expect((await createInboxHTTP({ store: () => state, origin: () => undefined })(submission())).status).toBe(403);
     expect(await state.listAudit()).toHaveLength(accepted);
+  });
+
+  it('accepts only the demo host declared loopback origin beside the public origin', async () => {
+    const state = new MemoryStateStore();
+    const handler = createInboxHTTP({ store: () => state, origin: () => 'https://demo.example',
+      loopbackOrigin: () => 'http://127.0.0.1:3477',
+      modelRoute: vi.fn().mockResolvedValue({ output: { kind: 'unknown' }, route: 'local', model: 'mock', costUsd: 0, latencyMs: 1 }) });
+    expect((await handler(submission({}, undefined, 'http://127.0.0.1:3477/api/inbox', 'http://127.0.0.1:3477'))).status).toBe(200);
+    expect((await handler(submission({}, undefined, 'http://127.0.0.1:3477/api/inbox', 'http://localhost:3477'))).status).toBe(403);
+    expect((await handler(submission({}, undefined, 'http://127.0.0.1:3477/api/inbox', 'http://127.0.0.1:3478'))).status).toBe(403);
   });
 
   it('rejects cross-origin, oversized, unsupported and empty submissions without writing audit records', async () => {

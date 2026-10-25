@@ -4,14 +4,17 @@ import { createOperatorSignIn, createSignInHTTP, operatorSessionCookie } from '.
 
 const ORIGIN = 'https://demo.example';
 const LOOPBACK = 'http://127.0.0.1:3477';
-function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' }), extras?: { loopback?: string; relay?: false }) {
+function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' }), extras?: {
+  loopback?: string; relay?: false;
+  followUp?: (entry: CallRequestAudit) => Promise<{ status: 'queued' | 'duplicate' } | undefined>;
+}) {
   let clock = 1_000_000;
   let current: { status: 'ringing' | 'live' | 'ended'; endedAt?: number } | null = null;
   const audits: CallRequestAudit[] = [];
   const relay = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => relayResponse());
   const handle = createCallRequestHTTP({ secret: () => 'operator-code', origin: () => ORIGIN, loopbackOrigin: () => extras?.loopback, now: () => clock,
     relay: extras?.relay === false ? () => undefined : () => ({ url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin-secret' }), currentCall: async () => current,
-    audit: async entry => { audits.push(entry); }, fetch: relay as typeof fetch });
+    audit: async entry => { audits.push(entry); }, followUp: extras?.followUp, fetch: relay as typeof fetch });
   // The desk phone has no code endpoint of its own: 'session' is the shared operator sign-in.
   const origins = () => [ORIGIN, ...(extras?.loopback ? [extras.loopback] : [])];
   const signIn = createSignInHTTP({ signIn: createOperatorSignIn({ code: () => 'operator-code', origins, now: () => clock }), signedIn: () => false, origins });
@@ -169,5 +172,15 @@ describe('office call request', () => {
     expect(await (await click(down, cookie)).json()).toMatchObject({ error: 'RELAY_UNCONFIRMED' });
     expect((await click(down, cookie)).status).toBe(429);
     expect(down.relay).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a simulated email preview when the demo host handles an email-only refusal', async () => {
+    const followUp = vi.fn(async () => ({ status: 'queued' as const }));
+    const blocked = harness(async () => new Response('CALL_DENIED:B2B_ONLY_CALLS', { status: 409 }), { followUp });
+    const response = await click(blocked, await blocked.unlock());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ ok: false, error: 'CALL_DENIED',
+      message: 'Policy refused the call (B2B_ONLY_CALLS). No call placed. Email preview (simulated, not sent).' });
+    expect(followUp).toHaveBeenCalledWith({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' });
   });
 });

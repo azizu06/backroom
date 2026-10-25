@@ -1,9 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createNorthfieldRepository, getStateStore, PayablesSeat, processInbox, VendorSeat,
+import { resolve } from 'node:path';
+import { FileClaims, NessieClient } from '@backroom/nessie';
+import { createNorthfieldRepository, getStateStore, nessieDebitPayables, PayablesSeat, processInbox, VendorSeat,
   type InboxOptions, type InvoiceFields, type StateStore, type VendorFields } from '@backroom/orchestrator';
 
 import { narrateInbox, type InboxNarration } from '../demo/agents';
 import { noteEscalation } from '../approvals/inbox';
+import { declaredLoopbackOfficeOrigin } from '../calls/loopback-origin';
 
 import { createInboxVendorGate } from './checks';
 import { matchPreset, presetFields } from './presets';
@@ -13,14 +16,18 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 
 const LIMIT = 4 * 1024 * 1024;
 
-/** Public synthetic judge intake. No payment adapter. Vendor checks follow DEMO_LIVE; a passkey applies a bank change. */
-export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>; origin?: () => string | undefined; env?: Record<string, string | undefined>; fetch?: typeof fetch } = {}) {
+/** Public judge intake. DEMO_LIVE plus server-only Nessie configuration enables sandbox AP debits.
+ * Vendor checks follow DEMO_LIVE; a passkey applies a bank change. */
+export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>;
+  origin?: () => string | undefined; loopbackOrigin?: () => string | undefined; env?: Record<string, string | undefined>; fetch?: typeof fetch } = {}) {
   const origin = options.origin ?? (() => process.env.DEMO_PUBLIC_URL || process.env.WEBAUTHN_ORIGIN);
+  const loopbackOrigin = options.loopbackOrigin ?? declaredLoopbackOfficeOrigin;
   return async (request: Request) => {
     // Compare the browser Origin with the deployment origin. Next rewrites request.url
     // (127.0.0.1 becomes localhost; a tunnel can gain an explicit port) and Host is not a source of truth.
     const allowed = origin();
-    if (!allowed || request.headers.get('origin') !== allowed) return json({ error: 'Origin rejected.' }, 403);
+    const requestOrigin = request.headers.get('origin');
+    if (!allowed || (requestOrigin !== allowed && requestOrigin !== loopbackOrigin())) return json({ error: 'Origin rejected.' }, 403);
     if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) return json({ error: 'Use the inbox form.' }, 415);
     if (Number(request.headers.get('content-length')) > LIMIT + 64000) return json({ error: 'Attachment must be 4 MB or smaller.' }, 413);
     let form: FormData;
@@ -57,10 +64,17 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
           evidenceRefs: refs, policyVersion: decision.policyVersion, quote: decision.quote }, Date.now());
         return escalation.id;
       } };
+      const env = options.env ?? process.env;
       const repository = await createNorthfieldRepository();
       const shared = { state, controller, repository };
-      const payables = new PayablesSeat(shared);
-      const gate = createInboxVendorGate(options.env ?? process.env, options.fetch);
+      const nessie = env.DEMO_LIVE === '1' && env.NESSIE_API_KEY && env.NESSIE_ACCOUNT_ID
+        ? nessieDebitPayables(new NessieClient({ apiKey: env.NESSIE_API_KEY, surface: 'nessie_sandbox',
+            claims: new FileClaims(resolve(/*turbopackIgnore: true*/ env.NESSIE_CLAIMS_DIR || '.nessie-state/claims')),
+            ...(options.fetch && { fetch: options.fetch }) }),
+            env.NESSIE_ACCOUNT_ID)
+        : undefined;
+      const payables = new PayablesSeat({ ...shared, nessie });
+      const gate = createInboxVendorGate(env, options.fetch);
       const vendor = new VendorSeat({ ...shared, checks: gate.checks, bankChangeRisk: gate.risk });
       const preset = !file && matchPreset(form.get('presetId'), String(kind), sender, text);
       if (preset && preset.id === '4419') {
@@ -95,12 +109,17 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       } catch { /* A synchronous adapter failure also leaves the recorded decision intact. */ }
       const documentRoute = 'documentRoute' in result ? result.documentRoute : null;
       const documentModelAttempted = 'documentModelAttempted' in result && result.documentModelAttempted;
+      const debitNotice = result.reconciliation?.match === 'EXACT'
+        ? 'Nessie sandbox debit matched exactly to the invoice withdrawal. This is simulated sandbox money, not a production payment.'
+        : result.reconciliation?.match === 'MISMATCH'
+          ? 'Nessie sandbox debit read-back did not match exactly. The invoice remains held for controller review.'
+          : undefined;
       return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
         extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
-        notice: file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. No bank debit is configured. File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
+        notice: debitNotice ?? (file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
           : gate.simulated
-            ? 'Synthetic Northfield company. CRS, OFAC, and Apify checks are simulated fixtures. No bank debit. A bank-account change is applied only after Dana’s passkey.'
-            : 'CRS, OFAC, and Apify use the configured live clients. An unknown or missing check is not verified. No bank debit. A bank-account change is applied only after Dana’s passkey.',
+            ? `Synthetic Northfield company. CRS, OFAC, and Apify checks are simulated fixtures. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`
+            : `CRS, OFAC, and Apify use the configured live clients. An unknown or missing check is not verified. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`),
         auditId: entry.id, auditHref: `/audit?entry=${encodeURIComponent(entry.id)}#audit-replay`,
         ...(result.escalationId ? { approvalHref: `/approve/${encodeURIComponent(result.escalationId)}` } : {}) });
     } catch { return json({ error: 'Intake could not record a decision. Try again; no payment was submitted.' }, 503); }

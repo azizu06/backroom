@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createNorthfieldRepository, MemoryStateStore, northfieldInvoice } from '@backroom/orchestrator';
+import { createNorthfieldRepository, fakeCreditCheck, fakeHealthCheck, MemoryStateStore, northfieldInvoice } from '@backroom/orchestrator';
 import { FileUsageLedger, MemoryUsageLedger, type QueryFn } from '@backroom/orchestrator/agents';
 import { scriptedQuery, type ScriptStep, type ScriptedCall } from '../../../orchestrator/src/agents/mock-query';
 import { createInboxAgents, demoAgentsEnabled, type InboxNarration } from './agents';
@@ -178,4 +178,50 @@ describe('judge inbox production role narration', () => {
     expect((await state.listAudit()).some(row => row.action.startsWith('agent_'))).toBe(false);
   });
 
+});
+
+describe('collections refused-call email preview', () => {
+  it('uses the production planner on trusted case data and dedupes a same-day repeat', async () => {
+    const control = new MemoryStateStore();
+    const providerStart = vi.fn(async () => ({ sessionId: 'unexpected', callId: 'unexpected' }));
+    const current = {
+      sessionId: 'demo:email:1042',
+      invoice: { amountCents: 495000, currency: 'USD', daysPastDue: 40 },
+      precall: { clientId: 'client-02', invoiceId: '1042', testIdentityId: 7,
+        company: { name: 'Summit Design Partners', website: 'https://example.invalid' },
+        context: { client: { type: 'consumer' as const, phoneNumber: '+12025550102', dnc: false,
+          localWeekday: 2, localHour: 11 } } },
+      dial: { sessionId: 'demo:email:1042', agentId: 'demo:collections', fromNumberId: 'simulated-email-only',
+        clientId: 'client-02', businessName: 'Northfield Studio', contactName: 'Summit Design Partners', invoiceId: '1042',
+        callbackNumber: '+12025550100', client: { type: 'consumer' as const, number: '+12025550102',
+          timeZone: 'America/Los_Angeles', dnc: false } },
+      emailContact: { address: 'billing@client.example' },
+    };
+    const query = scriptedQuery(role => role === 'collections' ? [
+      { tool: 'get_invoice_context', args: {} }, { tool: 'can_call', args: {} },
+      { tool: 'run_precall', args: {} }, { tool: 'start_call', args: {} },
+    ] : []);
+    const host = createInboxAgents({ control, ledger: new MemoryUsageLedger(), query, credential: () => 'mock-key',
+      collectionsPlanner: {
+        caseFor: async () => structuredClone(current), voice: { start: providerStart }, now: () => Date.parse('2026-10-27T18:00:00Z'),
+        precall: { credit: fakeCreditCheck({ testIdentityId: 7, ofacStatus: 'clear', activeSignals: [], evidence: [] }),
+          health: fakeHealthCheck({ signals: [] }), audit: control, escalate: async () => {},
+          planner: { draft: async () => ({ output: { tone: 'neutral', offerOrder: ['pay_in_full'],
+            plan: { installments: 1, firstPaymentPct: 100, totalDays: 0, waiveFees: false, discountPct: 0 } },
+            route: 'local', model: 'test', latencyMs: 0, costUsd: 0 }) } },
+      } });
+    cleanups.push(() => host.stop());
+
+    await expect(host.submitCallRefusal({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' }))
+      .resolves.toEqual({ status: 'queued' });
+    await expect(host.submitCallRefusal({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' }))
+      .resolves.toEqual({ status: 'duplicate' });
+    expect(host.emailOutbox.sent).toHaveLength(1);
+    expect(host.emailOutbox.sent[0]).toMatchObject({ label: 'SIMULATED: email preview, not sent', to: 'billing@client.example' });
+    expect(providerStart).not.toHaveBeenCalled();
+    const rows = (await control.listAudit()).filter(row => row.action.startsWith('email_followup_'));
+    expect(rows.map(row => row.action)).toEqual(['email_followup_queued', 'email_followup_duplicate']);
+    expect(rows.map(row => row.inputs?.toDomain)).toEqual(['client.example', 'client.example']);
+    expect(JSON.stringify(rows)).not.toContain('billing@client.example');
+  });
 });
