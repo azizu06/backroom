@@ -16,7 +16,7 @@ import { ApifyBudget } from '../tools/vendor-apify';
 import { MemoryStateStore } from '../../store';
 import { createRouter } from '../../router';
 import { createNorthfieldRepository, northfield, northfieldInvoice, northfieldSource, PayablesSeat } from '../../payables';
-import type { FinanceRepository, InvoiceFields } from '../../payables';
+import type { FinanceRepository, InvoiceFields, PayablesClient } from '../../payables';
 
 const fixtureRoot = fileURLToPath(new URL('../../../../fixtures/', import.meta.url));
 export interface Trace { role: Role; tool: string; output: Json }
@@ -55,6 +55,7 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
   candidate?: InvoiceFields; repository?: FinanceRepository; state?: MemoryStateStore;
   /** Explicitly omit the AP debit port to measure the current host's unavailable-capability path. */
   payment?: 'mock' | 'unavailable';
+  paymentClient?: PayablesClient;
   /** P12: route extraction through the production router with GX10 healthy or cut; records routing audits. */
   gx10?: 'healthy' | 'cut' } = {}) {
   const caseId = options.caseId ?? `ap:${id}`;
@@ -101,7 +102,7 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
   const receipts: string[] = [];
   const destinations: string[] = [];
   const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'nessie', bankChangeRisk: verifier.bankChangeRisk,
-    nessie: options.payment === 'unavailable' ? undefined : { payInvoice: async payment => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt);
+    nessie: options.payment === 'unavailable' ? undefined : options.paymentClient ?? { payInvoice: async payment => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt);
       destinations.push(payment.destinationAccountId); return { id: receipt, status: 'completed' }; } } });
   const store = new MemoryHandoffStore({ audit: state });
   const ledger = new MemoryUsageLedger();
@@ -109,7 +110,11 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
     payables: { seat, repository, controller, loadCase: async () => ({ fields: extraction?.fields as unknown as InvoiceFields, source }) },
     auditor: { store: state, loadCase: async () => ({ refs: [source.id, id, caseId],
       correctionCount: auditorCorrections((await store.getCase(caseId))!) }),
-      loadReceipt: async receiptId => receipts.includes(receiptId) ? { id: receiptId, status: 'completed' } : undefined },
+      loadReceipt: async receiptId => {
+        const saved = await repository.getInvoice(fields.vendorId, fields.invoiceId);
+        return receipts.includes(receiptId) || saved?.result.receiptId === receiptId
+          ? { id: receiptId, status: saved?.result.status === 'paid' ? 'completed' : 'pending' } : undefined;
+      } },
   });
   let assessment: Record<string, Json> = {}, verdict: Record<string, Json> = {}, result: Record<string, Json> = {};
   const runtime = mockRuntime(store, async (spec, ctx, invoke) => {
