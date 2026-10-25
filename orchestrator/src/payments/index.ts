@@ -84,6 +84,37 @@ export class PaymentService {
     }
     return structuredClone(this.records.get(id)!);
   }
+  /** Rebuild the process-local view from bank evidence and reducer receipts without writing either. */
+  recover(linkIds: readonly string[], store: Pick<StateStore, 'getPayment'>): Promise<{ restored: PaymentRecord[]; skipped: { linkId: string; reason: string }[] }> {
+    return this.serial(async () => {
+      const feed = await this.options.bank.listDeposits(this.options.accountId);
+      const restored: PaymentRecord[] = [];
+      const skipped: { linkId: string; reason: string }[] = [];
+      for (const linkId of linkIds) {
+        if (this.records.has(linkId)) { skipped.push({ linkId, reason: 'ALREADY_TRACKED' }); continue; }
+        let link: AuthorizedPaymentLink;
+        try { link = await this.link(linkId); }
+        catch (error) {
+          if (!(error instanceof PaymentError)) throw error;
+          skipped.push({ linkId, reason: error.code }); continue;
+        }
+        const evidence = inspectPaymentEvidence({ linkId, memo: paymentMemo(link), amountCents: link.amountCents }, feed);
+        if (evidence.ruleId) {
+          skipped.push({ linkId, reason: evidence.ruleId === 'RECON_UNMATCHED' ? 'NOT_POSTED' : evidence.ruleId }); continue;
+        }
+        const depositId = evidence.deposit!._id;
+        const receipt = await store.getPayment(`ar:${link.invoiceId}:${link.installment}`);
+        if (receipt && receipt.fingerprint !== `${depositId}:${link.amountCents}`) {
+          skipped.push({ linkId, reason: 'RECON_RECEIPT_CONFLICT' }); continue;
+        }
+        const record: PaymentRecord = { linkId, invoiceId: link.invoiceId, installment: link.installment,
+          amountCents: link.amountCents, depositId,
+          status: receipt ? receipt.result.invoiceState as 'paid' | 'partially_paid' : 'pending_reconciliation' };
+        this.records.set(linkId, record); restored.push(structuredClone(record));
+      }
+      return { restored, skipped };
+    });
+  }
   pendingPayments() { return structuredClone([...this.records.values()].filter(row => row.status === 'pending_reconciliation')); }
   retryPending(): Promise<{ linkId: string; ok: boolean }[]> {
     if (this.retrying) return this.retrying;

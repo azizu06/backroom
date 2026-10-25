@@ -14,6 +14,7 @@ import { runCallButton } from './call-button';
 import { runInvoice, runReceivable, runCollectionsPermit } from './chain';
 import { runBankChange } from './bank-change';
 import { runRecovery } from './recovery';
+import { runDurableRecoveryPreflight } from './durable-recovery';
 import { runBadgeAttack } from './badge-attack';
 import { evaluatorSourceHash, inputFileSha256 } from './provenance';
 import { score, type Observation } from './score';
@@ -113,6 +114,7 @@ for (const invoice of northfield.arInvoices) {
   if (expected && expected !== actual) gaps.push({ id: scenario.id, detail: `Reconciler expected ${expected}, got ${actual}.` });
 }
 const legacy = await runEval({ persona: scriptedPersona });
+const durableRecovery = await runDurableRecoveryPreflight();
 const recoveryRuns = [];
 for (const variant of [{ lateCancel: false }, { lateCancel: true }, { checkpoint: 'before_provider' as const }]) {
   const run = await runRecovery(variant);
@@ -145,15 +147,6 @@ for (const run of failoverRuns) if (!run.match) gaps.push({ id: `P12:${run.id}`,
 const failoverCovered = new Set(failoverRuns.map(row => row.scenarioId));
 const failoverComplete = failoverRuns.length > 0 && failoverRuns.every(row => row.match);
 const failoverUnreplayed = failoverScenarioIds.filter(id => !failoverCovered.has(id));
-for (const row of legacy.reports) {
-  for (const violation of row.violations) gaps.push({ id: row.id, detail: `Existing eval: ${violation}` });
-  // P12's integration step is executed by the dispatcher failover pairs above, not by the legacy runner.
-  if (row.id === 'P12' && failoverComplete) {
-    if (failoverUnreplayed.length) gaps.push({ id: 'P12:scope', detail: `No keyed AP invoice step to replay for ${failoverUnreplayed.join(', ')}; their GX10 failover is not measured here.` });
-    continue;
-  }
-  if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
-}
 const approvalExpiry = await runApprovalExpiry();
 if (!approvalExpiry.match) gaps.push({ id: 'approval-expiry', detail: `Approval expiry missed: ${Object.entries(approvalExpiry.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const precallStops = [];
@@ -171,6 +164,31 @@ for (const name of CONVERSATIONS) {
   if (!run.match) gaps.push({ id: `AR:${run.scenarioId}:${name}`, detail: `Scripted call through the Dispatcher missed: ${Object.entries(run.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 }
 gaps.push({ id: 'AR_RUNTIME', detail: `${conversations.length} AR conversations (${[...new Set(conversations.map(row => row.scenarioId))].join(', ')}) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured.` });
+for (const row of legacy.reports) {
+  for (const violation of row.violations) gaps.push({ id: row.id, detail: `Existing eval: ${violation}` });
+  // P12's integration step is executed by the dispatcher failover pairs above, not by the legacy runner.
+  if (row.id === 'P12' && failoverComplete) {
+    if (failoverUnreplayed.length) gaps.push({ id: 'P12:scope', detail: `No keyed AP invoice step to replay for ${failoverUnreplayed.join(', ')}; their GX10 failover is not measured here.` });
+    continue;
+  }
+  // C17's integration step (record PHONE_MISMATCH_WARN on Dana's audit wall, identity before any amount) is executed
+  // end to end by the scripted phone_mismatch conversation; a live phone retest is still a separate, ungraded item.
+  // C14: no dial, and the email-only path queues one simulated follow-up with no amount or invoice detail.
+  if (row.id === 'C14' && precallStops.find(run => run.id === 'C14')?.match) continue;
+  if (row.id === 'C17' && conversations.find(run => run.id === 'phone_mismatch')?.match) continue;
+  // C13: the desk-phone gate withholds Request call, the office request is refused, and a direct dial is rejected before the provider.
+  if (row.id === 'C13' && callButton.checks.noConsent && precallStops.find(run => run.id === 'C13')?.match) continue;
+  if (row.id === 'P11' && row.seams.includes('integration:not_executed')) {
+    gaps.push({ id: row.id, detail: `${durableRecovery.scope} Frozen integrationOutcome: ${key.payables.P11.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}.` });
+    continue;
+  }
+  if (row.id === 'C09' && row.seams.includes('integration:not_executed')) {
+    const run = conversations.find(run => run.scenarioId === 'C09');
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher run queues ${run?.humanFollowup?.queuedRequests ?? 0} request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has ${run?.humanFollowup?.gatewayReviewRecipients.length ?? 0} review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.` });
+    continue;
+  }
+  if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
+}
 const inboxTeam = await runInboxTeam();
 if (!inboxTeam.match) gaps.push({ id: 'inbox-team', detail: `Demo inbox agent team missed: ${Object.entries(inboxTeam.checks).filter(([, ok]) => !ok).map(([key]) => key).join(', ')}.` });
 const judgeRuns = [];
@@ -211,7 +229,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -229,6 +247,7 @@ const report = {
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
     payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.',
     recovery: recoveryRuns[0]!.scope,
+    durableRecovery: durableRecovery.scope,
     arConversations: conversations[0]?.scope ?? 'not run',
     judgeCalls: `${judgeRuns[0]?.scope ?? 'not run'} Cases: ${judgeRuns.map(row => row.id).join(', ')}. The opt-out control must not escalate.`,
     gx10Failover: 'Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.',
@@ -246,6 +265,7 @@ const report = {
     historicalMockDebits: invoiceRuns.filter(row => row.historical).reduce((sum, row) => sum + row.mockDebits, 0) },
   rates, ap: invoiceRuns, gradedAP, permits, receivables,
   recovery: recoveryRuns,
+  durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
   bankChange: { ...bankChange, match: bankChangeMatch, expected: key.payables.P04.plantedRule,
     before: { ...bankChange.before, trace: undefined, extraction: undefined },
@@ -293,9 +313,9 @@ const lines = [
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
-  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail) | ${display(rates.arConversations)} |`,
-  `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
-  `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once) | ${display(rates.callButton)} |`,
+  `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | ${display(rates.arConversations)} |`,
+  `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider, email-only clients get a simulated follow-up with no amount (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
+  `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: button withheld, 409, no provider attempt) | ${display(rates.callButton)} |`,
   `| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0, mismatched origin rejected) | ${display(rates.inboxTeam)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,

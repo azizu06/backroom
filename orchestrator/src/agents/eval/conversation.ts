@@ -15,7 +15,7 @@ import { createGateway } from '../../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../../web/lib/gateway/store';
 
 export const CONVERSATIONS = ['promise', 'dispute', 'already_paid_matched', 'already_paid_unmatched', 'wrong_number', 'opt_out',
-  'hostile', 'human_request', 'voicemail'] as const;
+  'hostile', 'human_request', 'voicemail', 'phone_mismatch'] as const;
 export type Conversation = typeof CONVERSATIONS[number];
 type Turn = { caller: string; tool?: string; args?: Record<string, unknown> };
 const confirm: Turn[] = [
@@ -23,7 +23,7 @@ const confirm: Turn[] = [
   { caller: 'Yes, this is the right person.', tool: 'get_invoice_context' },
 ];
 /** Frozen scenario id, invoice and the voice agent's tool choices for each caller line. */
-const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; turns: Turn[] }> = {
+const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; turns: Turn[]; signals?: string[] }> = {
   promise: { scenarioId: 'C02', invoiceId: '1042', turns: [...confirm,
     { caller: 'Can I pay half now and the rest in thirty days?', tool: 'propose_plan',
       args: { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 } },
@@ -52,6 +52,12 @@ const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; tur
   voicemail: { scenarioId: 'C21', invoiceId: '1042', turns: [
     { caller: '(voicemail greeting) Please leave a message after the tone.' },
     { caller: '(beep)', tool: 'get_invoice_context' }] },
+  // Apify found a different phone number: the call proceeds with extra identity caution and Dana is warned.
+  phone_mismatch: { scenarioId: 'C17', invoiceId: '1042', signals: ['phone_mismatch'], turns: [
+    { caller: 'Hello, who is this?', tool: 'verify_identity_result', args: { result: 'uncertain' } },
+    { caller: 'Just tell me what this is about first.', tool: 'get_invoice_context' },
+    { caller: 'Fine. Yes, this is the right person.', tool: 'verify_identity_result', args: { result: 'confirmed' } },
+    { caller: 'Okay, what is it?', tool: 'get_invoice_context' }] },
   opt_out: { scenarioId: 'C12', invoiceId: '1042', turns: [...confirm,
     { caller: 'Stop calling this number. Take us off your list.', tool: 'record_opt_out' },
     { caller: 'Actually, what was the amount again?', tool: 'propose_plan',
@@ -67,6 +73,7 @@ const EXPECTED: Record<Conversation, { caseStatus: CaseResult['status']; roles: 
   opt_out: { caseStatus: 'done', roles: ['collections'], cleared: false, callStatus: 'opted_out' },
   hostile: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'human_requested' },
   human_request: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'human_requested' },
+  phone_mismatch: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'active' },
   voicemail: { caseStatus: 'held', roles: ['collections'], cleared: false, callStatus: 'active' },
 };
 
@@ -91,8 +98,8 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const trace: Trace[] = [];
 
   // 1. Planner: production specialist + runtime with offline pre-call fakes; the dial is a mock CallStarter.
-  const gateway = new MemoryGatewayStore([]);
-  const precallContext = async () => ({ client: { type: client.type as 'business', phoneNumber: client.phoneNumber,
+  const gateway = new MemoryGatewayStore([], state);
+  const precallContext = async () => ({ ...(SCRIPTS[name].signals && { signals: { active: SCRIPTS[name].signals } }), client: { type: client.type as 'business', phoneNumber: client.phoneNumber,
     dnc: client.dnc || await gateway.clientStopped(client.id), localWeekday: 2, localHour: 11, consent: client.consent } });
   const loadCase = async () => ({ sessionId, invoice: { amountCents, currency: 'USD', daysPastDue: 40 },
       precall: { clientId: client.id, invoiceId, testIdentityId: 7, company: { name: client.name, website: 'https://example.invalid' }, context: await precallContext() },
@@ -195,7 +202,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   // 4. Opt-out persists before the next call: the same host composes the next pre-call from gateway state.
   const redials: string[] = [];
   // Stops persist before the next call; a voicemail does not stop future calls.
-  const nextCall = ['opt_out', 'hostile', 'human_request', 'voicemail'].includes(name) ? await plan('next-call', redials) : undefined;
+  const nextCall = ['opt_out', 'hostile', 'human_request', 'voicemail', 'wrong_number'].includes(name) ? await plan('next-call', redials) : undefined;
   const nextPermit = trace.find(row => row.tool === 'next-call.can_call')?.output as Record<string, Json> | undefined;
 
   // The reconciler's code-owned receipt is the only thing that clears an AR invoice.
@@ -212,6 +219,18 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const roleOrder = dispatched.activations.map(row => row.role);
   const expected = EXPECTED[name];
   const reconRules = audits.filter(row => row.action === 'agent_reconciliation').map(row => row.ruleIds[0]);
+  const humanFollowup = name === 'human_request' ? {
+    queuedRequests: call.outbox.filter(row => row.type === 'request_human').length,
+    gatewayEscalations: call.audits.filter(row => row.action === 'request_human')
+      .map(row => ({ decision: row.kind, ruleIds: row.ruleIds })),
+    mirroredEscalations: audits.filter(row => row.action === 'request_human')
+      .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
+    postcallEscalations: audits.filter(row => row.action === 'collections_postcall_terminal')
+      .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
+    // Read the actual record: request_human currently queues an unassigned outbox event.
+    // Plan approval recipients are not proof that a callback was assigned or delivered.
+    gatewayReviewRecipients: call.escalations.map(row => row.toHuman),
+  } : undefined;
   const checks = {
     dialedOnce: planned.kind === 'started' && dials.length === 1,
     callStatus: call.status === expected.callStatus,
@@ -220,21 +239,35 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     cleared: cleared === expected.cleared,
     noLeakBeforeIdentity: !leaked,
     auditChain: (await state.verifyAuditChain()).valid,
+    ...(humanFollowup && {
+      humanFollowupQueued: humanFollowup.queuedRequests === 1,
+      humanEscalationMirrored: humanFollowup.gatewayEscalations.length === 1 && humanFollowup.mirroredEscalations.length === 1 &&
+        humanFollowup.gatewayEscalations[0]!.decision === 'ESCALATE' && humanFollowup.mirroredEscalations[0]!.decision === 'ESCALATE' &&
+        JSON.stringify(humanFollowup.mirroredEscalations[0]!.ruleIds) === JSON.stringify(['REQUEST_HUMAN']) &&
+        humanFollowup.postcallEscalations[0]?.decision === 'ESCALATE',
+    }),
     ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.length > 0 && reconRules.every(rule => rule === 'RECON_UNMATCHED') && !cleared }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
     ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0
       && transcript.at(-1)?.tool === 'propose_plan' && transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids) === JSON.stringify(['CALL_STOPPED']),
       humanHoldRecorded: audits.some(row => row.action === 'collections_postcall_terminal' && row.inputs?.outcome === 'human_requested'),
       nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0 && nextPermit?.decision === 'DENY' }),
+    ...(name === 'phone_mismatch' && {
+      warningRecorded: audits.some(row => row.action === 'phone_mismatch_warn' && row.ruleIds.includes('PHONE_MISMATCH_WARN')),
+      noAmountBeforeIdentity: transcript[1]?.result?.kind === 'DENY' && !revealsInvoice(transcript[1]!.result!, amountCents),
+      contextAfterIdentity: transcript.at(-1)?.result?.kind === 'CONTEXT' }),
     ...(name === 'voicemail' && { noDetailsWithoutIdentity: transcript.at(-1)?.result?.kind === 'DENY' && !JSON.stringify(transcript.at(-1)?.result).includes(String(amountCents)),
       nextCallAllowed: nextCall?.kind === 'started' && redials.length === 1 }),
     ...(name === 'opt_out' && { noOfferAfterOptOut: call.plans.length === 0, nextCallRefused: nextCall?.kind === 'not_started' && redials.length === 0
       && nextPermit?.decision === 'DENY' && JSON.stringify(nextPermit?.ruleIds) === JSON.stringify(['DNC']) }),
-    ...(name === 'wrong_number' && { identityDenied: transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids ?? []).includes('IDENTITY_REQUIRED') }),
+    ...(name === 'wrong_number' && { identityDenied: transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids ?? []).includes('IDENTITY_REQUIRED'),
+      // C08 "flag phone": a wrong-person number must not be dialed again until a human reviews it.
+      numberFlagged: nextCall?.kind === 'not_started' && redials.length === 0 && nextPermit?.decision === 'DENY' }),
     ...(name === 'already_paid_unmatched' && { claimNotCleared: reconRules.includes('RECON_UNMATCHED') }),
   };
   return { id: name, scenarioId, invoiceId, match: Object.values(checks).every(Boolean), checks,
     callStatus: call.status, caseStatus: dispatched.status, reason: dispatched.reason ?? null, roles: roleOrder, cleared, reconRules,
+    ...(humanFollowup && { humanFollowup }),
     gatewayTools: transcript.filter(row => row.tool).map(row => `${row.tool}:${String(row.result?.kind ?? row.result?.error)}`),
     tools: trace.map(row => `${row.role}.${row.tool}`),
     scope: 'Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.' };

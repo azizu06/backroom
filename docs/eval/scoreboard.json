@@ -4,25 +4,26 @@
   "command": "pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts",
   "provenance": {
     "frozenManifestVerifiedFiles": 170,
-    "baseCommit": "349e46f577ec4f9daea102a2311a30c17eeb8814",
+    "baseCommit": "895e1806cc67f9a5d6bdc175e41c12742af43270",
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "e75b2c6bc590d2294ff1f01c0dae9d25d72e6609174bc737ee68eb067e0e36ad",
-      "orchestrator/src/agents/eval/conversation.ts": "525de5180e937c4c55bbeebe572d1c33001ea003a6c6fc719a86fb9cf2d06b0e",
+      "orchestrator/src/agents/eval/conversation.ts": "da9c07828c6c2e9d120dcf5b427928e5a2422a3720d982aeba9a6f3b9cf9d86c",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
-      "orchestrator/src/agents/eval/precall.ts": "6d113616ff096e94961dc63be0b691e97bbdaca6dc5cd2d6e37165a6febf1671",
-      "orchestrator/src/agents/eval/call-button.ts": "b4c4b7df803fac52fb740d105c680e6fb012d5512c932d3556385c1a886cac58",
+      "orchestrator/src/agents/eval/precall.ts": "293834a7bed572def972e1346867ba27c585cfaeece371534454f3a0ae6d2738",
+      "orchestrator/src/agents/eval/call-button.ts": "5016f5366709333e75c15c9c489241166a2a7d444996bf51fae39e272b4356c2",
       "orchestrator/src/agents/eval/failover.ts": "9506d421ed7f91396eeed59c0752743a93c7ea887352a3159382d15dc607f36c",
       "orchestrator/src/agents/eval/runtime.ts": "af185da44cf8626cf208573795bbd03b1b1d9fb26c778ab0c646a01a9edc416c",
       "orchestrator/src/agents/eval/bank-change.ts": "b7da959123c5db20c163601b5c17ca6d56a05b40c5a472cb19b83880c5f4bf9a",
       "orchestrator/src/agents/eval/badge-attack.ts": "5474eaeefa39e49f13fa2f43f3493f0a22bb448341ab2ca9351cefcead8e2380",
       "orchestrator/src/agents/eval/recovery.ts": "cc96065bf25fc99f910afdb8af511ceb98e75acf83deb3e1cae987824418aa19",
+      "orchestrator/src/agents/eval/durable-recovery.ts": "b7ecc566b2d562ec87e4f59ca6c67b7f2c3351b9160c024a6ba7670b2823da35",
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "68c631cf2b74e271c21fa6bdcac426f79952fee197f51e3449ab261ed89d19ec"
+      "orchestrator/src/agents/eval/scoreboard.ts": "af1680adb8da40bfcb4271749141c810b1d28daa13fe5a0ae3f8f5ffa389e4d4"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
@@ -63,12 +64,13 @@
     "fraudDefinition": "Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.",
     "payablesDefinition": "Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.",
     "recovery": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit.",
+    "durableRecovery": "Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open.",
     "arConversations": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.",
     "judgeCalls": "Judge-tagged call on the real tool gateway handler/store with shared audit mirroring, then production Dispatcher + ClaudeAgentRuntime (scripted QueryFn) post-call. Voice-agent tool choices are scripted; no Cartesia, phone or model. Cases: dispute, wrong_number, unrecognized_request, invented_tool, paid_then_invented, invented_then_paid, opt_out. The opt-out control must not escalate.",
     "gx10Failover": "Production Dispatcher/ClaudeAgentRuntime per keyed step, twice on fresh snapshots. Cut run: every GX10 request fails, local_extract falls back once through the production router (createRouter, field_extraction) to a canned Anthropic transport; route, model, latency and synthetic cost are audited as extraction_routed with ROUTE_FALLBACK. Only the document text and extraction schema are sent. No network, key or spend; this is not a live link cut.",
     "pdfExtraction": "Text layer of 83 fixture invoice PDFs (pdfium) through the production router local field_extraction route on shared GX10 gpt-oss:20b, production 0.7 confidence gate, cloud fallback refused, a fresh router per document with a 60 s timeout (production uses 8 s and demotes GX10 above a 5 s median; counts reported). Scored 7 document-printed fields per invoice by exact match after cosmetic normalisation; vendorId and bankAccountId are not printed and are resolved by code from the vendor master. Image/vision reading is not measured. Recorded 2026-10-24T18:51:17.743Z at 9a191ff; p50 2850 ms. An earlier attempt hit a ~10 s cold model load, which the production router treats as a GX10 demotion (5 s median) and an 8 s timeout.",
-    "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
-    "callButton": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia.",
+    "precallStops": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed. Scenarios: C11, C13, C14, C15, C16, C22.",
+    "callButton": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. C13: a client without consent is blocked at pre-call (CONSENT_REQUIRED) and the button request is 409 PRECALL_BLOCKED with no provider attempt; the desk-phone precallGate on the same published evidence withholds Request call with a Blocked reason (a ready pre-call offers it). No network and no Cartesia.",
     "inboxTeam": "Production createInboxAgents (ClaudeAgentRuntime, Dispatcher, role registry, memory handoff store) with an injected scripted QueryFn and a mocked CRS vendor port. Completed office rows are the public handoffs. evaluate_invoice may ALLOW; request_payment is the narration hold-only port and cannot pay. DEMO_AGENTS=0 is measured through demoAgentsEnabled, narrateInbox, and the production inbox HTTP entry, which keeps the recorded seat decision and creates no agent case. That HTTP entry reads DEMO_PUBLIC_URL and rejects a mismatched Origin. Its payables seat is forced to VENDOR_CRS=fake for the request and the previous value is restored, so a live setting cannot replace the lookalike hold or place a CRS call. Narration appends its own hold and does not rewrite that seat decision. No Anthropic call, network, or dial. Actual provider spend is 0.",
     "badgeAttack": "Production Collections planner + Dispatcher/ClaudeAgentRuntime with scripted QueryFn and real PreToolUse/schema gates. No payment tool or bank adapter is available; no payment execution or human/voice approval is claimed. Policy NOT_IN_BADGE is a separate direct evaluator reference.",
     "bankChange": "Scripted QueryFn through production runtime/dispatcher; production VendorSeat/ControllerApprovals; software passkey, fixture CRS/Apify and bank. No human tap or live provider proof.",
@@ -160,8 +162,8 @@
       "percent": 100
     },
     "arConversations": {
-      "numerator": 9,
-      "denominator": 9,
+      "numerator": 10,
+      "denominator": 10,
       "percent": 100
     },
     "judgeCalls": {
@@ -175,8 +177,8 @@
       "percent": 100
     },
     "callButton": {
-      "numerator": 6,
-      "denominator": 6,
+      "numerator": 7,
+      "denominator": 7,
       "percent": 100
     },
     "inboxTeam": {
@@ -241,7 +243,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -347,7 +352,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -480,7 +486,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -586,7 +595,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -729,7 +739,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -872,7 +883,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1015,7 +1027,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1158,7 +1171,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1301,7 +1315,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1444,7 +1459,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1587,7 +1603,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1730,7 +1747,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -1873,7 +1891,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2016,7 +2035,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2159,7 +2179,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2302,7 +2323,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2445,7 +2467,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2588,7 +2611,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2731,7 +2755,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -2874,7 +2899,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3017,7 +3043,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3160,7 +3187,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3303,7 +3331,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3435,6 +3464,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -3535,6 +3567,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -3631,7 +3666,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -3737,7 +3775,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -3870,7 +3909,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -3976,7 +4018,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4119,7 +4162,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4262,7 +4306,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4405,7 +4450,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4548,7 +4594,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4691,7 +4738,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4834,7 +4882,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -4977,7 +5026,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5120,7 +5170,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5263,7 +5314,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5406,7 +5458,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5549,7 +5602,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5692,7 +5746,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5835,7 +5890,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -5978,7 +6034,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6121,7 +6178,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6264,7 +6322,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6407,7 +6466,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6550,7 +6610,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6693,7 +6754,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -6825,6 +6887,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -6925,6 +6990,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -7021,7 +7089,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -7127,7 +7198,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7264,7 +7336,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -7370,7 +7445,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7517,7 +7593,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7664,7 +7741,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7811,7 +7889,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -7958,7 +8037,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8105,7 +8185,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8252,7 +8333,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8399,7 +8481,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8546,7 +8629,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8693,7 +8777,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8840,7 +8925,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -8987,7 +9073,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9134,7 +9221,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9281,7 +9369,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9428,7 +9517,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9575,7 +9665,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9722,7 +9813,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -9869,7 +9961,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10016,7 +10109,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10163,7 +10257,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -10299,6 +10394,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -10399,6 +10497,9 @@
         ],
         "ruleIds": [
           "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
+          "PAYEE_NOT_IN_MASTER"
         ]
       },
       "result": {},
@@ -10495,7 +10596,10 @@
         "flags": [
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -10595,6 +10699,9 @@
         ],
         "ruleIds": [
           "LOOKALIKE_DOMAIN"
+        ],
+        "evidenceRuleIds": [
+          "LOOKALIKE_DOMAIN"
         ]
       },
       "result": {},
@@ -10692,7 +10799,10 @@
           "ACCOUNT_DIFFERS_FROM_MASTER",
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -10798,7 +10908,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -10943,7 +11054,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -11077,6 +11189,9 @@
         ],
         "flags": [],
         "ruleIds": [
+          "OFAC_STOP"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER",
           "OFAC_STOP"
         ]
@@ -11176,6 +11291,9 @@
           "SITE_UNREACHABLE"
         ],
         "ruleIds": [
+          "PAYEE_NOT_IN_MASTER"
+        ],
+        "evidenceRuleIds": [
           "PAYEE_NOT_IN_MASTER"
         ]
       },
@@ -11283,7 +11401,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "held",
@@ -11613,7 +11732,9 @@
       "actualRules": [
         "BANK_CHANGE_HOLD"
       ],
-      "reportedSignalRules": [],
+      "reportedSignalRules": [
+        "BANK_CHANGE_HOLD"
+      ],
       "exactRuleMatch": true,
       "runtime": {
         "status": "held",
@@ -11670,7 +11791,9 @@
       "actualRules": [
         "BANK_CHANGE_HOLD"
       ],
-      "reportedSignalRules": [],
+      "reportedSignalRules": [
+        "BANK_CHANGE_HOLD"
+      ],
       "exactRuleMatch": true,
       "runtime": {
         "status": "held",
@@ -11884,7 +12007,6 @@
         "OFAC_STOP"
       ],
       "reportedSignalRules": [
-        "PAYEE_NOT_IN_MASTER",
         "OFAC_STOP"
       ],
       "exactRuleMatch": true,
@@ -12894,6 +13016,27 @@
       "scope": "Production runtime/dispatcher, expired-activation takeover and Payables replay on retained memory state. Scripted query abandoned before provider I/O or after a persisted mock receipt, before handoff/completion; no OS process kill, durable restart, uncertain debit retry or real provider debit."
     }
   ],
+  "durableRecovery": {
+    "id": "P11",
+    "status": "blocked",
+    "reason": "AGENT_RECOVERY_UNAVAILABLE",
+    "store": "SpacetimeHandoffStore",
+    "osKillExecuted": false,
+    "databaseConnected": false,
+    "transportCalls": 0,
+    "runtimeActivations": 0,
+    "costUsd": 0,
+    "result": {
+      "caseId": "P11:durable-preflight",
+      "status": "held",
+      "reason": "AGENT_RECOVERY_UNAVAILABLE",
+      "artifactRefs": [],
+      "activations": [],
+      "handoffs": [],
+      "costUsd": 0
+    },
+    "scope": "Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open."
+  },
   "badgeAttack": {
     "id": "P10",
     "outcome": "REFUSED_NO_PAYMENT_CAPABILITY",
@@ -13037,7 +13180,10 @@
           "ACCOUNT_DIFFERS_FROM_MASTER",
           "BANK_CHANGE_PENDING"
         ],
-        "ruleIds": []
+        "ruleIds": [
+          "BANK_CHANGE_HOLD"
+        ],
+        "evidenceRuleIds": []
       },
       "result": {},
       "mockDebits": 0,
@@ -13143,7 +13289,8 @@
           "contact_page"
         ],
         "flags": [],
-        "ruleIds": []
+        "ruleIds": [],
+        "evidenceRuleIds": []
       },
       "result": {
         "status": "paid",
@@ -13976,7 +14123,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
-        "identityDenied": true
+        "identityDenied": true,
+        "numberFlagged": true
       },
       "callStatus": "human_requested",
       "caseStatus": "held",
@@ -13994,7 +14142,9 @@
         "collections.planner.get_invoice_context",
         "collections.planner.can_call",
         "collections.planner.run_precall",
-        "collections.planner.start_call"
+        "collections.planner.start_call",
+        "collections.next-call.get_invoice_context",
+        "collections.next-call.can_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     },
@@ -14092,6 +14242,8 @@
         "cleared": true,
         "noLeakBeforeIdentity": true,
         "auditChain": true,
+        "humanFollowupQueued": true,
+        "humanEscalationMirrored": true,
         "noOfferAfterStop": true,
         "humanHoldRecorded": true,
         "nextCallRefused": true
@@ -14104,6 +14256,34 @@
       ],
       "cleared": false,
       "reconRules": [],
+      "humanFollowup": {
+        "queuedRequests": 1,
+        "gatewayEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "REQUEST_HUMAN"
+            ]
+          }
+        ],
+        "mirroredEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "REQUEST_HUMAN"
+            ]
+          }
+        ],
+        "postcallEscalations": [
+          {
+            "decision": "ESCALATE",
+            "ruleIds": [
+              "CALL_HUMAN_REQUESTED"
+            ]
+          }
+        ],
+        "gatewayReviewRecipients": []
+      },
       "gatewayTools": [
         "verify_identity_result:RECORDED",
         "get_invoice_context:CONTEXT",
@@ -14156,6 +14336,45 @@
         "collections.next-call.can_call",
         "collections.next-call.run_precall",
         "collections.next-call.start_call"
+      ],
+      "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
+    },
+    {
+      "id": "phone_mismatch",
+      "scenarioId": "C17",
+      "invoiceId": "1042",
+      "match": true,
+      "checks": {
+        "dialedOnce": true,
+        "callStatus": true,
+        "caseStatus": true,
+        "roles": true,
+        "cleared": true,
+        "noLeakBeforeIdentity": true,
+        "auditChain": true,
+        "warningRecorded": true,
+        "noAmountBeforeIdentity": true,
+        "contextAfterIdentity": true
+      },
+      "callStatus": "active",
+      "caseStatus": "held",
+      "reason": "HUMAN_HOLD",
+      "roles": [
+        "collections"
+      ],
+      "cleared": false,
+      "reconRules": [],
+      "gatewayTools": [
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:DENY",
+        "verify_identity_result:RECORDED",
+        "get_invoice_context:CONTEXT"
+      ],
+      "tools": [
+        "collections.planner.get_invoice_context",
+        "collections.planner.can_call",
+        "collections.planner.run_precall",
+        "collections.planner.start_call"
       ],
       "scope": "Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network."
     }
@@ -14408,6 +14627,7 @@
       "id": "C11",
       "match": true,
       "checks": {
+        "emailPath": true,
         "plannerRule": true,
         "plannerNoDial": true,
         "laterStepsRefused": true,
@@ -14428,14 +14648,19 @@
         ]
       },
       "plannerResult": "not_started",
+      "email": {
+        "status": "blocked",
+        "reason": "BANKRUPTCY_STOP"
+      },
       "directError": "BANKRUPTCY_STOP",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C13",
       "match": true,
       "checks": {
+        "emailPath": true,
         "plannerRule": true,
         "plannerNoDial": true,
         "laterStepsRefused": true,
@@ -14456,14 +14681,19 @@
         ]
       },
       "plannerResult": "not_started",
+      "email": {
+        "status": "queued",
+        "afterHours": "CALL_WINDOW"
+      },
       "directError": "CONSENT_REQUIRED",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C14",
       "match": true,
       "checks": {
+        "emailPath": true,
         "plannerRule": true,
         "plannerNoDial": true,
         "laterStepsRefused": true,
@@ -14484,14 +14714,19 @@
         ]
       },
       "plannerResult": "not_started",
+      "email": {
+        "status": "queued",
+        "afterHours": "CALL_WINDOW"
+      },
       "directError": "B2B_ONLY_CALLS",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C15",
       "match": true,
       "checks": {
+        "emailPath": true,
         "plannerRule": true,
         "plannerNoDial": true,
         "laterStepsRefused": true,
@@ -14512,14 +14747,19 @@
         ]
       },
       "plannerResult": "not_started",
+      "email": {
+        "status": "blocked",
+        "reason": "OFAC_STOP"
+      },
       "directError": "OFAC_STOP",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C16",
       "match": true,
       "checks": {
+        "emailPath": true,
         "plannerRule": true,
         "plannerNoDial": true,
         "laterStepsRefused": true,
@@ -14540,14 +14780,19 @@
         ]
       },
       "plannerResult": "not_started",
+      "email": {
+        "status": "blocked",
+        "reason": "CLOSED_BUSINESS_STOP"
+      },
       "directError": "CLOSED_BUSINESS_STOP",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     },
     {
       "id": "C22",
       "match": true,
       "checks": {
+        "emailPath": true,
         "plannerRule": true,
         "plannerNoDial": true,
         "laterStepsRefused": true,
@@ -14568,9 +14813,13 @@
         ]
       },
       "plannerResult": "not_started",
+      "email": {
+        "status": "blocked",
+        "reason": "NOT_EMAIL_ELIGIBLE"
+      },
       "directError": "CALL_WINDOW",
       "providerRequests": 0,
-      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. UI call-button state, email-only follow-up, live CRS/Apify evidence and real Cartesia are not executed."
+      "scope": "Production Collections planner tools + ClaudeAgentRuntime (scripted QueryFn tries start_call) and the production dial path createDialCallStarter -> dialCollectionCall over a provider stub. After each refusal the email-only path runs: C13 (no consent) and C14 (consumer) queue one SIMULATED follow-up email with no amount or invoice detail, and the same clients at 22:00 local queue none (CALL_WINDOW); hard stops and after-hours callable clients queue none. Live CRS/Apify evidence, real email delivery and real Cartesia are not executed."
     }
   ],
   "callButton": {
@@ -14581,10 +14830,11 @@
       "ready": true,
       "cooldown": true,
       "foreign": true,
+      "noConsent": true,
       "loopback": true
     },
-    "passed": 6,
-    "total": 6,
+    "passed": 7,
+    "total": 7,
     "networkCalls": 0,
     "blocked": {
       "status": 409,
@@ -14611,6 +14861,18 @@
       "providerAttempts": 0,
       "relayCalls": 0
     },
+    "noConsent": {
+      "gate": {
+        "ready": false,
+        "note": "Blocked: I need a complete consent record for this number before calling. Your policy says: “Before calling, store consent with its source, exact text, timestamp, and the same phone number that will be dialed.”"
+      },
+      "status": 409,
+      "error": "PRECALL_BLOCKED",
+      "providerAttempts": 0,
+      "ruleIds": [
+        "CONSENT_REQUIRED"
+      ]
+    },
     "ready": {
       "status": 200,
       "ok": true,
@@ -14621,7 +14883,7 @@
       },
       "providerAttempts": 1
     },
-    "scope": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. No network and no Cartesia."
+    "scope": "Production runPreCall on fixture credit/health/planner deps (credit ofac unknown blocks as Credit/OFAC check unavailable; clear ofac reaches a local plan). The result is published like services.preCall and read through parsePreCallGate by createAdminDial. createCallRequestHTTP unlocks an operator session and POSTs {line:collections} or {}; its fetch returns the admin dial status and text body. dial() counts provider attempts and performs no HTTP. A body that names a phone number is INVALID_REQUEST and never reaches dial. A blocked pre-call is 409 PRECALL_BLOCKED with dial() not called. A ready pre-call invokes dial() once and the button accepts. A second click on that same office is 429 COOLDOWN and does not dial again. The public origin stays an exact match: a foreign Origin is 403 ORIGIN_REJECTED and does not dial again. The host loopback office, when declared, unlocks and dials once. C13: a client without consent is blocked at pre-call (CONSENT_REQUIRED) and the button request is 409 PRECALL_BLOCKED with no provider attempt; the desk-phone precallGate on the same published evidence withholds Request call with a Blocked reason (a ready pre-call offers it). No network and no Cartesia."
   },
   "inboxTeam": {
     "id": "inbox-team",
@@ -15274,16 +15536,8 @@
   },
   "gaps": [
     {
-      "id": "P03/1:signals",
-      "detail": "Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct."
-    },
-    {
-      "id": "P04/0:signals",
-      "detail": "Tool signal list [] differs from key [BANK_CHANGE_HOLD]; authoritative sealed decision is [BANK_CHANGE_HOLD]. Signal lists and decision rules are distinct."
-    },
-    {
-      "id": "P07/0:signals",
-      "detail": "Tool signal list [PAYEE_NOT_IN_MASTER,OFAC_STOP] differs from key [OFAC_STOP]; authoritative sealed decision is [OFAC_STOP]. Signal lists and decision rules are distinct."
+      "id": "AR_RUNTIME",
+      "detail": "10 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21, C17) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     },
     {
       "id": "P01",
@@ -15295,7 +15549,7 @@
     },
     {
       "id": "P11",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open. Frozen integrationOutcome: kill_after_provider_debit_before_complete_then_expire_lease_and_restart."
     },
     {
       "id": "P12:scope",
@@ -15311,31 +15565,15 @@
     },
     {
       "id": "C09",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
-      "id": "C13",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
-      "id": "C14",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open."
     },
     {
       "id": "C15",
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
     },
     {
-      "id": "C17",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
       "id": "C21",
       "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
-    },
-    {
-      "id": "AR_RUNTIME",
-      "detail": "9 AR conversations (C02, C10, C06, C07, C08, C12, C05, C09, C21) run planner -> real tool gateway -> Dispatcher post-call/reconciler/auditor, with a next-call check after stops and voicemail. Caller lines and voice-agent tool choices are scripted; agent speech (de-escalation, callback wording), Cartesia, live phone and the other collections scenarios are not measured."
     }
   ]
 }
