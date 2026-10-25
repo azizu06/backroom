@@ -18,10 +18,11 @@ function drawBoard(ctx: CanvasRenderingContext2D, model: TicketBoardModel) {
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = ROLES.text;
   ctx.font = `bold 52px ${PROP_FONT}`;
-  ctx.fillText('Tickets', 28, 58);
+  ctx.fillText('Tickets · agent tasks', 28, 58);
   ctx.font = `${minFont}px ${PROP_FONT}`;
   ctx.textAlign = 'right';
-  ctx.fillText(model.notice ?? 'Open tickets · E when nearby', width - 28, 52);
+  canvasTextLines(model.notice ?? 'Open tickets · E when nearby', text => ctx.measureText(text).width, 560, 2)
+    .forEach((line, index) => ctx.fillText(line, width - 28, 34 + index * 34));
   ctx.textAlign = 'left';
   const columnWidth = (width - 48) / 4;
   model.columns.forEach((column, index) => {
@@ -89,7 +90,7 @@ export function TicketBoardMount({ snapshot }: SceneMountProps) {
     if (ctx) { drawBoard(ctx, JSON.parse(key) as TicketBoardModel); texture.needsUpdate = true; invalidate(); }
   }, [texture, key, invalidate]);
   useLayoutEffect(() => () => texture.dispose(), [texture]);
-  useSceneTextNode('ticket-board', `Tickets\n${text}`);
+  useSceneTextNode('ticket-board', `Tickets · agent tasks\n${text}`);
   useEffect(() => {
     canvas.dataset.ticketBoard = text;
     return () => { delete canvas.dataset.ticketBoard; };

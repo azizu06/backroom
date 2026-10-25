@@ -5,7 +5,7 @@ import { WHITEBOARD, WHITEBOARD_INTERACTION } from './whiteboard';
 import { chooseTicketBoardMount, ticketBoardGeometry, TICKET_BOARD, TICKET_BOARD_TEXTURE } from './ticketBoard';
 
 const square = { minX: -12, maxX: 12, minZ: -12, maxZ: 12 };
-const scale = (WALL_HEIGHT - 0.1 - 0.9) / 2.2;
+const scale = Math.min(1, (WALL_HEIGHT - 1) / 2.2);
 
 describe('ticket board geometry', () => {
   it('clears current north-wall windows and mounted boards by at least 0.3 m', () => {

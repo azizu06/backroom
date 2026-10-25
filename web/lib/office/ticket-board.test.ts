@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HANDOFF_AGENTS, type Handoff } from './handoffs';
+import { agentCards } from './agent-cards';
+import { createMockOfficeState } from './preview';
 import { INITIAL_OFFICE, type OfficeAudit, type OfficeSnapshot } from './state';
 import { ticketBoard, ticketBoardKey, ticketBoardText } from './ticket-board';
 import { INTERACT_RANGE, interactCandidates, pickTarget, playPanel, targetLabel } from './play';
@@ -22,6 +24,54 @@ const fixture: OfficeSnapshot = {
 };
 
 describe('ticket board projection', () => {
+  it('shows the demo preview desk tasks without handoffs and moves an escalated task to Needs you once', () => {
+    const preview = createMockOfficeState();
+    const snapshot = preview.source.getSnapshot();
+    const model = ticketBoard(snapshot, 1000);
+    expect(model.empty).toBe(false);
+    expect(model.notice).toBe('Preview · sample tickets');
+    expect(model.columns.map(column => column.count)).toEqual([0, 3, 0, 0]);
+    for (const agent of snapshot.agents) {
+      const shared = agentCards(snapshot, 1000).find(card => card.agentId === agent.id)!;
+      expect(model.columns[1]!.cards).toContainEqual(expect.objectContaining({
+        caseDisplayId: shared.title, summary: agent.state, agent: agent.name, tag: 'WORKING',
+        color: HANDOFF_AGENTS[agent.seatId === 'vendor_onboarding' ? 'vendor' : agent.seatId].color,
+      }));
+    }
+    expect(ticketBoardText(model)).not.toContain('No tickets yet');
+    preview.setTargetAnchor('dana');
+    const escalated = ticketBoard(preview.source.getSnapshot(), 1000);
+    expect(escalated.columns.map(column => column.count)).toEqual([0, 2, 1, 0]);
+    expect(escalated.columns[1]!.cards.map(card => card.agent).sort()).toEqual(['Jules', 'Sam']);
+    expect(escalated.columns[2]!.cards[0]).toMatchObject({ agent: 'Alex', tag: 'NEEDS YOU', summary: 'Invoice 1042 · four installments → Dana' });
+  });
+  it('uses shared task text and tags once when preview agents gain handoffs', () => {
+    const preview = createMockOfficeState().source.getSnapshot();
+    const agents = preview.agents;
+    const handoffs = [
+      handoff('alex', 'accepted', { toAgentId: agents[0]!.id, toRole: 'collections' }),
+      handoff('sam', 'offered', { toAgentId: agents[1]!.id }),
+      handoff('jules', 'completed', { toAgentId: agents[2]!.id, toRole: 'vendor', completedAt: 900 }),
+    ];
+    const snapshot = { ...preview, handoffs };
+    const model = ticketBoard(snapshot, 1000);
+    expect(model.columns.map(column => column.count)).toEqual([1, 1, 0, 1]);
+    for (const task of agentCards(snapshot, 1000).filter(card => card.tag !== 'READY')) {
+      expect(model.columns.flatMap(column => column.cards)).toContainEqual(expect.objectContaining({
+        summary: task.line, tag: task.tag,
+      }));
+    }
+    // A human-wait reason and its audit receipt represent one task, even without decisionRef.
+    const waiting = ticketBoard({ ...snapshot,
+      audit: [{ ...receipt('approval'), agentId: agents[0]!.id }],
+      handoffs: handoffs.map(row => row.handoffId === 'alex' ? { ...row, reason: 'Requires human approval' } : row),
+    }, 1000);
+    expect(waiting.columns.map(column => column.count)).toEqual([1, 0, 1, 1]);
+    expect(waiting.columns[2]!.cards[0]).toMatchObject({ agent: 'Alex', tag: 'NEEDS YOU' });
+    const finished = ticketBoard({ ...snapshot, handoffs: handoffs.map(row => ({ ...row, status: 'rejected' as const })) }, 1000);
+    expect(finished.columns.map(column => column.count)).toEqual([0, 0, 0, 3]);
+    expect(finished.columns[3]!.cards.every(card => card.rejected)).toBe(true);
+  });
   it('maps state into columns, keeps owner identity and marks rejected tickets', () => {
     const model = ticketBoard(fixture);
     expect(model.columns.map(column => [column.name, column.count])).toEqual([
