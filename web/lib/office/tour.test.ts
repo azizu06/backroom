@@ -1,9 +1,50 @@
 import { describe, expect, it } from "vitest";
 import {
   TOUR_DWELL_MS, TOUR_INTERRUPT_EVENTS, TOUR_MOVE_MS, TOUR_ORDER, TOUR_STEP_MS,
-  easeInOutCubic, tourCaption, tourIndexAt, tourProgress, tourStops,
+  easeInOutCubic, tourCaption, tourIndexAt, tourProgress, tourStops, tourRoute, tourRoutePoint,
 } from "./tour";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
+import { ANCHOR_IDS, workspaceRoute, type Vec2 } from './layout';
+import { CAMERA_CLEARANCE } from './metrics';
+import { insideAny, officeColliders } from './play';
+
+describe('aerial tour routing', () => {
+  const colliders = officeColliders(ANCHOR_IDS);
+
+  it('follows the clear grid route between every stop, including reverse or skipped stops', () => {
+    for (const from of TOUR_ORDER) for (const to of TOUR_ORDER) {
+      const a = OFFICE_ANCHORS[from].position, b = OFFICE_ANCHORS[to].position;
+      const route = tourRoute(a, b);
+      expect(route).toEqual(workspaceRoute(a, b));
+      expect(tourRoutePoint(route, 0)).toEqual(a);
+      const end = tourRoutePoint(route, 1);
+      expect(end[0]).toBeCloseTo(b[0]);
+      expect(end[1]).toBeCloseTo(b[1]);
+      for (let i = 0; i <= 200; i++) {
+        expect(insideAny(tourRoutePoint(route, i / 200), colliders, CAMERA_CLEARANCE), `${from} → ${to}`).toBe(false);
+      }
+    }
+  });
+
+  it('can enter from the full-floor overview or a furniture-centred focus', () => {
+    const starts: Vec2[] = [[0, 0], ...Object.values(OFFICE_ANCHORS).map(anchor => anchor.center)];
+    for (const start of starts) {
+      const route = tourRoute(start, OFFICE_ANCHORS.lobby.position);
+      expect(route.at(-1)).toEqual(OFFICE_ANCHORS.lobby.position);
+      for (let i = 0; i <= 100; i++) expect(insideAny(tourRoutePoint(route, i / 100), colliders, CAMERA_CLEARANCE)).toBe(false);
+    }
+  });
+
+  it('spends time in proportion to leg length and resumes an interrupted move on the grid', () => {
+    expect(tourRoutePoint([[0, 0], [0, 1], [3, 1]], 0.5)).toEqual([1, 1]);
+    const route = tourRoute(OFFICE_ANCHORS.collections.position, OFFICE_ANCHORS.payables.position);
+    const midway = tourRoutePoint(route, 0.4);
+    const resumed = tourRoute(midway, OFFICE_ANCHORS.dana.position);
+    expect(resumed[0]).toEqual(midway);
+    expect(resumed.at(-1)).toEqual(OFFICE_ANCHORS.dana.position);
+    for (let i = 0; i <= 100; i++) expect(insideAny(tourRoutePoint(resumed, i / 100), colliders, CAMERA_CLEARANCE)).toBe(false);
+  });
+});
 
 describe("tour stops", () => {
   it("visits the lobby, the desks, Dana, then Treasury", () => {

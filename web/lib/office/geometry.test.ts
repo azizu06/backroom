@@ -3,7 +3,7 @@ import { Box3, Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { describe, expect, it } from 'vitest';
 import { CHAIR_FOOTPRINT, workstationPieces, type FurniturePiece } from './furniture';
-import { deskKitPlacements } from './deskkit';
+import { TREASURY_VAULT, deskKitPlacements } from './deskkit';
 import { ANCHOR_IDS, BUILDING, LOBBY_BOARD_MOUNT, WALL_THICKNESS, WORKSTATIONS, wallPieces, windowPieces } from './layout';
 import { PLAYER_RADIUS, SERVER_ROOM_BOX, insideAny, movePlayer, officeColliders } from './play';
 import { ROLES } from './palette';
@@ -41,7 +41,7 @@ function expectSolidFootprint(box: Box3) {
 }
 
 describe('open office support and clipping', () => {
-  it('supports all twelve chairs and monitors, encloses chairs in collisions and separates neighboring seats', () => {
+  it('supports all twenty-four chairs and monitors, encloses chairs in collisions and separates neighboring seats', () => {
     const stations = WORKSTATIONS.map(({ center, flip }) => workstationPieces(center, flip, ROLES.partition).map(bounds));
     for (const pieces of stations) {
       pieces.forEach(expectIndoor);
@@ -88,7 +88,7 @@ describe('open office support and clipping', () => {
     expect(board.faceOffset - board.depth / 2).toBeLessThan(0.01);
     const tray = bounds({ at: [WHITEBOARD_INTERACTION.position[0], WHITEBOARD.bottom - 0.02, whiteZ + 0.07], size: [1.1, 0.05, 0.14], color: '' });
     expectSolidFootprint(tray);
-    const start = [WHITEBOARD_INTERACTION.position[0], -6] as const;
+    const start = [WHITEBOARD_INTERACTION.position[0], BUILDING.minZ + 2] as const;
     const stop = movePlayer(start, [0, -2], colliders, PLAYER_RADIUS);
     expect(stop[1]).toBeCloseTo(tray.max.z + PLAYER_RADIUS, 3);
     expect(insideAny(stop, colliders, PLAYER_RADIUS)).toBe(false);
@@ -114,10 +114,10 @@ describe('open office support and clipping', () => {
         expect(box.min.y, placement.id).toBeCloseTo(0.91, 2);
       }
     }
-    // The procedural handle projects to z=4.73, in front of the vault body at z=4.875.
-    expect(insideAny([2.5, 4.73], colliders, 0)).toBe(true);
-    const stop = movePlayer([2.5, 3.6], [0, 2], colliders, PLAYER_RADIUS);
-    expect(stop[1]).toBeLessThanOrEqual(4.73 - PLAYER_RADIUS);
+    const { x, z } = TREASURY_VAULT;
+    expect(insideAny([x, z - 0.77], colliders, 0)).toBe(true);
+    const stop = movePlayer([x, z - 2], [0, 2], colliders, PLAYER_RADIUS);
+    expect(stop[1]).toBeLessThanOrEqual(z - 0.77 - PLAYER_RADIUS);
     expect(insideAny(stop, colliders, PLAYER_RADIUS)).toBe(false);
   });
 });

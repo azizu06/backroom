@@ -18,8 +18,7 @@ export function storyCameraPose(anchor: AnchorId, anchors: Readonly<Record<Ancho
   readonly position: readonly [number, number]; readonly center: readonly [number, number];
 }>> = OFFICE_ANCHORS): IntroPose {
   const { position, center } = anchors[anchor];
-  // Stand in front of the lobby props rather than inside its inbox footprint.
-  const x = position[0], z = position[1] - (anchor === 'lobby' ? 1.5 : 0);
+  const [x, z] = position;
   const yaw = Math.atan2(x - center[0], z - center[1]);
   return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)] };
 }

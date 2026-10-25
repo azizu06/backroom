@@ -4,8 +4,9 @@
  * Colours come from the cozy pastel roles in ./palette; only intensities and geometry live here.
  */
 import { ROLES } from "./palette";
+import type { FurniturePiece } from './furniture';
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { BUILDING, roomPoint } from "./layout";
+import { BUILDING, FLOOR_FIXTURES } from "./layout";
 
 export type Vec3 = [number, number, number];
 
@@ -89,11 +90,6 @@ export interface OfficeLamp {
   floor: boolean;
 }
 
-function lampBase(room: 'lobby' | 'treasury', dx: number, dz: number): Vec3 {
-  const [x, z] = roomPoint(room, dx, dz);
-  return [x, 0.05, z];
-}
-
 /** Small desk lamps sit within the existing desk footprints; floor lamps stay out of the aisle. */
 export const OFFICE_LAMPS: readonly OfficeLamp[] = [
   ...(['collections', 'payables', 'vendor_onboarding', 'dana'] as const).map(room => {
@@ -101,9 +97,20 @@ export const OFFICE_LAMPS: readonly OfficeLamp[] = [
     const flip = room === 'dana' ? -1 : 1;
     return { room, base: [x + flip * 0.9, 0.91, z - flip * 0.3] as Vec3, height: 0.55, floor: false };
   }),
-  { room: 'lobby', base: lampBase('lobby', -2.4, 2.9), height: 1.9, floor: true },
-  { room: 'treasury', base: lampBase('treasury', 2, 1.1), height: 1.9, floor: true },
+  { room: 'lobby', base: [FLOOR_FIXTURES.lampWest.x, 0, FLOOR_FIXTURES.lampWest.z], height: 1.9, floor: true },
+  { room: 'treasury', base: [FLOOR_FIXTURES.lampEast.x, 0, FLOOR_FIXTURES.lampEast.z], height: 1.9, floor: true },
 ];
+
+/** The rendered lamp parts, also used to verify support and collision coverage. */
+export function lampPieces(lamp: OfficeLamp): FurniturePiece[] {
+  const [x, y, z] = lamp.base;
+  const width = lamp.floor ? 0.35 : 0.22;
+  return [
+    { at: [x, y + 0.025, z], size: [width, 0.05, width], color: ROLES.frame },
+    { at: [x, y + lamp.height / 2, z], size: [0.035, lamp.height, 0.035], color: ROLES.frame },
+    { at: [x, y + lamp.height, z], size: [width + 0.1, 0.16, width + 0.1], color: ROLES.lampLight },
+  ];
+}
 
 const LAMP_POOLS = OFFICE_LAMPS.filter(lamp => lamp.floor).map(lamp => ({
   room: lamp.room,

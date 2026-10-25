@@ -2,7 +2,8 @@ import { OFFICE_ANCHORS, type AnchorId } from "../state";
 import { auditEntries, defineTarget, valueText } from "./types";
 
 /** A desk's interact radius is the circle inscribed in its footprint. */
-export const DESK_SIZE = { width: 2.25, depth: 1.05 } as const;
+import { DESK_SIZE } from "../metrics";
+export { DESK_SIZE };
 export const DESK_RADIUS = DESK_SIZE.depth / 2;
 export const DESKS = ["collections", "payables", "vendor_onboarding", "dana"] as const satisfies readonly AnchorId[];
 

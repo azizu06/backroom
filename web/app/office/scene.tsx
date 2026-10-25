@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instances, OrbitControls } from '@react-three/drei';
 import { Group, MathUtils, MeshStandardMaterial, Vector3, type Camera } from 'three';
@@ -10,11 +10,11 @@ import type { PlayBridge } from '../../lib/office/play';
 import { PlayRig } from './play';
 import { OFFICE_ANCHORS, isAnchorId, visibleRooms, type AnchorId, type OfficeAgent, type OfficeSnapshot } from '../../lib/office/state';
 import { registerSceneFrameRequester } from '../../lib/office/frame';
-import { tourProgress } from '../../lib/office/tour';
+import { tourProgress, tourRoute, tourRoutePoint } from '../../lib/office/tour';
 import { OFFICE_LIGHTING, officeLightRig } from '../../lib/office/lighting';
 import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights';
 import { ROLES } from '../../lib/office/palette';
-import { BUILDING, CORRIDOR, CORRIDOR_Z, SPACES, roomPad, sightBlocked } from '../../lib/office/layout';
+import { BUILDING, sightBlocked, type Vec2 } from '../../lib/office/layout';
 import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
@@ -28,7 +28,7 @@ import { agentCueKey, deskHeading } from '../../lib/office/agent-motion';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
-import { CLICK_SLOP, type OverviewPick } from '../../lib/office/overview';
+import { CLICK_SLOP, roomRect, type OverviewPick } from '../../lib/office/overview';
 import type { ThreeEvent } from '@react-three/fiber';
 
 /** Overview click handler: what was picked and where (client coordinates). */
@@ -45,11 +45,11 @@ function pickHandlers(pick: OverviewPick, onPick: OverviewPickHandler) {
     onPointerOut() { document.body.style.cursor = ''; },
   };
 }
-/** Invisible pads over each room floor: clicking a room in Overview jumps into it in first person. */
+/** Invisible pads around logical destinations: Overview picks follow the shared pod/anchor bounds. */
 function RoomPicks({ rooms, onPick }: { rooms: readonly AnchorId[]; onPick: OverviewPickHandler }) {
   useEffect(() => () => { document.body.style.cursor = ''; }, []);
   return <>{rooms.map(room => {
-    const pad = roomPad(SPACES[room].rect);
+    const pad = roomRect(room);
     return <mesh key={room} name={`room-pick:${room}`} position={[(pad.minX + pad.maxX) / 2, 0.06, (pad.minZ + pad.maxZ) / 2]} rotation-x={-Math.PI / 2} {...pickHandlers({ kind: 'room', room }, onPick)}>
       <planeGeometry args={[pad.maxX - pad.minX, pad.maxZ - pad.minZ]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -57,8 +57,6 @@ function RoomPicks({ rooms, onPick }: { rooms: readonly AnchorId[]; onPick: Over
   })}</>;
 }
 
-type LabelRef = RefObject<HTMLDivElement | null>;
-export type RoomLabels = Record<AnchorId, LabelRef>;
 /** Looks up the HTML tag element Office renders for an agent id. */
 export type AgentTagLookup = (agentId: string) => HTMLDivElement | undefined;
 export const ROOM_IDS = Object.keys(OFFICE_ANCHORS) as AnchorId[];
@@ -81,17 +79,6 @@ const BODY_SAMPLES = [[0, 0], [0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45]] as c
 function bodyBehindWalls(camera: Camera, x: number, z: number): boolean {
   if ((camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera !== true) return false;
   return BODY_SAMPLES.every(([dx, dz]) => sightBlocked(camera.position.x, camera.position.z, x + dx, z + dz));
-}
-function ScreenLabel({ at, element }: { at: [number, number, number]; element: LabelRef }) {
-  const point = useRef(new Vector3());
-  useFrame(({ camera, size }) => {
-    point.current.set(...at).project(camera);
-    if (!element.current) return;
-    element.current.style.visibility = point.current.z > 1 || Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05
-      || behindWall(camera, at[0], at[2]) ? 'hidden' : 'visible';
-    element.current.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -50%)`;
-  });
-  return null;
 }
 /** Projects the avatar's current head position onto its HTML tag on frames that are already rendering. */
 function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkMotion; element: AgentTagLookup }) {
@@ -150,7 +137,7 @@ function Avatar({ agent, motion, tween, recorded, paused, onPick }: { agent: Off
 const FOLDER_MATERIAL = new MeshStandardMaterial({ color: '#e0b365', roughness: OFFICE_LIGHTING.base.roughness });
 const FOLDER_PAPER_MATERIAL = new MeshStandardMaterial({ color: '#f3dfb9', roughness: OFFICE_LIGHTING.base.roughness });
 /** Tour moves start from wherever the camera is when the frame after a focus change renders. */
-interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number }
+interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number; route: Vec2[] }
 function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: boolean; tour: boolean }) {
   const reduced = useReducedMotion();
   const { camera, size, invalidate } = useThree();
@@ -159,9 +146,9 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
   const orbiting = useRef(false);
   const target = useRef(new Vector3());
   const destination = useRef(new Vector3(13, 15, 17));
-  const tourMove = useRef<TourMove>({ startedAt: null, position: new Vector3(), target: new Vector3(), zoom: 1 });
+  const tourMove = useRef<TourMove>({ startedAt: null, position: new Vector3(), target: new Vector3(), zoom: 1, route: [] });
   useEffect(() => {
-    const center = focus ? OFFICE_ANCHORS[focus].center : [(BUILDING.minX + BUILDING.maxX) / 2, 0];
+    const center = focus ? OFFICE_ANCHORS[focus][tour ? 'position' : 'center'] : [(BUILDING.minX + BUILDING.maxX) / 2, 0];
     target.current.set(center[0]!, 0.2, center[1]!);
     destination.current.copy(target.current).add(new Vector3(13, 15, 17));
     tourMove.current.startedAt = null;
@@ -180,10 +167,17 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
         move.position.copy(camera.position);
         move.target.copy(controls.current.target);
         move.zoom = camera.zoom;
+        move.route = tourRoute([move.target.x, move.target.z], [target.current.x, target.current.z]);
       }
       const progress = tourProgress(performance.now() - move.startedAt, reduced);
       camera.position.lerpVectors(move.position, destination.current, progress);
       controls.current.target.lerpVectors(move.target, target.current, progress);
+      // Translate the existing aerial rig along the floor route, preserving its height and view offset.
+      const [x, z] = tourRoutePoint(move.route, progress);
+      camera.position.x += x - controls.current.target.x;
+      camera.position.z += z - controls.current.target.z;
+      controls.current.target.x = x;
+      controls.current.target.z = z;
       camera.zoom = MathUtils.lerp(move.zoom, zoom, progress);
       camera.updateProjectionMatrix();
       controls.current.update();
@@ -220,8 +214,8 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, labels, agentTag, onFailure, onRestored, play, presence = [], chatBubbles, onPick }: {
-  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null; labels: RoomLabels;
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, agentTag, onFailure, onRestored, play, presence = [], chatBubbles, onPick }: {
+  snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null;
   agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[]; chatBubbles?: ChatBubble[];
   /** Overview quick actions; only used outside Play. */
   onPick?: OverviewPickHandler;
@@ -234,18 +228,8 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     <OfficeLights snapshot={snapshot} lowPower={lowPower} />
     <Instances limit={240} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
-    {/* Floor slab, a cream pad per room (tinted while focused) and a blush corridor runner; walls, windows and the ceiling are the WorldShell mount. */}
+    {/* Floor slab; walls, windows and the ceiling are the WorldShell mount. */}
     <Block at={[(BUILDING.minX + BUILDING.maxX) / 2, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
-    <Block at={[(CORRIDOR.minX + CORRIDOR.maxX) / 2, 0.01, CORRIDOR_Z]} size={[CORRIDOR.maxX - CORRIDOR.minX - 0.5, 0.02, 1.3]} color={ROLES.aisle} />
-
-    {visibleRooms(snapshot).map(room => {
-      const { center } = OFFICE_ANCHORS[room];
-      return <group key={room}>
-
-        {/* Over the room's far wall, clear of the agent tags (agents stand near each room's door). */}
-        <ScreenLabel at={[center[0] + 1.2, 1.3, center[1] - 0.4]} element={labels[room]} />
-      </group>;
-    })}
     {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}
     {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
     <ContactDynamic name='office:agents'>{snapshot.agents.map(agent => <Fragment key={agent.id}>

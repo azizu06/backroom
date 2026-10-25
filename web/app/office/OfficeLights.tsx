@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react';
 import { ACESFilmicToneMapping, MeshStandardMaterial } from 'three';
-import { LOW_POWER_QUERY, OFFICE_LAMPS, OFFICE_EXPOSURE, officeLightRig, officeLowPower } from '../../lib/office/lighting';
+import { LOW_POWER_QUERY, OFFICE_LAMPS, OFFICE_EXPOSURE, lampPieces, officeLightRig, officeLowPower } from '../../lib/office/lighting';
 import { ROLES } from '../../lib/office/palette';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 import type { FurniturePiece } from '../../lib/office/furniture';
@@ -44,11 +44,9 @@ function Lamps({ rooms }: { rooms: string }) {
     const bodies: FurniturePiece[] = [], shades: FurniturePiece[] = [];
     // Under ?art=baked the baked room brings its own lamp, so the procedural one would stand inside it.
     for (const lamp of OFFICE_LAMPS.filter(lamp => rooms.split(',').includes(lamp.room) && !bakedReplacesProps(baked, lamp.room))) {
-      const [x, y, z] = lamp.base;
-      const width = lamp.floor ? 0.35 : 0.22;
-      bodies.push({ at: [x, y + 0.025, z], size: [width, 0.05, width], color: ROLES.frame },
-        { at: [x, y + lamp.height / 2, z], size: [0.035, lamp.height, 0.035], color: ROLES.frame });
-      shades.push({ at: [x, y + lamp.height, z], size: [width + 0.1, 0.16, width + 0.1], color: ROLES.lampLight });
+      const [base, stem, shade] = lampPieces(lamp);
+      bodies.push(base!, stem!);
+      shades.push(shade!);
     }
     return { bodies, shades };
   }, [rooms, baked]);
