@@ -253,7 +253,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   overviewKey.current = event => {
     if (!overview || event.defaultPrevented || !isOverviewKey(event) || event.repeat) return;
     const target = event.target instanceof HTMLElement ? event.target : null;
-    if (target && (target.isContentEditable || target.closest('input, textarea, select, dialog, [aria-modal=true], [role=dialog], [role=menu], [role=alertdialog]'))) return;
+    if (target && (target.isContentEditable || target.closest('input, textarea, select, dialog[open], [aria-modal=true], [role=dialog], [role=menu], [role=alertdialog]'))) return;
     event.preventDefault();
     enterFirstPerson(play.last.current);
   };
@@ -362,8 +362,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
+      {/* Inside the viewport so the disclosure pill (same stacking context) can sit above it. */}
+      {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     </div>
-    {splash && <PlaySplash onEnter={enterPlay} onOverview={enterOverview} />}
     <footer id='office-drawer' className='office-footer office-drawer' hidden={!drawerOpen} aria-label='Office panels' onKeyDown={event => {
       const target = event.target as HTMLElement;
       if (isCloseKey(event.key) && !event.defaultPrevented && !target.closest('input, textarea, select, dialog, [role=dialog]')) { event.preventDefault(); closeDrawer(); }

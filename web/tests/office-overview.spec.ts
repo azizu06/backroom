@@ -141,6 +141,9 @@ test('O leaves the view unchanged while keyboard shortcuts has focus', async ({ 
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
+  // O is the Overview key only once the 3D overview is showing (the scene loads lazily).
+  await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await expect(page.getByTestId('office-viewport').getByText('Loading 3D office…')).toHaveCount(0);
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(help.getByRole('button', { name: 'Close', exact: true })).toBeFocused();

@@ -217,6 +217,8 @@ html body .office-shell .office-drawer {
 .office-shell[data-hud='diegetic'] .office-corner { visibility: hidden; }
 .office-shell[data-hud='diegetic'] .office-corner dialog[open] { visibility: visible; }
 .office-shell[data-hud='diegetic'] .office-disclosure { z-index: 100; }
+/* The Enter splash covers the world, but never the disclosure pill. */
+.office-shell:has(.play-splash) .office-disclosure { z-index: 51; }
 @media (max-width: 760px) {
   .office-shell .office-disclosure { max-width: calc(100% - 150px); }
   .office-shell:not([data-hud='diegetic']) .office-caption { display: none; }

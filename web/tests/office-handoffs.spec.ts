@@ -13,6 +13,11 @@ async function requireWebGL(page: Page) {
   });
   if (!available) throw new Error('WebGL is unavailable in this headless Chromium, so the 3D handoffs cannot render.');
 }
+/** The handoff log and voice controls live in the office panels drawer, closed by default. */
+async function openPanels(page: Page) {
+  const toggle = page.getByRole('button', { name: /^Office panels/ });
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+}
 function log(page: Page) {
   return page.getByRole('log');
 }
@@ -41,6 +46,7 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
+  await openPanels(page);
   await requireWebGL(page);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Agent handoffs' })).toBeVisible();
@@ -71,6 +77,7 @@ test('mock handoffs walk folders between desks, return a rejected folder, show a
 test('reduced motion lists handoffs instead of animating them', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
+  await openPanels(page);
   await requireWebGL(page);
   const region = page.getByRole('region', { name: 'Agent handoffs' });
   await expect(region).toContainText('Reduced motion · listed instead of animated');
@@ -87,6 +94,7 @@ test('renders the first four handoffs from the mocked feed', async ({ page }) =>
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await installHandoffClock(page);
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=8');
+  await openPanels(page);
   await requireWebGL(page);
   const entries = log(page).locator('li[data-status]');
   await expect(page.getByText('No handoffs yet.')).toBeVisible();
@@ -134,6 +142,7 @@ async function bearing(page: Page, x: number, z: number) {
 
 test('play mode: facing a handoff agent and pressing E shows the handoff details', async ({ page }) => {
   await page.goto('/office?handoffs=mock&view=overview');
+  await openPanels(page);
   await requireWebGL(page);
   // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
   await expect(log(page)).toContainText('INV-1043', { timeout: 10_000 });
@@ -177,6 +186,7 @@ test('voices stay off until enabled, then speak handoff lines through the proxy'
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
+  await openPanels(page);
   const toggle = page.getByRole('button', { name: 'Voices off' });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await page.waitForTimeout(1500);
@@ -199,6 +209,7 @@ test('a failing voice proxy falls back to silent visuals', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?handoffs=mock&view=overview&handoffSpeed=4');
+  await openPanels(page);
   await page.getByRole('button', { name: 'Voices off' }).click();
   await expect(page.getByText('Voices unavailable · visuals only')).toBeVisible({ timeout: 20_000 });
   const after = calls;

@@ -40,9 +40,9 @@ test.describe('at 1440x1000', () => {
       return { onTop: top === el || el.contains(top), inSplash: !!top?.closest('.play-splash'), opacity: getComputedStyle(el).opacity, visibility: getComputedStyle(el).visibility };
     });
     expect(hit).toEqual({ onTop: true, inSplash: false, opacity: '1', visibility: 'visible' });
-    // The rest of the nav is still inert behind the splash; the disclosure itself holds no controls.
-    await expect(page.locator('.site-nav > ul')).toHaveAttribute('inert', '');
-    await expect(page.locator('.site-nav .site-nav-note')).not.toHaveAttribute('inert', '');
+    // The corner menu is inert behind the splash; the disclosure itself holds no controls and stays live.
+    await expect(page.locator('.office-corner-row')).toHaveAttribute('inert', '');
+    expect(await disclosure.evaluate(el => !!el.closest('[inert]'))).toBe(false);
   });
 });
 
@@ -73,9 +73,9 @@ test('Tab three times stays in the splash, Escape closes it, and focus returns t
   await page.keyboard.press('Tab');
   await expect(overview).toBeFocused();
   await expect(gate.locator(':focus')).toHaveCount(1);
-  const story = page.getByRole('button', { name: 'Story mode' });
-  await expect(page.locator('.office-shell > header')).toHaveAttribute('inert', '');
-  const blocked = await story.evaluate(el => {
+  const menu = page.locator('.office-corner-toggle');
+  await expect(page.locator('.office-corner-row')).toHaveAttribute('inert', '');
+  const blocked = await menu.evaluate(el => {
     const rect = el.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     el.focus();
