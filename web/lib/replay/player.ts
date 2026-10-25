@@ -18,14 +18,14 @@ function project(frame: ReplayFrame, entries: AuditEntry[], positions: Map<strin
     agents: state.agents.map(agent => {
       const task = state.tasks.find(task => task.id === agent.currentTaskId);
       const escalation = state.escalations.find(row => row.id === task?.escalationId || row.fromAgent === agent.id && row.status === 'pending');
-      return { id: agent.id, name: `${seatNames[agent.seatId]} · ${agent.id}`, seatId: agent.seatId,
+      return { id: agent.id, name: seatNames[agent.seatId], seatId: agent.seatId,
         pos: [...positions.get(agent.id)!.position], targetAnchor: anchor(agent.targetAnchor, agent.seatId), state: agent.state,
         escalationId: escalation?.status === 'pending' ? escalation.id : undefined };
     }),
     audit: entries.flatMap(entry => !entry.decision || entry.seat === 'controller' ? [] : [{
       id: entry.id, agentId: state.agents.find(agent => agent.seatId === entry.seat)?.id ?? '', seatId: entry.seat,
       action: entry.action, decision: entry.decision, ruleIds: entry.ruleIds,
-      summary: `${entry.action.replaceAll('_', ' ')} · ${entry.refs.join(', ')}`,
+      summary: `${entry.action.replaceAll('_', ' ')} · ${entry.refs.join(', ')}`, refs: entry.refs,
     }]), denials: [],
   };
 }

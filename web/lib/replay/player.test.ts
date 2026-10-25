@@ -13,9 +13,9 @@ describe('read-only OfficeState replay', () => {
     let at = 0;
     const recorder = createReplayRecorder({ name: 'timing', now: () => at });
     const store = recorder.attach(new MemoryStateStore(), 'call');
-    await store.registerAgent('alex', 'collections', 1000);
+    await store.registerAgent('collections-demo', 'collections', 1000);
     await store.enqueueTask({ id: 'invoice', seatId: 'collections', refs: [], steps: [] });
-    const lease = (await store.claimTask('alex', 1000, 12000))!;
+    const lease = (await store.claimTask('collections-demo', 1000, 12000))!;
     at = 1000;
     await store.setAgentTarget(lease, 'dana_desk', 1000);
     await store.appendAudit({ ts: 1000, actor: 'code', seat: 'collections', action: 'plan', decision: 'ESCALATE',
@@ -25,6 +25,8 @@ describe('read-only OfficeState replay', () => {
     const player = createReplayPlayer(parseReplay(recorder.toJsonl()));
     expect(player.source.getSnapshot().connection).toBe('replay');
     const initial = player.source.getSnapshot();
+    expect(initial.agents[0]?.name).toBe('Alex');
+    expect(initial.agents[0]?.id).toBe('collections-demo');
     expect(player.source.getSnapshot()).toBe(initial);
     player.play(); player.advance(500);
     expect(player.source.getSnapshot().agents[0]?.targetAnchor).toBe('collections');

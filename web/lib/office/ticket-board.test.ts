@@ -123,6 +123,32 @@ describe('ticket board projection', () => {
     expect(model.columns[2]!.cards.find(card => card.caseDisplayId === 'INV-4481')?.summary).toBe('Held for Dana · bank change');
     expect(ticketBoardText(model)).not.toMatch(/audit:|review:|judge:|vendor:acme/);
   });
+  it('keeps a different case from the same waiting agent and joins known case receipts to handoffs', () => {
+    const model = ticketBoard({ ...fixture, handoffs: [handoff('4482', 'offered', { toRole: 'human', fromAgentId: 'payables-1', fromRole: 'payables' })],
+      audit: [
+        { ...receipt('linked'), agentId: 'payables-1', refs: ['judge:one', '4482'] },
+        { ...receipt('opaque'), refs: ['judge:one'] },
+        { ...receipt('other'), agentId: 'payables-1', refs: ['judge:two', '4483'] },
+      ] });
+    expect(model.columns[2]!.count).toBe(2);
+    expect(model.columns[2]!.cards.map(card => card.caseDisplayId).sort()).toEqual(['INV-4482', 'INV-4483']);
+  });
+  it('counts four workday cases once across fifteen stripped-id review receipts', () => {
+    const audit = Array.from({ length: 15 }, (_, i) => ({ ...receipt(`audit:${i}`),
+      agentId: i % 2 ? 'payables' : 'controller',
+      action: i % 3 === 0 ? 'create_escalation' : i % 3 === 1 ? 'agent_narration_hold' : 'judge_inbox_decision',
+      refs: i % 3 === 0 ? [`agent-review:judge:item-${i % 4}`, `judge:item-${i % 4}`, String(4482 + i % 4)] : [`judge:item-${i % 4}`, `audit:${i}`],
+      summary: i % 3 === 0 ? 'create escalation · agent-, , 4482' : i % 3 === 1 ? 'agent narration hold · ,' : 'judge inbox decision · , ,',
+    }));
+    const model = ticketBoard({ ...INITIAL_OFFICE, audit });
+    expect(model.columns[2]).toMatchObject({ count: 4, more: 0 });
+    expect(ticketBoardText(model)).toContain('Needs you · 4');
+    expect(ticketBoardText(model)).not.toMatch(/agent-|,|narration|judge inbox|create escalation/);
+    const extra = Array.from({ length: 4 }, (_, i) => ({ ...receipt(`extra:${i}`), refs: [`case:extra-${i}`] }));
+    const overflow = ticketBoard({ ...INITIAL_OFFICE, audit: [...audit, ...extra] });
+    expect(overflow.columns[2]).toMatchObject({ count: 8, more: 2 });
+    expect(ticketBoardText(overflow)).toContain('+2 more');
+  });
   it.each(['preview', 'replay', 'disconnected'] as const)('keeps empty columns and a %s notice', connection => {
     const model = ticketBoard({ ...INITIAL_OFFICE, connection });
     expect(model.columns).toHaveLength(4);
