@@ -5,12 +5,15 @@ import {
   damp, deskHeading, facesPlayer, handoffCueKey, lookYaw, poseAgent, transientMode, type AgentCue, type AgentMode,
 } from './agent-motion';
 import { OFFICE_ANCHORS } from './state';
-import { Group, PerspectiveCamera } from 'three';
+import { Group, PerspectiveCamera, Vector3 } from 'three';
 import { AgentAnimator } from '../../app/office/avatars/agentAnimator';
 import { createBearRig, poseBear } from '../../app/office/avatars/Bear';
 import { agentCues } from './agent-motion';
-import { BEAR_SEAT_LIFT, SIT_HIP_RAD, deskSeat, seatAtApproach } from './baked-seat';
+import { BEAR_SEAT_LIFT, SIT_HIP_RAD, KEYBOARD_LOCAL, DESK_TOP_Y, seatAtApproach } from './baked-seat';
 import { WORKSTATIONS, workstationApproach } from './layout';
+import { BEAR } from './bear';
+import { CHAIR_FOOTPRINT } from './metrics';
+import { MONITOR_FACE } from './props/monitors';
 
 const cue = (over: Partial<AgentCue> = {}): AgentCue => ({ greetAt: -Infinity, thinkAt: -Infinity, talking: false, ...over });
 
@@ -73,7 +76,11 @@ describe('agent cues', () => {
 
 describe('agent motion geometry', () => {
   it.each(['collections', 'payables', 'vendor_onboarding', 'dana'] as const)('faces the monitor at %s', room => {
-    expect(deskHeading(room, ...OFFICE_ANCHORS[room].position)).toBe(deskSeat(room)!.heading);
+    const { center } = OFFICE_ANCHORS[room];
+    const { flip } = WORKSTATIONS.find(station => station.center[0] === center[0] && station.center[1] === center[1])!;
+    const heading = deskHeading(room, ...OFFICE_ANCHORS[room].position);
+    expect(Math.sin(heading)).toBeCloseTo(0);
+    expect(Math.cos(heading)).toBe(Math.sign(flip * (MONITOR_FACE.z - CHAIR_FOOTPRINT.z)));
   });
   it('faces the desk only when seated at a desk seat', () => {
     const [x, z] = OFFICE_ANCHORS.payables.position;
@@ -105,8 +112,13 @@ describe('rendered seat transitions', () => {
   function fixture(index: number) {
     const rig = createBearRig();
     rig.root = new Group(); rig.legs = new Group(); rig.head = new Group();
+    rig.chest = new Group(); rig.arms = new Group();
+    rig.root.add(rig.legs, rig.head, rig.chest, rig.arms);
     for (let i = 0; i < 2; i++) {
       const leg = new Group(), shin = new Group(); shin.name = 'shin'; leg.add(shin); rig.legs.add(leg);
+      const arm = new Group();
+      arm.position.set((i === 0 ? -1 : 1) * BEAR.shoulder.x, BEAR.shoulder.y, 0);
+      rig.arms.add(arm);
     }
     const body = new Group(); body.add(rig.root);
     const animator = new AgentAnimator('handoff:seated-test', 'seated-test', rig);
@@ -122,6 +134,29 @@ describe('rendered seat transitions', () => {
     const settle = () => { for (let i = 0; i < 180; i++) frame(); };
     return { rig, body, animator, state, frame, settle };
   }
+
+  it.each(WORKSTATIONS.map((_, i) => i))('places typing paws on the keyboard at workstation %i', index => {
+    const { rig, body, animator, frame, state } = fixture(index);
+    const { center: [cx, cz], flip } = WORKSTATIONS[index]!;
+    animator.input.reduced = true;
+    frame();
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 1000);
+    try {
+      // Include the static accessibility pose and a full cycle of live typing taps.
+      for (let sample = 0; sample <= 30; sample++) {
+        animator.input.reduced = sample === 0;
+        state.clock.elapsedTime = sample / 30;
+        frame();
+        body.updateMatrixWorld(true);
+        for (const arm of rig.arms!.children) {
+          const paw = arm.localToWorld(new Vector3(...BEAR.paw.at));
+          expect(Math.abs(paw.x - (cx + flip * KEYBOARD_LOCAL.x))).toBeLessThan(KEYBOARD_LOCAL.width / 2);
+          expect(Math.abs(paw.z - (cz + flip * KEYBOARD_LOCAL.z))).toBeLessThan(KEYBOARD_LOCAL.depth / 2);
+          expect(Math.abs(paw.y - (DESK_TOP_Y + KEYBOARD_LOCAL.height))).toBeLessThan(BEAR.paw.radius);
+        }
+      }
+    } finally { clock.mockRestore(); }
+  });
 
   it.each(WORKSTATIONS.map((_, i) => i))('sits on workstation %i with bent knees and eyes on the monitor', index => {
     const { rig, body, animator, settle } = fixture(index);

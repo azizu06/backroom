@@ -5,7 +5,7 @@ import {
 } from '../../../lib/office/agent-motion';
 import { bearPhase } from '../../../lib/office/bear';
 import type { BearRig } from './Bear';
-import { BEAR_SEAT_LIFT, SIT_HIP_RAD, easeSeat, seatAtApproach, stepSeatBlend, type DeskSeat } from '../../../lib/office/baked-seat';
+import { BEAR_SEAT_LIFT, SEATED_TORSO_FORWARD_M, SIT_HIP_RAD, easeSeat, seatAtApproach, stepSeatBlend, type DeskSeat } from '../../../lib/office/baked-seat';
 
 /** What the owner's useFrame knows about the agent this frame (reused, never reallocated). */
 export interface AnimateInput {
@@ -106,6 +106,10 @@ export class AgentAnimator {
       const shin = leg.getObjectByName('shin');
       if (shin) shin.rotation.x = SIT_HIP_RAD * sit;
     });
+    // Upper-body reach is local +z, so it follows either workstation heading without moving the hips.
+    for (const part of [rig.chest, rig.head, rig.arms]) {
+      if (part) part.position.z = SEATED_TORSO_FORWARD_M * sit;
+    }
     if (rig.chest) { rig.chest.scale.x = 1 + pose.breath; rig.chest.scale.z = 1 + pose.breath; }
     if (rig.head) rig.head.rotation.set(mix(3, pose.headPitch), this.headYaw, mix(4, pose.headTilt));
     // Inactive arms blend toward the walk swing / carry pose poseBear already set this frame.

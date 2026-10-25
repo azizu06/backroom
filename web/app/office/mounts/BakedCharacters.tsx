@@ -13,7 +13,7 @@ import {
   type CharacterClip,
 } from '../../../lib/office/baked-character';
 import {
-  SIT_HIP_RAD, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, isSeatDesk, seatPieces, stepSeatBlend, turnToward,
+  SEATED_TORSO_FORWARD_M, SIT_HIP_RAD, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, isSeatDesk, seatPieces, stepSeatBlend, turnToward,
   type DeskSeat,
 } from '../../../lib/office/baked-seat';
 import { visibleRooms, type OfficeAgent } from '../../../lib/office/state';
@@ -54,6 +54,7 @@ interface Puppet {
   last: [number, number] | null;
   /** Thigh and shin bones with their seated local rotations; null when the rig lacks them (never sits). */
   readonly legs: SeatedLegs | null;
+  readonly torso: { bone: Object3D; rest: Vector3; forward: Vector3 } | null;
   /** 0 standing at the anchor, 1 seated on the chair. */
   seat: number;
   /** Drawn heading (avatar convention), smoothed toward the desk, the player or the avatar's own heading. */
@@ -256,6 +257,10 @@ export function BakedCharacters({ snapshot }: SceneMountProps) {
       scratchActivity.atDesk = atDesk;
       play(puppet, characterClip(scratchActivity, puppet.available), reduced);
       puppet.mixer.update(step);
+      if (puppet.torso) {
+        const { bone, rest, forward } = puppet.torso;
+        bone.position.copy(rest).addScaledVector(forward, sit);
+      }
       // The clip leaves the legs at rest (type, talk, idle); fold them onto the chair on top of it.
       if (puppet.legs && sit > 0) {
         for (let index = 0; index < puppet.legs.bones.length; index++) {
@@ -321,6 +326,13 @@ function syncClone(template: CharacterTemplate, agent: OfficeAgent, map: Map<str
     }
   }
   const body = scene.getObjectByName(`agent:${agent.id}`);
+  const spine = object.getObjectByName('spine');
+  // Baked models face -z; express the reach in the spine parent's coordinates.
+  const torso = spine?.parent ? {
+    bone: spine, rest: spine.position.clone(),
+    forward: new Vector3(0, 0, -SEATED_TORSO_FORWARD_M)
+      .applyQuaternion(rootRelative(spine.parent, object, new Quaternion()).invert()),
+  } : null;
   if (body) {
     placeCharacter(object, body);
     object.visible = true;
@@ -328,6 +340,6 @@ function syncClone(template: CharacterTemplate, agent: OfficeAgent, map: Map<str
   map.set(agent.id, {
     object, body, deskSeat: deskSeat(agent.seatId), mixer: actions.size > 0 ? mixer : null,
     actions, available: new Set(actions.keys()), current: null, fadeLeft: 0, last: null,
-    legs: seatedLegs(object), seat: 0, heading: null,
+    legs: seatedLegs(object), torso, seat: 0, heading: null,
   });
 }

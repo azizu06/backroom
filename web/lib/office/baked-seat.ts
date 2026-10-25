@@ -14,6 +14,8 @@ export const CHAIR_SEAT_TOP = cushion.at[1] + cushion.size[1] / 2;
 export const DESK_TOP_Y = furniture[0]!.at[1] + furniture[0]!.size[1] / 2;
 export const SEAT_LOCAL = { x: CHAIR_FOOTPRINT.x, z: CHAIR_FOOTPRINT.z } as const;
 export const KEYBOARD_LOCAL = { x: SEAT_LOCAL.x, z: 0.455, width: 0.5, depth: 0.13, height: 0.03 } as const;
+/** Type clip reaches about 0.33 m: lean the upper body in while hips stay on the cushion. */
+export const SEATED_TORSO_FORWARD_M = SEAT_LOCAL.z - KEYBOARD_LOCAL.z - 0.33;
 /** Rest-model thigh underside (tools/bake/character.py). */
 export const SIT_LIFT_M = CHAIR_SEAT_TOP - 0.365;
 /** The procedural thigh rests on top of the cushion. */

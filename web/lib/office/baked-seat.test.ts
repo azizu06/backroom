@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  KEYBOARD_LOCAL, SEAT_CLEARANCE_M, SEAT_LOCAL, CHAIR_SEAT_TOP, WORKSTATION_SEATS, seatAtApproach, BEAR_SEAT_LIFT, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, seatPieces,
+  KEYBOARD_LOCAL, SEATED_TORSO_FORWARD_M, SEAT_CLEARANCE_M, SEAT_LOCAL, CHAIR_SEAT_TOP, WORKSTATION_SEATS, seatAtApproach, BEAR_SEAT_LIFT, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, seatPieces,
   stepSeatBlend, turnToward, SIT_SECONDS,
 } from './baked-seat';
 import { PALETTE } from './palette';
@@ -44,9 +44,9 @@ describe('deskSeat', () => {
 
   it('keeps the body clear of the desk edge with the keys within reach', () => {
     expect(SEAT_CLEARANCE_M).toBeGreaterThanOrEqual(0.19);
-    const reach = SEAT_LOCAL.z - KEYBOARD_LOCAL.z;
+    const reach = SEAT_LOCAL.z - SEATED_TORSO_FORWARD_M - KEYBOARD_LOCAL.z;
     expect(reach).toBeGreaterThan(0.28);
-    expect(reach).toBeLessThan(0.5);
+    expect(reach).toBeLessThan(0.38);
     expect(KEYBOARD_LOCAL.z + KEYBOARD_LOCAL.depth / 2).toBeLessThanOrEqual(DESK_SIZE.depth / 2);
   });
 });
@@ -106,8 +106,11 @@ describe('existing workstation chairs', () => {
   });
 
   it('rests both avatars on the existing cushion, with tags above their heads', () => {
-    expect(BEAR.hip + BEAR_SEAT_LIFT - BEAR.leg.part.size[2] / 2).toBeCloseTo(CHAIR_SEAT_TOP);
-    expect(0.365 + SIT_LIFT_M).toBeCloseTo(CHAIR_SEAT_TOP);
+    const cushion = workstationPieces([0, 0], 1, PALETTE.navy).find(piece =>
+      piece.at[2] === CHAIR_FOOTPRINT.z && piece.size[0] === CHAIR_FOOTPRINT.width)!;
+    const cushionTop = cushion.at[1] + cushion.size[1] / 2;
+    expect(BEAR.hip + BEAR_SEAT_LIFT - BEAR.leg.part.size[2] / 2).toBeCloseTo(cushionTop);
+    expect(0.365 + SIT_LIFT_M).toBeCloseTo(cushionTop);
     // Existing card (1.9) and desk/name plate (1.95) projection heights remain clear.
     expect(BEAR_HEIGHT + BEAR_SEAT_LIFT).toBeLessThan(1.9);
     expect(seatAtApproach(100, 100)).toBeNull();
