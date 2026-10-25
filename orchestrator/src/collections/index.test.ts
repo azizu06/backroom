@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_POLICY } from '@backroom/policy';
 import { MemoryStateStore, type AuditInput } from '../store';
-import { runPreCall, type PreCallInput, type PreCallDependencies, type CreditCheck, type HealthCheck, type HealthResult } from './index';
+import { CallPlannerUnavailableError, runPreCall, type PreCallInput, type PreCallDependencies, type CreditCheck, type HealthCheck, type HealthResult } from './index';
 
 const input = (): PreCallInput => ({
   clientId: 'client-1042', invoiceId: '1042', testIdentityId: 7,
@@ -90,22 +90,42 @@ describe('collections pre-call', () => {
     expect(await runPreCall(request, deps)).toMatchObject({ status: 'blocked' });
   });
 
-  it.each(['unknown', 'mismatch', 'failure'])('blocks a missing CRS clearance (%s) and redacts errors', async kind => {
+  it.each(['unknown', 'sandbox-unavailable', 'mismatch', 'failure'])('blocks a missing CRS clearance (%s) and redacts errors', async kind => {
     const { deps, audit } = harness();
     deps.credit.check = vi.fn<CreditCheck['check']>(async () => {
       if (kind === 'failure') throw new Error('private provider payload / secret');
-      return { testIdentityId: kind === 'mismatch' ? 99 : 7, ofacStatus: 'unknown', activeSignals: [], evidence: [] };
+      return { testIdentityId: kind === 'mismatch' ? 99 : 7, ofacStatus: 'unknown',
+        ...(kind === 'sandbox-unavailable' ? { ofacAvailability: 'not available in sandbox' as const } : {}), activeSignals: [], evidence: [] };
     });
     expect(await runPreCall(input(), deps)).toMatchObject({ status: 'blocked', reason: 'Credit/OFAC check unavailable' });
     expect(deps.planner.draft).not.toHaveBeenCalled();
     expect(JSON.stringify(await audit())).not.toContain('secret');
   });
 
+  it('allows explicit CRS sandbox OFAC unavailability only under the visible logged demo override', async () => {
+    const { deps, audit } = harness();
+    deps.credit.check = vi.fn<CreditCheck['check']>(async () => ({ testIdentityId: 7, ofacStatus: 'unknown',
+      ofacAvailability: 'not available in sandbox', activeSignals: [], evidence: [] }));
+    const request = input();
+    request.context.demoOverride = { visible: true, logged: true };
+    expect(await runPreCall(request, deps)).toMatchObject({ status: 'ready',
+      warnings: ['Sanctions check not available in CRS sandbox'] });
+    expect((await audit()).find(entry => entry.action === 'demo_ofac_unavailable_override')).toMatchObject({
+      decision: 'ALLOW', ruleIds: ['DEMO_OVERRIDE'], inputs: {
+        warning: 'Sanctions check not available in CRS sandbox', ofacAvailability: 'not available in sandbox',
+      },
+    });
+  });
+
   it('audits a model outage without exposing provider errors or returning a plan', async () => {
     const { deps, audit } = harness();
-    deps.planner.draft = vi.fn(async () => { throw new Error('secret model provider response'); });
+    deps.planner.draft = vi.fn(async () => { throw new CallPlannerUnavailableError({
+      stage: 'cloud', status: 401, errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5',
+    }); });
     expect(await runPreCall(input(), deps)).toEqual({ status: 'blocked', reason: 'Call planner unavailable' });
-    expect((await audit()).at(-1)).toMatchObject({ action: 'call_plan', decision: 'DENY' });
+    expect((await audit()).at(-1)).toMatchObject({ action: 'call_plan', decision: 'DENY', inputs: {
+      reason: 'Call planner unavailable', failure: { stage: 'cloud', status: 401, errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5' },
+    } });
     expect(JSON.stringify(await audit())).not.toContain('secret');
   });
 

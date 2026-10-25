@@ -7,7 +7,7 @@ test('viewers in the same browser context see each other and expire', async ({ b
   const errors: string[] = [];
   first.on('pageerror', error => errors.push(error.message));
   second.on('pageerror', error => errors.push(error.message));
-  await Promise.all([first.goto('/office?presence=1&presenceTtl=1500'), second.goto('/office?presence=1&presenceTtl=1500')]);
+  await Promise.all([first.goto('/office?presence=1&presenceTtl=1500&view=overview'), second.goto('/office?presence=1&presenceTtl=1500&view=overview')]);
   await expect(first.getByText('2 viewing')).toBeVisible({ timeout: 8000 });
   await expect(second.getByText('2 viewing')).toBeVisible({ timeout: 8000 });
   await second.close();

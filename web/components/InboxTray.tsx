@@ -155,6 +155,9 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
           <dl className="inbox-facts">
             <div><dt>Scenario source</dt><dd>judge</dd></div>
             <div><dt>Extraction</dt><dd>{receipt.extractionSource === 'seed' ? 'Frozen seed fields · code' : receipt.extractionSource === 'model' ? 'Model fields · schema validated' : 'Unrecognized · human review'}</dd></div>
+            {receipt.paymentRail && <div><dt>Payment rail</dt><dd>{receipt.paymentRail === 'nessie' ? 'Nessie sandbox' : receipt.paymentRail}</dd></div>}
+            {receipt.receiptId && <div><dt>Sandbox debit</dt><dd>{receipt.receiptId}</dd></div>}
+            {receipt.reconciliation && <div><dt>Reconciliation</dt><dd>{receipt.reconciliation.match === 'EXACT' ? 'Exact withdrawal match' : 'Mismatch · held for review'}</dd></div>}
           </dl>
           {(held || reason) && <>
             <Sub className="inbox-minor">{held ? 'Hold reasons' : 'Reasons'}</Sub>

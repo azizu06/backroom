@@ -11,6 +11,7 @@ import { context, type Trace } from './chain';
 import { MemoryStateStore } from '../../store';
 import { northfield } from '../../payables';
 import { fakeCreditCheck, fakeHealthCheck } from '../../collections/fakes';
+import { managedConfig } from '../../voice/tools';
 import { createGateway } from '../../../../web/lib/gateway/http';
 import { MemoryGatewayStore, type GatewayCall } from '../../../../web/lib/gateway/store';
 
@@ -48,7 +49,7 @@ const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; tur
     { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human' },
     { caller: 'Fine, I can pay it all today then.', tool: 'propose_plan',
       args: { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 } }] },
-  // Voicemail: nobody confirms identity; the agent leaves a generic callback and must not reveal the invoice.
+  // Voicemail: nobody confirms identity. Probe disclosure refusal; no spoken callback is executed.
   voicemail: { scenarioId: 'C21', invoiceId: '1042', turns: [
     { caller: '(voicemail greeting) Please leave a message after the tone.' },
     { caller: '(beep)', tool: 'get_invoice_context' }] },
@@ -98,7 +99,7 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const trace: Trace[] = [];
 
   // 1. Planner: production specialist + runtime with offline pre-call fakes; the dial is a mock CallStarter.
-  const gateway = new MemoryGatewayStore([]);
+  const gateway = new MemoryGatewayStore([], state);
   const precallContext = async () => ({ ...(SCRIPTS[name].signals && { signals: { active: SCRIPTS[name].signals } }), client: { type: client.type as 'business', phoneNumber: client.phoneNumber,
     dnc: client.dnc || await gateway.clientStopped(client.id), localWeekday: 2, localHour: 11, consent: client.consent } });
   const loadCase = async () => ({ sessionId, invoice: { amountCents, currency: 'USD', daysPastDue: 40 },
@@ -219,6 +220,30 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   const roleOrder = dispatched.activations.map(row => row.role);
   const expected = EXPECTED[name];
   const reconRules = audits.filter(row => row.action === 'agent_reconciliation').map(row => row.ruleIds[0]);
+  const voicemailEvidence = name === 'voicemail' ? {
+    gatewayReplyKinds: transcript.flatMap(row => row.result ? [String(row.result.kind)] : []),
+    invoiceReadRefused: transcript.some(row => row.tool === 'get_invoice_context' && row.result?.kind === 'DENY' &&
+      JSON.stringify(row.result.rule_ids) === JSON.stringify(['IDENTITY_REQUIRED'])),
+    callbackInstructionConfigured: managedConfig([]).instructions.includes('Before ending say the callback number {{callback_number}}.'),
+    speechMeasured: false, messageDelivered: false,
+  } : undefined;
+  const humanFollowup = name === 'human_request' || name === 'hostile' ? {
+    queuedRequests: call.outbox.filter(row => row.type === 'request_human').length,
+    gatewayEscalations: call.audits.filter(row => row.action === 'request_human')
+      .map(row => ({ decision: row.kind, ruleIds: row.ruleIds })),
+    mirroredEscalations: audits.filter(row => row.action === 'request_human')
+      .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
+    postcallEscalations: audits.filter(row => row.action === 'collections_postcall_terminal')
+      .map(row => ({ decision: row.decision, ruleIds: row.ruleIds })),
+    // Read the actual record: request_human currently queues an unassigned outbox event.
+    // Plan approval recipients are not proof that a callback was assigned or delivered.
+    gatewayReviewRecipients: call.escalations.map(row => row.toHuman),
+  } : undefined;
+  const hostileEvidence = name === 'hostile' ? {
+    requiredRule: 'HOSTILE_ESCALATE',
+    dedicatedRuleRecorded: [...call.audits, ...audits].some(row => row.ruleIds.includes('HOSTILE_ESCALATE')),
+    speechMeasured: false, providerEndCallExecuted: false,
+  } : undefined;
   const checks = {
     dialedOnce: planned.kind === 'started' && dials.length === 1,
     callStatus: call.status === expected.callStatus,
@@ -227,6 +252,13 @@ export async function runConversation(name: Conversation, options: { pairing?: b
     cleared: cleared === expected.cleared,
     noLeakBeforeIdentity: !leaked,
     auditChain: (await state.verifyAuditChain()).valid,
+    ...(humanFollowup && {
+      humanFollowupQueued: humanFollowup.queuedRequests === 1,
+      humanEscalationMirrored: humanFollowup.gatewayEscalations.length === 1 && humanFollowup.mirroredEscalations.length === 1 &&
+        humanFollowup.gatewayEscalations[0]!.decision === 'ESCALATE' && humanFollowup.mirroredEscalations[0]!.decision === 'ESCALATE' &&
+        JSON.stringify(humanFollowup.mirroredEscalations[0]!.ruleIds) === JSON.stringify(['REQUEST_HUMAN']) &&
+        humanFollowup.postcallEscalations[0]?.decision === 'ESCALATE',
+    }),
     ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.length > 0 && reconRules.every(rule => rule === 'RECON_UNMATCHED') && !cleared }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
     ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0
@@ -248,6 +280,9 @@ export async function runConversation(name: Conversation, options: { pairing?: b
   };
   return { id: name, scenarioId, invoiceId, match: Object.values(checks).every(Boolean), checks,
     callStatus: call.status, caseStatus: dispatched.status, reason: dispatched.reason ?? null, roles: roleOrder, cleared, reconRules,
+    ...(humanFollowup && { humanFollowup }),
+    ...(hostileEvidence && { hostileEvidence }),
+    ...(voicemailEvidence && { voicemailEvidence }),
     gatewayTools: transcript.filter(row => row.tool).map(row => `${row.tool}:${String(row.result?.kind ?? row.result?.error)}`),
     tools: trace.map(row => `${row.role}.${row.tool}`),
     scope: 'Production collections planner (mock CallStarter), real tool gateway handler/store, production Dispatcher + ClaudeAgentRuntime with scripted QueryFn for post-call, reconciler and auditor. Scripted caller lines and voice-agent tool choices; no Cartesia, phone, model or bank network.' };

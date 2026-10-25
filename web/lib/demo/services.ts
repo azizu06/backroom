@@ -1,12 +1,15 @@
 import { resolve } from 'node:path';
 import { FileClaims, MemoryBalanceDisplayCache, NessieClient, seedNorthfield } from '@backroom/nessie';
 import { createCachedCrsClientFromEnv, createCrsFixtureClient, createPreCallHealthCheck, APIFY_DEMO_COMPANY,
-  northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, recordSignals, signalsFromCrs, signalsFromHealth,
-  type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
+  EMAIL_ONLY_RULES, northfield, runPreCall, createPreCallCreditCheck, createCallPlanner, route, recordSignals, signalsFromCrs, signalsFromHealth,
+  type PreCallDependencies, type PreCallInput, type PreCallResult, type HealthResult, type StateStore } from '@backroom/orchestrator';
 import type { DemoStatus, HealthRow } from '../../../tools/demo/health';
+import { environmentHealthRow } from '../../../tools/demo/env';
 import type { PrecallEvidence } from '../calls/precall';
+import type { CallRefusal, DemoCollectionsPlanner } from './agents';
 
 const root = globalThis as typeof globalThis & { backroomDemoServiceStatus?: () => DemoStatus['services'] };
+const LEAD_CRS_TEST_IDENTITY_ID = 1;
 /** Safe server-only observation for the real-vs-sim route; never initiates a probe. */
 export const getDemoHostServices = () => root.backroomDemoServiceStatus?.() ?? null;
 export function installDemoServiceStatus(read: () => DemoStatus['services']) { root.backroomDemoServiceStatus = read; }
@@ -43,6 +46,7 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   let apify: { mode: string; status: string; runId?: string } = { mode: apifyLive ? 'live' : 'FAKE', status: 'not_probed' };
   let crsStatus = 'not_probed';
   let preCall: PreCallResult | undefined;
+  let preCallInput: PreCallInput | undefined;
   let evidence: { health?: HealthResult; crs?: unknown[] } = {};
   // One Actor attempt per owned host, including failed/ambiguous starts. Reset never re-bills.
   function prepare() {
@@ -58,7 +62,10 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
         (async () => {
           try {
             // Exact sponsor persona P01. These are public-record/fraud checks, never OFAC/business credit.
-            evidence.crs = await Promise.all([crs.getPublicRecords(1), crs.getFraudRisk(1)]);
+            evidence.crs = await Promise.all([
+              crs.getPublicRecords(LEAD_CRS_TEST_IDENTITY_ID),
+              crs.getFraudRisk(LEAD_CRS_TEST_IDENTITY_ID),
+            ]);
             crsStatus = 'complete';
           } catch { crsStatus = 'unavailable'; }
         })(),
@@ -74,13 +81,62 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
   const precall = (): PrecallEvidence => ({ preCall: { ...status().services.preCall,
     ...(preCall?.status === 'ready' && preCall.warnings ? { warnings: preCall.warnings } : {}) },
     signals: evidence.health ? signalsFromHealth('1042', evidence.health, healthCheck.label ?? 'provided') : [] });
+  const precallDeps = (state: StateStore): PreCallDependencies => ({
+    credit, health: { label: healthCheck.label, async check() {
+      if (!evidence.health) throw new Error('Cached health check unavailable');
+      return evidence.health;
+    } }, planner: createCallPlanner({ cloudRoute: options.modelRoute ?? route }), audit: state,
+    escalate: async (decision, refs) => { await state.createCallEscalation({ id: `demo:precall:${Date.now()}`,
+      taskId: 'demo:precall', fromAgent: 'demo:precall', seat: 'collections', toHuman: decision.toHuman,
+      ruleIds: decision.ruleIds, evidenceRefs: refs, policyVersion: decision.policyVersion, quote: decision.quote }, Date.now()); },
+  });
+  const emailOnly = (rules: readonly string[]) => rules.length > 0
+    && rules.every(rule => (EMAIL_ONLY_RULES as readonly string[]).includes(rule));
+  function emailCase(refusal: CallRefusal) {
+    if (!preCallInput) return undefined;
+    let rules: readonly string[] = [];
+    let context = structuredClone(preCallInput.context);
+    if (refusal.code === 'PRECALL_BLOCKED' && preCall?.status === 'blocked' && preCall.decision) {
+      rules = preCall.decision.ruleIds;
+    } else if (refusal.code === 'CALL_DENIED' && refusal.detail) {
+      rules = refusal.detail.split(',');
+      const baseClient = context.client;
+      if (!baseClient) return undefined;
+      const client = { ...baseClient };
+      if (rules.includes('B2B_ONLY_CALLS')) client.type = 'consumer';
+      if (rules.includes('DNC')) client.dnc = true;
+      if (rules.includes('CONSENT_REQUIRED')) delete client.consent;
+      context = { ...context, client };
+    }
+    if (!emailOnly(rules)) return undefined;
+    const invoice = northfield.arInvoices.find(row => row.id === preCallInput!.invoiceId)!;
+    const client = northfield.clients.find(row => row.id === preCallInput!.clientId)!;
+    const policyClient = context.client!;
+    return {
+      sessionId: `demo:email:${invoice.id}`,
+      invoice: { amountCents: invoice.principalCents + invoice.lateFeeCents, currency: 'USD', daysPastDue: 40 },
+      precall: { ...structuredClone(preCallInput), context },
+      dial: { sessionId: `demo:email:${invoice.id}`, agentId: 'demo:collections', fromNumberId: 'simulated-email-only',
+        clientId: client.id, businessName: northfield.company.name, contactName: client.name, invoiceId: invoice.id,
+        callbackNumber: '+12025550100', client: { type: policyClient.type ?? 'business', number: policyClient.phoneNumber ?? client.phoneNumber,
+          timeZone: client.timezone, dnc: policyClient.dnc === true,
+          ...(policyClient.consent ? { consent: policyClient.consent } : {}) } },
+      // Synthetic server-owned fixture contact. Only client.example is projected into the audit chain.
+      emailContact: { address: 'billing@client.example' },
+    };
+  }
   return { bank, accountId, status, precall,
+    collectionsPlanner(state: StateStore): DemoCollectionsPlanner {
+      return { caseFor: emailCase, voice: { async start() { throw new Error('REFUSED_CALL_CANNOT_DIAL'); } },
+        precall: precallDeps(state) };
+    },
     async prepare(state: StateStore) {
       if (!live) return;
       await prepare();
       await state.appendAudit({ ts: Date.now(), actor: 'code', seat: 'collections', action: 'demo_pre_call_evidence',
         ruleIds: [], policyVersion: (await state.getPolicy()).policyVersion, refs: ['1042'], route: 'code', latencyMs: 0, costUsd: 0,
-        inputs: { noDial: true, syntheticCaller: true, crsLabel: realCrs ? 'SANDBOX: test identity #1' : 'FAKE: test identity #1',
+        inputs: { noDial: true, syntheticCaller: true,
+          crsLabel: `${realCrs ? 'SANDBOX' : 'FAKE'}: test identity #${LEAD_CRS_TEST_IDENTITY_ID}`,
           apify, crsStatus, ...evidence, ofac: 'unknown', businessCredit: 'unavailable' } });
       const invoice = northfield.arInvoices.find(row => row.id === '1042')!;
       const client = northfield.clients.find(row => row.id === invoice.clientId)!;
@@ -98,21 +154,15 @@ export async function createDemoServices(options: { env?: NodeJS.ProcessEnv; fet
       }
       // Scripted pre-call only: synthetic consent and an explicitly logged weekend override.
       // The separate preverified gateway rehearsal is not evidence of a live dial permit.
-      preCall = await runPreCall({ clientId: client.id, invoiceId: invoice.id, testIdentityId: 7,
+      preCallInput = { clientId: client.id, invoiceId: invoice.id, testIdentityId: LEAD_CRS_TEST_IDENTITY_ID,
         company: APIFY_DEMO_COMPANY, context: { policy: await state.getPolicy(),
           client: { ...client, type: client.type, localWeekday: 6, localHour: 11 },
-          demoOverride: { visible: true, logged: true }, signals: {} } }, {
-        credit, health: { label: healthCheck.label, async check() {
-          if (!evidence.health) throw new Error('Cached health check unavailable');
-          return evidence.health;
-        } }, planner: createCallPlanner({ cloudRoute: options.modelRoute ?? route }), audit: state,
-        escalate: async (decision, refs) => { await state.createCallEscalation({ id: `demo:precall:${Date.now()}`,
-          taskId: 'demo:precall', fromAgent: 'demo:precall', seat: 'collections', toHuman: decision.toHuman,
-          ruleIds: decision.ruleIds, evidenceRefs: refs, policyVersion: decision.policyVersion, quote: decision.quote }, Date.now()); },
-      });
+          demoOverride: { visible: true, logged: true }, signals: {} } };
+      preCall = await runPreCall(preCallInput, precallDeps(state));
     },
     async health(): Promise<HealthRow[]> {
-      const rows: HealthRow[] = [{ name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present in web host; not a call-readiness test' : 'missing in web host' }];
+      const rows: HealthRow[] = [environmentHealthRow('web + seats', env),
+        { name: 'Cartesia key', ok: !!env.CARTESIA_API_KEY, detail: env.CARTESIA_API_KEY ? 'present in web host; not a call-readiness test' : 'missing in web host' }];
       if (!live) return [...rows, { name: 'Nessie', ok: false, detail: 'unused: web host uses mock bank' },
         { name: 'GX10 router', ok: false, detail: 'unused: rehearsal defaults OFF' },
         { name: 'Cloud fallback', ok: false, detail: 'unused: rehearsal defaults OFF' },

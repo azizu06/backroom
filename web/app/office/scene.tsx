@@ -18,8 +18,12 @@ import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } 
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
+import { useBakedLobbyReady } from './mounts/BakedArt';
+import { bakedReplacesPartition } from '../../lib/office/baked-art';
 import { PresenceGhosts } from './PresenceGhosts';
 import { Bear, createBearRig, poseBear } from './avatars/Bear';
+import { useAgentAnimator } from './avatars/agentAnimator';
+import { agentCueKey, deskHeading } from '../../lib/office/agent-motion';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
@@ -61,6 +65,7 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
   const reduced = useReducedMotion();
   const body = useRef<Group>(null);
   const [rig] = useState(createBearRig);
+  const animator = useAgentAnimator(agentCueKey(agent.id), agent.id, rig);
   useFrame((state, delta) => {
     const walk = motion;
     if (paused) return;
@@ -69,9 +74,13 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     if (walk.moving) state.invalidate();
     if (!body.current) return;
     body.current.position.set(walk.position[0], 0, walk.position[1]);
-    const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
-    body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
-    poseBear(rig, walk.distance, walk.moving && !tween && !recorded, reduced);
+    const moving = walk.moving && !tween && !recorded;
+    poseBear(rig, walk.distance, moving, reduced);
+    // Body turn, head look, breathing, typing and greet/talk beats (lib/office/agent-motion.ts).
+    const input = animator.input;
+    input.x = walk.position[0]; input.z = walk.position[1]; input.heading = walk.heading; input.moving = moving;
+    input.stride = walk.distance; input.desk = walk.moving ? NaN : deskHeading(agent.seatId, walk.position[0], walk.position[1]); input.reduced = reduced;
+    animator.animate(state, delta, body.current);
   });
   const bakedVersion = useSyncExternalStore(subscribeBakedCharacters, bakedCharacterVersion, () => 0);
   // The character mount sets this only after that agent's GLB clone exists. Otherwise the bear stays.
@@ -140,6 +149,15 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
   return <OrbitControls ref={controls} onStart={() => { orbiting.current = true; invalidate(); }} onEnd={() => { orbiting.current = false; invalidate(); }} enablePan={false} enableZoom={false} enableRotate={!fixed}
     minPolarAngle={0.45} maxPolarAngle={1.1} minAzimuthAngle={-0.7} maxAzimuthAngle={0.9} />;
 }
+/** Lavender partitions; under ?art=baked the baked lobby's east wall replaces the lobby-side segment in first person. */
+function Partitions() {
+  const baked = useBakedLobbyReady();
+  const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
+  return <>{[-2.5, 2.5].map(x => <group key={x}>
+    <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
+    {!bakedReplacesPartition(baked, overview, x) && <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color={ROLES.partition} />}
+  </group>)}</>;
+}
 function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
   const invalidate = useThree(state => state.invalidate);
@@ -175,10 +193,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color={ROLES.wall} />
     <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color={ROLES.wall} />
     <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color={ROLES.aisle} />
-    {[-2.5, 2.5].map(x => <group key={x}>
-      <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
-      <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color={ROLES.partition} />
-    </group>)}
+    <Partitions />
     {visibleRooms(snapshot).map(room => {
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>

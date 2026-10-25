@@ -12,6 +12,8 @@ import {
   AMBIENT_FPS, CURSOR_SIZE, GLOW_MEAN, ambientActive, ambientDesks, busyLevel, cursorBlink, cursorPoint, plantSway, screenGlow, type AmbientDesk,
 } from '../../../lib/office/props/ambient';
 import { monitorScreen } from '../../../lib/office/props/monitors';
+import { bakedReplacesAuditBoard } from '../../../lib/office/baked-art';
+import { useBakedLobbyReady } from '../mounts/BakedArt';
 import { useCanvasTexture } from './useCanvasTexture';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
@@ -133,6 +135,8 @@ export function Ambient({ snapshot }: { snapshot: OfficeSnapshot }) {
   const [shared] = useState(createShared);
   useEffect(() => () => { for (const resource of Object.values(shared)) resource.dispose(); }, [shared]);
   const glowMap = useCanvasTexture(GLOW_TEX, GLOW_TEX, drawGlow, []);
+  const baked = useBakedLobbyReady();
+  const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
   useEffect(() => {
     invalidate();
     if (!active) return;
@@ -143,6 +147,6 @@ export function Ambient({ snapshot }: { snapshot: OfficeSnapshot }) {
     {ambientDesks(snapshot).map(({ room, seed }) => <DeskAmbient key={room} room={room} seed={seed} busy={busyLevel(snapshot, room)}
       lines={monitorScreen(snapshot, room).lines.length}
       active={active} shared={shared} glowMap={glowMap} />)}
-    {visibleRooms(snapshot).includes('lobby') && <BoardGlow active={active} shared={shared} glowMap={glowMap} />}
+    {visibleRooms(snapshot).includes('lobby') && !bakedReplacesAuditBoard(baked, overview) && <BoardGlow active={active} shared={shared} glowMap={glowMap} />}
   </group>;
 }

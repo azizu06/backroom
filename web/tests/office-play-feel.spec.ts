@@ -34,7 +34,7 @@ async function startPlay(page: Page) {
       window.AudioContext.prototype.createOscillator = function (this: AudioContext) { oscillators++; return create.call(this); };
     }
   });
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await requireWebGL(page);
   const select = page.getByLabel('Office view');
   await expect(select).toBeEnabled();
@@ -51,6 +51,19 @@ async function walkFor(page: Page, ms: number) {
   await page.waitForTimeout(ms);
   await page.keyboard.up('w');
 }
+/** Release the key on the first frame the predicate is true, before the walk reaches the desk behind Alex. */
+async function holdUntil(page: Page, key: string, done: () => Promise<boolean>, timeout = 15_000) {
+  const started = Date.now();
+  await page.keyboard.down(key);
+  try {
+    while (!(await done())) {
+      if (Date.now() - started > timeout) throw new Error(`Holding ${key} timed out`);
+      await page.waitForTimeout(16);
+    }
+  } finally {
+    await page.keyboard.up(key);
+  }
+}
 
 test('crosshair changes state and shows a short prompt over an interactable, then goes idle in the dialog', async ({ page }) => {
   const errors = await startPlay(page);
@@ -59,9 +72,8 @@ test('crosshair changes state and shows a short prompt over an interactable, the
   await expect(crosshair).toHaveAttribute('data-state', 'idle');
   await expect(page.locator('.play-prompt')).toHaveText('');
 
-  // Alex is dead ahead of the spawn point.
-  await page.keyboard.down('w');
-  try { await expect(crosshair).toHaveAttribute('data-state', 'target', { timeout: 15_000 }); } finally { await page.keyboard.up('w'); }
+  // Alex is dead ahead of the spawn point. Stop on the first target; walking on reaches the desk behind him.
+  await holdUntil(page, 'w', async () => (await crosshair.getAttribute('data-state')) === 'target');
   await expect(crosshair).toHaveAttribute('data-kind', 'agent');
   await expect(page.locator('.play-prompt')).toHaveText('E · Talk to Alex');
 
@@ -124,7 +136,7 @@ test('the Play settings turn FOV kick off and remember it', async ({ page }) => 
 });
 
 test('reduced motion keeps the FOV fixed while walking still works', async ({ browser }) => {
-  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 }, baseURL: 'http://localhost:3035' });
+  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 1000 }, baseURL: `http://localhost:${Number(process.env.OFFICE_TEST_PORT) || 3035}` });
   const page = await context.newPage();
   try {
     const errors = await startPlay(page);

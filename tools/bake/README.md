@@ -16,4 +16,6 @@ scp gx10:bake/run1/out/lobby.glb web/public/office-art/lobby.glb
 
 Inspect the GLB (size, parses, only the expected nodes) before committing. Scripts are our own code only: no downloads, no subprocess, socket, urllib, requests or exec.
 
-Node names the web layer relies on: `shell`, `wall_far`, `wall_near`, `ceiling`. `wall_near` and `ceiling` are hidden in the orthographic overview and shown in first-person Play.
+Node names the web layer relies on: `shell`, `wall_far`, `wall_near`, `ceiling`. `wall_near` and `ceiling` are hidden in the orthographic overview and shown in first-person Play. The ceiling panels, downlights and pendants are joined into `ceiling` so they hide with it. `lobby.colliders.json` is written by the script (no bake needed to know it) and mirrored in `web/public/office-art/`.
+
+`character.py` (no lightmap, seconds to run): one rigged base body (`body`, `skin`, `hair`, `legs`, `face`, armature `rig`), per-role accessories named `v_<variant>_<item>` (collections, payables, vendor, dana) and four looping clips `idle`, `walk`, `talk`, `type`. Bake it with the same runner (`run-gx10.sh ~/bake/in/character.py ~/bake/char1`), copy `out/character.glb` to `web/public/office-art/`, and check it has the four animations and stays under 2 MB. The web mapping lives in `web/lib/office/baked-character.ts`.

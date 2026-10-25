@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStateStore } from '../../store';
+import { MemoryEmailOutbox } from '../../collections/email';
 import type { PreCallDependencies, PreCallInput } from '../../collections';
 import type { DialInput } from '../../voice';
 import type { ActivationResult, AgentRuntime, Specialist, ToolContext, UsageReceipt } from '../contracts';
@@ -50,6 +51,91 @@ const done: ActivationResult = { kind: 'done', artifactRefs: [], usage };
 const happy = scripted(async call => { await call('get_invoice_context'); await call('can_call'); await call('run_precall'); await call('start_call'); return done; });
 
 describe('collections planner specialist', () => {
+  it('queues a simulated C14 email from trusted case data after a completed planner refusal, without dialing', async () => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    const outbox = new MemoryEmailOutbox();
+    const rt = scripted(async call => {
+      expect(await call('can_call')).toMatchObject({ decision: 'DENY', ruleIds: ['B2B_ONLY_CALLS'] });
+      return done;
+    });
+    const run = await runCollectionsPlanner(rt, ctx(), { ...h.deps, emailFollowUp: { outbox } });
+    expect(run).toMatchObject({ kind: 'not_started', email: { status: 'queued', withLink: false } });
+    expect(outbox.sent).toHaveLength(1);
+    expect(outbox.sent[0]!.label).toBe('SIMULATED: email preview, not sent');
+    expect(outbox.sent[0]!.body).toContain('AI assistant');
+    expect(outbox.sent[0]!.body).not.toContain('120000');
+    expect(h.voice.start).not.toHaveBeenCalled();
+    expect((await h.store.listAudit()).some(row => row.action === 'email_followup_queued')).toBe(true);
+  });
+
+  it('re-reads the trusted stop state after the model finishes, before attempting email fallback', async () => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    const outbox = new MemoryEmailOutbox();
+    const rt = scripted(async call => {
+      await call('can_call');
+      h.live.precall.context.signals = { disputed: true };
+      return done;
+    });
+    const run = await runCollectionsPlanner(rt, ctx(), { ...h.deps, emailFollowUp: { outbox } });
+    expect(run).toMatchObject({ kind: 'not_started', email: { status: 'blocked', reason: 'DISPUTE_STOP' } });
+    expect(outbox.sent).toHaveLength(0);
+  });
+
+  it.each(['paused', 'failed'] as const)('does not email after a %s runtime result', async kind => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    const outbox = new MemoryEmailOutbox();
+    const rt: AgentRuntime = { run: async () => ({ kind, reason: 'TEST_STOP' }) };
+    await runCollectionsPlanner(rt, ctx(), { ...h.deps, emailFollowUp: { outbox } });
+    expect(outbox.sent).toHaveLength(0);
+    expect(h.deps.cases.load).not.toHaveBeenCalled();
+  });
+
+  it('fences the email queue immediately before the effect', async () => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    const outbox = new MemoryEmailOutbox();
+    const rt = scripted(async () => done);
+    const fenced = ctx({ fence: () => { throw new Error('STALE_LEASE'); } });
+    await expect(runCollectionsPlanner(rt, fenced, { ...h.deps, emailFollowUp: { outbox } })).rejects.toThrow('STALE_LEASE');
+    expect(outbox.sent).toHaveLength(0);
+  });
+
+  it.each([false, true])('does not queue a stale preview if contact policy changes during the final ownership check (shared case=%s)', async shared => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    if (shared) h.deps.cases.load = vi.fn(async () => h.live);
+    const outbox = new MemoryEmailOutbox();
+    let checks = 0;
+    const changing = ctx({ assertCurrent: async () => {
+      if (++checks === 3) h.live.precall.context.signals = { disputed: true };
+    } });
+    await expect(runCollectionsPlanner(scripted(async () => done), changing, { ...h.deps, emailFollowUp: { outbox } }))
+      .rejects.toThrow('EMAIL_CASE_CHANGED');
+    expect(outbox.sent).toHaveLength(0);
+  });
+
+  it.each(['CANCELLED', 'LLM_OFF'])('does not queue when %s arrives during the final read and no synchronous store fence exists', async reason => {
+    const h = harness(c => { c.precall.context.client!.type = 'consumer'; });
+    h.live.emailContact = { address: 'billing@client.example' };
+    const outbox = new MemoryEmailOutbox();
+    const controller = new AbortController();
+    let reads = 0;
+    h.deps.cases.load = vi.fn(async () => {
+      if (++reads === 2) controller.abort(reason);
+      return structuredClone(h.live);
+    });
+    const current = ctx({ activation: { ...ctx().activation, signal: controller.signal }, assertCurrent: async () => {
+      if (controller.signal.aborted) throw new Error(reason);
+    } });
+    expect(current.fence).toBeUndefined();
+    await expect(runCollectionsPlanner(scripted(async () => done), current, { ...h.deps, emailFollowUp: { outbox } }))
+      .rejects.toThrow(reason);
+    expect(outbox.sent).toHaveLength(0);
+  });
+
   it('prepares and starts one call through the voice layer', async () => {
     const h = harness();
     const run = await runCollectionsPlanner(happy, ctx(), h.deps);

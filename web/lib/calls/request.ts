@@ -14,6 +14,7 @@ const RELAY: Record<string, [number, string]> = {
 };
 
 export type CallRequestAudit = { outcome: 'requested' | 'accepted' | 'refused'; code: string; detail?: string; suppressed?: number };
+export type CallFollowUpResult = { status: 'queued' | 'duplicate' };
 export interface CallRequestOptions {
   /** Operator code; its shared sign-in (`/api/session`) unlocks the desk phone. */
   secret: () => string | undefined;
@@ -29,6 +30,8 @@ export interface CallRequestOptions {
   /** The desk phone's current call, from the read-only projection. */
   currentCall: () => Promise<{ status: 'ringing' | 'live' | 'ended'; endedAt?: number } | null>;
   audit: (entry: CallRequestAudit) => Promise<void>;
+  /** Trusted demo-host hook. It may queue a simulated preview after a refusal; it never delivers email. */
+  followUp?: (entry: CallRequestAudit) => Promise<CallFollowUpResult | undefined>;
   fetch?: typeof fetch; now?: () => number;
   /** Minimum gap between dial attempts, and after a call ends. */
   cooldownMs?: number;
@@ -47,13 +50,17 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
   const quiet = new Map<string, { at: number; suppressed: number }>();
   // A refusal places nothing, so its audit is best effort; a dial requires its audit first.
   const refuse = async (status: number, code: string, message: string, detail?: string, coalesce = false) => {
+    const entry: CallRequestAudit = { outcome: 'refused', code, ...(detail && { detail }) };
     if (coalesce) {
       const prior = quiet.get(code);
       if (prior && now() - prior.at < 10_000) { prior.suppressed++; return json({ ok: false, error: code, message }, status); }
       quiet.set(code, { at: now(), suppressed: 0 });
-      await options.audit({ outcome: 'refused', code, ...(prior?.suppressed && { suppressed: prior.suppressed }) }).catch(() => undefined);
-    } else await options.audit({ outcome: 'refused', code, ...(detail && { detail }) }).catch(() => undefined);
-    return json({ ok: false, error: code, message }, status);
+      await options.audit({ ...entry, ...(prior?.suppressed && { suppressed: prior.suppressed }) }).catch(() => undefined);
+    } else await options.audit(entry).catch(() => undefined);
+    const followedUp = (code === 'PRECALL_BLOCKED' || code === 'CALL_DENIED')
+      ? await options.followUp?.(entry).catch(() => undefined) : undefined;
+    const suffix = followedUp ? ' Email preview (simulated, not sent).' : '';
+    return json({ ok: false, error: code, message: `${message}${suffix}` }, status);
   };
   const readJSON = async (request: Request, limit: number): Promise<Record<string, unknown> | undefined> => {
     if (!request.headers.get('content-type')?.startsWith('application/json')) return undefined;

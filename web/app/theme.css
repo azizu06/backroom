@@ -1,0 +1,43 @@
+/* Shared palette for every page, ported from AJ's 271-cozy-office-ui (iisu.css, operator.module.css).
+   Token names match AJ's branch and the /office chrome; do not rename them. lib/theme-contrast.test.ts checks the text pairs.
+   Dark mode: <html data-theme="dark">, set from localStorage['backroom-theme'] by the root layout and the site-nav toggle. */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap');
+
+:root {
+  --ink: #19213B;
+  --ink-soft: #4B5577;
+  --paper: #FFFDF4;
+  --line: #D6F0F5;
+  --pastel-aqua: #A9F6FF;
+  --pastel-yellow: #FFF3A6;
+  --danger: #BD4B42;
+  --danger-soft: #FFE2DB;
+  /* Yellow and aqua surfaces keep navy ink in both themes. */
+  --on-pastel: #19213B;
+  --bubble-radius: 28px;
+  --bubble-glass: rgba(255, 255, 255, 0.78);
+  --bubble-border: 3px solid #ffffff;
+  --bubble-shadow: 0 8px 24px rgba(25, 33, 59, 0.12);
+  --field: #ffffff;
+  --page-bg: linear-gradient(165deg, #A9F6FF 0%, #d8fbff 50%, #FFF3A6 100%);
+  --font-ui: 'Nunito', ui-rounded, 'Avenir Next', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --ink: #FFF8DC;
+  --ink-soft: #C7CEE6;
+  --paper: #222C4E;
+  --line: #2E3A63;
+  --danger: #FFA99C;
+  --danger-soft: #442D3C;
+  --bubble-glass: rgba(25, 33, 59, 0.82);
+  --bubble-border: 3px solid #2E3A63;
+  --bubble-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --field: #2B3660;
+  --page-bg: linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%);
+  color-scheme: dark;
+}
+
+html { min-height: 100%; background: var(--page-bg); }
+body { color: var(--ink); font-family: var(--font-ui); }
