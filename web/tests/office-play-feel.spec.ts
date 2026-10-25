@@ -118,6 +118,63 @@ test('walking eases the FOV out and back, and the player keeps moving', async ({
   expect(errors).toEqual([]);
 });
 
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`Play settings stay anchored at ${viewport.width}x${viewport.height} and after resizing or wrapping`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = await startPlay(page);
+    const settings = page.getByRole('button', { name: 'Settings', exact: true });
+    const exit = page.getByRole('button', { name: 'Exit Play', exact: true });
+    const overview = page.getByRole('button', { name: 'Overview', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    await settings.focus();
+    await page.keyboard.press('Enter');
+    await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toBeFocused();
+
+    const assertAnchor = async () => {
+      await expect(async () => {
+        const [button, panel, exitButton, overviewButton] = await Promise.all([
+          settings.boundingBox(), dialog.boundingBox(), exit.boundingBox(), overview.boundingBox(),
+        ]);
+        if (!button || !panel || !exitButton || !overviewButton) throw new Error('Missing Settings or HUD bounds');
+        const gap = panel.y - (button.y + button.height);
+        expect(gap).toBeGreaterThanOrEqual(0);
+        expect(gap).toBeLessThanOrEqual(16);
+        expect(Math.abs(gap - 8)).toBeLessThanOrEqual(1);
+        expect(Math.abs(panel.x + panel.width - button.x - button.width)).toBeLessThanOrEqual(16);
+        for (const control of [exitButton, overviewButton]) {
+          expect(panel.y).toBeGreaterThanOrEqual(control.y + control.height);
+        }
+        const size = page.viewportSize()!;
+        expect(panel.x).toBeGreaterThanOrEqual(8);
+        expect(panel.x + panel.width).toBeLessThanOrEqual(size.width - 8);
+        expect(panel.y + panel.height).toBeLessThanOrEqual(size.height - 8);
+        if (size.width === 1280) {
+          expect(Math.abs(button.y + button.height - exitButton.y - exitButton.height)).toBeLessThanOrEqual(1);
+          expect(Math.abs(button.y + button.height - overviewButton.y - overviewButton.height)).toBeLessThanOrEqual(1);
+        }
+      }).toPass();
+    };
+    await assertAnchor();
+    await dialog.locator('summary').filter({ hasText: 'Movement Feel' }).click();
+    await assertAnchor();
+    // Keep the dialog open through both a viewport change and a row-only layout change.
+    await page.setViewportSize({ width: viewport.width === 1280 ? 390 : 1280, height: 360 });
+    await assertAnchor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('.play-controls').evaluate(element => { element.style.width = '150px'; });
+    await expect(async () => {
+      const button = (await settings.boundingBox())!;
+      const first = (await overview.boundingBox())!;
+      expect(button.y).toBeGreaterThan(first.y + first.height);
+    }).toPass();
+    await assertAnchor();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(surface(page)).toBeFocused();
+    expect(errors).toEqual([]);
+  });
+}
+
 test('the Play settings turn FOV kick off and remember it', async ({ page }) => {
   const errors = await startPlay(page);
   await page.getByRole('button', { name: 'Settings' }).focus();
@@ -148,6 +205,7 @@ test.describe('system reduced motion', () => {
     const errors = await startPlay(page);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    await dialog.locator('summary').filter({ hasText: 'Movement Feel' }).click();
     const indicator = dialog.getByText('Reduced motion is on in your system, so these are off', { exact: true });
     await expect(indicator).toBeVisible();
     for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
@@ -207,6 +265,7 @@ test.describe('motion enabled', () => {
     await expect(view).toHaveAttribute('data-player-eye-y', /\d/, { timeout: 30_000 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Play settings' });
+    await dialog.locator('summary').filter({ hasText: 'Movement Feel' }).click();
     const bob = dialog.getByRole('checkbox', { name: 'Head bob', exact: true });
     await expect(bob).toBeChecked();
     await expect(bob).toBeEnabled();
