@@ -7,7 +7,7 @@ import { requestSceneFrame } from '../../../lib/office/frame';
 import { FLOOR_AGENTS, HANDOFF_AGENTS, HUMAN, handoffFlag, type Handoff, type HandoffAgentId } from '../../../lib/office/handoffs';
 import { createMockHandoffFeed, type HandoffFeed } from '../../../lib/office/handoff-mock';
 import { HandoffStage } from '../../../lib/office/handoff-plan';
-import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, voiceCues } from '../../../lib/office/handoff-voice';
+import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, liveVoiceCues } from '../../../lib/office/handoff-voice';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 import { HandoffEntries } from './HandoffLog';
 import './handoffs.css';
@@ -45,24 +45,25 @@ function useHandoffs(snapshot: OfficeSnapshot) {
 }
 /**
  * Voices for the handoff bubbles (#133). On by default after the first office gesture;
- * any proxy or playback error silences them and the visuals carry on.
+ * fatal proxy or playback errors silence them and the visuals carry on.
  */
-function useHandoffVoice(stage: HandoffStage | null, rows: readonly Handoff[]) {
+function useHandoffVoice(rows: readonly Handoff[]) {
+  const [since] = useState(Date.now);
+  const [unlocked, setUnlocked] = useState(false);
   const [, rerender] = useReducer((count: number) => count + 1, 0);
   const [player] = useState(createAudioPlayer);
   const [voice] = useState(() => new HandoffVoice(line => getHandoffAudio(line), player.play, rerender));
-  useEffect(() => unlockOnFirstGesture(window, player.unlock), [player]);
+  const unlock = useCallback(() => { player.unlock(); setUnlocked(true); }, [player]);
+  useEffect(() => unlockOnFirstGesture(window, unlock), [unlock]);
   useEffect(() => () => voice.stop(), [voice]);
   useEffect(() => {
-    if (!stage || !voice.enabled || voice.failed) return;
-    const now = Date.now();
-    const timers = voiceCues(stage.plan).flatMap(cue => {
-      if (cue.at < now - 1000) { voice.skip(cue.key); return []; }
-      return [setTimeout(() => voice.say(cue), Math.max(0, cue.at - now))];
-    });
-    return () => timers.forEach(clearTimeout);
-  }, [stage, rows, voice, voice.enabled, voice.failed]);
-  return { voice, unlock: player.unlock };
+    if (!unlocked || voice.failed) return;
+    for (const cue of liveVoiceCues(rows, since)) {
+      if (voice.enabled) voice.say(cue);
+      else voice.skip(cue.key);
+    }
+  }, [rows, since, unlocked, voice, voice.enabled, voice.failed]);
+  return { voice, unlock };
 }
 function SoundToggle({ voice, unlock }: { voice: HandoffVoice; unlock: () => void }) {
   if (voice.failed) return <p className='handoff-sound' role='status'>Voices unavailable · visuals only</p>;
@@ -98,7 +99,7 @@ export function useHandoffPresentation() { return useContext(HandoffPresentation
 /** One view-only stage for tags, the registered 3D mount, Play and optional voices. */
 export function useOfficeHandoffs(snapshot: OfficeSnapshot) {
   const { stage, rows } = useHandoffs(snapshot);
-  const { voice, unlock } = useHandoffVoice(stage, rows);
+  const { voice, unlock } = useHandoffVoice(rows);
   const projected = useMemo(() => rows === snapshot.handoffs ? snapshot : { ...snapshot, handoffs: rows }, [snapshot, rows]);
   const elements = useRef(new Map<HandoffAgentId, HTMLDivElement>());
   const tag = useCallback((id: HandoffAgentId) => elements.current.get(id), []);

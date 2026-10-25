@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { createHandoffProxy, HANDOFF_UPSTREAM } from './handoff-proxy';
-import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, handoffVoiceLine, voiceCues, type VoiceCue } from './handoff-voice';
+import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, handoffVoiceLine, liveVoiceCues, voiceCues, type VoiceCue } from './handoff-voice';
 import { planHandoffs } from './handoff-plan';
 
 const ORIGIN = 'http://localhost:3035';
@@ -119,12 +119,16 @@ describe('HandoffVoice', () => {
     await flush();
     expect(fetchAudio).toHaveBeenCalledTimes(2);
   });
-  it('treats a blocked playback as silent fallback', async () => {
-    const voice = new HandoffVoice(async () => new Blob(['x']), async () => { throw new Error('NotAllowedError'); });
+  it('drops an autoplay-blocked line and plays the next line after a gesture', async () => {
+    const play = vi.fn().mockRejectedValueOnce(new DOMException('User gesture required', 'NotAllowedError')).mockResolvedValue(undefined);
+    const voice = new HandoffVoice(async () => new Blob(['x']), play);
     voice.setEnabled(true);
     voice.say(cue('a'));
     await flush(); await flush();
-    expect(voice.failed).toBe(true);
+    expect(voice.failed).toBe(false);
+    voice.say(cue('after-gesture'));
+    await flush();
+    expect(play).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -220,5 +224,19 @@ describe('office voice gesture unlock', () => {
   it('skips playback before unlock without creating audio or throwing', async () => {
     const player = createAudioPlayer();
     await expect(player.play(new Blob(['x']), new AbortController().signal)).resolves.toBeUndefined();
+  });
+});
+
+// Live snapshots can coalesce offered -> accepted -> completed into one update.
+describe('live workday voice cues', () => {
+  it('voices newly published terminal rows independently of visual desk availability', () => {
+    const row = { handoffId: 'new', sequence: 1n, caseDisplayId: 'INV-1', fromAgentId: 'extractor-1', toAgentId: 'vendor-1',
+      fromRole: 'extractor' as const, toRole: 'vendor' as const, fromVoiceRole: 'extractor', toVoiceRole: 'vendor_verifier',
+      status: 'completed' as const, correction: false, reason: '', summary: '', line: 'Fields validated.', createdAt: 5000 };
+    for (const status of ['offered', 'accepted', 'completed', 'rejected'] as const) {
+      expect(liveVoiceCues([{ ...row, status }], 4000)).toEqual([{ key: 'new', at: 5000, line: { role: 'extractor', text: row.line } }]);
+    }
+    expect(liveVoiceCues([row], 6000)).toEqual([]); // Existing history on page load.
+    expect(liveVoiceCues([{ ...row, line: '<unsafe>' }], 4000)).toEqual([]);
   });
 });
