@@ -59,7 +59,8 @@ describe('public handoff choreography', () => {
     expect(plan.folders[0]!.segments.every(segment => segment.kind === 'carry' && segment.actor === 'extractor')).toBe(true);
     const frame = sampleHandoffs(plan, (back.start + back.end) / 2);
     expect(frame.folders[0]!.failed).toBe(true);
-    expect(frame.bubbles[0]!.text).toContain('MISMATCH');
+    expect(frame.bubbles[0]!.text).toContain('held for review');
+    expect(frame.bubbles[0]!.text).not.toContain('MISMATCH');
   });
   it('draws a correction as its own reverse trip with an amber cue and label', () => {
     const plan = planHandoffs([row('forward', 'vendor', 'payables'), row('reverse', 'payables', 'vendor', 10_000, { correction: true })]);
@@ -67,7 +68,7 @@ describe('public handoff choreography', () => {
     expect(trip).toMatchObject({ courier: 'payables', receiver: 'vendor' });
     const frame = sampleHandoffs(plan, trip.start + 100);
     expect(frame.folders[0]).toMatchObject({ handoffId: 'reverse', correction: true, failed: false });
-    expect(frame.bubbles[0]).toMatchObject({ tone: 'correction', text: expect.stringContaining('Correction') });
+    expect(frame.bubbles[0]).toMatchObject({ tone: 'correction', text: expect.stringContaining('checking a correction') });
   });
   it('shows Dana only for explicit approval evidence or an open snapshot escalation', () => {
     for (const status of ['offered', 'accepted', 'completed', 'rejected'] as const) {

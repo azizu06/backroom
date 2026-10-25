@@ -17,6 +17,8 @@ it('posts only the authorized link amount and replays simultaneous clicks withou
   const { service, posts } = setup();
   const [a, b] = await Promise.all([service.pay(link.id), service.pay(link.id)]);
   expect(a).toEqual(b); expect(posts()).toBe(1);
+  expect(service.hasRecordedPayment(link.id)).toBe(true);
+  expect(service.hasRecordedPayment('another-link')).toBe(false);
   expect(a).toMatchObject({ amountCents: 247500, status: 'pending_reconciliation', depositId: 'deposit-1' });
   expect((await service.view(link.id)).balance).toMatchObject({ accountBalance: 0, displayTotal: 2475,
     label: 'Nessie account balance + Nessie-reported posted deposits' });
@@ -35,6 +37,7 @@ it('reconciles an exact completed deposit through reducer transitions and record
   await service.pay(link.id);
   expect(await service.reconcile(link.id, store, lease, 'promised')).toMatchObject({ status: 'partially_paid' });
   expect(await service.reconcile(link.id, store, lease, 'promised')).toMatchObject({ status: 'partially_paid' });
+  expect(service.hasRecordedPayment(link.id)).toBe(true);
   expect(await store.getPayment('ar:1042:1')).toMatchObject({ result: { amountCents: 247500, invoiceState: 'partially_paid' } });
   expect((await store.listAudit()).filter(row => row.ruleIds.includes('EXACT_PAYMENT_MATCH'))).toHaveLength(1);
 });

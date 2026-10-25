@@ -42,3 +42,16 @@ describe('operator console x402 runs', () => {
     expect(x402TestnetAvailability({ X402_LIVE: '1' }, 'darwin', () => true)).toEqual({ available: true });
   });
 });
+
+it('publishes the session receipt and replays it without touching the signer', async () => {
+  const root = globalThis as typeof globalThis & { backroomX402TestnetResult?: Awaited<ReturnType<typeof runX402Console>> };
+  const receipt = { rail: 'x402 testnet' as const, scenario: 'testnet' as const, status: 'paid' as const,
+    transaction: '0x123', explorer: 'https://sepolia.basescan.org/tx/0x123' };
+  root.backroomX402TestnetResult = receipt;
+  try {
+    const keyPresent = vi.fn(() => false);
+    expect(x402TestnetAvailability({}, 'linux', keyPresent)).toMatchObject({ available: false, reason: 'Already paid this session', lastResult: receipt });
+    expect(await runX402Console('testnet', new MemoryStateStore(), { env: {}, keyPresent })).toEqual({ ...receipt, replay: true });
+    expect(keyPresent).not.toHaveBeenCalled();
+  } finally { delete root.backroomX402TestnetResult; }
+});

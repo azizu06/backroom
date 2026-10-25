@@ -13,10 +13,10 @@ export async function resolvePaymentCode(store: GatewayStore, code: string, now 
   const delivery = call && link ? project(call, link, now) : undefined;
   return delivery && link ? { ...delivery, path: link.path } : undefined;
 }
-export async function activePaymentDelivery(store: GatewayStore, now = Date.now()) {
+export async function activePaymentDelivery(store: GatewayStore, now = Date.now(), paymentRecorded: (id: string) => boolean = () => false) {
   const call = await store.activePaymentCall?.();
   const link = call?.links.at(-1);
-  return call && link ? project(call, link, now) : undefined;
+  return call && link && !paymentRecorded(link.id) ? project(call, link, now) : undefined;
 }
 /** Public rule still rejects these prefixes. The offline allowlist below is exact, so a remote name cannot pass by starting with localhost or 127. */
 const PUBLIC_LOOPBACK_PREFIX = /^(localhost|127\.|\[::1\])/;

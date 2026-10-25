@@ -6,7 +6,7 @@ import { parseAttackPresets, parseAttackResult, record, type AttackMode, type At
 import './AttackDemoPanel.css';
 
 const LIVE_HELP = 'Live allows one Haiku activation per service instance, capped at $0.02. The server enforces the global OFF switch. No money moves.';
-const BLOCKED_HELP = 'Live is disabled on this server. Runs use Scripted.';
+const BLOCKED_HELP = 'Live agents: off on this host. Runs use Scripted.';
 // The server names the deterministic agents "mock"; the page calls them scripted.
 const modeLabel = (mode: string) => mode === 'mock' ? 'scripted' : mode;
 
