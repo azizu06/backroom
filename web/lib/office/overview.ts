@@ -4,6 +4,7 @@
  */
 import { FLOOR, INTERACT_RANGE, PLAYER_RADIUS, SPAWN, insideAny, interactCandidates, pickTarget, type Box, type PlayEntry, type Vec2 } from './play';
 import { AGENT_RADIUS } from './targets/agent';
+import { SPACES } from './layout';
 import { OFFICE_ANCHORS, isAnchorId, type AnchorId, type OfficeSnapshot } from './state';
 
 export type { PlayEntry };

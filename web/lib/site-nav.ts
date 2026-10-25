@@ -13,7 +13,7 @@ export const navLinks = [
 export const PAYMENT_LINK_HREF = '/payment-link';
 
 /** Small trailing link to the integration status page. */
-export const whatsRealLink = { label: 'System status', href: '/real-vs-sim' } as const;
+export const whatsRealLink = { label: 'System Status', href: '/real-vs-sim' } as const;
 
 export type SiteNavPlacement = 'layout' | 'office';
 

@@ -111,7 +111,7 @@ test('source Rooms picker, single topbar, sheets, Info and light/dark survive de
     await reachable(button);
     await expect(button.locator('.room-icon svg')).toBeVisible();
   }
-  for (const [name, href] of [['Attack Demo', '/attack'], ['Operator', '/operator'], ['Controller', '/controller'], ['What’s real', '/real-vs-sim']] as const) {
+  for (const [name, href] of [['Attack lab', '/attack'], ['Operator', '/operator'], ['Controller', '/controller'], ['System Status', '/real-vs-sim']] as const) {
     const link = sidebar.getByRole('link', { name, exact: true });
     await reachable(link);
     await expect(link).toHaveAttribute('href', href);
@@ -183,21 +183,21 @@ test('source Rooms picker, single topbar, sheets, Info and light/dark survive de
     await expect(room).toHaveCount(0);
     await expect(rooms).toBeFocused();
   }
-  const disclosure = page.getByRole('complementary', { name: 'Real versus simulated disclosure' });
+  const disclosure = page.getByRole('complementary', { name: 'System Status' });
   await expect(disclosure.getByText('Info', { exact: true })).toBeVisible();
   const details = disclosure.getByRole('button', { name: 'Details', exact: true });
   await reachable(details);
   await expect(details).toHaveAttribute('aria-expanded', 'false');
   await details.click();
   await expect(details).toHaveAttribute('aria-expanded', 'true');
-  await expect(disclosure.getByRole('region', { name: 'Real integrations' })).toBeVisible();
-  await expect(disclosure.getByRole('region', { name: 'Sandbox and simulated' })).toBeVisible();
-  const fullPage = disclosure.getByRole('link', { name: /Full page/ });
+  await expect(disclosure.getByRole('region', { name: 'Live services' })).toBeVisible();
+  await expect(disclosure.getByRole('region', { name: 'Partner services' })).toBeVisible();
+  const fullPage = disclosure.getByRole('link', { name: /System Status/ });
   await reachable(fullPage);
   await fullPage.click({ trial: true });
   await capture(page, 'overview-info');
   await details.click();
-  await expect(disclosure.getByRole('region', { name: 'Sandbox and simulated' })).toBeHidden();
+  await expect(disclosure.getByRole('region', { name: 'Partner services' })).toBeHidden();
   const dark = page.getByRole('button', { name: 'Switch to dark mode' });
   await reachable(dark);
   await dark.click();
