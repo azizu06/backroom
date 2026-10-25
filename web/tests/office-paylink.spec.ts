@@ -10,7 +10,7 @@ test('office lobby kiosk shows the authorized payment link', async ({ page }) =>
     code: 'ABCDEF1234', url: 'https://demo.example/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr: PIXEL,
     bankLine: 'Mock bank (offline) · simulated card',
   } } }));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const kiosk = page.locator("[data-office-mount='payment-link']");
   await expect(kiosk).toHaveAttribute('aria-label', 'Payment link kiosk');
   await expect(kiosk.getByRole('heading', { name: 'Scan to pay' })).toBeVisible();
@@ -33,7 +33,7 @@ test('office lobby kiosk labels a loopback rehearsal link', async ({ page }) => 
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: {
     code: 'ABCDEF1234', url: 'http://127.0.0.1:3300/p/ABCDEF1234', amountCents: 247500, expiresAt: Date.now() + 600_000, qr: PIXEL, localOnly: true,
   } } }));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const kiosk = page.locator("[data-office-mount='payment-link']");
   await expect(kiosk.getByText('local rehearsal only, not scannable by a phone')).toBeVisible();
   await expect(kiosk.getByRole('link', { name: 'http://127.0.0.1:3300/p/ABCDEF1234' })).toBeVisible();
@@ -41,7 +41,7 @@ test('office lobby kiosk labels a loopback rehearsal link', async ({ page }) => 
 
 test('office lobby kiosk waits when no payment is authorized', async ({ page }) => {
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   const kiosk = page.locator("[data-office-mount='payment-link']");
   await expect(kiosk.getByRole('heading', { name: 'Scan to pay' })).toBeVisible();
   await expect(kiosk.getByRole('status')).toHaveText('Waiting for an authorized payment plan…');
