@@ -3,6 +3,7 @@
 Blender-made rooms, baked to a lightmap and exported as GLB, shown with `/office?art=baked`. The procedural scene stays the default and the fallback (`web/app/office/mounts/BakedArt.tsx`).
 
 - `lobby.py`: models the lobby in web-scene coordinates, bakes lighting to one 2048 px lightmap (Cycles CPU, denoising off), exports `lobby.glb` with the map as WebP.
+- `deskkit.py`: no bake, no lightmap. Builds separate named props (desk, chair, monitor, keyboard, desk_lamp, filing_cabinet, bookshelf, plant_small/medium/large, whiteboard, wall_art, rug, mug, tray, vault_body, vault_door, safe, meeting_table, kitchen_counter, kettle, fridge), origin at the floor contact, front +z, a vertex contact-shadow term in `ao`; exports `deskkit.glb` and `deskkit.nodes.json`. The web registry `web/lib/office/deskkit.ts` places them on the procedural anchors and recolours materials named `tint`. Bake like the lobby, then `scp gx10:bake/<run>/out/deskkit.glb web/public/office-art/`.
 - `run-gx10.sh`: runs a script on the GX10 inside `bwrap` (no network, read-only system and script, one writable dir under `~/bake`, `nice -n 19`, `timeout 1800`).
 
 Bake (from the desktop; check `nproc`, `uptime`, `nvidia-smi` and Ollama first, and only run when the box is quiet):

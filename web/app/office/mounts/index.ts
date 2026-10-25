@@ -10,6 +10,7 @@ import { ReceiptPrinter } from '../props/ReceiptPrinter';
 import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
 import { AuditWallMount } from './AuditWallMount';
 import { Desks } from './Desks';
+import { DeskKit } from './DeskKit';
 import { Doors } from './Doors';
 import { InteractiveDoors } from './InteractiveDoors';
 import { CarryFolder } from './CarryFolder';
@@ -52,6 +53,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'room-props', instanced: false, Component: RoomProps },
   { id: 'server-room', instanced: false, Component: ServerRoomMount },
   { id: 'baked-art', instanced: false, Component: BakedArt },
+  { id: 'desk-kit', instanced: false, Component: DeskKit },
   { id: 'baked-characters', instanced: false, moving: true, Component: BakedCharacters },
   { id: 'audit-wall', instanced: false, Component: AuditWallMount },
   { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },

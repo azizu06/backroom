@@ -11,6 +11,8 @@ import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { ROLES } from '../../../lib/office/palette';
 import { bakedReplacesProps } from '../../../lib/office/baked-art';
 import { useBakedLobbyReady } from '../mounts/BakedArt';
+import { deskKitReplaces } from '../../../lib/office/deskkit';
+import { useDeskKitReady } from '../mounts/DeskKit';
 
 const SIGN_TEX_W = 256, SIGN_TEX_H = 64;
 
@@ -68,10 +70,15 @@ export function RoomDressing({ snapshot }: { snapshot: OfficeSnapshot }) {
   const rooms = visibleRooms(snapshot).join(',');
   // Rebuilt only when the set of visible rooms changes, not on every snapshot.
   const baked = useBakedLobbyReady();
+  const kit = useDeskKitReady();
   const dressing = useMemo(() => {
     const all = dressingFor(snapshot);
-    // Under ?art=baked the baked lobby brings its own plants; drop the procedural plant (pot and foliage) inside it.
-    return baked ? { ...all, plants: all.plants.filter(plant => !bakedReplacesProps(baked, plant.room)) } : all;
-  }, [rooms, baked]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!baked && !kit) return all;
+    // A loaded baked lobby brings its own plants; drop the procedural plant (pot and foliage) inside it.
+    // The loaded desk kit draws shelves and floor plants elsewhere, independent of the lobby (colliders are unchanged: same footprints).
+    return { ...all,
+      shelves: all.shelves.filter(shelf => !deskKitReplaces(kit, shelf.room)),
+      plants: all.plants.filter(plant => !bakedReplacesProps(baked, plant.room) && !deskKitReplaces(kit, plant.room)) };
+  }, [rooms, baked, kit]); // eslint-disable-line react-hooks/exhaustive-deps
   return <DressingMeshes dressing={dressing} />;
 }
