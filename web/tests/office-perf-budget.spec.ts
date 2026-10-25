@@ -13,7 +13,7 @@ const position = (page: Page) => surface(page).evaluate(element => `${(element a
 test('moving first-person Play stays within the draw-call budget', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office?perf=1');
+  await page.goto('/office?perf=1&view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toBeEnabled();
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();

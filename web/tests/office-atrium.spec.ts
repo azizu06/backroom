@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test('walks from the corridor into the atrium without a wall or furniture blocking the opening', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office?playSpawn=-10.8,0&perf=1');
+  await page.goto('/office?playSpawn=-10.8,0&perf=1&view=overview');
   const view = page.getByLabel('Office view');
   await expect(view).toBeEnabled();
   await view.selectOption({ label: 'Play (first person)' });

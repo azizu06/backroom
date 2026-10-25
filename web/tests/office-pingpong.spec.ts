@@ -6,7 +6,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
-    await page.goto('/office?playSpawn=9.5,4');
+    await page.goto('/office?playSpawn=9.5,4&view=overview');
     await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
     await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
     const surface = page.getByRole('application', { name: /First-person office/ });
@@ -54,7 +54,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
 test('score card hides behind a wall in first person and returns in overview', async ({ page }) => {
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/office?playSpawn=9,0');
+  await page.goto('/office?playSpawn=9,0&view=overview');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const score = page.getByTestId('pingpong-score');
