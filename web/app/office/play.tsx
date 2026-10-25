@@ -8,6 +8,7 @@ import { PerspectiveCamera } from '@react-three/drei';
 import { OrthographicCamera, type PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import { REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { interpolateIntroPose, playIntroProgress, type IntroPose } from '../../lib/office/play-intro';
+import { storyCameraPose } from '../../lib/office/story';
 import type { MotionRegistry } from '../../lib/office/motion';
 import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, type FeelState } from '../../lib/office/playFeel';
 import { playOfficeCue } from '../../lib/office/sound-events';
@@ -29,7 +30,7 @@ function playEye([x, z]: readonly [number, number]): IntroPose {
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, story }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
@@ -64,8 +65,20 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
   const [spawn] = useState(() => playSpawn(location.search, colliders));
   const [eye] = useState(() => playEye(spawn));
   const position = useRef<[number, number]>(spawn);
+  const storyMove = useRef<{ id: string; from: IntroPose; startedAt: number } | null>(null);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
+
+  // Clear held keys only when a tour starts, changes stop or ends: on a plain Play mount the rig can
+  // mount after a key is already held, and clearing then would swallow that first press.
+  const lastStory = useRef(story);
+  useEffect(() => {
+    if (lastStory.current === story) return;
+    lastStory.current = story;
+    input.clear(); written.current = false;
+    if (!story) storyMove.current = null;
+    invalidate();
+  }, [story, input, invalidate]);
 
   useEffect(() => {
     const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -86,6 +99,39 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
 
   useFrame((state, delta) => {
     if (!camera.current) return;
+    if (story) {
+      const now = performance.now();
+      // First-person from the first tour frame, even when entered from the overview.
+      if (!intro.done) {
+        camera.current.position.fromArray(eye.position);
+        camera.current.quaternion.fromArray(eye.quaternion);
+        intro.done = true;
+      }
+      if (storyMove.current?.id !== story.id) storyMove.current = {
+        id: story.id, startedAt: now,
+        from: { position: camera.current.position.toArray(), quaternion: camera.current.quaternion.toArray() },
+      };
+      const progress = playIntroProgress(now - storyMove.current.startedAt, reduced.current);
+      const pose = interpolateIntroPose(storyMove.current.from, storyCameraPose(story.anchor), progress);
+      camera.current.position.fromArray(pose.position);
+      camera.current.quaternion.fromArray(pose.quaternion);
+      camera.current.rotation.reorder('YXZ');
+      camera.current.updateMatrixWorld();
+      // Retain the sampled pose on Skip, including halfway through a move.
+      position.current = [pose.position[0], pose.position[2]];
+      yaw.current = camera.current.rotation.y; pitch.current = camera.current.rotation.x;
+      velocity.current = [0, 0]; feel.current = INITIAL_FEEL; feelSettling.current = false;
+      input.clear();
+      if (hud.current) {
+        hud.current.dataset.playerX = position.current[0].toFixed(3);
+        hud.current.dataset.playerZ = position.current[1].toFixed(3);
+        hud.current.dataset.playerYaw = yaw.current.toFixed(3);
+        hud.current.dataset.storyAnchor = story.anchor;
+        hud.current.dataset.storyMoving = String(progress < 1);
+      }
+      if (progress < 1) state.invalidate();
+      return;
+    }
     if (!intro.done) {
       const now = performance.now();
       intro.startedAt ??= now;

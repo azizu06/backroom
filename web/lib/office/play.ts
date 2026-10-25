@@ -254,6 +254,8 @@ export function targetLabel(snapshot: OfficeSnapshot, target: PlayTarget): strin
 
 /** What the lazy scene needs from Office to run Play; `hud` receives data-player-* attributes. */
 export interface PlayBridge {
+  /** A Story mode stop temporarily owns this same first-person rig. */
+  readonly story?: import('./story').StoryChapter;
   readonly input: PlayInput;
   readonly onTarget: (target: PlayTarget | null) => void;
   readonly hud: { readonly current: HTMLElement | null };
