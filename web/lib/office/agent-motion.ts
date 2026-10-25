@@ -7,6 +7,7 @@
 import { requestSceneFrame } from './frame';
 import { OFFICE_ANCHORS, isAnchorId } from './state';
 import { DESKS } from './targets/desk';
+import { deskSeat } from './baked-seat';
 
 export type AgentMode = 'idle' | 'walk' | 'type' | 'talk' | 'greet' | 'think';
 /** Wave plus nod after the player presses E on the agent. */
@@ -81,9 +82,9 @@ export const agentCues = createAgentCues();
 /** Heading (WalkMotion convention, atan2(dx, dz)) from a seated agent to its desk, or NaN when not seated at one. */
 export function deskHeading(seatId: string, x: number, z: number): number {
   if (!isAnchorId(seatId) || !(DESKS as readonly string[]).includes(seatId)) return NaN;
-  const { position, center } = OFFICE_ANCHORS[seatId];
+  const { position } = OFFICE_ANCHORS[seatId];
   if (Math.hypot(position[0] - x, position[1] - z) > SEATED) return NaN;
-  return Math.atan2(center[0] - x, center[1] - z);
+  return deskSeat(seatId)?.heading ?? NaN;
 }
 /** Shortest signed angle from `from` to `to`, in (-π, π]. */
 export function angleDelta(from: number, to: number): number {

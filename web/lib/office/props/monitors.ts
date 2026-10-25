@@ -1,10 +1,8 @@
 import { OFFICE_ANCHORS, anchorLabel, visibleRooms, type OfficeAudit, type OfficeSnapshot, type SeatId } from '../state';
 import type { OfficePropInteraction } from './interact';
-import { truncateSummary } from './whiteboard';
 
 export const MONITOR_DESKS = ['collections', 'payables', 'vendor_onboarding', 'dana'] as const;
 export type MonitorDesk = typeof MONITOR_DESKS[number];
-export const MONITOR_LINE_MAX = 26;
 export const MONITOR_MAX_LINES = 4;
 /** Fits inside the desk width; both the housing and texture use this transform. */
 export const MONITOR_FACE = { width: 1.8, height: 1.08, x: -0.15, y: 1.54, z: -0.23 } as const;
@@ -18,7 +16,7 @@ export type MonitorStatusKey = 'allow' | 'deny' | 'escalate' | 'recorded';
 export interface MonitorStatus { decision: OfficeAudit['decision']; key: MonitorStatusKey }
 export interface MonitorScreen {
   heading: string;
-  /** At most MONITOR_MAX_LINES, each at most MONITOR_LINE_MAX characters. */
+  /** At most MONITOR_MAX_LINES entries; preserve full text for measured canvas wrapping. */
   lines: readonly MonitorLine[];
   status: MonitorStatus | null;
 }
@@ -26,7 +24,7 @@ export interface MonitorScreen {
 const LINE_LABELS: Record<MonitorLineKind, string> = {
   agent: 'Agent', away: 'Away', folder: 'Folder', idle: 'Status', awaiting: 'Awaiting', escalation: 'Escalation',
 };
-const line = (kind: MonitorLineKind, text: string): MonitorLine => ({ kind, text: truncateSummary(text, MONITOR_LINE_MAX) });
+const line = (kind: MonitorLineKind, text: string): MonitorLine => ({ kind, text });
 const status = (row: OfficeAudit | undefined): MonitorStatus | null =>
   row ? { decision: row.decision, key: row.decision.toLowerCase() as MonitorStatusKey } : null;
 

@@ -4,8 +4,9 @@
  * Colours come from the cozy pastel roles in ./palette; only intensities and geometry live here.
  */
 import { ROLES } from "./palette";
+import type { FurniturePiece } from './furniture';
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { BUILDING, roomPoint } from "./layout";
+import { BUILDING, FLOOR_FIXTURES, WALL_HEIGHT } from "./layout";
 
 export type Vec3 = [number, number, number];
 
@@ -82,16 +83,20 @@ export const MAX_OFFICE_LIGHTS = 6;
 export const OFFICE_EXPOSURE = 1;
 export const LOW_POWER_QUERY = '(prefers-reduced-data: reduce)';
 
+/** Warm diffuse surfaces retain their palette even on the ceiling's downward-facing underside. */
+export const OFFICE_SHELL_MATERIALS = {
+  wall: { emissive: ROLES.wall, emissiveIntensity: 0.38 },
+  ceiling: { emissive: ROLES.ceiling, emissiveIntensity: 0.6 },
+};
+/** One shared soft pool beneath the ceiling panels, using the sixth (last) light slot. */
+const CEILING_FILL = { position: [0, WALL_HEIGHT - 0.4, 3] as Vec3, color: ROLES.lampLight,
+  intensity: 8, distance: 18, decay: 2, castShadow: false as const };
+
 export interface OfficeLamp {
   room: AnchorId;
   base: Vec3;
   height: number;
   floor: boolean;
-}
-
-function lampBase(room: 'lobby' | 'treasury', dx: number, dz: number): Vec3 {
-  const [x, z] = roomPoint(room, dx, dz);
-  return [x, 0.05, z];
 }
 
 /** Small desk lamps sit within the existing desk footprints; floor lamps stay out of the aisle. */
@@ -101,9 +106,20 @@ export const OFFICE_LAMPS: readonly OfficeLamp[] = [
     const flip = room === 'dana' ? -1 : 1;
     return { room, base: [x + flip * 0.9, 0.91, z - flip * 0.3] as Vec3, height: 0.55, floor: false };
   }),
-  { room: 'lobby', base: lampBase('lobby', -2.4, 2.9), height: 1.9, floor: true },
-  { room: 'treasury', base: lampBase('treasury', 2, 1.1), height: 1.9, floor: true },
+  { room: 'lobby', base: [FLOOR_FIXTURES.lampWest.x, 0, FLOOR_FIXTURES.lampWest.z], height: 1.9, floor: true },
+  { room: 'treasury', base: [FLOOR_FIXTURES.lampEast.x, 0, FLOOR_FIXTURES.lampEast.z], height: 1.9, floor: true },
 ];
+
+/** The rendered lamp parts, also used to verify support and collision coverage. */
+export function lampPieces(lamp: OfficeLamp): FurniturePiece[] {
+  const [x, y, z] = lamp.base;
+  const width = lamp.floor ? 0.35 : 0.22;
+  return [
+    { at: [x, y + 0.025, z], size: [width, 0.05, width], color: ROLES.frame },
+    { at: [x, y + lamp.height / 2, z], size: [0.035, lamp.height, 0.035], color: ROLES.frame },
+    { at: [x, y + lamp.height, z], size: [width + 0.1, 0.16, width + 0.1], color: ROLES.lampLight },
+  ];
+}
 
 const LAMP_POOLS = OFFICE_LAMPS.filter(lamp => lamp.floor).map(lamp => ({
   room: lamp.room,
@@ -122,6 +138,7 @@ export function officeLightRig(lowPower = false) {
     fill: OFFICE_LIGHTING.fill,
     hemisphere: OFFICE_LIGHTING.hemisphere,
     pointLights: lowPower ? [] : LAMP_POOLS,
+    ceilingFill: lowPower ? null : CEILING_FILL,
     contactShadows: lowPower ? null : OFFICE_LIGHTING.contactShadows,
     shadows: lowPower ? false as const : 'soft' as const,
     exposure: OFFICE_EXPOSURE,

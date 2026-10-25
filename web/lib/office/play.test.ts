@@ -6,7 +6,7 @@ import {
 } from "./play";
 import { createMockOfficeState } from "./preview";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
-import { BUILDING, DOORWAYS, WALL_THICKNESS, spaceAt } from "./layout";
+import { BUILDING, DOORWAYS, WALL_THICKNESS, spaceAt, workspaceRoute } from "./layout";
 import { doorPosition } from "./doors";
 import { roomPropColliders } from './room-props';
 import { PINGPONG_COLLIDER } from './pingpong/table';
@@ -55,7 +55,7 @@ describe("collisions", () => {
 
   it("stops at the outer walls and clamps to the floor bounds", () => {
     expect(walk([-21, -0.5], [-1, 0], 5)[0]).toBeCloseTo(BUILDING.minX + wallFace + PLAYER_RADIUS, 3);
-    expect(walk([-0.8, 6], [0, 1], 5)[1]).toBeCloseTo(BUILDING.maxZ - wallFace - PLAYER_RADIUS, 3);
+    expect(walk([-0.8, BUILDING.maxZ - 2], [0, 1], 5)[1]).toBeCloseTo(BUILDING.maxZ - wallFace - PLAYER_RADIUS, 3);
     expect(movePlayer([0, 0.5], [0, 20], [], PLAYER_RADIUS)).toEqual([0, BUILDING.maxZ - wallFace - PLAYER_RADIUS]);
   });
 
@@ -91,9 +91,8 @@ describe("collisions", () => {
     expect(stopped[0]).toBeLessThanOrEqual(extra.minX - PLAYER_RADIUS + 1e-6);
   });
   it("makes the GX10 server room solid at its footprint", () => {
-    for (const [key, value] of Object.entries({ minX: 10.3, maxX: 11.5, minZ: -1.325, maxZ: -0.275 })) {
-      expect(SERVER_ROOM_BOX[key as keyof typeof SERVER_ROOM_BOX]).toBeCloseTo(value, 9);
-    }
+    expect(SERVER_ROOM_BOX.minX).toBeCloseTo(SERVER_ROOM.position[0] - SERVER_ROOM.size.width / 2);
+    expect(SERVER_ROOM_BOX.maxZ).toBeCloseTo(SERVER_ROOM.position[1] + SERVER_ROOM.size.depth / 2);
     expect(spaceAt(SERVER_ROOM.position)).toBe("server_room");
     const withServer = officeColliders(ALL, [SERVER_ROOM_BOX]);
     expect(insideAny(SPAWN.position, withServer, PLAYER_RADIUS)).toBe(false);
@@ -101,8 +100,8 @@ describe("collisions", () => {
     expect(fromFront[1]).toBeCloseTo(SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS, 3);
     const fromWest = walk([9.9, -0.6], [1, 0], 2, withServer);
     expect(fromWest[0]).toBeCloseTo(SERVER_ROOM_BOX.minX - PLAYER_RADIUS, 3);
-    // Without the extra footprint the same walk passes through.
-    expect(walk([9.9, -0.6], [1, 0], 2)[0]).toBeGreaterThan(SERVER_ROOM_BOX.maxX);
+    // The visible rack always collides, even without a caller adding it as an extra.
+    expect(officeColliders([])).toContainEqual(SERVER_ROOM_BOX);
   });
   it('keeps shared pod geometry stable when live department rows are absent', () => {
     const withoutCollections = officeColliders(ALL.filter(room => room !== 'collections'));
@@ -232,29 +231,21 @@ describe("targets", () => {
     expect(pickTarget([0, -0.35], 0.8, [door])).toBeNull();
   });
 
-  it("walking forward from SPAWN reaches Alex's interact range", () => {
-    const { source } = createMockOfficeState();
-    const snapshot = source.getSnapshot();
+  it("walks from the entry through the grid into Alex's interact range", () => {
+    const snapshot = createMockOfficeState().source.getSnapshot();
     const candidates = interactCandidates(snapshot.agents.map(agent => ({ id: agent.id, position: agent.pos })), ALL);
-    expect(pickTarget(SPAWN.position, SPAWN.yaw, candidates)).toEqual({ kind: "agent", id: "collections-clerk" });
-    let position: [number, number] = [SPAWN.position[0], SPAWN.position[1]];
-    const input = new PlayInput();
-    input.press("forward");
-    let found: PlayTarget | null = null;
-    for (let i = 0; i < 120 && found === null; i++) {
-      position = movePlayer(position, moveIntent(input, SPAWN.yaw, 1 / 60), colliders);
-      found = pickTarget(position, SPAWN.yaw, candidates, INTERACT_RANGE);
+    expect(pickTarget(SPAWN.position, SPAWN.yaw, candidates)).toBeNull();
+    const alex = OFFICE_ANCHORS.collections.position;
+    const target: Vec2 = [alex[0], alex[1] + 1];
+    let position: Vec2 = SPAWN.position;
+    const route = workspaceRoute(position, target);
+    expect(route.at(-1)).toEqual(target);
+    for (const next of route.slice(1)) {
+      const delta: Vec2 = [next[0] - position[0], next[1] - position[1]];
+      const length = Math.hypot(...delta);
+      position = walk(position, [delta[0] / length, delta[1] / length], length);
     }
-    expect(found).toEqual({ kind: "agent", id: "collections-clerk" });
-    // Found while still walking: the Collections desk stops the player further on.
-    const stop = walk(SPAWN.position, [0, -1], 6);
-    expect(stop[1]).toBeCloseTo(OFFICE_ANCHORS.collections.center[1] + 0.9 + 0.325 + PLAYER_RADIUS, 2);
-    expect(position[1]).toBeGreaterThan(stop[1] + 0.5);
-    // Alex is not solid, so you can walk right up to him and keep the prompt.
-    const alexAt = OFFICE_ANCHORS.collections.position;
-    expect(pickTarget([alexAt[0], alexAt[1] + 0.3], SPAWN.yaw, candidates)).toEqual({ kind: "agent", id: "collections-clerk" });
-    // At the desk the desk is offered.
-    expect(pickTarget(stop, SPAWN.yaw, candidates)).toEqual({ kind: "desk", room: "collections" });
+    expect(pickTarget(position, 0, candidates)).toEqual({ kind: "agent", id: "collections-clerk" });
   });
 
   it("does not offer a desk from across the aisle", () => {

@@ -4,8 +4,7 @@
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
 import { OPEN_DOORS, type DoorState } from './doors';
-import { CHAIR_FOOTPRINT, PLANT_SPOTS } from './furniture';
-import { TREASURY_VAULT } from './deskkit';
+import { PLANT_SPOTS } from './furniture';
 import { AUDIT_WALL } from './props/auditWall';
 import { extraColliders } from './props/extraColliders';
 import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
@@ -17,7 +16,7 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
-import { WORKSTATIONS, BUILDING, LOBBY_BOARD_MOUNT, ROOM_SPAWNS, WALL_THICKNESS, wallColliders } from "./layout";
+import { WORKSTATION_COLLIDERS, BUILDING, FLOOR_FIXTURES, fixtureBounds, LOBBY_BOARD_MOUNT, ROOM_SPAWNS, WALL_THICKNESS, wallColliders } from "./layout";
 import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
@@ -40,7 +39,7 @@ export const INTERACT_RANGE = 1.1;
 export const PICK_CONE = 0.35;
 export const PITCH_LIMIT = 1.2;
 export const LOOK_SENSITIVITY = 0.0025;
-/** Corridor outside the lobby, facing -z through the open Collections door toward its desk. */
+/** Centred south entry, facing north across the shared floor. */
 export const SPAWN = ROOM_SPAWNS.corridor;
 /** Walkable floor: inside the building's outer walls (./layout), whose faces are also colliders. */
 export const FLOOR = {
@@ -67,15 +66,14 @@ export const SERVER_ROOM_BOX: Box = box(SERVER_ROOM.position[0], SERVER_ROOM.pos
  */
 export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], _doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const chair = CHAIR_FOOTPRINT;
-  const boxes: Box[] = [...extra, ...wallColliders(), ...WORKSTATIONS.flatMap(({ center: [x, z], flip }) => [box(x, z, DESK_SIZE.width, DESK_SIZE.depth), box(x + chair.x * flip, z + chair.z * flip, chair.width, chair.depth)])];
+  const boxes: Box[] = [...extra, ...wallColliders(), ...WORKSTATION_COLLIDERS];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
     if (room === "collections") boxes.push(box(PHONE_STAND.x, PHONE_STAND.z, PHONE_STAND.width, PHONE_STAND.depth));
   }
   if (visible.has("treasury")) {
     // Include the frame and projecting handle in both procedural and opt-in kit modes.
-    boxes.push(box(TREASURY_VAULT.x, TREASURY_VAULT.z - 0.065, 1.84, 1.42));
+    boxes.push(fixtureBounds(FLOOR_FIXTURES.vault));
   }
   if (visible.has("lobby")) {
     const board = LOBBY_BOARD_MOUNT;
@@ -90,6 +88,9 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
   }
   for (const [x, z] of PLANT_SPOTS) boxes.push(box(x, z, 1, 1));
   boxes.push(...extraColliders);
+  if (!boxes.includes(SERVER_ROOM_BOX)) boxes.push(SERVER_ROOM_BOX);
+  if (visible.has('lobby')) boxes.push(fixtureBounds(FLOOR_FIXTURES.lampWest));
+  if (visible.has('treasury')) boxes.push(fixtureBounds(FLOOR_FIXTURES.lampEast));
   return boxes;
 }
 

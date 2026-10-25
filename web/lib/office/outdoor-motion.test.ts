@@ -1,3 +1,4 @@
+import { BUILDING, WINDOWS } from './layout';
 import { describe, expect, it } from 'vitest';
 import { BIRD_COUNT, BIRD_PERIOD, CLOUD_COUNT, CLOUD_PERIOD, OUTDOOR_FPS, birdPosition, cloudPosition,
   daylightBlend, outdoorMotionVisible, outdoorSway } from './outdoor-motion';
@@ -65,7 +66,7 @@ describe('outdoor motion', () => {
     expect(outdoorMotionVisible(false, 3, 0)).toBe(false);
     expect(outdoorMotionVisible(false, -11, -6)).toBe(true);
     expect(outdoorMotionVisible(false, 11, 6)).toBe(true);
-    expect(outdoorMotionVisible(false, -0.8, -6)).toBe(true);
+    expect(outdoorMotionVisible(false, WINDOWS.find(win => win.wall === 'north')!.at, BUILDING.minZ + 1)).toBe(true);
     expect(outdoorMotionVisible(false, 0, 20)).toBe(true);
   });
 });

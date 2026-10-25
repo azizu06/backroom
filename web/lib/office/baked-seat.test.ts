@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  KEYBOARD_LOCAL, SEAT_CLEARANCE_M, SEAT_LOCAL, STOOL_SEAT_TOP, angleDelta, deskSeat, easeSeat, headingToward, seatPieces,
+  KEYBOARD_LOCAL, SEATED_TORSO_FORWARD_M, SEAT_CLEARANCE_M, SEAT_LOCAL, CHAIR_SEAT_TOP, WORKSTATION_SEATS, seatAtApproach, BEAR_SEAT_LIFT, SIT_LIFT_M, angleDelta, deskSeat, easeSeat, headingToward, seatPieces,
   stepSeatBlend, turnToward, SIT_SECONDS,
 } from './baked-seat';
 import { PALETTE } from './palette';
 import { OFFICE_ANCHORS } from './state';
 import { DESK_SIZE } from './targets/desk';
+import { CHAIR_FOOTPRINT } from './metrics';
+import { WORKSTATIONS, workstationApproach } from './layout';
+import { workstationPieces } from './furniture';
+import { BEAR, BEAR_HEIGHT } from './bear';
 
 const palette = new Set<string>(Object.values(PALETTE));
 
@@ -40,7 +44,7 @@ describe('deskSeat', () => {
 
   it('keeps the body clear of the desk edge with the keys within reach', () => {
     expect(SEAT_CLEARANCE_M).toBeGreaterThanOrEqual(0.19);
-    const reach = SEAT_LOCAL.z - KEYBOARD_LOCAL.z;
+    const reach = SEAT_LOCAL.z - SEATED_TORSO_FORWARD_M - KEYBOARD_LOCAL.z;
     expect(reach).toBeGreaterThan(0.28);
     expect(reach).toBeLessThan(0.38);
     expect(KEYBOARD_LOCAL.z + KEYBOARD_LOCAL.depth / 2).toBeLessThanOrEqual(DESK_SIZE.depth / 2);
@@ -87,28 +91,41 @@ describe('seat blend', () => {
   });
 });
 
-describe('seatPieces', () => {
-  it('draws a palette-only stool under the seat and a keyboard on the desk top', () => {
-    const pieces = seatPieces('collections');
-    const seat = deskSeat('collections')!;
-    for (const piece of pieces) expect(palette.has(piece.color)).toBe(true);
-    const cushion = pieces[0]!;
+describe('existing workstation chairs', () => {
+  it.each(WORKSTATIONS.map((station, index) => ({ ...station, index })))('centres on $id, respecting flip $flip', ({ center: [x, z], flip, index }) => {
+    const seat = seatAtApproach(...workstationApproach(index))!;
+    expect(seat).toBe(WORKSTATION_SEATS[index]);
+    expect(seat.x).toBeCloseTo(x + flip * CHAIR_FOOTPRINT.x);
+    expect(seat.z).toBeCloseTo(z + flip * CHAIR_FOOTPRINT.z);
+    expect(Math.cos(seat.heading)).toBeCloseTo(-flip);
+    expect(Math.sin(seat.heading)).toBeCloseTo(0);
+    const cushion = workstationPieces([x, z], flip, PALETTE.navy).find(piece =>
+      piece.size[0] === CHAIR_FOOTPRINT.width && piece.at[2] === seat.z)!;
     expect(cushion.at[0]).toBeCloseTo(seat.x);
-    expect(cushion.at[2]).toBeCloseTo(seat.z);
-    expect(cushion.at[1] + cushion.size[1] / 2).toBeCloseTo(STOOL_SEAT_TOP);
-    const keyboard = pieces.at(-2)!;
-    const [cx, cz] = OFFICE_ANCHORS.collections.center;
-    expect(keyboard.at[0]).toBeCloseTo(cx + KEYBOARD_LOCAL.x);
-    expect(keyboard.at[2]).toBeCloseTo(cz + KEYBOARD_LOCAL.z);
-    expect(keyboard.at[1] - keyboard.size[1] / 2).toBeCloseTo(0.91);
-    for (const piece of pieces) expect(piece.at[1] - piece.size[1] / 2).toBeGreaterThanOrEqual(0);
+    expect(cushion.at[1] + cushion.size[1] / 2).toBeCloseTo(CHAIR_SEAT_TOP);
   });
 
-  it('turns Dana’s stool and keyboard with her desk', () => {
-    const pieces = seatPieces('dana');
-    const seat = deskSeat('dana')!;
-    expect(pieces[0]!.at[0]).toBeCloseTo(seat.x);
-    expect(pieces[0]!.at[2]).toBeCloseTo(seat.z);
-    expect(pieces[0]!.rotation![1]).toBeCloseTo(Math.PI);
+  it('rests both avatars on the existing cushion, with tags above their heads', () => {
+    const cushion = workstationPieces([0, 0], 1, PALETTE.navy).find(piece =>
+      piece.at[2] === CHAIR_FOOTPRINT.z && piece.size[0] === CHAIR_FOOTPRINT.width)!;
+    const cushionTop = cushion.at[1] + cushion.size[1] / 2;
+    expect(BEAR.hip + BEAR_SEAT_LIFT - BEAR.leg.part.size[2] / 2).toBeCloseTo(cushionTop);
+    expect(0.365 + SIT_LIFT_M).toBeCloseTo(cushionTop);
+    // Existing card (1.9) and desk/name plate (1.95) projection heights remain clear.
+    expect(BEAR_HEIGHT + BEAR_SEAT_LIFT).toBeLessThan(1.9);
+    expect(seatAtApproach(100, 100)).toBeNull();
+  });
+});
+
+describe('seatPieces', () => {
+  it.each(['collections', 'payables', 'vendor_onboarding', 'dana'] as const)('adds only a keyboard at %s, no second seat', room => {
+    const pieces = seatPieces(room);
+    const seat = deskSeat(room)!;
+    expect(pieces).toHaveLength(2);
+    for (const piece of pieces) expect(palette.has(piece.color)).toBe(true);
+    const keyboard = pieces[0]!;
+    expect(keyboard.at[0]).toBeCloseTo(seat.x);
+    expect(keyboard.at[1] - keyboard.size[1] / 2).toBeCloseTo(0.91);
+    expect(Math.abs(angleDelta(keyboard.rotation![1], seat.heading - Math.PI))).toBeLessThan(1e-9);
   });
 });

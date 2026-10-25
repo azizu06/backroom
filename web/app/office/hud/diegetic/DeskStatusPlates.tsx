@@ -4,15 +4,14 @@ import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { BoxGeometry, MeshStandardMaterial, PlaneGeometry, type Group } from 'three';
 import { AGENT_DONE_MS, agentCardKey, agentCards, type AgentCard } from '../../../../lib/office/agent-cards';
-import { deskPlates, type DeskPlate } from '../../../../lib/office/hud-diegetic';
-import { canvasTextLines } from '../../../../lib/office/props/readability';
+import { canvasTextLines, deskPlates, type DeskPlate } from '../../../../lib/office/hud-diegetic';
 import { PALETTE, ROLES } from '../../../../lib/office/palette';
 import { PROP_FONT, useCanvasTexture } from '../../props/useCanvasTexture';
 import type { SceneMountProps } from '../../mounts/types';
 import { usePlayCamera } from './usePlayCamera';
 
-const PLATE_W = 1.56, PLATE_H = 0.56, HANG_Y = 2.5;
-const TEX_W = 624, TEX_H = 224;
+const PLATE_W = 1.56, PLATE_H = 0.8, HANG_Y = 2.5;
+const TEX_W = 624, TEX_H = 320;
 const FACE = new PlaneGeometry(PLATE_W, PLATE_H);
 const FRAME = new BoxGeometry(PLATE_W + 0.06, PLATE_H + 0.06, 0.04);
 const ROD = new BoxGeometry(0.02, 0.5, 0.02);
@@ -21,10 +20,10 @@ const FRAME_MATERIAL = new MeshStandardMaterial({ color: ROLES.frame, roughness:
 const PILL = new PlaneGeometry(0.9, 0.9 * 46 / 280);
 const pillUv = PILL.getAttribute('uv');
 for (let i = 0; i < pillUv.count; i++) {
-  pillUv.setXY(i, (44 + pillUv.getX(i) * 280) / TEX_W, (TEX_H - 200 + pillUv.getY(i) * 46) / TEX_H);
+  pillUv.setXY(i, (44 + pillUv.getX(i) * 280) / TEX_W, (TEX_H - 304 + pillUv.getY(i) * 46) / TEX_H);
 }
 
-function drawPlate(ctx: CanvasRenderingContext2D, card: AgentCard) {
+export function drawPlate(ctx: CanvasRenderingContext2D, card: AgentCard) {
   const measure = (text: string) => ctx.measureText(text).width;
   ctx.fillStyle = PALETTE.cream;
   ctx.fillRect(0, 0, TEX_W, TEX_H);
@@ -32,23 +31,23 @@ function drawPlate(ctx: CanvasRenderingContext2D, card: AgentCard) {
   ctx.fillRect(0, 0, TEX_W, 10);
   ctx.fillStyle = PALETTE[card.agentColour];
   ctx.beginPath();
-  ctx.roundRect(16, 30, 18, 98, 9);
+  ctx.roundRect(16, 30, 18, 208, 9);
   ctx.fill();
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
   ctx.fillStyle = ROLES.text;
   ctx.font = `800 34px ${PROP_FONT}`;
-  ctx.fillText(canvasTextLines(card.title, measure, TEX_W - 68, 1)[0] ?? '', 44, 68);
+  canvasTextLines(card.title, measure, TEX_W - 68, 3).forEach((text, i) => ctx.fillText(text, 44, 48 + i * 38));
   ctx.font = `600 32px ${PROP_FONT}`;
-  ctx.fillText(canvasTextLines(card.line, measure, TEX_W - 68, 1)[0] ?? '', 44, 124);
+  canvasTextLines(card.line, measure, TEX_W - 68, 3).forEach((text, i) => ctx.fillText(text, 44, 166 + i * 36));
   ctx.fillStyle = ROLES[card.colourRole];
   ctx.beginPath();
-  ctx.roundRect(44, 154, 280, 46, 23);
+  ctx.roundRect(44, 258, 280, 46, 23);
   ctx.fill();
   ctx.fillStyle = ROLES.text;
   ctx.font = `800 28px ${PROP_FONT}`;
   ctx.textAlign = 'center';
-  ctx.fillText(card.tag, 184, 187);
+  ctx.fillText(card.tag, 184, 291);
 }
 
 function Plate({ plate, card, play }: { plate: DeskPlate; card: AgentCard; play: boolean }) {

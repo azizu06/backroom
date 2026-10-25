@@ -3,6 +3,7 @@ import { deskPieces, deskScreenPiece, PLANT_SPOTS } from './furniture';
 import { MONITOR_FACE } from './props/monitors';
 import { OFFICE_ANCHORS } from './state';
 import { DESKS, DESK_SIZE } from './targets/desk';
+import { BUILDING } from './layout';
 import { ROLES } from './palette';
 
 describe('static office furniture', () => {
@@ -18,7 +19,7 @@ describe('static office furniture', () => {
 
   it('rotates Dana’s chair and paper around the anchor and turns her screen back to the room', () => {
     const pieces = deskPieces('dana');
-    expect(pieces[5]!.at).toEqual([OFFICE_ANCHORS.dana.center[0] - 0.65, 0.95, OFFICE_ANCHORS.dana.center[1] - 0.1]);
+    expect(pieces[5]!.at).toEqual([OFFICE_ANCHORS.dana.center[0] - 0.65, 0.94, OFFICE_ANCHORS.dana.center[1] - 0.1]);
     expect(pieces[5]!.rotation![1]).toBeCloseTo(Math.PI - 0.12);
     expect(pieces[7]!.at[2]).toBeCloseTo(OFFICE_ANCHORS.dana.center[1] - 1.14);
     const screen = deskScreenPiece('dana');
@@ -39,6 +40,9 @@ describe('static office furniture', () => {
   });
 
   it('keeps the fixed plant footprints in their corners', () => {
-    expect(PLANT_SPOTS).toEqual([[11.3, 6.8], [-11.3, -6.8]]);
+    for (const [x, z] of PLANT_SPOTS) {
+      expect(Math.min(x - BUILDING.minX, BUILDING.maxX - x)).toBeCloseTo(0.7);
+      expect(Math.min(z - BUILDING.minZ, BUILDING.maxZ - z)).toBeCloseTo(0.7);
+    }
   });
 });
