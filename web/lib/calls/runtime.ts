@@ -3,7 +3,7 @@ import { getGatewayStore } from '../gateway/runtime';
 import { voiceCallLifecycle } from './lifecycle';
 import { MAX_CALL_MS, projectVoiceCall, type CallProjectionRow } from './projection';
 import { declaredLoopbackOfficeOrigin } from './loopback-origin';
-import { createCallRequestHTTP, type CallRequestAudit } from './request';
+import { createCallRequestHTTP, type CallFollowUpResult, type CallRequestAudit } from './request';
 
 const ENDED_VISIBLE_MS = 2 * 60_000;
 const POLICY_REFUSALS = new Set(['PRECALL_BLOCKED', 'CALL_DENIED', 'CLIENT_STOPPED']);
@@ -31,7 +31,14 @@ export async function activeCall(now = Date.now()): Promise<CallProjectionRow | 
 }
 
 // One per server process, so the single-flight and cooldown hold across route chunks.
-const root = globalThis as typeof globalThis & { backroomCallRequests?: ReturnType<typeof createCallRequestHTTP> };
+const root = globalThis as typeof globalThis & {
+  backroomCallRequests?: ReturnType<typeof createCallRequestHTTP>;
+  backroomCallRefusalFollowUp?: (entry: CallRequestAudit) => Promise<CallFollowUpResult | undefined>;
+};
+/** Installed only by the trusted demo bootstrap; ordinary Next imports remain call-only. */
+export function installCallRefusalFollowUp(handler: typeof root.backroomCallRefusalFollowUp) {
+  root.backroomCallRefusalFollowUp = handler;
+}
 export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = request => (root.backroomCallRequests ??= createCallRequestHTTP({
   secret: () => process.env.CONTROLLER_ENROLLMENT_SECRET,
   origin: () => process.env.WEBAUTHN_ORIGIN,
@@ -41,6 +48,7 @@ export const handleCallRequest: ReturnType<typeof createCallRequestHTTP> = reque
   relay: () => process.env.DEMO_VOICE_RUNNING === '1' && process.env.VOICE_ADMIN_SECRET
     ? { url: `http://127.0.0.1:${Number(process.env.VOICE_PORT || 8788)}/_admin/dial`, secret: process.env.VOICE_ADMIN_SECRET } : undefined,
   currentCall: () => activeCall(),
+  followUp: async entry => root.backroomCallRefusalFollowUp?.(entry),
   audit: async entry => {
     const store = getStateStore();
     const decision = officeCallAuditDecision(entry);

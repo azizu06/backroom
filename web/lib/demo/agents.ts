@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { resolve } from 'node:path';
 import { getStateStore, type StateStore, type StateTransport,
-  PayablesSeat, northfield, createCrsClientFromEnv, createCrsBankChangeRisk, createCrsPublicRecordsCheck, createPreCallHealthCheck, type FinanceInboxItem, type FinanceRepository,
+  MemoryEmailOutbox, PayablesSeat, northfield, createCrsClientFromEnv, createCrsBankChangeRisk, createCrsPublicRecordsCheck, createPreCallHealthCheck, type FinanceInboxItem, type FinanceRepository,
   type InvoiceFields, type VendorFields, type SeatResult, type ControllerPort } from '@backroom/orchestrator';
 import { ClaudeAgentRuntime, Dispatcher, FileUsageLedger, MemoryHandoffStore, SpacetimeHandoffStore,
   createRoleRegistry, auditorCorrections, type AgentCaseStore, type CaseResult,
@@ -22,11 +22,22 @@ export interface InboxNarration {
 export const demoAgentsEnabled = (env: Record<string, string | undefined> = process.env) =>
   env.DEMO_AGENTS === '1' || (env.DEMO_AGENTS === undefined && env.BACKROOM_DEMO === '1');
 
+type CollectionsPlannerDeps = NonNullable<RoleDeps['collectionsPlanner']>;
+type CollectionsCase = Awaited<ReturnType<CollectionsPlannerDeps['cases']['load']>>;
+export interface CallRefusal { outcome: 'refused'; code: string; detail?: string }
+export interface DemoCollectionsPlanner {
+  caseFor(refusal: CallRefusal): Promise<CollectionsCase | undefined> | CollectionsCase | undefined;
+  voice: CollectionsPlannerDeps['voice'];
+  precall: CollectionsPlannerDeps['precall'];
+  now?: CollectionsPlannerDeps['now'];
+}
+
 /** Uses the existing runtime/registry/dispatcher. Injection is for network-free QueryFn tests. */
 export function createInboxAgents(options: {
   control: StateStore; transport?: StateTransport; store?: AgentCaseStore; ledger?: UsageLedger;
   query?: QueryFn; credential?: () => string;
   vendor?: Partial<NonNullable<RoleDeps['vendor']>>;
+  collectionsPlanner?: DemoCollectionsPlanner;
 }) {
   const control = options.control;
   const store = options.store ?? (options.transport ? new SpacetimeHandoffStore(options.transport) : new MemoryHandoffStore({ audit: control }));
@@ -41,6 +52,8 @@ export function createInboxAgents(options: {
   };
   const risk = crs ? createCrsBankChangeRisk(crs, identityFor) : { async check() { throw new Error('CRS_UNAVAILABLE'); } };
   const cases = new Map<string, { abort: AbortController; opened: Promise<unknown>; done: Promise<CaseResult | undefined> }>();
+  const emailOutbox = new MemoryEmailOutbox();
+  let collectionSerial = 0;
   let stopped = false;
 
   function submit(unchecked: InboxNarration): Promise<CaseResult | undefined> {
@@ -125,6 +138,39 @@ export function createInboxAgents(options: {
     // Keep only control handles after completion; drop the request/document closure.
     return done;
   }
+  async function submitCallRefusal(refusal: CallRefusal): Promise<{ status: 'queued' | 'duplicate' } | undefined> {
+    const config = options.collectionsPlanner;
+    if (stopped || !config) return undefined;
+    const trusted = await config.caseFor(refusal);
+    if (stopped || !trusted) return undefined;
+    const caseId = `agent:call-refusal:${trusted.precall.invoiceId}:${++collectionSerial}`;
+    const snapshot = structuredClone(trusted);
+    let emailStatus: 'queued' | 'duplicate' | undefined;
+    const deps: CollectionsPlannerDeps = {
+      cases: { load: async requested => {
+        if (requested !== caseId) throw new Error('COLLECTIONS_CASE_NOT_FOUND');
+        return structuredClone(snapshot);
+      } },
+      voice: config.voice,
+      precall: config.precall,
+      emailFollowUp: { outbox: { async queue(message) {
+        emailStatus = await emailOutbox.queue(message);
+        return emailStatus;
+      } } },
+      ...(config.now ? { now: config.now } : {}),
+    };
+    const abort = new AbortController();
+    const roles = createRoleRegistry({ collectionsPlanner: deps });
+    const dispatcher = new Dispatcher({ runtime, store, ledger, control, roles, mode: 'demo',
+      runnerId: `call-refusal:${randomUUID()}` });
+    const artifactRefs = [`ar_invoice:${snapshot.precall.invoiceId}`];
+    const opened = store.openCase({ caseId, role: 'collections', artifactRefs, displayId: snapshot.precall.invoiceId });
+    const done = opened.then(() => stopped ? undefined : dispatcher.runCase({ caseId, role: 'collections', artifactRefs,
+      credentialOwnerId: 'aziz', signal: abort.signal, input: {} }));
+    cases.set(caseId, { abort, opened, done });
+    const result = await done;
+    return result?.status === 'done' && emailStatus ? { status: emailStatus } : undefined;
+  }
   async function drain() { await Promise.allSettled([...cases.values()].map(row => row.done)); }
   async function stop() {
     stopped = true;
@@ -147,17 +193,18 @@ export function createInboxAgents(options: {
     if (cancellations.some(row => row.status === 'rejected')) throw new Error('DEMO_AGENT_CANCEL_FAILED');
     cases.clear();
   }
-  return { submit, stop, drain, store, ledger };
+  return { submit, submitCallRefusal, stop, drain, store, ledger, emailOutbox };
 }
 
 type Host = ReturnType<typeof createInboxAgents>;
+type HostConfig = { control: StateStore; transport?: StateTransport; collectionsPlanner?: DemoCollectionsPlanner };
 const root = globalThis as typeof globalThis & {
   backroomInboxAgents?: Host;
-  backroomInboxAgentConfig?: { control: StateStore; transport?: StateTransport };
+  backroomInboxAgentConfig?: HostConfig;
 };
-export function installInboxAgents(control: StateStore, transport?: StateTransport) {
+export function installInboxAgents(control: StateStore, transport?: StateTransport, collectionsPlanner?: DemoCollectionsPlanner) {
   // Defer ledger/SDK construction until an inbox case; failure cannot break demo startup.
-  root.backroomInboxAgentConfig = demoAgentsEnabled() ? { control, transport } : undefined;
+  root.backroomInboxAgentConfig = demoAgentsEnabled() ? { control, transport, collectionsPlanner } : undefined;
 }
 export async function resetInboxAgents() {
   const prior = root.backroomInboxAgents;
@@ -176,4 +223,15 @@ export async function narrateInbox(input: InboxNarration) {
     root.backroomInboxAgents = createInboxAgents(config ?? { control: getStateStore() });
   }
   return root.backroomInboxAgents?.submit(input);
+}
+
+/** The authenticated call route reports a refusal; the installed demo host rebuilds trusted case data. */
+export async function narrateCallRefusal(refusal: CallRefusal) {
+  if (!demoAgentsEnabled()) return;
+  if (!root.backroomInboxAgents) {
+    const config = root.backroomInboxAgentConfig;
+    if (!config) return;
+    root.backroomInboxAgents = createInboxAgents(config);
+  }
+  return root.backroomInboxAgents.submitCallRefusal(refusal);
 }

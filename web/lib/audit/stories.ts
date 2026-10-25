@@ -15,12 +15,13 @@ const RUN_START = new Set(['seed_company', 'operator_reset']);
 const INBOX = new Set(['judge_inbox_decision', 'route_inbox_item', 'submit_inbox_item', 'document_extracted',
   'inbox_classified', 'fields_extracted', 'extraction_routed', 'unrecognized_request']);
 const PAYMENT = new Set(['reconcile', 'agent_reconciliation', 'nessie_completed', 'pay', 'payment_boundary_rejected']);
+const EMAIL_FOLLOWUP = new Set(['email_followup_queued', 'email_followup_duplicate', 'email_followup_blocked']);
 // Gateway tools, pre-call checks and approval lifecycle rows that belong to the call in progress.
 const CALL = new Set(['office_call_requested', 'office_call_accepted', 'office_call_refused', 'CALL_PERMIT', 'CALL_BLOCKED_PRECALL',
   'can_call', 'credit_check', 'health_check', 'pre_call_permit', 'pre_call_blocked', 'pre_call_escalated', 'envelope', 'call_plan',
   'demo_pre_call_evidence', 'get_invoice_context', 'verify_identity_result', 'propose_plan', 'check_approval', 'send_payment_link',
   'mark_dispute', 'record_opt_out', 'request_human', 'report_already_paid', 'create_escalation', 'decide_escalation',
-  'pending_owner', 'escalation_expired', 'collections_postcall_handoff']);
+  'pending_owner', 'escalation_expired', 'collections_postcall_handoff', ...EMAIL_FOLLOWUP]);
 const APPROVAL = new Set(['create_escalation', 'decide_escalation', 'pending_owner', 'escalation_expired']);
 const MAX_LINES = 6;
 
@@ -66,6 +67,9 @@ function describe(entry: AuditEntry): string {
     case 'office_call_requested': return 'Collections desk phone asked for a call';
     case 'office_call_accepted': return 'Call placed to the allowlisted demo phone';
     case 'office_call_refused': return `Call not placed (${text(inputs.code) ?? 'refused'})`;
+    case 'email_followup_queued': return `Email preview (simulated, not sent)${text(inputs.toDomain) ? ` · ${text(inputs.toDomain)}` : ''}`;
+    case 'email_followup_duplicate': return `Email preview already queued today (simulated, not sent)${text(inputs.toDomain) ? ` · ${text(inputs.toDomain)}` : ''}`;
+    case 'email_followup_blocked': return 'Email preview blocked';
     case 'CALL_PERMIT': case 'can_call': case 'pre_call_permit':
       return outcome === 'DENY' ? 'Pre-call checks blocked the call' : 'Pre-call checks allowed the call';
     case 'CALL_BLOCKED_PRECALL': case 'pre_call_blocked': return 'Call blocked before dialing';
@@ -167,7 +171,7 @@ export function auditStories(entries: readonly AuditEntry[]): Story[] {
   for (const entry of run) if (INBOX.has(entry.action))
     for (const ref of entry.refs) if (escalations.has(ref)) inboxOf.set(ref, `inbox:${entry.refs[0]}`);
   const owner = new Map<string, Draft>();
-  let call: Draft | undefined, payment: Draft | undefined, calls = 0, payments = 0;
+  let call: Draft | undefined, lastCall: Draft | undefined, payment: Draft | undefined, calls = 0, payments = 0;
   for (const entry of run) {
     if (isPlumbing(entry)) continue;
     const { action } = entry;
@@ -180,7 +184,8 @@ export function auditStories(entries: readonly AuditEntry[]): Story[] {
     else if (PAYMENT.has(action)) {
       draft = payment ??= open(`payment:${++payments}`, 'payment');
       if (action === 'reconcile') payment = undefined;
-    } else if (action === 'office_call_requested' || (callLike && !call)) draft = call = open(`call:${++calls}`, 'call');
+    } else if (EMAIL_FOLLOWUP.has(action) && lastCall) draft = lastCall;
+    else if (action === 'office_call_requested' || (callLike && !call)) draft = lastCall = call = open(`call:${++calls}`, 'call');
     else if (callLike || (call && entry.seat === 'collections')) draft = call!;
     else draft = drafts.some(d => d.kind !== 'startup') ? open('other', 'other') : open('startup', 'startup');
     draft.entries.push(entry);
