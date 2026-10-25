@@ -1,0 +1,25 @@
+/* Office chrome mappings onto the shared palette (web/app/theme.css owns --ink, --paper, --line, --pastel-*, --on-pastel and their dark values).
+   Dark mode is the app-wide <html data-theme="dark">. Only the chrome reads these: the 3D world stays on PALETTE/ROLES (lib/office/palette.ts).
+   lib/office/overlay-contrast.test.ts resolves these against theme.css and checks the AA pairs. */
+.office-shell {
+  /* Re-point the overlay tokens the office stylesheets already use (lobby.css :root keeps the base for other pages). */
+  --office-navy: var(--ink);
+  --office-slate: var(--ink-soft);
+  --office-cream: var(--paper);
+  --office-peach: var(--pastel-yellow);
+  --office-aqua: var(--pastel-aqua);
+  --office-lavender: var(--line);
+}
+.office-shell :focus-visible { outline-color: var(--ink); }
+
+:root[data-theme='dark'] .office-shell {
+  /* AJ's dark lavender; peach/aqua stay on the pastel accents, cream/navy follow --paper/--ink. */
+  --office-lavender: #34406A;
+  color-scheme: dark;
+  color: var(--ink);
+  background: var(--page-bg);
+}
+/* Pastel plates (yellow, aqua, blush) keep navy ink in both themes; dark panels use --paper with cream --ink. */
+:root[data-theme='dark'] .office-shell :is(.play-chat-off button, .coworker-bubble, .office-disconnected, .room-inspector button, .play-panel button:not([aria-pressed='true']),
+  .tour-stop:hover, .story-mode button, .office-sound-toggle[aria-pressed='true'], .agent-talk-line, .agent-talk-recent li[data-tone='fail'],
+  .agent-talk-reply[data-tone='fail'], .agent-talk-recent li[data-tone='correction']) { color: var(--on-pastel); }
