@@ -48,6 +48,32 @@ describe('live handoffs drive the office floor', () => {
     expect(stage.sample(trip.end + 1).actors.find(actor => actor.id === 'intake')!.position).toEqual(HANDOFF_AGENTS.intake.station);
   });
 
+  it('a live call escalation walks Collections to Dana while pending and home once Dana decides', () => {
+    const escalation = (extra: Partial<AgentHandoffPublic>) => publicRow({ handoffId: 'call-1:esc', fromAgentId: 'voice:collections', toAgentId: 'human:Dana',
+      fromRole: 'collections', toRole: 'human', fromVoiceRole: 'collections_caller', toVoiceRole: 'human', ...extra });
+    const stage = new HandoffStage();
+    stage.update(projectOfficeRows(liveRows([escalation({ status: 'offered' })])).handoffs!, 10_000);
+    const trip = stage.plan.trips[0]!;
+    const collections = (now: number) => stage.sample(now).actors.find(actor => actor.id === 'collections')!;
+    expect(collections(trip.start).position).toEqual(HANDOFF_AGENTS.collections.station);
+    const halfway = collections((trip.start + trip.arrive) / 2).position;
+    expect(distance(halfway, handoffSpot('human'))).toBeLessThan(distance(HANDOFF_AGENTS.collections.station, handoffSpot('human')));
+    expect(collections(trip.arrive + 120_000).position).toEqual(handoffSpot('human'));
+    const decided = trip.arrive + 2_000;
+    stage.update(projectOfficeRows(liveRows([escalation({ status: 'completed', acceptedAt: decided, completedAt: decided + 100 })])).handoffs!, decided);
+    expect(collections(stage.plan.trips[0]!.end + 1).position).toEqual(HANDOFF_AGENTS.collections.station);
+  });
+
+  it('the after-call chain walks Reconciler to the Auditor desk', () => {
+    const stage = new HandoffStage();
+    stage.update(projectOfficeRows(liveRows([publicRow({ handoffId: 'call-1:recon', fromAgentId: 'reconciler-agent', toAgentId: 'auditor-agent',
+      fromRole: 'reconciler', toRole: 'auditor', status: 'offered' })])).handoffs!, 10_000);
+    const trip = stage.plan.trips[0]!;
+    const reconciler = (now: number) => stage.sample(now).actors.find(actor => actor.id === 'reconciler')!.position;
+    expect(reconciler(trip.start)).toEqual(HANDOFF_AGENTS.reconciler.station);
+    expect(reconciler(trip.arrive + 1)).toEqual(handoffSpot('auditor'));
+  });
+
   it('labels the agents talking on a live handoff as live, not scripted', () => {
     const stage = new HandoffStage();
     stage.update(projectOfficeRows(liveRows([publicRow()])).handoffs!, 10_000);

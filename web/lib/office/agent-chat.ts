@@ -10,10 +10,11 @@ export function agentChatSource(connection: OfficeSnapshot['connection'], script
     : connection === 'replay' ? 'Replay' : 'Offline record';
 }
 
-const REVIEW: Record<HandoffRole, string> = {
+const REVIEW: Record<HandoffAgentId, string> = {
   intake: 'I’ll sort the documents.', extractor: 'I’ll check the invoice fields.', vendor: 'I’ll review the vendor documents.',
   payables: 'I’ll review the payment evidence.', collections: 'I’ll review the contact record.',
   reconciler: 'I’ll compare the records.', auditor: 'I’ll review the audit evidence.',
+  human: 'I’ll review it before approving.',
 };
 
 /** Only the public display label is eligible; arbitrary case strings and free text are never echoed. */
