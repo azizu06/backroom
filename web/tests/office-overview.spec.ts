@@ -182,3 +182,57 @@ test.describe('touch orbit camera', () => {
     await session.detach();
   });
 });
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+  test.describe(`floor plan at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport });
+    test('matches the subscribed roster and keeps labels clear of desks in both themes', async ({ page }) => {
+      // Keep this local check independent of remote fonts and other external assets.
+      await page.route(/^https?:\/\//, route => new URL(route.request().url()).hostname === 'localhost'
+        ? route.continue() : route.abort());
+      await page.goto('/office?view=overview');
+      const roster = await openSheet(page, 'overview');
+      const ids = await roster.locator('[data-agent-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-agent-id')).sort());
+      expect(ids.length).toBeGreaterThan(0);
+      await page.keyboard.press('Escape');
+      await page.getByLabel('Office view').selectOption('plan');
+      const plan = page.getByLabel('2D office floor plan', { exact: true });
+      await expect(plan).toBeVisible();
+      await expect(plan.locator('.plan-agent')).toHaveCount(ids.length);
+      expect(await plan.locator('.plan-agent').evaluateAll(rows => rows.map(row => row.getAttribute('data-agent')).sort())).toEqual(ids);
+      await expect(plan.locator('.plan-desk')).toHaveCount(24);
+      await expect(plan.locator('.plan-fixture')).toHaveCount(5);
+      let background = '';
+      for (const theme of ['light', 'dark']) {
+        if (theme === 'dark') {
+          await page.getByRole('button', { name: /Switch to dark/i }).click();
+          // ThemeToggle applies inside the browser's asynchronous view transition.
+          await expect.poll(() => plan.evaluate(root => getComputedStyle(root).backgroundColor)).not.toBe(background);
+        }
+        await expect.poll(() => plan.locator('[data-plan-label]').evaluateAll(labels => labels.every(label => getComputedStyle(label).visibility === 'visible'))).toBe(true);
+        const geometry = await plan.evaluate(root => {
+          const desks = [...root.querySelectorAll('.plan-desk')].map(node => node.getBoundingClientRect());
+          const labels = [...root.querySelectorAll('[data-plan-label]')];
+          const box = root.getBoundingClientRect();
+          return { overlaps: labels.some(node => {
+            const label = node.getBoundingClientRect();
+            return desks.some(desk => label.left < desk.right && label.right > desk.left && label.top < desk.bottom && label.bottom > desk.top);
+          }), minFont: Math.min(...labels.map(node => parseFloat(getComputedStyle(node).fontSize))),
+          square: Math.abs(box.width - box.height) < 1, right: box.right,
+          background: getComputedStyle(root).backgroundColor,
+          scrolls: document.documentElement.scrollWidth > window.innerWidth };
+        });
+        expect(geometry.overlaps).toBe(false);
+        expect(geometry.minFont).toBeGreaterThanOrEqual(11);
+        expect(geometry.square).toBe(true);
+        expect(geometry.right).toBeLessThanOrEqual(viewport.width);
+        expect(geometry.scrolls).toBe(false);
+        if (theme === 'dark') expect(geometry.background).not.toBe(background);
+        background = geometry.background;
+      }
+      await expect(page.locator('.office-caption')).toHaveText('Floor plan · same subscribed state');
+      await plan.locator('[data-room="collections"]').click();
+      await expect(page.locator('.room-inspector')).toContainText('Collections');
+    });
+  });
+}
