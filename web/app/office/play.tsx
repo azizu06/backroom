@@ -13,7 +13,7 @@ import { BASE_FOV, INITIAL_FEEL, advanceFeel, effectiveFeel, integrateVelocity, 
 import { playOfficeCue } from '../../lib/office/sound-events';
 import {
   EYE_HEIGHT, PLAYER_RADIUS, SERVER_ROOM_BOX, SPAWN, applyLook, interactCandidates, moveIntent, movePlayer, officeColliders,
-  frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
+  frameLookYaw, insideAny, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
 import { useImmersiveRig } from './immersive/rig';
@@ -24,15 +24,15 @@ import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-c
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 import { pingPongSession } from '../../lib/office/pingpong/session';
 
-function playEye([x, z]: readonly [number, number]): IntroPose {
-  return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(SPAWN.yaw / 2), 0, Math.cos(SPAWN.yaw / 2)] };
+function playEye([x, z]: readonly [number, number], yaw: number): IntroPose {
+  return { position: [x, EYE_HEIGHT, z], quaternion: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)] };
 }
 
 /**
  * First-person camera for Play. Replaces CameraRig while mounted; unmounting restores the
  * orthographic default camera. Frames continue only during the intro or while input is active.
  */
-export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
+export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, entry, last }: PlayBridge & { motions: MotionRegistry; snapshot: OfficeSnapshot }) {
   const handoffs = useHandoffPresentation()?.stage;
   const camera = useRef<ThreePerspectiveCamera>(null);
   const invalidate = useThree(state => state.invalidate);
@@ -44,7 +44,9 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     from: { position: previous.position.toArray(), quaternion: previous.quaternion.toArray() } satisfies IntroPose,
     startedAt: null as number | null, done: false,
   }));
-  const yaw = useRef<number>(SPAWN.yaw);
+  // Overview "Go here" / room jump / resume: a requested entry, read once and cleared. Only a standable one is used.
+  const [requested] = useState(() => { const next = entry?.current ?? null; if (entry) entry.current = null; return next; });
+  const yaw = useRef<number>(requested?.yaw ?? SPAWN.yaw);
   const pitch = useRef(0);
   const feel = useRef<FeelState>(INITIAL_FEEL);
   const velocity = useRef<[number, number]>([0, 0]);
@@ -65,8 +67,11 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     () => withoutHiddenAuditBoard(officeColliders(rooms, lobbyCollisionExtras(baked, LOBBY_PROP_BOXES, [SERVER_ROOM_BOX]), local.doors), baked),
     [roomsKey, baked, local.doors],
   );
-  const [spawn] = useState(() => playSpawn(location.search, colliders));
-  const [eye] = useState(() => playEye(spawn));
+  const [spawn] = useState((): [number, number] => {
+    if (requested && !insideAny(requested.position, colliders, PLAYER_RADIUS)) return [requested.position[0], requested.position[1]];
+    return playSpawn(location.search, colliders);
+  });
+  const [eye] = useState(() => playEye(spawn, yaw.current));
   const position = useRef<[number, number]>(spawn);
   const latest = useRef({ snapshot, colliders, onTarget });
   latest.current = { snapshot, colliders, onTarget };
@@ -78,7 +83,10 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, [invalidate]);
-  useEffect(() => () => { latest.current.onTarget(null); }, []);
+  useEffect(() => () => {
+    latest.current.onTarget(null);
+    if (last) last.current = { position: [position.current[0], position.current[1]], yaw: yaw.current };
+  }, [last]);
   useEffect(() => () => { pingPongSession.stop(); }, []);
   // The canvas only resizes the active camera; refit the restored orthographic one in case it resized during Play.
   useEffect(() => () => {

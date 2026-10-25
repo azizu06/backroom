@@ -1,41 +1,36 @@
 import { test, expect } from '@playwright/test';
 
-test('Play minimap toggles with M without page errors', async ({ page }) => {
+// Diegetic HUD (variant c): the corner minimap gives way to the 3D Overview (O), which shows the whole floor.
+test('Play keeps the corner map out of view and offers the Overview instead, without page errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await select.selectOption({ label: 'Play (first person)' });
+  await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
   const minimap = page.getByRole('img', { name: /Office map/ });
-  await expect(minimap).toBeVisible();
-  await page.keyboard.press('m');
   await expect(minimap).toBeHidden();
   await page.keyboard.press('m');
-  await expect(minimap).toBeVisible();
+  await expect(minimap).toBeHidden();
+  await page.keyboard.press('o');
+  await expect(select).toHaveValue('walk');
+  await expect(page.getByRole('region', { name: 'Office overview' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('Play minimap can be hidden and restored by touch button and persists after reload', async ({ page }) => {
-  await page.goto('/office?view=overview');
-  const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
-  await select.selectOption({ label: 'Play (first person)' });
+test.describe('Overview touch control', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
-  const minimap = page.getByRole('img', { name: /Office map/ });
-  const toggle = page.getByRole('button', { name: 'Hide map' });
-  await expect(minimap).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await toggle.click();
-  await expect(minimap).toBeHidden();
-  const show = page.getByRole('button', { name: 'Show map' });
-  await expect(show).toHaveAttribute('aria-pressed', 'false');
-  await show.click();
-  await expect(minimap).toBeVisible();
-
-  await page.reload();
-  const reloadedSelect = page.getByLabel('Office view');
-  await expect(reloadedSelect).toHaveValue('walk');
-  await reloadedSelect.selectOption({ label: 'Play (first person)' });
-  await expect(page.getByRole('img', { name: /Office map/ })).toBeVisible();
+  test('opens Overview from first person by touch', async ({ page }) => {
+    await page.goto('/office?view=overview');
+    const select = page.getByLabel('Office view');
+    await select.selectOption({ label: 'Play (first person)' });
+    await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
+    await page.getByRole('button', { name: /^Overview/ }).tap();
+    // At 390px the overview keeps the fixed camera it started with (Office.tsx prefers orbit only above 760px).
+    await expect(select).toHaveValue('tween');
+    await expect(page.getByRole('region', { name: 'Office overview' })).toBeVisible();
+    await expect(page.getByRole('application', { name: /First-person office/ })).toHaveCount(0);
+  });
 });

@@ -265,4 +265,10 @@ export interface PlayBridge {
   readonly hud: { readonly current: HTMLElement | null };
   /** Other viewers in Play (soft targets), read on each rig frame. */
   readonly coworkers?: { readonly current: readonly CoworkerSpot[] };
+  /** Where the next Play session starts (Overview "Go here" / room jump); read once when the rig mounts, then cleared. */
+  readonly entry?: { current: PlayEntry | null };
+  /** The pose the last Play session ended at, so toggling Overview and back resumes there. */
+  readonly last?: { current: PlayEntry | null };
 }
+/** A first-person entry: floor position and yaw (yaw 0 looks toward -z). */
+export interface PlayEntry { readonly position: readonly [x: number, z: number]; readonly yaw: number }

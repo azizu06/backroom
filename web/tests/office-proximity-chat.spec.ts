@@ -41,7 +41,8 @@ test('proximity chat reaches a coworker in range and is dropped out of range', a
 
   await enterPlay(a, '/office?presence=1&view=overview');
   await enterPlay(b, '/office?presence=1&view=overview');
-  await expect(a.getByText('2 viewing')).toBeVisible({ timeout: 8000 });
+  // The presence chip lives in the corner menu, which steps aside in first person: the count is still kept.
+  await expect(a.getByText('2 viewing')).toBeAttached({ timeout: 8000 });
 
   // Both at the lobby spawn: within PROXIMITY_RADIUS.
   await say(a, 'hello from A');
@@ -64,10 +65,11 @@ test('play chat offers Show coworkers when presence is off', async ({ page }) =>
   page.on('pageerror', error => errors.push(error.message));
   await enterPlay(page, '/office?view=overview');
   const chat = page.getByRole('region', { name: 'Proximity chat' });
-  await chat.getByRole('button', { name: 'Show coworkers' }).click();
-  await expect(page.getByLabel('Show viewers')).toBeChecked();
+  // Diegetic HUD: the closed chat shows nothing on screen; T opens it and offers Show coworkers there.
   await surface(page).focus();
   await page.keyboard.press('t');
+  await chat.getByRole('button', { name: 'Show coworkers' }).click();
+  await expect(page.getByLabel('Show viewers')).toBeChecked();
   await expect(page.getByRole('textbox', { name: /Message viewers within 6 m/ })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(surface(page)).toBeFocused();

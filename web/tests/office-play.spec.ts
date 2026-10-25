@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import type { Gx10Status } from '../lib/gx10/status';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
-const HINT = 'Click to look · WASD move · ←/→ turn · E interact · M map · Esc exit';
+const HINT = 'Click to look · WASD move · ←/→ turn · E interact · O overview · Esc exit';
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });
@@ -112,8 +112,8 @@ test('play mode walks to Alex, opens the talk panel and exits back to the previo
   const prompt = page.getByText('E · Talk to Alex');
   await holdUntil(page, 'w', () => prompt.isVisible());
   await expect(prompt).toBeVisible();
-  // Name tags from the judge tour stay on in Play: Alex is right ahead.
-  await expect(viewport.locator('[data-agent-tag]', { hasText: 'Alex' })).toBeVisible();
+  // Diegetic HUD: the floating 2D name tag gives way to Alex's in-world desk sign; the prompt above names him.
+  await expect(viewport.locator('[data-agent-tag]', { hasText: 'Alex' })).toBeHidden();
   const moved = await player(page);
   expect(moved.z).toBeLessThan(start.z - 0.1);
   expect(Math.abs(moved.x - start.x)).toBeLessThan(0.05);
@@ -140,6 +140,9 @@ test('play mode walks to the locked Treasury door by keyboard and shows the deni
   const errors = await startPlay(page, async () => {
     // Retry until hydrated: a click before hydration is a no-op.
     await expect(async () => {
+      // Preview controls sit in the corner menu (closed by default); a pick closes it again.
+      const menu = page.getByRole('button', { name: 'Backroom menu' });
+      if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
       await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
       await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
     }).toPass();
