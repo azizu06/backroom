@@ -18,10 +18,10 @@ export const disclosureItems = [
   { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
   { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run in this demo host.' },
   { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
-  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live SpacetimeDB database probe, or shown as a fixture when the in-memory store is used.' },
+  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live database probe; simulated when the server runs in memory.' },
   { id: 'crs', kind: 'sandbox', label: 'CRS test identities', description: 'Sandbox identities only; no real customer credit reports.' },
   { id: 'nessie', kind: 'sandbox', label: 'Nessie bank', description: 'Sandbox bank accounts and transactions; no real money moves.' },
-  { id: 'company', kind: 'sandbox', label: 'Company, vendors & emails', description: 'Northfield Studio and its business records are fictional demo fixtures.' },
+  { id: 'company', kind: 'sandbox', label: 'Company, vendors & emails', description: 'Northfield Studio and its records are fictional.' },
   { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'Simulated card payment; the demo creates a sandbox Nessie deposit.' },
 ] as const satisfies readonly DisclosureItem[];
 
@@ -32,19 +32,6 @@ export const unprobedServices = disclosureItems
   .map(item => item.id as ServiceId);
 export const NOT_PROBED_LABEL = 'Not probed in this process';
 export const CHECKING_LABEL = 'Checking…';
-
-/** At or below this width the overlay starts collapsed outside the office too. */
-export const NARROW_PANEL_QUERY = '(max-width: 760px)';
-
-/** The details page is always expanded; the office overlay starts collapsed. */
-export function panelExpanded({ detailed, narrow, officeView = false, userExpanded }: { detailed: boolean; narrow: boolean; officeView?: boolean; userExpanded: boolean | null }) {
-  return detailed || (userExpanded ?? !(narrow || officeView));
-}
-
-/** The Hide/Show toggle stores the opposite of what is currently shown. */
-export function toggledPanel(expanded: boolean) {
-  return !expanded;
-}
 
 export type DemoStatus = {
   measuredAt: string;
@@ -86,10 +73,14 @@ function probeStatus(probe: ServiceProbe, now: number): DisclosureStatus {
   }
 }
 
+// Do not retain an ON/online claim after a disconnected or stalled status poll.
+function isCurrent(status: DemoStatus | null, now: number): status is DemoStatus {
+  return !!status && Number.isFinite(Date.parse(status.measuredAt)) && now - Date.parse(status.measuredAt) <= STATUS_MAX_AGE_MS;
+}
+
 export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | null, now = Date.now()): DisclosureStatus {
   const unverified: DisclosureStatus = { label: 'Unverified', tone: 'neutral' };
-  // Do not retain an ON/online claim after a disconnected or stalled status poll.
-  const current = !!status && Number.isFinite(Date.parse(status.measuredAt)) && now - Date.parse(status.measuredAt) <= STATUS_MAX_AGE_MS;
+  const current = isCurrent(status, now);
   if (item.kind === 'sandbox') {
     // Sandbox rows stay Simulated unless the demo host reports their adapter; a sandbox is never 'real'.
     const probe = current && (hostSandboxServices as readonly string[]).includes(item.id) ? status!.services?.[item.id as HostSandboxId] : undefined;
@@ -111,4 +102,12 @@ export function getDisclosureStatus(item: DisclosureItem, status: DemoStatus | n
   // services present but probesCheckedAt null: the server's first probe run has not finished yet.
   if (status.services && status.probesCheckedAt === null) return { label: CHECKING_LABEL, tone: 'neutral' };
   return unverified;
+}
+
+/** The one-line disclosure every page shows. Money wording follows the host's Nessie adapter, so every page agrees. */
+export function demoPillText(status: DemoStatus | null, now = Date.now()) {
+  const current = isCurrent(status, now);
+  const nessie = current ? status.services?.nessie : undefined;
+  const money = !nessie ? 'sandbox money' : nessie.state === 'simulated' ? 'mock bank money' : 'Nessie sandbox money';
+  return ['Demo', 'synthetic company', money, ...(current && !status.llmEnabled ? ['LLM OFF'] : [])].join(' · ');
 }

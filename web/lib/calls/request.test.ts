@@ -1,18 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createCallRequestHTTP, type CallRequestAudit } from './request';
+import { createOperatorSignIn, createSignInHTTP, operatorSessionCookie } from '../operator/sign-in';
 
 const ORIGIN = 'https://demo.example';
 const LOOPBACK = 'http://127.0.0.1:3477';
-function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' }), extras?: { loopback?: string; relay?: false }) {
+function harness(relayResponse: () => Promise<Response> = async () => Response.json({ sessionId: 's', callId: 'c' }), extras?: {
+  loopback?: string; relay?: false;
+  followUp?: (entry: CallRequestAudit) => Promise<{ status: 'queued' | 'duplicate' } | undefined>;
+}) {
   let clock = 1_000_000;
   let current: { status: 'ringing' | 'live' | 'ended'; endedAt?: number } | null = null;
   const audits: CallRequestAudit[] = [];
   const relay = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => relayResponse());
   const handle = createCallRequestHTTP({ secret: () => 'operator-code', origin: () => ORIGIN, loopbackOrigin: () => extras?.loopback, now: () => clock,
     relay: extras?.relay === false ? () => undefined : () => ({ url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin-secret' }), currentCall: async () => current,
-    audit: async entry => { audits.push(entry); }, fetch: relay as typeof fetch });
-  const post = (action: 'session' | 'request', body: unknown, headers: Record<string, string> = {}) => handle(action, new Request(`${ORIGIN}/api/calls/${action}`, {
-    method: 'POST', headers: { origin: ORIGIN, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }));
+    audit: async entry => { audits.push(entry); }, followUp: extras?.followUp, fetch: relay as typeof fetch });
+  // The desk phone has no code endpoint of its own: 'session' is the shared operator sign-in.
+  const origins = () => [ORIGIN, ...(extras?.loopback ? [extras.loopback] : [])];
+  const signIn = createSignInHTTP({ signIn: createOperatorSignIn({ code: () => 'operator-code', origins, now: () => clock }), signedIn: () => false, origins });
+  const post = (action: 'session' | 'request', body: unknown, headers: Record<string, string> = {}) => {
+    const request = new Request(`${ORIGIN}/api/${action === 'session' ? 'session' : 'calls/request'}`, {
+      method: 'POST', headers: { origin: ORIGIN, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    return action === 'session' ? signIn(request) : handle(request);
+  };
   const unlock = async () => {
     const response = await post('session', { code: 'operator-code' });
     return response.headers.get('set-cookie')!.split(';')[0]!;
@@ -26,13 +36,13 @@ describe('office call request', () => {
     const h = harness();
     const anonymous = await h.post('request', { line: 'collections' });
     expect(anonymous.status).toBe(401);
-    expect(await anonymous.json()).toMatchObject({ ok: false, error: 'OPERATOR_SESSION_REQUIRED', message: expect.stringContaining('/calls') });
+    expect(await anonymous.json()).toMatchObject({ ok: false, error: 'OPERATOR_SESSION_REQUIRED', message: expect.stringContaining('/operator') });
     const cookie = await h.unlock();
     expect((await h.post('request', {}, { cookie, origin: 'https://evil.example' })).status).toBe(403);
     expect((await h.post('request', {}, { cookie, 'sec-fetch-site': 'cross-site' })).status).toBe(403);
     expect((await h.post('request', {}, { cookie: `${cookie.split('.')[0]}.forged` })).status).toBe(401);
     expect((await h.post('session', { code: 'guess' })).status).toBe(403);
-    h.tick(12 * 60 * 60 * 1000 + 1);
+    h.tick(8 * 60 * 60 * 1000 + 1);
     expect((await click(h, cookie)).status).toBe(401);
     expect(h.relay).not.toHaveBeenCalled();
     expect(h.audits.map(a => a.code)).toEqual(['OPERATOR_SESSION_REQUIRED', 'ORIGIN_REJECTED', 'OPERATOR_SESSION_REQUIRED']);
@@ -47,7 +57,7 @@ describe('office call request', () => {
   it('dials the relay once with its server secret and never forwards a number from the request', async () => {
     const h = harness();
     const cookie = await h.unlock();
-    expect(cookie).toMatch(/^backroom_calls=\d+\.[a-f0-9]{64}$/);
+    expect(cookie).toMatch(/^backroom_session=\d+\.[a-f0-9]{64}$/);
     for (const body of [{ to: '+15555550199' }, { line: 'collections', number: '+15555550199' }, { line: 'payables' }, ['+15555550199']]) {
       expect((await click(h, cookie, body)).status).toBe(400);
     }
@@ -66,9 +76,8 @@ describe('office call request', () => {
     const handle = createCallRequestHTTP({ secret: () => 'operator-code', origin: () => ORIGIN, relay: () => ({ url: 'http://127.0.0.1:8788/_admin/dial', secret: 'admin' }),
       currentCall: async () => null, audit: async () => { throw new Error('STATE_UNAVAILABLE'); }, fetch: relay as typeof fetch });
     const headers = { origin: ORIGIN, 'content-type': 'application/json' };
-    const session = await handle('session', new Request(`${ORIGIN}/api/calls/session`, { method: 'POST', headers, body: '{"code":"operator-code"}' }));
-    const response = await handle('request', new Request(`${ORIGIN}/api/calls/request`, { method: 'POST',
-      headers: { ...headers, cookie: session.headers.get('set-cookie')!.split(';')[0]! }, body: '{}' }));
+    const response = await handle(new Request(`${ORIGIN}/api/calls/request`, { method: 'POST',
+      headers: { ...headers, cookie: operatorSessionCookie('operator-code', ORIGIN).split(';')[0]! }, body: '{}' }));
     expect(response.status).toBe(503);
     expect(relay).not.toHaveBeenCalled();
   });
@@ -163,5 +172,15 @@ describe('office call request', () => {
     expect(await (await click(down, cookie)).json()).toMatchObject({ error: 'RELAY_UNCONFIRMED' });
     expect((await click(down, cookie)).status).toBe(429);
     expect(down.relay).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a simulated email preview when the demo host handles an email-only refusal', async () => {
+    const followUp = vi.fn(async () => ({ status: 'queued' as const }));
+    const blocked = harness(async () => new Response('CALL_DENIED:B2B_ONLY_CALLS', { status: 409 }), { followUp });
+    const response = await click(blocked, await blocked.unlock());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ ok: false, error: 'CALL_DENIED',
+      message: 'Policy refused the call (B2B_ONLY_CALLS). No call placed. Email preview (simulated, not sent).' });
+    expect(followUp).toHaveBeenCalledWith({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' });
   });
 });

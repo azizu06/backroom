@@ -1,4 +1,5 @@
-import { callStore } from '../calls';
+import { precallRows } from '../../calls/precall';
+import { callStore, precallStore } from '../calls';
 import { OFFICE_ANCHORS, visibleRooms } from '../state';
 import type { OfficePropInteraction } from './interact';
 
@@ -16,7 +17,9 @@ export const PHONE_INTERACTION: OfficePropInteraction = {
   visible: snapshot => visibleRooms(snapshot).includes('collections'),
   panel: () => {
     const call = callStore.getSnapshot();
+    const card = precallStore.getSnapshot();
     return { title: 'Collections desk phone', rows: [
+      ...(card ? precallRows(card) : []),
       { label: 'Status', value: call.status },
       ...(call.callerLabel ? [{ label: 'Caller', value: call.callerLabel }] : []),
       ...(call.agentName ? [{ label: 'Agent', value: call.agentName }] : []),

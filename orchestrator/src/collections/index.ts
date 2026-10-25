@@ -1,14 +1,19 @@
 import { DEFAULT_POLICY, evaluate, computeEnvelope, type Context, type Decision } from '@backroom/policy';
 import { validateCallPlan, renderCallPlan } from './plan';
 import { boundedHealthCheck, boundedCreditCheck } from './checks';
+import { CallPlannerUnavailableError, sanitizeCallPlannerFailure } from './planner';
 import type { AuditInput } from '../store';
 import type { PreCallInput, PreCallDependencies, PreCallResult } from './types';
 export type * from './types';
 export { createPreCallCreditCheck, createCrsPublicRecordsCheck } from './crs';
-export { createCallPlanner } from './planner';
+export { createCallPlanner, CallPlannerUnavailableError } from './planner';
 export { createCrsCreditCheck, createApifyHealthCheck } from './adapters';
 export { createApifyRunner, createPreCallHealthCheck, APIFY_DEMO_COMPANY } from './apify';
 export { fakeCreditCheck, fakeHealthCheck } from './fakes';
+export { recordSignals, signalsFromCrs, signalsFromHealth } from './signals';
+export type { SignalRow, SignalSink } from './signals';
+export { runEmailFollowUp, composeFollowUp, MemoryEmailOutbox, EMAIL_ONLY_RULES, EMAIL_LABEL } from './email';
+export type { EmailFollowUpInput, EmailFollowUpResult, EmailOutbox, SimulatedEmail } from './email';
 
 /** Prepares a plan only. The dial boundary must re-read state and evaluate call_client again. */
 export async function runPreCall(input: PreCallInput, deps: PreCallDependencies): Promise<PreCallResult> {
@@ -59,7 +64,9 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
     bankruptcy: input.context.signals?.bankruptcy === true || credit?.bankruptcy === true,
     ofacHit: input.context.signals?.ofacHit === true || credit?.ofacStatus === 'hit',
     closedBusiness: input.context.signals?.closedBusiness === true || !!health?.signals.some(signal => signal.type === 'maps_status' && signal.value === 'permanently_closed'),
-    active: [...new Set([...(input.context.signals?.active ?? []), ...(credit?.activeSignals ?? []), ...(!health ? ['health_check_pending'] : [])])],
+    active: [...new Set([...(input.context.signals?.active ?? []), ...(credit?.activeSignals ?? []), ...(!health ? ['health_check_pending'] : []),
+      // Apify found a different public phone number than the one we are about to dial.
+      ...(health?.signals.some(signal => signal.type === 'phone_match' && signal.value === false) ? ['phone_mismatch'] : [])])],
   } };
   const checked = evaluate('collections', { type: 'call_client' }, context);
   await audit('pre_call_permit', { decision: checked.kind, ruleIds: checked.ruleIds, inputs: { decision: checked } });
@@ -68,12 +75,26 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
     await audit('pre_call_blocked', { decision: 'DENY', inputs: { reason: 'Credit/OFAC check unavailable' } });
     return { status: 'blocked', reason: 'Credit/OFAC check unavailable' };
   }
+  // C17: the call may proceed, but Dana sees a warning and identity comes before any invoice detail.
+  // Recorded only once the call can still go ahead, so a blocked call never leaves an ALLOW row.
+  const warnings = context.signals?.active?.includes('phone_mismatch') ? ['PHONE_MISMATCH_WARN'] : [];
+  if (warnings.length) await audit('phone_mismatch_warn', { decision: 'ALLOW', ruleIds: warnings,
+    inputs: { identityCaution: true, ownerWarning: 'The number on file differs from the public listing; confirm identity before any invoice detail.' } });
   const envelope = computeEnvelope(policy, context.signals?.active);
   await audit('envelope', { inputs: { envelope } });
   const planStarted = now();
-  const draft = await deps.planner.draft({ envelope, preferPlanFirst: !!health?.signals.some(signal => signal.type === 'distress_news' && signal.value), healthCheckPending: !health }).catch(() => undefined);
+  let draft: Awaited<ReturnType<PreCallDependencies['planner']['draft']>> | undefined;
+  let plannerFailure: ReturnType<typeof sanitizeCallPlannerFailure> | undefined;
+  try {
+    draft = await deps.planner.draft({ envelope, preferPlanFirst: !!health?.signals.some(signal => signal.type === 'distress_news' && signal.value), healthCheckPending: !health });
+  } catch (error) {
+    plannerFailure = error instanceof CallPlannerUnavailableError
+      ? error.diagnostic
+      : sanitizeCallPlannerFailure(error, 'planner', 'unknown');
+  }
   if (!draft) {
-    await audit('call_plan', { decision: 'DENY', latencyMs: now() - planStarted, inputs: { reason: 'Call planner unavailable' } });
+    await audit('call_plan', { decision: 'DENY', latencyMs: now() - planStarted,
+      inputs: { reason: 'Call planner unavailable', ...(plannerFailure && { failure: plannerFailure }) } });
     return { status: 'blocked', reason: 'Call planner unavailable' };
   }
   if ('kind' in draft && draft.kind === 'LLM_OFF') {
@@ -86,5 +107,5 @@ export async function runPreCall(input: PreCallInput, deps: PreCallDependencies)
   await audit('plan_validated', { decision: plan ? 'ALLOW' : 'DENY', inputs: { valid: !!plan, ...(plan ? { plan } : {}) } });
   if (!plan) return { status: 'blocked', reason: 'Invalid call plan or terms outside the envelope' };
   return { status: 'ready', envelope, plan, summary: `${!health ? 'health check pending. ' : ''}${renderCallPlan(plan)}`, healthCheckPending: !health,
-    route: draft.route, model: draft.model, evidenceRefs: refs, signals: context.signals ?? {} };
+    route: draft.route, model: draft.model, evidenceRefs: refs, signals: context.signals ?? {}, ...(warnings.length && { warnings }) };
 }

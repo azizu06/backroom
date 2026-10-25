@@ -3,8 +3,19 @@ export interface DemoStatus {
   llmEnabled: boolean; stateStore: 'memory' | 'spacetime'; voice: boolean;
   approvePath?: string; payPath?: string; workersHealthy?: boolean; tunnelUrl?: string;
   attackDemo?: HealthRow;
+  envChecks?: import('./env').DemoEnvironmentCheck[];
 }
 export interface HealthRow { name: string; ok: boolean; detail: string }
+function environmentRows(status: DemoStatus, hostRows: HealthRow[] = []): HealthRow[] {
+  const observed = new Set(hostRows.map(row => row.name));
+  return (status.envChecks ?? []).map(row => {
+    const detail = [
+      ...(row.missing.length ? [`missing: ${row.missing.join(', ')}`] : []),
+      ...(row.defaulted.length ? [`defaulted: ${row.defaulted.join(', ')}`] : []),
+    ].join('; ');
+    return { name: `Required env (${row.process})`, ok: !detail, detail: detail || 'all required variables explicitly configured' };
+  }).filter(row => !observed.has(row.name));
+}
 /** Local authenticated GET only. The private supervisor owns this bearer, never the CLI output. */
 export async function probeAttackDemo(env: NodeJS.ProcessEnv, http: typeof fetch = fetch): Promise<HealthRow> {
   const name = 'Attack demo';
@@ -41,6 +52,7 @@ export async function probeDependencies(options: {
   const nessie = env.NESSIE_API_KEY && env.NESSIE_ACCOUNT_ID
     ? `https://prod-api.nessieisreal.com/accounts/${encodeURIComponent(env.NESSIE_ACCOUNT_ID)}?key=${encodeURIComponent(env.NESSIE_API_KEY)}` : undefined;
   return [
+    ...environmentRows(status, options.hostRows),
     { name: 'Web + seats', ok: status.workersHealthy !== false, detail: status.workersHealthy === false ? 'worker stopped' : 'web responding; shared-process seats' },
     { name: 'SpacetimeDB', ok: status.stateStore === 'spacetime', detail: status.stateStore === 'memory' ? 'unused: process-local memory mode' : 'adapter connected' },
     ...(options.hostRows ?? [await probe('GX10 router', `${(env.GX10_BASE_URL || 'http://100.117.44.20:11434/v1').replace(/\/$/, '')}/models`, 'not configured')]),

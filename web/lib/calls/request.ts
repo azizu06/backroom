@@ -1,14 +1,8 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { operatorSignedIn } from '../operator/sign-in';
 
-export const CALL_SESSION_COOKIE = 'backroom_calls';
-const SESSION_MS = 12 * 60 * 60 * 1000;
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
-const equal = (a: string, b: string) => {
-  const left = Buffer.from(a), right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-};
-const UNLOCK = 'Calls are locked. Unlock them at /calls with the operator code.';
+const UNLOCK = 'Calls are locked. Sign in at /operator with the operator code.';
 /** Relay codes the office may show. Anything else is reported generically. */
 const RELAY: Record<string, [number, string]> = {
   CLIENT_STOPPED: [409, 'The client asked us to stop. No call placed.'],
@@ -20,8 +14,9 @@ const RELAY: Record<string, [number, string]> = {
 };
 
 export type CallRequestAudit = { outcome: 'requested' | 'accepted' | 'refused'; code: string; detail?: string; suppressed?: number };
+export type CallFollowUpResult = { status: 'queued' | 'duplicate' };
 export interface CallRequestOptions {
-  /** Operator code; the audit wall's existing private code. */
+  /** Operator code; its shared sign-in (`/api/session`) unlocks the desk phone. */
   secret: () => string | undefined;
   /** Deployment origin, never derived from Host/X-Forwarded-Host. */
   origin: () => string | undefined;
@@ -35,6 +30,8 @@ export interface CallRequestOptions {
   /** The desk phone's current call, from the read-only projection. */
   currentCall: () => Promise<{ status: 'ringing' | 'live' | 'ended'; endedAt?: number } | null>;
   audit: (entry: CallRequestAudit) => Promise<void>;
+  /** Trusted demo-host hook. It may queue a simulated preview after a refusal; it never delivers email. */
+  followUp?: (entry: CallRequestAudit) => Promise<CallFollowUpResult | undefined>;
   fetch?: typeof fetch; now?: () => number;
   /** Minimum gap between dial attempts, and after a call ends. */
   cooldownMs?: number;
@@ -53,19 +50,17 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
   const quiet = new Map<string, { at: number; suppressed: number }>();
   // A refusal places nothing, so its audit is best effort; a dial requires its audit first.
   const refuse = async (status: number, code: string, message: string, detail?: string, coalesce = false) => {
+    const entry: CallRequestAudit = { outcome: 'refused', code, ...(detail && { detail }) };
     if (coalesce) {
       const prior = quiet.get(code);
       if (prior && now() - prior.at < 10_000) { prior.suppressed++; return json({ ok: false, error: code, message }, status); }
       quiet.set(code, { at: now(), suppressed: 0 });
-      await options.audit({ outcome: 'refused', code, ...(prior?.suppressed && { suppressed: prior.suppressed }) }).catch(() => undefined);
-    } else await options.audit({ outcome: 'refused', code, ...(detail && { detail }) }).catch(() => undefined);
-    return json({ ok: false, error: code, message }, status);
-  };
-  const sign = (secret: string, expires: string) => createHmac('sha256', secret).update(`call-request:${expires}`).digest('hex');
-  const operator = (request: Request, secret: string) => {
-    const token = request.headers.get('cookie')?.split(';').map(part => part.trim()).find(part => part.startsWith(`${CALL_SESSION_COOKIE}=`))?.slice(CALL_SESSION_COOKIE.length + 1);
-    const [expires = '', signature = ''] = token?.split('.') ?? [];
-    return /^\d+$/.test(expires) && Number(expires) > now() && Number(expires) <= now() + SESSION_MS && equal(signature, sign(secret, expires));
+      await options.audit({ ...entry, ...(prior?.suppressed && { suppressed: prior.suppressed }) }).catch(() => undefined);
+    } else await options.audit(entry).catch(() => undefined);
+    const followedUp = (code === 'PRECALL_BLOCKED' || code === 'CALL_DENIED')
+      ? await options.followUp?.(entry).catch(() => undefined) : undefined;
+    const suffix = followedUp ? ' Email preview (simulated, not sent).' : '';
+    return json({ ok: false, error: code, message: `${message}${suffix}` }, status);
   };
   const readJSON = async (request: Request, limit: number): Promise<Record<string, unknown> | undefined> => {
     if (!request.headers.get('content-type')?.startsWith('application/json')) return undefined;
@@ -80,22 +75,12 @@ export function createCallRequestHTTP(options: CallRequestOptions) {
   // desk phone can dial where its state socket is allowed to connect.
   const acceptedOrigin = (request: Request, origin: string) => matches(request, origin) || matches(request, options.loopbackOrigin?.());
 
-  return async (action: 'session' | 'request', request: Request): Promise<Response> => {
+  return async (request: Request): Promise<Response> => {
     if (request.method !== 'POST') return json({ ok: false, error: 'METHOD_NOT_ALLOWED', message: 'Use POST.' }, 405);
     const secret = options.secret(), origin = options.origin();
-    if (action === 'session') {
-      if (!secret || !origin) return json({ ok: false, error: 'CALLS_NOT_CONFIGURED', message: 'Office calls are not configured on this host.' }, 503);
-      if (!acceptedOrigin(request, origin)) return json({ ok: false, error: 'ORIGIN_REJECTED', message: 'Origin rejected.' }, 403);
-      const body = await readJSON(request, 4096);
-      if (!body || typeof body.code !== 'string' || !equal(body.code, secret)) return json({ ok: false, error: 'OPERATOR_CODE_REJECTED', message: 'Operator code rejected.' }, 403);
-      const expires = String(now() + SESSION_MS);
-      const sent = request.headers.get('origin') ?? '';
-      return json({ ok: true, message: 'Office calls unlocked for 12 hours on this browser.' }, 200, { 'Set-Cookie':
-        `${CALL_SESSION_COOKIE}=${expires}.${sign(secret, expires)}; Path=/api/calls; HttpOnly; SameSite=Strict${sent.startsWith('https:') ? '; Secure' : ''}; Max-Age=${SESSION_MS / 1000}` });
-    }
     if (!secret || !origin) return refuse(503, 'CALLS_NOT_CONFIGURED', 'Office calls are not configured on this host.', undefined, true);
     if (!acceptedOrigin(request, origin)) return refuse(403, 'ORIGIN_REJECTED', 'Open the office from its public address to place calls.', undefined, true);
-    if (!operator(request, secret)) return refuse(401, 'OPERATOR_SESSION_REQUIRED', UNLOCK, undefined, true);
+    if (!operatorSignedIn(request, secret, now())) return refuse(401, 'OPERATOR_SESSION_REQUIRED', UNLOCK, undefined, true);
     const body = await readJSON(request, 1024);
     // The destination, scenario and amounts are server configuration; reject anything else.
     if (!body || Object.keys(body).some(key => key !== 'line') || (body.line !== undefined && body.line !== 'collections')) {

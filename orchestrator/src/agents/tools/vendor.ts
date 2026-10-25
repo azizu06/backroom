@@ -271,7 +271,9 @@ export function createVendorTools(deps: VendorToolDeps, options: { deadlineMs?: 
         // Model prose is stored as data for people; it never feeds a rule.
         note: input.note, ...(decision ? { decision: decision as unknown as Json } : {}),
       }, verdict.ruleIds);
-      return { decision: 'ALLOW', verdictRef: row.ref, outcome: input.outcome, next: row.facts.next ?? null, pending: verdict.pending, flags: verdict.flags, ruleIds: verdict.ruleIds };
+      // Report the rule code actually sealed (e.g. the default BANK_CHANGE_HOLD), so a handoff can cite it.
+      return { decision: 'ALLOW', verdictRef: row.ref, outcome: input.outcome, next: row.facts.next ?? null, pending: verdict.pending, flags: verdict.flags,
+        ruleIds: decision ? [...decision.ruleIds] : verdict.ruleIds, evidenceRuleIds: verdict.ruleIds };
     },
   };
 

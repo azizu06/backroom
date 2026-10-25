@@ -52,6 +52,10 @@ export interface Transaction {
   medium: string; transaction_date: string;
 }
 export interface Payment { accountId: string; invoiceId: string; installment: number; amountCents: number }
+export interface WithdrawalPayment { accountId: string; vendorId: string; invoiceId: string; amountCents: number }
+export interface WithdrawalReconciliation {
+  match: 'EXACT' | 'MISMATCH'; debitId: string; transactionId?: string; amountCents: number; reason?: string;
+}
 /** Atomic, durable, shared by ALL writers to an account. A claimed operation is never automatically re-POSTed. */
 export interface Claims { claim(key: string): Promise<boolean> }
 export class FileClaims implements Claims {
@@ -99,6 +103,10 @@ const segment = (value: string) => encodeURIComponent(value);
 export function paymentMemo(payment: Pick<Payment, 'invoiceId' | 'installment'>): string {
   if (!payment.invoiceId.trim() || !Number.isSafeInteger(payment.installment) || payment.installment < 1) throw new NessieError('invalid payment reference');
   return `backroom:invoice=${segment(payment.invoiceId)}:installment=${payment.installment}`;
+}
+export function withdrawalMemo(payment: Pick<WithdrawalPayment, 'vendorId' | 'invoiceId'>): string {
+  if (!payment.vendorId.trim() || !payment.invoiceId.trim()) throw new NessieError('invalid withdrawal reference');
+  return `backroom:ap_vendor=${segment(payment.vendorId)}:invoice=${segment(payment.invoiceId)}`;
 }
 export class NessieClient {
   private readonly fetcher: typeof fetch;
@@ -203,11 +211,12 @@ export class NessieClient {
     }
   }
   listDeposits(accountId: string) { return this.request<Transaction[]>('GET', `/accounts/${segment(accountId)}/deposits`); }
+  listWithdrawals(accountId: string) { return this.request<Transaction[]>('GET', `/accounts/${segment(accountId)}/withdrawals`); }
   /** Bank feed: each collection remains tagged; no fictional aggregate /transactions endpoint. */
   async listTransactions(accountId: string) {
     const kinds = ['deposits', 'withdrawals'] as const;
     const collections = await Promise.all(kinds.map(async kind => {
-      const rows = await this.request<Transaction[]>('GET', `/accounts/${segment(accountId)}/${kind}`);
+      const rows = kind === 'deposits' ? await this.listDeposits(accountId) : await this.listWithdrawals(accountId);
       return rows.map(row => ({ ...row, kind }));
     }));
     return collections.flat();
@@ -238,6 +247,48 @@ export class NessieClient {
       const recovered = await existing(); if (recovered) return recovered;
       throw new NessieError('deposit uncertain: reconcile reserved reference before any manual action');
     }
+  }
+  async withdraw(payment: WithdrawalPayment): Promise<Transaction> {
+    if (!Number.isSafeInteger(payment.amountCents) || payment.amountCents <= 0) throw new NessieError('positive integer amountCents required');
+    if (payment.amountCents % 100 !== 0) throw new NessieError('whole-dollar amounts required by integer-only sandbox; fractional dollars are truncated');
+    const description = withdrawalMemo(payment);
+    const existing = async () => {
+      const matches = (await this.listWithdrawals(payment.accountId)).filter(row => row.description === description);
+      if (matches.length > 1) throw new NessieError('duplicate withdrawal reference: reconciliation required');
+      const found = matches[0];
+      if (found && (Math.round(found.amount * 100) !== payment.amountCents || found.status === 'cancelled')) {
+        throw new NessieError('withdrawal reference conflict');
+      }
+      return found;
+    };
+    const found = await existing(); if (found) return found;
+    if (!await this.options.claims.claim(`withdrawal:${payment.accountId}:${description}`)) {
+      const recovered = await existing(); if (recovered) return recovered;
+      throw new NessieError('withdrawal uncertain: reserved reference requires reconciliation; will not re-POST');
+    }
+    try {
+      const created = await this.create<Transaction>(`/accounts/${segment(payment.accountId)}/withdrawals`, {
+        medium: 'balance', transaction_date: new Date().toISOString().slice(0, 10), status: 'completed', amount: payment.amountCents / 100, description,
+      });
+      if (!created?._id || created.description !== description || Math.round(created.amount * 100) !== payment.amountCents) {
+        throw new NessieError('withdrawal response mismatch');
+      }
+      return created;
+    } catch {
+      const recovered = await existing(); if (recovered) return recovered;
+      throw new NessieError('withdrawal uncertain: reconcile reserved reference before any manual action');
+    }
+  }
+  async reconcileWithdrawal(payment: WithdrawalPayment, debitId: string): Promise<WithdrawalReconciliation> {
+    const description = withdrawalMemo(payment);
+    const matches = (await this.listWithdrawals(payment.accountId)).filter(row => row.description === description);
+    const row = matches.length === 1 ? matches[0] : undefined;
+    const exact = row?._id === debitId && row.status === 'completed' && row.medium === 'balance' &&
+      Math.round(row.amount * 100) === payment.amountCents;
+    return exact
+      ? { match: 'EXACT', debitId, transactionId: row._id, amountCents: payment.amountCents }
+      : { match: 'MISMATCH', debitId, ...(row?._id && { transactionId: row._id }), amountCents: payment.amountCents,
+          reason: matches.length !== 1 ? `expected one invoice withdrawal, found ${matches.length}` : 'withdrawal fields do not match the requested debit' };
   }
 }
 

@@ -85,7 +85,7 @@ export function AttackDemoPanel() {
   }
 
   return <section className='attack-panel' aria-labelledby={`${id}-title`}>
-    <header><p className='attack-eyebrow'>Judge playground · source: judge</p><h1 id={`${id}-title`}>Try to trick the agents</h1>
+    <header><p className='attack-eyebrow'>Judge playground</p><h1 id={`${id}-title`}>Try to trick the agents</h1>
       <p>Choose an attack or write a malicious email or invoice. Follow what each agent observes and proposes, then read the server’s policy decision.</p></header>
     <form onSubmit={run}>
       <fieldset disabled={running} className='attack-presets'><legend>Attack presets</legend>
@@ -101,7 +101,7 @@ export function AttackDemoPanel() {
       <textarea id={`${id}-text`} rows={8} maxLength={2000} value={text} disabled={running} aria-describedby={`${id}-count ${id}-hint`}
         placeholder='Paste instructions that try to override the agents’ rules…' onChange={event => { setText(event.target.value); setSelected(undefined); }} />
       <p id={`${id}-count`} className='attack-help'>{text.length} / 2,000 characters · Editing a preset runs your custom text.</p>
-      <p id={`${id}-hint`} className='attack-help'>Tip: start from a preset and edit it. Plain prose without the invoice line is held as INVALID_INPUT.</p>
+      <p id={`${id}-hint`} className='attack-help'>Tip: start from a preset and edit it. Plain prose without the invoice line is held as invalid input.</p>
       <details className='attack-format'>
         <summary>Invoice line format</summary>
         <p>The intake parser reads exactly one line in this shape (one invoice per line, any surrounding email text is treated as untrusted data):</p>
@@ -122,7 +122,7 @@ export function AttackDemoPanel() {
       {error && <p role='alert' className='attack-error'>{error}</p>}
       {result && <>
         <p className='attack-eyebrow'>Completed · {result.mode} · source: {result.source}</p>
-        <p className='attack-help'>Untrusted data · isolated synthetic company</p>
+        <p className='attack-help'>Untrusted data</p>
         <p>Sender: {result.senderDomain === 'unknown.invalid' ? 'unknown (your text)' : result.senderDomain}</p>
         {result.liveBlocked && <p>{BLOCKED_HELP}</p>}
         <h2>Agent trace</h2>

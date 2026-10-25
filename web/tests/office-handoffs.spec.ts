@@ -71,8 +71,10 @@ test('renders the first four handoffs from the mocked feed', async ({ page }) =>
   await page.goto('/office?handoffs=mock&handoffSpeed=8');
   await requireWebGL(page);
   const entries = log(page).locator('li[data-status]');
-  // The first four fixture handoffs include the first five-role chain and arrive before later fixtures.
-  await expect(entries).toHaveCount(4, { timeout: 10_000 });
+  // The first four fixture handoffs include the first five-role chain and arrive before later fixtures. At speed 8
+  // exactly four are listed for only ~0.6 s before the fifth lands, so wait for at least four (a slow page can poll
+  // past that window) and check the first four, in order, rather than an exact count.
+  await expect.poll(() => entries.count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(4);
   await expect(entries.nth(0)).toContainText('Intake → Extractor · INV-1042');
   await expect(entries.nth(1)).toContainText('Collections → Auditor · INV-0977');
   await expect(entries.nth(2)).toContainText('Intake → Extractor · INV-1043');

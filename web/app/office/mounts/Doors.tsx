@@ -10,6 +10,7 @@ import { DOOR_LEAF_HEIGHT, doorPosition, type DoorId } from '../../../lib/office
 import { DOOR_OPENING_HEIGHT as DOOR_POST_TOP } from '../../../lib/office/layout';
 import { TREASURY_DOOR } from '../../../lib/office/targets/treasury';
 import type { SceneMountProps } from './types';
+import { CONTACT_DYNAMIC_LAYER } from '../../../lib/office/lighting';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
 
 const HIGHLIGHT_GEOMETRY = new BoxGeometry(1.5, 2.2, 0.2);
@@ -22,6 +23,8 @@ function Door({ room, snapshot }: { room: AnchorId; snapshot: OfficeSnapshot }) 
   const invalidate = useThree(state => state.invalidate);
   const [x, z] = room === 'treasury' ? TREASURY_DOOR : doorPosition(room as DoorId);
   useEffect(() => { if (denial) invalidate(); }, [denial, invalidate]);
+  // The flash toggles visibility per frame, so it belongs to the per-frame contact-shadow pass.
+  useEffect(() => { door.current?.layers.enable(CONTACT_DYNAMIC_LAYER); }, []);
   useFrame(({ invalidate }) => {
     if (!door.current) return;
     // Ages clamp at 0: clock skew can put a row's `at` ahead of this clock (same rule as doorFlash).

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_POLICY } from '@backroom/policy';
 import { MemoryStateStore, type AuditInput } from '../store';
-import { runPreCall, type PreCallInput, type PreCallDependencies, type CreditCheck, type HealthCheck, type HealthResult } from './index';
+import { CallPlannerUnavailableError, runPreCall, type PreCallInput, type PreCallDependencies, type CreditCheck, type HealthCheck, type HealthResult } from './index';
 
 const input = (): PreCallInput => ({
   clientId: 'client-1042', invoiceId: '1042', testIdentityId: 7,
@@ -103,9 +103,13 @@ describe('collections pre-call', () => {
 
   it('audits a model outage without exposing provider errors or returning a plan', async () => {
     const { deps, audit } = harness();
-    deps.planner.draft = vi.fn(async () => { throw new Error('secret model provider response'); });
+    deps.planner.draft = vi.fn(async () => { throw new CallPlannerUnavailableError({
+      stage: 'cloud', status: 401, errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5',
+    }); });
     expect(await runPreCall(input(), deps)).toEqual({ status: 'blocked', reason: 'Call planner unavailable' });
-    expect((await audit()).at(-1)).toMatchObject({ action: 'call_plan', decision: 'DENY' });
+    expect((await audit()).at(-1)).toMatchObject({ action: 'call_plan', decision: 'DENY', inputs: {
+      reason: 'Call planner unavailable', failure: { stage: 'cloud', status: 401, errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5' },
+    } });
     expect(JSON.stringify(await audit())).not.toContain('secret');
   });
 
@@ -181,4 +185,30 @@ describe('collections pre-call', () => {
     expect(deps.planner.draft).not.toHaveBeenCalled();
     expect((await audit()).map((entry: AuditInput) => entry.action)).toEqual(['can_call']);
   });
+});
+
+describe('phone mismatch (C17)', () => {
+  it('lets the call proceed but records PHONE_MISMATCH_WARN when Apify finds a different public number', async () => {
+    const { deps, audit } = harness();
+    deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: false, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+    expect(await runPreCall(input(), deps)).toMatchObject({ status: 'ready', warnings: ['PHONE_MISMATCH_WARN'] });
+    expect((await audit()).find((entry: AuditInput) => entry.action === 'phone_mismatch_warn'))
+      .toMatchObject({ decision: 'ALLOW', ruleIds: ['PHONE_MISMATCH_WARN'], inputs: { identityCaution: true } });
+  });
+  it('records no warning when the public number matches', async () => {
+    const { deps, audit } = harness();
+    deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: true, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+    const result = await runPreCall(input(), deps);
+    expect(result).toMatchObject({ status: 'ready' });
+    expect(result).not.toHaveProperty('warnings');
+    expect((await audit()).some((entry: AuditInput) => entry.action === 'phone_mismatch_warn')).toBe(false);
+  });
+});
+
+it('a phone mismatch on a call blocked by an unavailable OFAC check leaves no ALLOW warning row', async () => {
+  const { deps, audit } = harness();
+  deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: false, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+  deps.credit.check = vi.fn(async () => { throw new Error('CRS down'); });
+  expect(await runPreCall(input(), deps)).toMatchObject({ status: 'blocked' });
+  expect((await audit()).some((entry: AuditInput) => entry.action === 'phone_mismatch_warn')).toBe(false);
 });

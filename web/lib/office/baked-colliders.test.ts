@@ -9,7 +9,10 @@ import {
 
 const file = resolve(dirname(fileURLToPath(import.meta.url)), '../../public/office-art/lobby.colliders.json');
 const authored = JSON.parse(readFileSync(file, 'utf8')) as unknown;
-const NAMES = ['coffee_cabinet', 'water_cooler', 'bookshelf', 'floor_plant', 'sofa', 'coffee_table'] as const;
+const NAMES = [
+  'coffee_cabinet', 'water_cooler', 'bookshelf', 'floor_plant', 'sofa', 'coffee_table',
+  'coat_stand', 'umbrella_stand', 'magazine_table', 'plant_cluster',
+] as const;
 
 function boxNamed(boxes: readonly ColliderBox[], name: string): ColliderBox {
   const found = boxes.find(entry => entry.name === name);
@@ -18,7 +21,7 @@ function boxNamed(boxes: readonly ColliderBox[], name: string): ColliderBox {
 }
 
 describe('lobby collider loader', () => {
-  it('parses the six authored footprints into collision boxes', () => {
+  it('parses the authored footprints into collision boxes', () => {
     const boxes = parseLobbyColliders(authored);
     expect(boxes).toEqual(LOBBY_PROP_BOXES);
     expect(boxes.map(entry => entry.name)).toEqual([...NAMES]);

@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instances, OrbitControls } from '@react-three/drei';
-import { Group, MathUtils, Vector3, type Camera } from 'three';
+import { Group, MathUtils, MeshStandardMaterial, Vector3, type Camera } from 'three';
 import { cameraAlpha } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import type { PlayBridge } from '../../lib/office/play';
@@ -20,6 +20,8 @@ import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
 import { Block, useReducedMotion } from './mounts/shared';
 import { PresenceGhosts } from './PresenceGhosts';
+import { ContactDynamic } from './ContactShadows';
+import { UNIT_BOX } from './mounts/StaticGeometry';
 import { Bear, createBearRig, poseBear } from './avatars/Bear';
 import { CoworkerAvatars } from './CoworkerAvatars';
 import type { PresencePeer } from '../../lib/office/presence';
@@ -42,6 +44,17 @@ function RoomPad({ id, color }: { id: SpaceId; color: string }) {
 /** First person only: a wall between the eye and a label's floor point hides the label (the overview sees over the cut-away walls). */
 function behindWall(camera: Camera, x: number, z: number): boolean {
   return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked(camera.position.x, camera.position.z, x, z);
+}
+/** Sample offsets (m) around a floor point: an avatar is culled only when a wall hides its centre and all four sides. */
+const BODY_SAMPLES = [[0, 0], [0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45]] as const;
+/**
+ * First person only: true when walls hide every sample around (x, z), so the avatar's ~20 meshes skip the main,
+ * shadow and contact passes. Interior walls are full height and windowless, so the 2D test is exact enough;
+ * doorways stay open and the overview never culls.
+ */
+function bodyBehindWalls(camera: Camera, x: number, z: number): boolean {
+  if ((camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera !== true) return false;
+  return BODY_SAMPLES.every(([dx, dz]) => sightBlocked(camera.position.x, camera.position.z, x + dx, z + dz));
 }
 function ScreenLabel({ at, element }: { at: [number, number, number]; element: LabelRef }) {
   const point = useRef(new Vector3());
@@ -81,6 +94,7 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     if (walk.moving) state.invalidate();
     if (!body.current) return;
     body.current.position.set(walk.position[0], 0, walk.position[1]);
+    body.current.visible = !bodyBehindWalls(state.camera, walk.position[0], walk.position[1]);
     const turn = MathUtils.euclideanModulo(walk.heading - body.current.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
     body.current.rotation.y += turn * (1 - Math.exp(-12 * Math.min(delta, 0.1)));
     poseBear(rig, walk.distance, walk.moving && !tween && !recorded, reduced);
@@ -89,9 +103,10 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
   // The character mount sets this only after that agent's GLB clone exists. Otherwise the bear stays.
   const showGlb = bakedVersion > 0 && bakedCharacterReady(agent.id);
   const color = isAnchorId(agent.seatId) ? OFFICE_ANCHORS[agent.seatId].color : '#9aa38f';
+  // Own meshes, not shared Blocks: the folder moves with the agent, so the baked contact-shadow pass must not see it.
   const folder = agent.escalationId ? <group name={`folder:${agent.escalationId}`}>
-    <Block at={[0.05, 0.04, 0.14]} size={[0.1, 0.43, 0.5]} color='#e0b365' />
-    <Block at={[0.06, 0.13, 0.14]} size={[0.11, 0.04, 0.34]} color='#f3dfb9' />
+    <mesh geometry={UNIT_BOX} material={FOLDER_MATERIAL} position={[0.05, 0.04, 0.14]} scale={[0.1, 0.43, 0.5]} castShadow receiveShadow dispose={null} />
+    <mesh geometry={UNIT_BOX} material={FOLDER_PAPER_MATERIAL} position={[0.06, 0.13, 0.14]} scale={[0.11, 0.04, 0.34]} castShadow receiveShadow dispose={null} />
   </group> : null;
   // Same paw the bear holds the folder in (bear.ts pawPosition). The GLB has no paw, so the folder sits there on its own.
   const carried = pawPosition(1, BEAR_CARRY_PAW);
@@ -100,6 +115,9 @@ function Avatar({ agent, motion, tween, recorded, paused }: { agent: OfficeAgent
     {showGlb && folder && <group position={[carried[0], carried[1], carried[2]]}>{folder}</group>}
   </group>;
 }
+// Carried escalation folder (shared for the lazy scene lifetime; dispose={null} on the meshes).
+const FOLDER_MATERIAL = new MeshStandardMaterial({ color: '#e0b365', roughness: OFFICE_LIGHTING.base.roughness });
+const FOLDER_PAPER_MATERIAL = new MeshStandardMaterial({ color: '#f3dfb9', roughness: OFFICE_LIGHTING.base.roughness });
 /** Tour moves start from wherever the camera is when the frame after a focus change renders. */
 interface TourMove { startedAt: number | null; position: Vector3; target: Vector3; zoom: number }
 function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: boolean; tour: boolean }) {
@@ -195,13 +213,14 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     })}
     {/* Registered scene pieces (./mounts): instanced ones share these Instances; the rest draw after them. */}
     {SCENE_MOUNTS.filter(mount => mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
-    {snapshot.agents.map(agent => <Fragment key={agent.id}>
+    <ContactDynamic name='office:agents'>{snapshot.agents.map(agent => <Fragment key={agent.id}>
       <Avatar agent={agent} motion={motions.get(agent)} tween={fixed} recorded={snapshot.connection === 'replay'} paused={paused} />
       {agentTag && <AgentTag agentId={agent.id} motion={motions.get(agent)} element={agentTag} />}
-    </Fragment>)}
+    </Fragment>)}</ContactDynamic>
     </Instances>
-    {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component }) => <Component key={id} snapshot={snapshot} />)}
-    {play ? <CoworkerAvatars peers={presence} bubbles={chatBubbles} /> : <PresenceGhosts peers={presence} />}
+    {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component, moving }) => moving
+      ? <ContactDynamic key={id}><Component snapshot={snapshot} /></ContactDynamic> : <Component key={id} snapshot={snapshot} />)}
+    <ContactDynamic name='office:presence'>{play ? <CoworkerAvatars peers={presence} bubbles={chatBubbles} /> : <PresenceGhosts peers={presence} />}</ContactDynamic>
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }

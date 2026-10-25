@@ -2,9 +2,10 @@ import { northfield, northfieldChange, northfieldInvoice, northfieldSource } fro
 import type { InboxPreset } from './types';
 
 const planted = [
-  ['4419', 'Duplicate invoice · +$37'], ['4471', 'Lookalike sender · bank change'],
-  ['4481', 'No matching purchase order'], ['4482', 'Over the payment limit'],
-  ['4483', 'Sanctions flag'], ['4484', 'Vendor not approved'],
+  ['4401', 'Normal approved invoice'],
+  ['4419', 'Duplicate invoice +$37'], ['4471', 'Lookalike bank change'],
+  ['4481', 'No PO'], ['4482', 'Over limit'],
+  ['4483', 'Sanctions'], ['4484', 'Unapproved vendor'],
 ] as const;
 // Frozen company facts only. Never accept extracted fields or approval flags from the browser.
 export const inboxPresets: InboxPreset[] = planted.map(([id, label]) => {
@@ -15,7 +16,7 @@ export const inboxPresets: InboxPreset[] = planted.map(([id, label]) => {
 const cedar = northfield.bankChanges.find(row => row.id === 'bc-legitimate');
 if (cedar) {
   const change = northfieldChange(cedar.id);
-  inboxPresets.push({ id: cedar.id, label: 'Cedar bank change · verification required', kind: 'email',
+  inboxPresets.push({ id: cedar.id, label: 'Cedar bank change', kind: 'email',
     senderDomain: change.source.senderDomain,
     text: `Please update our payment account.\n\n${JSON.stringify(change.fields, null, 2)}` });
 }

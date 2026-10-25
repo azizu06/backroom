@@ -44,6 +44,12 @@ export interface OfficeLighting {
   vault: { color: string; roughness: number; metalness: number };
 }
 
+/**
+ * Extra layer for moving scene pieces (avatars, doors, carried folders). They also stay on layer 0; the contact
+ * shadow redraws only this layer per frame and bakes the rest. Outdoors uses layer 2.
+ */
+export const CONTACT_DYNAMIC_LAYER = 3;
+
 /** Top of the tallest floor pad in scene.tsx; the contact-shadow plane must sit above it. */
 export const FLOOR_PAD_TOP = 0.045;
 /** Highest underside the contact-shadow pass must skip (room pads and the aisle strip). */

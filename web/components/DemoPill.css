@@ -1,0 +1,5 @@
+/* Shared palette tokens (app/theme.css). */
+.demo-pill { box-sizing: border-box; display: inline-block; align-self: center; margin: 0; padding: 4px 12px; border: 2px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: 800 12px/1.5 var(--font-ui); white-space: nowrap; }
+.demo-pill-fixed { position: fixed; z-index: 110; right: 12px; bottom: 12px; max-width: calc(100vw - 24px); box-shadow: var(--bubble-shadow); white-space: normal; overflow-wrap: anywhere; }
+.demo-pill a { color: inherit; text-underline-offset: 2px; }
+.demo-pill a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

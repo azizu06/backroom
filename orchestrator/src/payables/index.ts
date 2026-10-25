@@ -1,7 +1,7 @@
 import { createBankChangeRiskCheck, assessBankChangeRisk } from '../vendor/crs';
-import { x402Payables, X402_LABEL } from '../x402';
+import { x402Payables, X402_LABEL, type X402Label } from '../x402';
 import { createHash } from 'node:crypto';
-import { evaluate, type APInvoice, type Context, type Decision, type LineItem } from '@backroom/policy';
+import { evaluate, type APInvoice, type Context, type Decision, type LineItem, type RuleId } from '@backroom/policy';
 import { audit, domain, hold } from './decisions';
 import { invoiceSchema, sourceSchema } from './schemas';
 import type { FinanceRepository, InboxSource, InvoiceFields, InvoiceRecord, PayablesClient, SeatOptions, SeatResult } from './types';
@@ -9,19 +9,26 @@ export type * from './types';
 export { MemoryFinanceRepository } from './repository';
 export { controllerForLease } from './decisions';
 export * from './northfield';
-export { nessiePayables } from './payments';
+export { nessieDebitPayables, nessiePayables } from './payments';
 
 function items(lines: readonly LineItem[]) {
   return JSON.stringify(lines.map(item => [item.description.trim().toLowerCase().replace(/\s+/g, ' '), item.quantity, item.unitPriceCents])
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
 }
+const CONTROLLER_OVERRIDABLE = new Set<RuleId>(['NO_PO', 'OVER_LIMIT']);
+const sameRules = (left: readonly string[], right: readonly string[]) =>
+  [...left].sort().join('\n') === [...right].sort().join('\n');
 export class PayablesSeat {
   private readonly payment?: PayablesClient;
   private readonly rail: 'nessie' | 'x402';
-  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient; x402?: PayablesClient; paymentRail?: string }) {
+  private readonly label: 'nessie' | X402Label;
+  /** `x402Label` only names an injected client's rail in results and audits. */
+  constructor(private readonly options: SeatOptions & { nessie?: PayablesClient; x402?: PayablesClient; paymentRail?: string; x402Label?: X402Label }) {
     const rail = options.paymentRail ?? process.env.PAYMENT_RAIL ?? 'nessie';
     if (rail !== 'nessie' && rail !== 'x402') throw new Error('UNKNOWN_PAYMENT_RAIL');
     this.rail = rail;
+    if (options.x402Label && options.x402Label !== X402_LABEL && (rail !== 'x402' || !options.x402)) throw new Error('X402_SIMULATION_NEEDS_CLIENT');
+    this.label = rail === 'x402' ? options.x402Label ?? X402_LABEL : 'nessie';
     this.payment = rail === 'x402' ? options.x402 ?? x402Payables(options) : options.nessie;
     this.risk = options.bankChangeRisk ?? createBankChangeRiskCheck();
   }
@@ -79,7 +86,7 @@ export class PayablesSeat {
       const vendor = await repo.getVendor(fields.vendorId);
       if (prior?.fingerprint === fingerprint && prior.paymentAttempted) {
         await audit(this.options, 'payables', 'pay_invoice_replay', source, prior.result.decision, [fields.invoiceId],
-          { paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie', receiptId: prior.result.receiptId });
+          { paymentRail: this.label, receiptId: prior.result.receiptId });
         return prior.result;
       }
       const { canReevaluate, policyInvoice, bankChanged, history, context, decision: first } =
@@ -96,28 +103,56 @@ export class PayablesSeat {
       }
       // An unrelated sender domain cannot be authenticated by a model's vendor ID.
       if (decision.kind === 'ALLOW' && vendor && domain(source.senderDomain) !== domain(vendor.domain)) decision = hold('PAYEE_NOT_IN_MASTER');
+      let approvedEscalation: Awaited<ReturnType<SeatOptions['state']['getEscalation']>>;
+      if (decision.kind === 'ESCALATE' && prior?.fingerprint === fingerprint && !prior.paymentAttempted && prior.result.escalationId &&
+          decision.ruleIds.length > 0 && decision.ruleIds.every(rule => CONTROLLER_OVERRIDABLE.has(rule))) {
+        const now = (this.options.now ?? Date.now)();
+        await this.options.state.expireEscalations(now);
+        const approval = await this.options.state.getEscalation(prior.result.escalationId);
+        const evidenceSource = prior.source?.id ?? source.id;
+        const bound = approval?.id === prior.result.escalationId && approval.status === 'approved' &&
+          approval.toHuman === decision.toHuman && approval.policyVersion === decision.policyVersion &&
+          approval.evidenceRefs.includes(evidenceSource) && approval.evidenceRefs.includes(fields.invoiceId) &&
+          sameRules(approval.ruleIds, decision.ruleIds);
+        const passkey = approval?.method === 'passkey' && typeof approval.credentialId === 'string' && !!approval.credentialId &&
+          typeof approval.decidedAt === 'number' && Number.isFinite(approval.decidedAt) &&
+          approval.decidedAt >= approval.createdAt && approval.decidedAt < approval.expiresAt && approval.decision?.kind === 'Approve';
+        if (bound && passkey) {
+          approvedEscalation = approval;
+          decision = { kind: 'ALLOW', ruleIds: [...decision.ruleIds], policyVersion: decision.policyVersion };
+        }
+      }
       if (decision.kind === 'ALLOW' && !this.payment) decision = hold('INVALID_INPUT');
       const duplicate = decision.ruleIds.includes('DUPLICATE_INVOICE') ? history.find(row =>
         evaluate('payables', { type: 'pay_invoice', invoice: policyInvoice }, { ...context, priorInvoices: [row.policyInvoice] }).ruleIds.includes('DUPLICATE_INVOICE')) ?? prior : undefined;
       const refs = [source.id, fields.invoiceId];
       const evidenceRefs = [...refs, ...(duplicate ? [duplicate.fields.invoiceId] : []), ...(risk?.refs ?? [])];
-      const result: SeatResult = { status: 'held', decision, evidenceRefs, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' };
+      const result: SeatResult = { status: 'held', decision, evidenceRefs, paymentRail: this.label };
       const row: InvoiceRecord = { source, fields, policyInvoice, fingerprint, result, vendorRevision: vendor?.revision ?? null, paymentAttempted: false };
       await audit(this.options, 'payables', 'pay_invoice', source, decision, evidenceRefs.slice(1), {
-        invoiceId: fields.invoiceId, vendorId: fields.vendorId, bankChanged, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie',
+        invoiceId: fields.invoiceId, vendorId: fields.vendorId, bankChanged, paymentRail: this.label,
         fence: effect.fence ? 'checked' : 'not_applicable',
         senderDomain: domain(source.senderDomain), vendorDomain: vendor?.domain,
         relatedInvoiceId: duplicate?.fields.invoiceId, amountDelta: duplicate ? (fields.amountCents - duplicate.fields.amountCents) / 100 : undefined,
       });
+      if (approvedEscalation && decision.kind === 'ALLOW') {
+        await this.options.state.appendAudit({ ts: (this.options.now ?? Date.now)(), actor: 'human', seat: 'payables',
+          action: 'pay_invoice_approval_applied', decision: 'ALLOW', ruleIds: [...approvedEscalation.ruleIds],
+          policyVersion: approvedEscalation.policyVersion, refs: [source.id, fields.invoiceId, approvedEscalation.id],
+          route: 'passkey', latencyMs: 0, costUsd: 0,
+          inputs: { method: approvedEscalation.method, credentialId: approvedEscalation.credentialId,
+            escalationId: approvedEscalation.id, controllerDecision: approvedEscalation.status } });
+      }
       if (decision.kind !== 'ALLOW') {
-        if (decision.kind === 'ESCALATE') result.escalationId = await this.options.controller.request(decision, refs);
+        if (decision.kind === 'ESCALATE') result.escalationId = prior?.fingerprint === fingerprint && prior.result.escalationId
+          ? prior.result.escalationId : await this.options.controller.request(decision, refs);
         // Conflicting replays never overwrite an original receipt or its fingerprint.
         if (!prior || canReevaluate) await repo.saveInvoice(row);
         return result;
       }
       const fenced = async (stage: 'reservation' | 'provider', error: unknown) => {
         await audit(this.options, 'payables', 'payment_fenced', source, hold('INVALID_INPUT'), [fields.invoiceId],
-          { stage, error: error instanceof Error ? error.message.slice(0, 80) : 'FENCED', paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' });
+          { stage, error: error instanceof Error ? error.message.slice(0, 80) : 'FENCED', paymentRail: this.label });
         return error;
       };
       const stale = () => { try { effect.fence?.(); return undefined; } catch (error) { return error ?? new Error('FENCED'); } };
@@ -141,6 +176,17 @@ export class PayablesSeat {
           sourceAccount: policyInvoice.account, destinationAccountId: vendor!.accountId });
         if (typeof receipt.id === 'string' && receipt.id) result.receiptId = receipt.id;
         if (receipt.status !== 'completed' || typeof receipt.id !== 'string' || !receipt.id) throw new Error('PAYMENT_UNCONFIRMED');
+        if (receipt.reconciliation) {
+          result.reconciliation = receipt.reconciliation;
+          const exact = receipt.reconciliation.match === 'EXACT';
+          await this.options.state.appendAudit({ ts: (this.options.now ?? Date.now)(), actor: 'code', seat: 'payables', action: 'reconcile',
+            decision: exact ? 'ALLOW' : 'ESCALATE', ruleIds: [exact ? 'EXACT_PAYMENT_MATCH' : 'RECON_MISMATCH'],
+            policyVersion: decision.policyVersion, refs: [source.id, fields.invoiceId, receipt.id], route: 'code', latencyMs: 0, costUsd: 0,
+            inputs: { transactionKind: 'withdrawal', match: receipt.reconciliation.match, debitId: receipt.reconciliation.debitId,
+              transactionId: receipt.reconciliation.transactionId, invoiceId: fields.invoiceId, vendorId: fields.vendorId, amountCents: fields.amountCents,
+              reason: receipt.reconciliation.reason } });
+          if (!exact) throw new Error('NESSIE_DEBIT_RECONCILIATION_MISMATCH');
+        }
         result.status = 'paid'; result.receiptId = receipt.id; result.decision = decision;
       } catch {
         const uncertain = hold('INVALID_INPUT');
@@ -148,9 +194,9 @@ export class PayablesSeat {
         result.escalationId = await this.options.controller.request(uncertain, refs);
       }
       await repo.saveInvoice(row);
-      const completedAction = this.rail === 'x402' ? 'x402_testnet_completed' : 'nessie_completed';
+      const completedAction = `${this.label.replace(' ', '_')}_completed`;
       await audit(this.options, 'payables', result.status === 'paid' ? completedAction : 'payment_uncertain', source,
-        result.decision, [fields.invoiceId], { receiptId: result.receiptId, paymentRail: this.rail === 'x402' ? X402_LABEL : 'nessie' });
+        result.decision, [fields.invoiceId], { receiptId: result.receiptId, paymentRail: this.label });
       return result;
     });
   }

@@ -7,12 +7,16 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDemoRuntime } from './lib/demo/runtime';
 import { recordVoiceCallEvent } from './lib/calls/lifecycle';
-import { localOperatorRequest, operatorSession } from './lib/operator/session';
+import { localOperatorRequest } from './lib/operator/session';
+import { localOperatorSessionCookie } from './lib/operator/sign-in';
 import { operatorAudit } from './lib/operator/audit';
+import { proxyStateHTTP, proxyStateUpgrade, stateProxyEnabled } from './lib/demo/state-proxy';
 
 async function main() {
   if (!['memory', 'spacetime'].includes(process.env.STATE_STORE || '')) throw new Error('DEMO_STATE_REQUIRED');
   const port = Number(process.env.DEMO_PORT || 3000);
+  // The office then subscribes through this host's own origin, so the public URL gets live state.
+  if (stateProxyEnabled(process.env)) process.env.DEMO_STATE_PROXY = '1';
   const origin = new URL(process.env.DEMO_PUBLIC_URL || `http://localhost:${port}`);
   // Next's hostname/port describe the public reverse-proxy origin, not our listen socket.
   const app = next({ dev: false, dir: fileURLToPath(new URL('.', import.meta.url)),
@@ -32,7 +36,7 @@ async function main() {
         res.writeHead(403).end('Unlock on the host’s local operator page.'); return;
       }
       try {
-        const cookie = operatorSession(process.env, `http://127.0.0.1:${port}`);
+        const cookie = localOperatorSessionCookie(process.env, `http://127.0.0.1:${port}`);
         await operatorAudit('session', 'operator:local-host', 'completed');
         res.setHeader('Set-Cookie', cookie); res.end('{}');
       } catch { res.writeHead(503).end('Operator session unavailable.'); }
@@ -101,6 +105,7 @@ async function main() {
       res.writeHead(409).end(); return;
     }
     if (resetting) { res.writeHead(503).end('Demo resetting; retry shortly'); return; }
+    if (proxyStateHTTP(req, res)) return;
     const relayPath = voiceRelayPath(path);
     if (relayPath !== undefined) {
       if (process.env.DEMO_VOICE_RUNNING !== '1') { res.writeHead(503).end('Voice relay disabled'); return; }
@@ -123,7 +128,7 @@ async function main() {
     try { await handle(req, res); } catch { if (!res.headersSent) res.writeHead(500); res.end('Demo request failed'); }
   };
   const host = demoBindHost(process.env);
-  const listeners = await listenDemo(handler, port, host);
+  const listeners = await listenDemo(handler, port, host, (req, socket, head) => proxyStateUpgrade(req, socket, head));
   console.log(`Demo bound: ${host}:${port}${host === '127.0.0.1' ? '' : ` and 127.0.0.1:${port}`}`);
   let closing = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {

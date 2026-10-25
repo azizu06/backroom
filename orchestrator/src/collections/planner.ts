@@ -5,11 +5,60 @@ export interface CallPlannerOptions {
   cloudRoute?: typeof route;
   fallbackRoute?: typeof route;
   fallbackFetch?: typeof fetch;
+  /** Model label used only in redacted diagnostics. */
+  modelId?: string;
+  /** Receives metadata only; provider messages, prompts, and credentials are never forwarded. */
+  reportFailure?: (failure: CallPlannerFailureDiagnostic) => void;
+}
+
+export interface CallPlannerFailureDiagnostic {
+  stage: 'cloud' | 'gx10_fallback' | 'planner';
+  status?: number;
+  errorType: string;
+  code?: string;
+  modelId: string;
+}
+
+const safeToken = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && /^[a-zA-Z0-9_.:/-]{1,128}$/.test(value) ? value : fallback;
+
+/** Convert an arbitrary failure into metadata safe for logs and immutable audit rows. */
+export function sanitizeCallPlannerFailure(error: unknown, stage: CallPlannerFailureDiagnostic['stage'], modelId: string): CallPlannerFailureDiagnostic {
+  const row = error && typeof error === 'object' ? error as Record<string, unknown> : undefined;
+  const status = row && typeof row.status === 'number' && Number.isInteger(row.status) && row.status >= 100 && row.status <= 599 ? row.status : undefined;
+  const rawCode = row?.kind ?? row?.code;
+  return {
+    stage,
+    ...(status !== undefined && { status }),
+    errorType: safeToken(error instanceof Error ? error.constructor.name : typeof error, 'UnknownError'),
+    ...(rawCode !== undefined && { code: safeToken(rawCode, 'UNKNOWN') }),
+    modelId: safeToken(modelId, 'unknown'),
+  };
+}
+
+export class CallPlannerUnavailableError extends Error {
+  override readonly name = 'CallPlannerUnavailableError';
+  constructor(readonly diagnostic: CallPlannerFailureDiagnostic) { super('Call planner unavailable'); }
 }
 
 /** Call-plan tasks are hard calls. The only downgrade is the authorized billing fallback. */
 export function createCallPlanner(options: CallPlannerOptions = {}): CallPlanner {
   const cloudRoute = options.cloudRoute ?? route;
+  const cloudProvider = process.env.LLM_CLOUD_PROVIDER ?? 'anthropic';
+  const modelId = options.modelId ?? (cloudProvider === 'anthropic'
+    ? process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5-5'
+    : process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5');
+  const reportFailure = (failure: CallPlannerFailureDiagnostic) => {
+    try {
+      if (options.reportFailure) options.reportFailure(failure);
+      else console.error('call planner unavailable', failure);
+    } catch { /* Diagnostics must not change the safe failure path. */ }
+  };
+  const unavailable = (error: unknown, stage: CallPlannerFailureDiagnostic['stage'], failedModelId: string) => {
+    const diagnostic = sanitizeCallPlannerFailure(error, stage, failedModelId);
+    reportFailure(diagnostic);
+    return new CallPlannerUnavailableError(diagnostic);
+  };
   const gx10Fetch: typeof fetch = (url, init) => {
     const body = JSON.parse(String(init?.body));
     // The shared router's cloud transport omits local reasoning controls. Keep the
@@ -54,12 +103,13 @@ export function createCallPlanner(options: CallPlannerOptions = {}): CallPlanner
       };
       try { return await cloudRoute('call_plan', input, schema); }
       catch (error) {
-        if (!(error instanceof Error) || error.message !== 'Model request failed: HTTP 402') throw new Error('Call planner unavailable');
+        const cloudFailure = sanitizeCallPlannerFailure(error, 'cloud', modelId);
+        if (cloudFailure.status !== 402) throw unavailable(error, 'cloud', modelId);
         try {
           const result = await fallbackRoute('call_plan', input, schema);
           if (isLlmOff(result)) return result;
           return { ...result, route: 'gx10_fallback', latencyMs: performance.now() - start, costUsd: 0 };
-        } catch { throw new Error('Call planner unavailable'); }
+        } catch (fallbackError) { throw unavailable(fallbackError, 'gx10_fallback', 'gpt-oss:120b'); }
       }
     },
   };

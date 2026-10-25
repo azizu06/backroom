@@ -8,6 +8,7 @@ import {
   CHARACTER_GLB_URL, agentBodyColor, characterYaw, disposeClonedBody, recolorBody, setBakedCharacterReady,
 } from '../../../lib/office/baked-character';
 import type { OfficeAgent } from '../../../lib/office/state';
+import { CONTACT_DYNAMIC_LAYER } from '../../../lib/office/lighting';
 import type { SceneMountProps } from './types';
 
 const scratchPosition = new Vector3();
@@ -126,6 +127,8 @@ function syncClone(template: Group, agent: OfficeAgent, map: Map<string, Group>,
   object.visible = false;
   (object.userData as { seatId?: string }).seatId = agent.seatId;
   object.traverse(node => {
+    // Walks with its agent: drawn by the per-frame contact-shadow pass, never baked.
+    node.layers.enable(CONTACT_DYNAMIC_LAYER);
     const mesh = node as Mesh;
     if (!mesh.isMesh) return;
     mesh.castShadow = true;

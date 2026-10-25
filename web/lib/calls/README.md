@@ -1,20 +1,21 @@
 # Office calls: Request call button and desk phone feed
 
-The office desk phone (`web/lib/office/calls.ts`) uses three host routes. All are
+The office desk phone (`web/lib/office/calls.ts`) uses four host routes. All are
 server-side; no number, secret or session id reaches the browser.
 
 | Route | Auth | Does |
 |---|---|---|
-| `POST /api/calls/session` | `{ code }` = operator code (`CONTROLLER_ENROLLMENT_SECRET`, same as the audit wall), from `WEBAUTHN_ORIGIN` or `http://127.0.0.1:$DEMO_PORT` | Sets `backroom_calls`, HttpOnly, SameSite=Strict, `Path=/api/calls`, 12 h. `Secure` only when that origin is https |
+| `POST /api/session` | `{ code }` = operator code (`CONTROLLER_ENROLLMENT_SECRET`), from `WEBAUTHN_ORIGIN`, `DEMO_PUBLIC_URL` or `http://127.0.0.1:$DEMO_PORT` | The shared operator sign-in (`web/lib/operator/sign-in.ts`): sets `backroom_session`, HttpOnly, SameSite=Strict, `Path=/`, 8 h, `Secure` on https. Five wrong codes lock that client out for 60 s |
 | `POST /api/calls/request` | that cookie + `Origin` is `WEBAUTHN_ORIGIN` or `http://127.0.0.1:$DEMO_PORT` | Dials once through the relay's `/_admin/dial` |
 | `GET /api/calls/active` | none (carries no secrets) | Read-only projection of the latest voice call, `no-store` |
+| `GET /api/calls/precall` | none (carries no secrets) | Pre-call card above Request call: Apify business status, source label verbatim (live run id / FAKE / cached), source host, checked time, phone match, pre-call ready/blocked + reason, optional warnings. Reads evidence `prepare()` already fetched; starts no Apify or CRS check, `no-store` |
 
-**Before judging**, open the office at `http://127.0.0.1:$DEMO_PORT/office`. The
-tunnel page cannot open the state socket, so it has no Request call button. The
-first click answers "Calls are locked" with an Unlock link to `/calls` on that same
-loopback origin. Enter the operator code (`CONTROLLER_ENROLLMENT_SECRET` in
-`.demo/private.env`). After that, each click rings the allowlisted phone, with no
-CLI step. A public origin still has to be `WEBAUTHN_ORIGIN` exactly.
+**Before judging**, open the office on the public URL and sign in once at
+`/operator` (or `/calls`) with the operator code (`CONTROLLER_ENROLLMENT_SECRET` in
+`.demo/private.env`). The office reaches live state through the host's same-origin
+proxy (`web/lib/demo/state-proxy.ts`), so the public page has the desk phone. A
+signed-out click answers "Calls are locked". After sign-in, each click rings the
+allowlisted phone, with no CLI step. The host's loopback office works the same way.
 
 `request` accepts only `{}` or `{ "line": "collections" }`. The destination is the
 relay's `T1_DIAL_TO`, never request input. It refuses when voice is not running
@@ -25,6 +26,14 @@ audit chain **before** forwarding (no audit, no dial), then `office_call_accepte
 or `office_call_refused` with the relay's code. Unauthenticated refusals are
 coalesced to one row per code per 10 s. The relay's own gate (pre-call `ready`,
 one call on the line) is described in `orchestrator/src/voice/README.md`.
+
+For an authenticated `PRECALL_BLOCKED` or `CALL_DENIED`, the demo bootstrap asks
+its existing agent host to rebuild the trusted pre-call case. Consumer, DNC and
+missing-consent cases run through the production Collections planner and may queue
+one `SIMULATED: email preview, not sent` per invoice/UTC day. The button result says
+`Email preview (simulated, not sent)` only after that queue reports queued or
+duplicate. The shared audit records only the recipient domain; no delivery provider
+is configured. Other refusal reasons keep the normal no-call response.
 
 `active` projects `GatewayStore.latestVoiceCall()` plus provider lifecycle
 (`lifecycle.ts`, pushed by the relay over the host's loopback). Status: no

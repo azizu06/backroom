@@ -12,6 +12,13 @@ describe('demo dependency health', () => {
     expect(calls).toEqual([]);
     expect(JSON.stringify(rows)).not.toContain('secret provider detail');
   });
+
+  it('shows a red row with only missing/defaulted required variable names', async () => {
+    const rows = await probeDependencies({ env: {}, status: { llmEnabled: false, stateStore: 'memory', voice: false,
+      envChecks: [{ process: 'web + seats', missing: ['APIFY_TOKEN'], defaulted: ['ANTHROPIC_MODEL'] }] } });
+    expect(rows[0]).toEqual({ name: 'Required env (web + seats)', ok: false,
+      detail: 'missing: APIFY_TOKEN; defaulted: ANTHROPIC_MODEL' });
+  });
 });
 
 it('bounded live probes hide credential URLs and require successful responses', async () => {

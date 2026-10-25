@@ -10,6 +10,8 @@ import { demoBindHost, externalState } from './host';
 import { localSpacetime } from './spacetime';
 import { OwnedProcesses } from './processes';
 import { probeAttackDemo, probeDependencies, type DemoStatus, type HealthRow } from './health';
+import { demoPublicTarget } from './public-url';
+import { demoEnvironmentChecks, formatEnvironmentCheck, markDemoEnvironmentDefaulted, type DemoEnvironmentCheck } from './env';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
@@ -36,6 +38,7 @@ function printUrls(status: DemoStatus & { publicUrl: string; localUrl: string })
     console.log(`${label}: ${status.publicUrl}${path || '/ (not seeded)'}`);
   }
   console.log(`StateStore=${status.stateStore}; ${status.bank}; synthetic preverified caller; LLM ${status.llmEnabled ? 'ON' : 'OFF'}. See docs/test-v1.md.`);
+  for (const row of status.envChecks ?? []) console.log(formatEnvironmentCheck(row));
 }
 async function waitFor(check: () => Promise<boolean>, ms: number) {
   const deadline = Date.now() + ms;
@@ -66,6 +69,7 @@ async function supervise() {
   let bindHost = '127.0.0.1';
   let stateConfig: Awaited<ReturnType<typeof database.publish>> | undefined;
   let resetting = false;
+  let envChecks: DemoEnvironmentCheck[] = [];
   const queryWeb = async (action: string) => {
     const response = await fetch(`${base}/__demo/${action}`, { method: action === 'reset' ? 'POST' : 'GET',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -91,7 +95,7 @@ async function supervise() {
         try { status = await queryWeb(req.url === '/reset' ? 'reset' : 'status'); }
         finally { if (req.url === '/reset') resetting = false; }
         const attackDemo = await probeAttackDemo(env);
-        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, attackDemo, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
+        res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...status, attackDemo, envChecks, publicUrl, localUrl: base, tunnelUrl: env.DEMO_TUNNEL === '0' ? undefined : publicUrl })); return;
       }
       res.writeHead(404).end();
     } catch { res.writeHead(503).end(); }
@@ -133,8 +137,11 @@ async function supervise() {
     if (env.DEMO_PREBUILT !== '1') await children.run('pnpm', ['--filter', '@backroom/web', 'build'], join(dir, 'build.log'));
     env.STATE_STORE = stateMode;
     // WebAuthn allows a non-HTTPS origin only for hostname localhost. The listen socket stays on the bind address.
-    publicUrl = env.DEMO_TUNNEL === '0' ? `http://localhost:${port}` : base;
-    if (env.DEMO_TUNNEL !== '0') {
+    // A preset HTTPS origin (Tailscale Funnel) is the public URL. demo:up has no other external-URL flag, so this skips cloudflared.
+    if (!env.DEMO_PUBLIC_URL) markDemoEnvironmentDefaulted(env, 'DEMO_PUBLIC_URL');
+    const target = demoPublicTarget(env, port, base);
+    publicUrl = target.publicUrl;
+    if (target.startCloudflared) {
       const log = join(dir, 'tunnel.log'); writeFileSync(log, '', { mode: 0o600 });
       children.start('cloudflared', ['tunnel', '--url', base, '--no-autoupdate'], log);
       await waitFor(async () => {
@@ -161,6 +168,7 @@ async function supervise() {
     if (env.DEMO_VOICE === '1') {
       const voicePrivate = join(dir, 'voice-private.env');
       const names = ['VOICE_TOOL_SECRET', 'VOICE_ADMIN_SECRET', 'CARTESIA_WEBHOOK_SECRET'];
+      if (!env.CARTESIA_WEBHOOK_SECRET) markDemoEnvironmentDefaulted(env, 'CARTESIA_WEBHOOK_SECRET');
       if (!existsSync(voicePrivate)) writeFileSync(voicePrivate, names.map(name => `${name}=${randomBytes(24).toString('hex')}`).join('\n') + '\n', { mode: 0o600 });
       const prior = { ...process.env }; process.loadEnvFile(voicePrivate);
       for (const name of names) env[name] = env[name] || prior[name] || process.env[name];
@@ -178,6 +186,7 @@ async function supervise() {
       await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${voicePort}/health`, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; } }, 20000);
       env.DEMO_VOICE_RUNNING = '1';
     }
+    envChecks = demoEnvironmentChecks(env);
     children.start(process.execPath, ['--import', loader, 'web/demo-server.ts'], join(dir, 'web.log'));
     await waitFor(async () => { try { return !!await queryWeb('status'); } catch { return false; } }, 90000);
     console.log(`Ready. ${env.DEMO_LIVE === '1' ? 'Live sandbox services' : 'Mock bank'}; ${env.STATE_STORE} state. No call placed.`);

@@ -4,7 +4,7 @@ export type ApprovalGrant = { id: string; human: string; decision: ControllerDec
 import { AuditLog, cloneState } from './audit';
 import { DEFAULT_POLICY, savePolicy, type Decision, type Policy } from '@backroom/policy';
 import type { Agent, AgentState, AuditEntry, AuditInput, Escalation, Invoice, InvoiceState,
-  CallEscalation, Lease, NewTask, PaymentReceipt, Seat, Task, PolicyLimits } from './store';
+  CallEscalation, Lease, NewTask, PaymentReceipt, Seat, Task, PolicyLimits, PolicySaveMethod } from './store';
 
 const copy = <T>(value: T): T => cloneState(value);
 export { hashAudit } from './audit';
@@ -18,7 +18,7 @@ export class ReducerEngine {
     if (!policy) throw new Error('POLICY_NOT_FOUND');
     return copy(policy);
   }
-  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number): Policy {
+  savePolicyLimits(expectedVersion: number, limits: PolicyLimits, now: number, method: PolicySaveMethod = 'demo_pin'): Policy {
     if (expectedVersion !== this.currentPolicyVersion) throw new Error('POLICY_CONFLICT');
     if (!limits || Object.keys(limits).sort().join(',') !== 'maxInstallments,maxPaymentCents,maxPlanDays,minFirstPct'
       || !Number.isSafeInteger(limits.maxInstallments) || limits.maxInstallments < 1
@@ -34,7 +34,7 @@ export class ReducerEngine {
     // No await in this check/write section; audit failure leaves policy unchanged.
     this.append({ ts: now, actor: 'human', seat: 'controller', action: 'save_policy', ruleIds: ['POLICY_SAVED'],
       policyVersion: next.policyVersion, refs: [`policy:v${previous.policyVersion}`, `policy:v${next.policyVersion}`],
-      route: 'code', latencyMs: 0, costUsd: 0, inputs: { previousVersion: previous.policyVersion, limits: copy(limits), method: 'demo_pin' } });
+      route: 'code', latencyMs: 0, costUsd: 0, inputs: { previousVersion: previous.policyVersion, limits: copy(limits), method: method === 'operator_session' ? method : 'demo_pin' } });
     this.policies.set(next.policyVersion, next);
     this.currentPolicyVersion = next.policyVersion;
     return copy(next);

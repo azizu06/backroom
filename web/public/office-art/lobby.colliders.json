@@ -42,6 +42,34 @@
    "maxX": -6.19,
    "minZ": 2.19,
    "maxZ": 2.71
+  },
+  {
+   "name": "coat_stand",
+   "minX": -6.28,
+   "maxX": -5.88,
+   "minZ": 1.42,
+   "maxZ": 1.82
+  },
+  {
+   "name": "umbrella_stand",
+   "minX": -6.77,
+   "maxX": -6.47,
+   "minZ": 1.37,
+   "maxZ": 1.67
+  },
+  {
+   "name": "magazine_table",
+   "minX": -3.23,
+   "maxX": -2.67,
+   "minZ": 3.02,
+   "maxZ": 3.58
+  },
+  {
+   "name": "plant_cluster",
+   "minX": -3.24,
+   "maxX": -2.64,
+   "minZ": 4.07,
+   "maxZ": 4.77
   }
  ]
 }
