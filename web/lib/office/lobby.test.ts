@@ -114,13 +114,21 @@ describe('office lobby', () => {
     expectLobby(html);
   });
 
-  it('opens Full Floor summary with statuses, handoffs and preview controls', () => {
+  it('opens Full Floor with a summary and collapsed detail disclosures', () => {
     const html = renderSheet(createElement(MockOffice), 'overview');
-    expect(html).toContain('Today at Backroom');
-    expect(html).toContain('class="seat-statuses"');
-    expect(html).toContain('data-office-mount="handoffs"');
-    expect(html).toContain('class="mock-controls"');
-    expect(html).toContain('Show escalation');
+    expect(html).toContain('>Full Floor</h2>');
+    expect(html).toContain('data-testid="full-floor-summary"');
+    expect(html).toContain('<h3>Today at Backroom</h3>');
+    expect(html).toContain('aria-label="Agent roster"');
+    for (const counter of ['Inbox', 'Handoffs in progress', 'Audit entries']) {
+      expect(html).toContain(`<dt>${counter}</dt>`);
+    }
+    for (const title of ['Workday', 'Handoff history', 'Receipts and scenarios', 'Controls']) {
+      expect(html).toMatch(new RegExp(`<button[^>]*aria-expanded="false"[^>]*><span aria-hidden="true">\\+</span> ${title}</button>`));
+    }
+    expect(html).not.toContain('data-office-mount="handoffs"');
+    expect(html).not.toContain('class="mock-controls"');
+    expect(html).not.toContain('Show escalation');
     expect(html).not.toContain('office-drawer');
   });
 
