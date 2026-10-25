@@ -3,11 +3,11 @@ import { OFFICE_ANCHORS, visibleRooms } from '../state';
 import type { OfficePropInteraction } from './interact';
 
 /**
- * Rail on the desk's aisle-side corner. A right strafe anywhere from just inside the collections
- * doorway to the desk front stops with the player centre near x=-4.14, in front of the handset.
+ * Rail on the desk's aisle-side corner. A right strafe anywhere between the collections doorway and the
+ * desk front stops with the player centre 0.86 m right of the desk centre, in front of the handset.
  * DeskPhone draws this same footprint.
  */
-export const PHONE_STAND = { x: -3.78, z: -1.96, width: 0.16, depth: 1.42 } as const;
+export const PHONE_STAND = { x: OFFICE_ANCHORS.collections.center[0] + 1.22, z: OFFICE_ANCHORS.collections.center[1] + 1.04, width: 0.16, depth: 1.42 } as const;
 /** Collections phone sits aisle-side on the desk at local x .85, z .3; floor y is omitted. */
 export const PHONE_INTERACTION: OfficePropInteraction = {
   // Cover the handset itself at the aisle stop; the desk target's wider footprint otherwise wins

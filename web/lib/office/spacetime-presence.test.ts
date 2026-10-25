@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DbConnection } from '@backroom/orchestrator/spacetime-client';
 import type { OfficePresence } from '@backroom/orchestrator/spacetime-client/types';
 import { createSpacetimePresence, presenceTransportKind, spacetimePresencePeers, viewerColor, type PresencePeer } from './presence';
+import { FLOOR } from './play';
 
 const row: OfficePresence = { viewerId: 'viewer-other', name: 'Other', x: 2, z: 3, yaw: 1, mode: 'play', at: 1000n };
 const self: PresencePeer = { viewerId: 'viewer-self', name: 'Self', color: '#ffffff', x: 1, z: 2, yaw: 0, mode: 'play', at: 999999 };
@@ -29,7 +30,7 @@ describe('SpacetimeDB viewer presence', () => {
       { ...row, viewerId: 'invalid', mode: 'admin' }, { ...row, viewerId: 'overflow', at: 2n ** 64n }], self.viewerId, 11000);
     expect(peers).toEqual([{ ...row, at: 1000, color: viewerColor(row.viewerId) }]);
     expect(spacetimePresencePeers([{ ...row, x: 999, z: -999, name: 'Other\nname' }], self.viewerId, 1000)[0])
-      .toMatchObject({ x: 8, z: -5.5, name: 'Othername' });
+      .toMatchObject({ x: FLOOR.maxX, z: FLOOR.minZ, name: 'Othername' });
   });
   it('selects SpacetimeDB only for live mode with presence table and reducers; all other modes fall back', () => {
     const { connection } = fakeConnection();

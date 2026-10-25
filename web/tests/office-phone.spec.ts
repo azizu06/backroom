@@ -58,11 +58,11 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
   // Pass the collections doorway between its posts, then move to the phone's aisle-side x.
   await page.keyboard.down('w');
-  await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.0);
+  await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.0);
   await page.keyboard.up('w');
-  await walkX(page, -4.2);
+  await walkX(page, -8.2);
   await page.keyboard.down('w');
-  await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.9);
+  await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.9);
   await page.keyboard.up('w');
   // Face the phone (desk top) from the aisle.
   await aimAtPhone(page);
@@ -90,9 +90,9 @@ test('phone stays idle without the mock query', async ({ page }) => {
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeVisible();
   // Target is already within reach at spawn only after approaching the Collections desk.
-  await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.0); await page.keyboard.up('w');
-  await walkX(page, -4.2);
-  await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z).toBeLessThan(-1.9); await page.keyboard.up('w');
+  await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.0); await page.keyboard.up('w');
+  await walkX(page, -8.2);
+  await page.keyboard.down('w'); await expect.poll(async () => (await pos(page)).z, { timeout: 15_000 }).toBeLessThan(-3.9); await page.keyboard.up('w');
   await aimAtPhone(page);
   await expect(page.getByText('E · Use desk phone')).toBeVisible();
   await page.keyboard.press('e');

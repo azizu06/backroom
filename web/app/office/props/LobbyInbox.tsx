@@ -9,6 +9,9 @@ import { INBOX_LABEL_ASPECT, INBOX_LABEL_GLYPH, INBOX_SHEET_LIMIT, inboxLabelHei
 import type { SceneMountProps } from '../mounts/types';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { useSceneTextNode } from './useSceneTextNode';
+import { LOBBY_KIOSK } from '../../../lib/office/layout';
+
+const [KIOSK_X, KIOSK_Z] = LOBBY_KIOSK;
 
 function Papers({ count }: { count: number }) {
   const mesh = useRef<InstancedMesh>(null);
@@ -71,7 +74,7 @@ function Label({ count }: { count: number }) {
 /** Sits entirely on the existing lobby counter, inside its Play collider. */
 export function LobbyInbox({ snapshot }: SceneMountProps) {
   if (!visibleRooms(snapshot).includes('lobby')) return null;
-  return <group name='prop:lobby-inbox' position={[-4.57, 0.79, 3.1]}>
+  return <group name='prop:lobby-inbox' position={[KIOSK_X - 0.17, 0.79, KIOSK_Z]}>
     <mesh receiveShadow><boxGeometry args={[0.4, 0.025, 0.5]} /><meshStandardMaterial color='#8b987b' /></mesh>
     {[-1, 1].map(side => <mesh key={side} position={[side * 0.19, 0.04, 0]}>
       <boxGeometry args={[0.02, 0.08, 0.5]} /><meshStandardMaterial color='#272f25' />

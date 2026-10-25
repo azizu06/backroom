@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 // Run via test:office:browser after building the web app. Needs WebGL (Play renders the 3D scene).
-const FAR = { x: 5, z: 0.6 }; // Aisle by the Treasury, 10 m from the lobby spawn (-5, 0.9).
+const FAR = { x: 5, z: 0.6 }; // Corridor by the Treasury, 14 m from the spawn (-9, 0.6).
 
 function surface(page: Page) {
   return page.getByRole('application', { name: /First-person office/ });

@@ -1,14 +1,15 @@
 import { OFFICE_ANCHORS, isAnchorId, matchingDenial, visibleRooms, type OfficeSnapshot } from '../state';
 import type { OfficePropInteraction } from './interact';
 import { ROLES } from '../palette';
+import { doorway } from '../layout';
 
 /** How long the Treasury door "DENY moment" plays before the door settles. */
 export const DENY_MOMENT_MS = 4000;
 export const DENY_FALLBACK_COLOR: string = ROLES.shadow;
 /** Floor (x, z) of the Treasury doorway; the aisle is on its -z side, the vault room on its +z side. */
-export const TREASURY_DOOR: readonly [x: number, z: number] = [5, 1.15];
+export const TREASURY_DOOR: readonly [x: number, z: number] = doorway('treasury').at;
 /** Where the denied agent's echo stands on the aisle side of the door. */
-export const ECHO_START: readonly [x: number, z: number] = [5, 0.55];
+export const ECHO_START: readonly [x: number, z: number] = [TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.6];
 /** How far the echo walks back toward the aisle (decreasing z). */
 export const ECHO_WALK = 1.2;
 export const ECHO_OPACITY = 0.55;
@@ -114,7 +115,7 @@ export function denyMoment(snapshot: OfficeSnapshot, now: number, reduced: boole
 export const TREASURY_DOOR_INTERACTION: OfficePropInteraction = {
   id: 'treasury-door',
   prompt: 'Inspect Treasury door',
-  position: [5, 0.6],
+  position: [TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.55],
   radius: 1.2,
   visible: snapshot => visibleRooms(snapshot).includes('treasury'),
   panel(snapshot) {

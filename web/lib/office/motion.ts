@@ -1,4 +1,5 @@
 import { OFFICE_ANCHORS, isAnchorId, type FloorPosition, type OfficeAgent } from "./state";
+import { CORRIDOR_Z } from "./layout";
 
 /** Visual interpolation only. Reaching a desk never triggers a business event. */
 export class WalkMotion {
@@ -33,8 +34,8 @@ export class WalkMotion {
       this.moving = false;
       return;
     }
-    // The central aisle keeps walks clear of the room furniture footprints.
-    this.route = [[this.position[0], 0.6], [destination[0], 0.6], destination];
+    // The corridor keeps walks clear of the room furniture footprints; every room door opens on it in line with its spot.
+    this.route = [[this.position[0], CORRIDOR_Z], [destination[0], CORRIDOR_Z], destination];
     this.moving = true;
   }
 
@@ -45,7 +46,12 @@ export class WalkMotion {
       const dx = waypoint[0] - this.position[0];
       const dz = waypoint[1] - this.position[1];
       const distance = Math.hypot(dx, dz);
-      if (distance < 0.001) { this.route.shift(); continue; }
+      if (distance < 0.001) {
+        this.position[0] = waypoint[0];
+        this.position[1] = waypoint[1];
+        this.route.shift();
+        continue;
+      }
       this.heading = Math.atan2(dx, dz);
       const step = Math.min(budget, distance);
       this.position[0] += dx / distance * step;
