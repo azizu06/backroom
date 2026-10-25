@@ -4,6 +4,8 @@ import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalSt
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
+import { WorkdayPanel } from '../../components/WorkdayPanel';
+import { StartWorkdayButton } from '../../components/StartWorkdayButton';
 import { SiteNav } from '../../components/SiteNav';
 import { flushSync } from 'react-dom';
 import { isCloseKey } from '../../lib/office/a11y';
@@ -298,6 +300,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           </div>
           <SiteNav placement='office' />
           <div className='office-tools'>
+            {snapshot.connection !== 'replay' && <StartWorkdayButton />}
             <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>{storyActive ? 'Skip tour' : 'Take the tour'}</button>
             <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Camera tour</button>
             <ThemeToggle className='theme-toggle office-theme-toggle' />
@@ -385,6 +388,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {inboxTray && <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby inbox tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section>}
+      {snapshot.connection !== 'replay' && <WorkdayPanel />}
       <ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>
     </footer>
   </section></HandoffPresentation>;
