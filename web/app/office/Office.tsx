@@ -1,5 +1,7 @@
 'use client';
 
+import { visibleSeatAgents } from '../../lib/office/agent-labels';
+
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
@@ -377,7 +379,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     setSheet(next);
   }
   const seatStatuses = (<ViewBoundary name='Seat statuses' resetKey={snapshot} fallback={<p role='status'>Seat status unavailable · a received row could not be displayed.</p>}>
-      <div className='seat-statuses'>{snapshot.agents.map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
+      <div className='seat-statuses'>{visibleSeatAgents(snapshot).map(agent => <div key={agent.id} tabIndex={0} role='group' aria-label={seatLabel(agent)} data-agent-id={agent.id} data-target={agent.targetAnchor} data-escalating={!!agent.escalationId} data-row-at={agent.rowAt}>
         <strong>{agent.name}</strong><span>{agent.state}</span>{agent.escalationId && <span className='folder-status'>▱ Folder → {anchorLabel(agent.targetAnchor)}</span>}
       </div>)}</div>
       </ViewBoundary>);

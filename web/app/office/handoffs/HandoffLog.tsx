@@ -1,13 +1,14 @@
-import { handoffGroups, handoffLine, type Handoff } from '../../../lib/office/handoffs';
+import { officeText, shortOfficeText } from '../../../lib/office/display';
+import { handoffGroups, handoffAgentName, handoffStatus, type Handoff } from '../../../lib/office/handoffs';
 import { HandoffText } from './HandoffText';
 
 /** Case groups in global sequence order. The parent owns the single accessible live log. */
 export function HandoffEntries({ rows }: { rows: readonly Handoff[] }) {
   return handoffGroups(rows).map(group => <li key={group.caseDisplayId}>
-    <strong>{group.caseDisplayId || 'Case'}</strong>
-    <ol aria-label={`Handoffs for ${group.caseDisplayId || 'case'}`}>
+    <strong>{officeText(group.caseDisplayId) || 'Case'}</strong>
+    <ol aria-label={`Handoffs for ${officeText(group.caseDisplayId) || 'case'}`}>
       {group.rows.map(row => <li key={row.handoffId} data-status={row.status} data-correction={row.correction}>
-        <HandoffText text={handoffLine(row)} />
+        <HandoffText text={`${handoffAgentName(row.fromRole)} → ${handoffAgentName(row.toRole)} · ${handoffStatus(row)} · ${shortOfficeText(/preview is untrusted data/i.test(row.summary) ? 'Evidence ready for review' : row.summary, 80)}`} />
       </li>)}
     </ol>
   </li>);

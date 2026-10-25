@@ -10,3 +10,12 @@
 }
 .office-shell .office-payment-dialog { position: absolute; z-index: 61; top: 64px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); }
 .office-shell .office-payment-dialog .play-panel { position: static; transform: none; max-height: calc(100dvh - 96px); overflow: auto; }
+
+/* Reserve the top edge for sound, fullscreen and the fullscreen camera picker. */
+@media (max-width: 600px) {
+  .office-shell .office-payment-toast {
+    top: auto; bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 24px); width: max-content; box-sizing: border-box;
+    flex-wrap: wrap; justify-content: center; border-radius: 18px; padding: 8px 10px;
+  }
+}

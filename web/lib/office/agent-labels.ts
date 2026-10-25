@@ -1,4 +1,4 @@
-import type { OfficeAgent } from './state';
+import type { OfficeAgent, OfficeSnapshot } from './state';
 
 const NAMES = { collections: 'Alex', payables: 'Sam', vendor_onboarding: 'Jules' } as const;
 /** Human-facing names are role-based; runtime identifiers stay intact for interactions and receipts. */
@@ -20,4 +20,10 @@ export function latestSeatAgents(agents: readonly OfficeAgent[]): OfficeAgent[] 
     if (!previous || at > previousAt || (at === previousAt && previous.state === 'Away' && agent.state !== 'Away')) seats.set(agent.seatId, agent);
   }
   return [...seats.values()];
+}
+
+/** Legacy named seats stay available in quiet/preview mode; working roles own the floor during a handoff. */
+export function visibleSeatAgents(snapshot: OfficeSnapshot): readonly OfficeAgent[] {
+  const workday = snapshot.handoffs?.some(row => row.status === 'offered' || row.status === 'accepted');
+  return workday ? snapshot.agents.filter(agent => agent.escalationId || !/^(idle|ready|available|offline|away)$/i.test(agent.state.trim())) : snapshot.agents;
 }
