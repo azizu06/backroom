@@ -1,6 +1,12 @@
 import type { Box } from '../play';
 import { OFFICE_ANCHORS, visibleRooms, type AnchorId, type OfficeSnapshot } from '../state';
 import { PALETTE, ROLES } from '../palette';
+import { BUILDING, CORRIDOR, CORRIDOR_Z, DOOR_OPENING_HEIGHT, SPACES, SPACE_IDS, WALL_THICKNESS, roomPad, roomPoint, type LayoutAnchorId } from '../layout';
+
+const plantAt = (room: LayoutAnchorId, dx: number, dz: number) => {
+  const [x, z] = roomPoint(room, dx, dz);
+  return { x, z, size: 0.6 };
+};
 
 /** Floor (x, z). */
 export type FloorPoint = readonly [x: number, z: number];
@@ -19,47 +25,49 @@ export interface Dressing {
 export const SHELF_DEPTH = 0.34, SHELF_HEIGHT = 0.9, SHELF_BOARD = 0.04;
 /** Foliage radius at size 1 (same dodecahedron as scene.tsx's Plant); the pot is narrower. */
 export const PLANT_RADIUS = 0.5, PLANT_POT = 0.46, PLANT_POT_HEIGHT = 0.44, PLANT_FOLIAGE_Y = 0.8;
-/** Plaque between upward extensions of the door posts (x = centre ± 0.72, top 1.04 in scene.tsx). */
+/** Plaque over the doorway header, between upward extensions of the door posts (x = centre ± 0.72, top DOOR_POST_TOP in Doors.tsx). */
 export const SIGN_WIDTH = 1.34, SIGN_HEIGHT = 0.34, SIGN_DEPTH = 0.05, SIGN_FACE_WIDTH = 1.2, SIGN_FACE_HEIGHT = 0.3;
-export const SIGN_POST_X = 0.72, SIGN_POST_SIZE = 0.1, DOOR_POST_TOP = 1.04;
+export const SIGN_POST_X = 0.72, SIGN_POST_SIZE = 0.1, DOOR_POST_TOP = DOOR_OPENING_HEIGHT;
 export const ROUTE_DASH = 0.3, ROUTE_GAP = 0.22, ROUTE_WIDTH = 0.07, ROUTE_ARROW = 0.26, ROUTE_THICKNESS = 0.01;
 export const ROUTE_COLOR = PALETTE.cream;
 /** Upper bound for the dressing's one instanced mesh. */
 export const DRESSING_INSTANCE_LIMIT = 150;
 
-const BACK_WALL_FACE = -5.42, LEFT_WALL_FACE = -7.92;
+const BACK_WALL_FACE = BUILDING.minZ + WALL_THICKNESS / 2;
 const BACK_SHELF_Z = BACK_WALL_FACE + SHELF_DEPTH / 2 + 0.01;
-const TOP_DOOR_Z = -0.65, AISLE_Z = 0.6;
-/** Bottom 1.58: clears the door's deny flash (top 1.3) and avatars (hair top ~1.54) walking through the doorway. */
-const SIGN_Y = 1.75;
+const TOP_DOOR_Z = CORRIDOR.minZ, AISLE_Z = CORRIDOR_Z;
+/** Bottom 2.38: on the wall above the doorway header (DOOR_OPENING_HEIGHT), clear of the door's deny flash. */
+const SIGN_Y = 2.55;
+/** Plaques hang on the corridor face of the wall, just proud of it. */
+const SIGN_Z = TOP_DOOR_Z + WALL_THICKNESS / 2 + Math.max(SIGN_DEPTH, SIGN_POST_SIZE) / 2 + 0.01;
 const LOBBY = OFFICE_ANCHORS.lobby.center;
 const door = (room: 'collections' | 'payables' | 'vendor_onboarding'): FloorPoint => [OFFICE_ANCHORS[room].center[0], TOP_DOOR_Z];
 const sign = (room: 'collections' | 'payables' | 'vendor_onboarding'): DressingSign =>
-  ({ room, x: OFFICE_ANCHORS[room].center[0], y: SIGN_Y, z: TOP_DOOR_Z, rotationY: 0, text: OFFICE_ANCHORS[room].name });
+  ({ room, x: OFFICE_ANCHORS[room].center[0], y: SIGN_Y, z: SIGN_Z, rotationY: 0, text: OFFICE_ANCHORS[room].name });
 
 export const DRESSING: Dressing = {
   shelves: [
-    { room: 'collections', x: -4.4, z: BACK_SHELF_Z, rotationY: 0, width: 1.5 },
-    { room: 'payables', x: -1.25, z: BACK_SHELF_Z, rotationY: 0, width: 1.3 },
-    { room: 'vendor_onboarding', x: 4.4, z: BACK_SHELF_Z, rotationY: 0, width: 1.5 },
-    // Near the lobby's back edge so the audit board (z = 3.9) does not hide it from the camera.
-    { room: 'lobby', x: LEFT_WALL_FACE + SHELF_DEPTH / 2 + 0.01, z: 1.8, rotationY: Math.PI / 2, width: 1.2 },
+    { room: 'collections', x: roomPoint('collections', 0.6, 0)[0], z: BACK_SHELF_Z, rotationY: 0, width: 1.5 },
+    { room: 'payables', x: roomPoint('payables', -1.25, 0)[0], z: BACK_SHELF_Z, rotationY: 0, width: 1.3 },
+    { room: 'vendor_onboarding', x: roomPoint('vendor_onboarding', -0.6, 0)[0], z: BACK_SHELF_Z, rotationY: 0, width: 1.5 },
+    // On the lobby's south wall between its window and the entrance, so the west windows stay clear.
+    { room: 'lobby', x: -8.8, z: BUILDING.maxZ - WALL_THICKNESS / 2 - SHELF_DEPTH / 2 - 0.01, rotationY: Math.PI, width: 1.2 },
   ],
   plants: [
-    { room: 'lobby', x: -7.4, z: 4.95, size: 0.6 },
-    { room: 'dana', x: -1.85, z: 4.95, size: 0.6 },
-    { room: 'treasury', x: 7.4, z: 4.95, size: 0.6 },
-    // Just inside the x = 2.5 partition; the GX10 server room occupies the right front corner.
-    { room: 'vendor_onboarding', x: 3.1, z: -1.05, size: 0.6 },
+    { room: 'lobby', ...plantAt('lobby', -2.4, 2.05) },
+    { room: 'dana', ...plantAt('dana', -1.85, 1.55) },
+    { room: 'treasury', ...plantAt('treasury', 2.4, 1.55) },
+    // Just inside the Vendor Desk's west wall, by its door.
+    { room: 'vendor_onboarding', ...plantAt('vendor_onboarding', -1.9, 1.95) },
   ],
   signs: [sign('collections'), sign('payables'), sign('vendor_onboarding')],
   routes: [
-    { from: 'lobby', to: 'collections', points: [LOBBY, [-5, AISLE_Z], door('collections')] },
-    { from: 'lobby', to: 'payables', points: [LOBBY, [-5, AISLE_Z], [0, AISLE_Z], door('payables')] },
-    // Drops to z = 0.25 before x = 3.5 so the Treasury door area (x 3.5..6.5, z 0.5..1.8) stays clear.
-    { from: 'lobby', to: 'vendor_onboarding', points: [LOBBY, [-5, AISLE_Z], [3.1, AISLE_Z], [3.1, 0.25], [5, 0.25], door('vendor_onboarding')] },
-    // Stops in front of Dana's desk (front edge z = 2.875).
-    { from: 'lobby', to: 'dana', points: [LOBBY, [-5, AISLE_Z], [0, AISLE_Z], [0, 2.55]] },
+    { from: 'lobby', to: 'collections', points: [LOBBY, [LOBBY[0], AISLE_Z], door('collections')] },
+    { from: 'lobby', to: 'payables', points: [LOBBY, [LOBBY[0], AISLE_Z], [door('payables')[0], AISLE_Z], door('payables')] },
+    // Runs along the corridor's north half so the Treasury door area (its south side) stays clear.
+    { from: 'lobby', to: 'vendor_onboarding', points: [LOBBY, [LOBBY[0], AISLE_Z], [door('vendor_onboarding')[0], AISLE_Z], door('vendor_onboarding')] },
+    // Stops in front of Dana's desk (front edge 0.525 m before its centre).
+    { from: 'lobby', to: 'dana', points: [LOBBY, [LOBBY[0], AISLE_Z], [OFFICE_ANCHORS.dana.center[0], AISLE_Z], roomPoint('dana', 0, -0.85)] },
   ],
 };
 
@@ -162,9 +170,10 @@ export function routePaint(routes: readonly DressingRoute[]): PaintSegment[] {
   return out;
 }
 
-const insidePad = (x: number, z: number, margin: number) => (Object.keys(OFFICE_ANCHORS) as AnchorId[]).some(room => {
-  const [cx, cz] = OFFICE_ANCHORS[room].center;
-  return Math.abs(x - cx) <= 4.25 / 2 + margin && Math.abs(z - cz) <= (room === 'lobby' ? 3.6 : 3.4) / 2 + margin;
+const insidePad = (x: number, z: number, margin: number) => SPACE_IDS.some(id => {
+  if (SPACES[id].kind !== 'room') return false;
+  const pad = roomPad(SPACES[id].rect);
+  return x >= pad.minX - margin && x <= pad.maxX + margin && z >= pad.minZ - margin && z <= pad.maxZ + margin;
 });
 /** Centre height for floor paint: just above the aisle strip (top 0.02), or above a room pad (top 0.045) it touches. */
 export function paintY(segment: PaintSegment): number {

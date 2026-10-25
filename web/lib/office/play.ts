@@ -3,7 +3,8 @@
  * inspecting never write state, evaluate policy or call a model. Panel data comes from the snapshot.
  */
 import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
-import { OPEN_DOORS, doorCollider, type DoorState } from './doors';
+import { OPEN_DOORS, doorCollider, doorPosition, type DoorState } from './doors';
+import { PLANT_SPOTS } from './furniture';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
 import { AGENT_RADIUS } from "./targets/agent";
@@ -12,6 +13,8 @@ import { PAYLINK_KIOSK, PAYLINK_RADIUS } from "./targets/paylink";
 import { SERVER_ROOM } from "./targets/server";
 import { DOOR_RADIUS, TREASURY_DOOR } from "./targets/treasury";
 import { PHONE_STAND } from "./props/phone";
+import { BUILDING, LOBBY_BOARD, ROOM_SPAWNS, WALL_THICKNESS, roomPoint, wallColliders } from "./layout";
+import { SHARED_ROOM_COLLIDERS } from "./shared-rooms";
 import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
@@ -24,8 +27,7 @@ export const TURN_SPEED = 2.2;
 export const PLAYER_RADIUS = 0.28;
 /**
  * Interact reach, measured from the eye to the edge of the thing (its centre distance minus its radius).
- * 1.1 m: arm's length plus a step. It has to stay below 1.2 so the Treasury door (radius 0.65) is not
- * offered from (5, 3.0) inside the locked vault, 1.85 m from the door centre. From where colliders stop
+ * 1.1 m: arm's length plus a step. From where colliders stop
  * you (PLAYER_RADIUS 0.28) every target is well inside it: the door barrier stops you 0.38 m from the
  * door centre and agents are not solid. A desk prompt starts 1.1 m from its front edge and 0.5 m from
  * its ends; from across the aisle (about 2.5 m away) nothing is offered.
@@ -35,9 +37,13 @@ export const INTERACT_RANGE = 1.1;
 export const PICK_CONE = 0.35;
 export const PITCH_LIMIT = 1.2;
 export const LOOK_SENSITIVITY = 0.0025;
-/** Lobby aisle, facing -z toward the Collections desk. */
-export const SPAWN = { position: [-5, 0.9] as const, yaw: 0 } as const;
-export const FLOOR = { minX: -8, maxX: 8, minZ: -5.5, maxZ: 5.5 } as const;
+/** Corridor outside the lobby, facing -z through the open Collections door toward its desk. */
+export const SPAWN = ROOM_SPAWNS.corridor;
+/** Walkable floor: inside the building's outer walls (./layout), whose faces are also colliders. */
+export const FLOOR = {
+  minX: BUILDING.minX + WALL_THICKNESS / 2, maxX: BUILDING.maxX - WALL_THICKNESS / 2,
+  minZ: BUILDING.minZ + WALL_THICKNESS / 2, maxZ: BUILDING.maxZ - WALL_THICKNESS / 2,
+} as const;
 export interface Box { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }
 
 /** Camera convention: yaw 0 looks toward -z. */
@@ -52,14 +58,14 @@ const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfie
 
 /**
  * Solid footprints mirroring the layout drawn in web/app/office/scene.tsx and its mounts (web/app/office/mounts:
- * Desks, Doors, Plants, LobbyCounter, TreasuryVault). Keep in sync with those files. The Treasury is locked: its doorway is closed by a barrier.
+ * WorldShell, SharedRooms, Desks, Doors, Plants, LobbyCounter, TreasuryVault). Walls come from ./layout, so a
+ * doorway in the data is a gap here. The Treasury is locked: its doorway is closed by a barrier.
  * `extra` takes footprints of room geometry mounted elsewhere (e.g. a self-contained room at an anchor),
  * so new furniture becomes solid without editing this list.
  */
 export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra];
-  for (const x of [-2.5, 2.5]) boxes.push(box(x, -3.15, 0.12, 4.6), box(x, 3.5, 0.12, 3.8));
+  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
     const [x, z] = OFFICE_ANCHORS[room].center;
@@ -70,19 +76,17 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
   }
   for (const room of DOORS) {
     if (!visible.has(room)) continue;
-    const [x] = OFFICE_ANCHORS[room].center;
-    boxes.push(box(x - 0.72, -0.65, 0.14, 0.18), box(x + 0.72, -0.65, 0.14, 0.18));
+    const [x, z] = doorPosition(room);
+    boxes.push(box(x - 0.72, z, 0.14, 0.18), box(x + 0.72, z, 0.14, 0.18));
     const leaf = doorCollider(doors, room);
     if (leaf) boxes.push(leaf);
   }
   if (visible.has("treasury")) {
-    const [x] = OFFICE_ANCHORS.treasury.center;
-    boxes.push(box(5, 4, 1.8, 1.25), box(x - 0.72, TREASURY_DOOR[1], 0.14, 0.18), box(x + 0.72, TREASURY_DOOR[1], 0.14, 0.18));
-    // Locked door: no gap between it and the x=2.5 partition, so the vault is unreachable.
-    boxes.push({ minX: 2.44, maxX: FLOOR.maxX, minZ: 1.05, maxZ: 1.6 });
+    const [x, z] = TREASURY_DOOR;
+    boxes.push(box(...roomPoint("treasury", 0, 0.6), 1.8, 1.25), box(x - 0.72, z, 0.14, 0.18), box(x + 0.72, z, 0.14, 0.18));
   }
-  if (visible.has("lobby")) boxes.push(box(-5.9, 3.9, 2, 0.15), box(-4.4, 3.1, 0.8, 1));
-  for (const [x, z] of [[-7.1, -4.6], [7.1, -4.6], [1.7, 4.5]] as const) boxes.push(box(x, z, 1, 1));
+  if (visible.has("lobby")) boxes.push(box(LOBBY_BOARD[0], LOBBY_BOARD[1], 2, 0.15), box(PAYLINK_KIOSK[0], PAYLINK_KIOSK[1], 0.8, 1));
+  for (const [x, z] of PLANT_SPOTS) boxes.push(box(x, z, 1, 1));
   return boxes;
 }
 

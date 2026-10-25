@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ComponentRef, type RefObject } from 'react';
 import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber';
 import { Instances, OrbitControls } from '@react-three/drei';
-import { Group, MathUtils, Vector3 } from 'three';
+import { Group, MathUtils, Vector3, type Camera } from 'three';
 import { cameraAlpha } from '../../lib/office/a11y';
 import type { MotionRegistry, WalkMotion } from '../../lib/office/motion';
 import type { PlayBridge } from '../../lib/office/play';
@@ -14,6 +14,7 @@ import { tourProgress } from '../../lib/office/tour';
 import { OFFICE_LIGHTING, officeLightRig } from '../../lib/office/lighting';
 import { OfficeLights, OFFICE_RENDERER, useOfficeLowPower } from './OfficeLights';
 import { ROLES } from '../../lib/office/palette';
+import { BUILDING, CORRIDOR, CORRIDOR_Z, SPACES, SPACE_IDS, roomPad, sightBlocked, type SpaceId } from '../../lib/office/layout';
 import { bakedCharacterReady, bakedCharacterVersion, subscribeBakedCharacters } from '../../lib/office/baked-character';
 import { BEAR_CARRY_PAW, pawPosition } from '../../lib/office/bear';
 import { SCENE_MOUNTS } from './mounts';
@@ -33,12 +34,22 @@ const { base } = OFFICE_LIGHTING;
 // Office (in the initial bundle) requests on-demand frames through this bridge.
 registerSceneFrameRequester(invalidate);
 
+const FLOOR_SIZE = [BUILDING.maxX - BUILDING.minX + 0.2, BUILDING.maxZ - BUILDING.minZ + 0.2] as const;
+function RoomPad({ id, color }: { id: SpaceId; color: string }) {
+  const pad = roomPad(SPACES[id].rect);
+  return <Block at={[(pad.minX + pad.maxX) / 2, 0.025, (pad.minZ + pad.maxZ) / 2]} size={[pad.maxX - pad.minX, 0.04, pad.maxZ - pad.minZ]} color={color} />;
+}
+/** First person only: a wall between the eye and a label's floor point hides the label (the overview sees over the cut-away walls). */
+function behindWall(camera: Camera, x: number, z: number): boolean {
+  return (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true && sightBlocked(camera.position.x, camera.position.z, x, z);
+}
 function ScreenLabel({ at, element }: { at: [number, number, number]; element: LabelRef }) {
   const point = useRef(new Vector3());
   useFrame(({ camera, size }) => {
     point.current.set(...at).project(camera);
     if (!element.current) return;
-    element.current.style.visibility = point.current.z > 1 || Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 ? 'hidden' : 'visible';
+    element.current.style.visibility = point.current.z > 1 || Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05
+      || behindWall(camera, at[0], at[2]) ? 'hidden' : 'visible';
     element.current.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -50%)`;
   });
   return null;
@@ -50,7 +61,8 @@ function AgentTag({ agentId, motion, element }: { agentId: string; motion: WalkM
     const tag = element(agentId);
     if (!tag) return;
     point.current.set(motion.position[0], 1.95, motion.position[1]).project(camera);
-    const offscreen = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 || point.current.z > 1;
+    const offscreen = Math.abs(point.current.x) > 1.05 || Math.abs(point.current.y) > 1.05 || point.current.z > 1
+      || behindWall(camera, motion.position[0], motion.position[1]);
     tag.style.visibility = offscreen ? 'hidden' : 'visible';
     tag.style.transform = `translate(${(point.current.x + 1) * size.width / 2}px, ${(1 - point.current.y) * size.height / 2}px) translate(-50%, -100%)`;
   });
@@ -111,7 +123,7 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
     if (orbiting.current) state.invalidate();
     if (!moving.current || !controls.current) return;
     state.invalidate();
-    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 22, size.height / 16);
+    const zoom = focus ? Math.min(size.width / 10, size.height / 8) : Math.min(size.width / 33, size.height / 22);
     if (tour) {
       const move = tourMove.current;
       if (move.startedAt === null) {
@@ -168,21 +180,16 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     gl={OFFICE_RENDERER} fallback={<span>3D unavailable. Choose the floor plan.</span>}>
     <color attach='background' args={[ROLES.background]} />
     <OfficeLights snapshot={snapshot} lowPower={lowPower} />
-    <Instances limit={200} castShadow receiveShadow frustumCulled={false}>
+    <Instances limit={240} castShadow receiveShadow frustumCulled={false}>
     <boxGeometry args={[1, 1, 1]} /><meshStandardMaterial roughness={base.roughness} />
-    {/* Room shell: peach floor, cream walls, lavender partitions, cream room pads and a blush aisle runner. */}
-    <Block at={[0, -0.23, 0]} size={[16, 0.45, 11]} color={ROLES.floor} />
-    <Block at={[0, 0.55, -5.5]} size={[16, 1.1, 0.16]} color={ROLES.wall} />
-    <Block at={[-8, 0.55, 0]} size={[0.16, 1.1, 11]} color={ROLES.wall} />
-    <Block at={[0, 0.01, 0.6]} size={[15.8, 0.02, 1.3]} color={ROLES.aisle} />
-    {[-2.5, 2.5].map(x => <group key={x}>
-      <Block at={[x, 0.38, -3.15]} size={[0.12, 0.76, 4.6]} color={ROLES.partition} />
-      <Block at={[x, 0.38, 3.5]} size={[0.12, 0.76, 3.8]} color={ROLES.partition} />
-    </group>)}
+    {/* Floor slab, a cream pad per room (tinted while focused) and a blush corridor runner; walls, windows and the ceiling are the WorldShell mount. */}
+    <Block at={[0, -0.23, 0]} size={[FLOOR_SIZE[0], 0.45, FLOOR_SIZE[1]]} color={ROLES.floor} />
+    <Block at={[(CORRIDOR.minX + CORRIDOR.maxX) / 2, 0.01, CORRIDOR_Z]} size={[CORRIDOR.maxX - CORRIDOR.minX - 0.5, 0.02, 1.3]} color={ROLES.aisle} />
+    {SPACE_IDS.filter(id => SPACES[id].kind === 'room' && !isAnchorId(id)).map(id => <RoomPad key={id} id={id} color={ROLES.roomPad} />)}
     {visibleRooms(snapshot).map(room => {
       const { center, color } = OFFICE_ANCHORS[room];
       return <group key={room}>
-        <Block at={[center[0], 0.025, center[1]]} size={[4.25, 0.04, room === 'lobby' ? 3.6 : 3.4]} color={focus === room ? color : ROLES.roomPad} />
+        <RoomPad id={room} color={focus === room ? color : ROLES.roomPad} />
         <ScreenLabel at={[center[0], 2.5, center[1] - 0.3]} element={labels[room]} />
       </group>;
     })}

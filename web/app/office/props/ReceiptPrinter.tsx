@@ -7,6 +7,9 @@ import { visibleRooms } from '../../../lib/office/state';
 import { RECEIPT_PRINT_MS, hasNewAuditRow, receiptExtension } from '../../../lib/office/props/receiptPrinter';
 import type { SceneMountProps } from '../mounts/types';
 import { useReducedMotion } from './useReducedMotion';
+import { LOBBY_KIOSK } from '../../../lib/office/layout';
+
+const [KIOSK_X, KIOSK_Z] = LOBBY_KIOSK;
 
 function Printer({ snapshot }: SceneMountProps) {
   const paper = useRef<Mesh>(null);
@@ -30,7 +33,7 @@ function Printer({ snapshot }: SceneMountProps) {
     if (!still && started.current !== null && age < RECEIPT_PRINT_MS) state.invalidate();
     else started.current = null;
   });
-  return <group name='prop:receipt-printer' position={[-4.16, 0.78, 3.1]}>
+  return <group name='prop:receipt-printer' position={[KIOSK_X + 0.24, 0.78, KIOSK_Z]}>
     <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
       <boxGeometry args={[0.29, 0.2, 0.36]} /><meshStandardMaterial color='#272f25' roughness={0.8} />
     </mesh>

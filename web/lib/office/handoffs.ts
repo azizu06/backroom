@@ -5,6 +5,7 @@
  */
 import type { AnchorId, FloorPosition } from './state';
 import { handoffText } from './handoff-text';
+import { CORRIDOR_Z, roomPoint } from './layout';
 
 // Mirrors orchestrator/src/agents/contracts.ts ROLES and the public projection in docs/agents.md / PR #152.
 export const HANDOFF_ROLES = ['intake', 'extractor', 'vendor', 'payables', 'collections', 'reconciler', 'auditor'] as const;
@@ -29,14 +30,14 @@ export interface HandoffAgent {
 export const HUMAN = 'human' satisfies HandoffAgentId;
 /** Desks for the runtime roles; the office has five rooms, so some rooms seat two. */
 export const HANDOFF_AGENTS: Record<HandoffAgentId, HandoffAgent> = {
-  intake: { name: 'Intake', room: 'lobby', station: [-6.0, 2.5], color: '#8fa7b8' },
-  extractor: { name: 'Extractor', room: 'lobby', station: [-7.0, 1.7], color: '#9fb6a0' },
-  auditor: { name: 'Auditor', room: 'lobby', station: [-3.4, 2.4], color: '#b8a2c8' },
-  collections: { name: 'Collections', room: 'collections', station: [-4.4, -1.6], color: '#a9bc8f' },
-  reconciler: { name: 'Reconciler', room: 'payables', station: [-0.6, -1.6], color: '#8fb3ad' },
-  payables: { name: 'Payables', room: 'payables', station: [0.6, -1.6], color: '#d2b27a' },
-  vendor: { name: 'Vendor verifier', room: 'vendor_onboarding', station: [4.4, -1.6], color: '#b2a3bb' },
-  human: { name: 'Dana', room: 'dana', station: [0, 2.3], color: '#cc9c7d' },
+  intake: { name: 'Intake', room: 'lobby', station: roomPoint('lobby', -1, -0.4), color: '#8fa7b8' },
+  extractor: { name: 'Extractor', room: 'lobby', station: roomPoint('lobby', -2, -1.2), color: '#9fb6a0' },
+  auditor: { name: 'Auditor', room: 'lobby', station: roomPoint('lobby', 1, 0.8), color: '#b8a2c8' },
+  collections: { name: 'Collections', room: 'collections', station: roomPoint('collections', 0.6, 1.4), color: '#a9bc8f' },
+  reconciler: { name: 'Reconciler', room: 'payables', station: roomPoint('payables', -0.6, 1.4), color: '#8fb3ad' },
+  payables: { name: 'Payables', room: 'payables', station: roomPoint('payables', 0.6, 1.4), color: '#d2b27a' },
+  vendor: { name: 'Vendor verifier', room: 'vendor_onboarding', station: roomPoint('vendor_onboarding', -0.6, 1.4), color: '#b2a3bb' },
+  human: { name: 'Dana', room: 'dana', station: roomPoint('dana', 0, -1.1), color: '#cc9c7d' },
 };
 export function isHandoffAgent(id: unknown): id is HandoffAgentId {
   return typeof id === 'string' && Object.hasOwn(HANDOFF_AGENTS, id);
@@ -47,11 +48,12 @@ export function handoffAgentName(id: string): string {
 /** Agents drawn on the floor (Dana only appears at the passkey step). */
 export const FLOOR_AGENTS = (Object.keys(HANDOFF_AGENTS) as HandoffAgentId[]).filter(id => id !== HUMAN);
 
-/** Where agents leave a room for the central aisle (z = AISLE_Z), clear of door posts and desks. */
+/** Where agents leave a room for the corridor (z = AISLE_Z): inside the room, in line with its doorway, clear of desks. */
 export const ROOM_DOORS: Partial<Record<AnchorId, FloorPosition>> = {
-  lobby: [-5.3, 1.5], collections: [-5, -1.3], payables: [0, -1.3], vendor_onboarding: [5, -1.3], dana: [0, 1.6],
+  lobby: roomPoint('lobby', -0.3, -1.4), collections: roomPoint('collections', 0, 1.7), payables: roomPoint('payables', 0, 1.7),
+  vendor_onboarding: roomPoint('vendor_onboarding', 0, 1.7), dana: roomPoint('dana', 0, -1.8),
 };
-export const AISLE_Z = 0.6;
+export const AISLE_Z = CORRIDOR_Z;
 /** Where a visitor stands to hand a folder to `agent`: in front of its station, toward its room door. */
 export function handoffSpot(agent: HandoffAgentId): FloorPosition {
   const { station, room } = HANDOFF_AGENTS[agent];

@@ -6,6 +6,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Group, Vector3 } from 'three';
 import { serverRoomReadout, type Gx10Status } from '../../../lib/gx10/server-room';
 import { ROLES } from '../../../lib/office/palette';
+import { sightBlocked } from '../../../lib/office/layout';
 
 /** Own the DOM root outside the Canvas reconciler; defer root work past its commit. */
 function Readout({ children }: { children: ReactNode }) {
@@ -27,10 +28,14 @@ function Readout({ children }: { children: ReactNode }) {
   }, [children, gl]);
   useFrame(({ camera, size }) => {
     if (!anchor.current || !portal.current) return;
-    anchor.current.getWorldPosition(point.current).project(camera);
+    anchor.current.getWorldPosition(point.current);
+    // First person: hide the readout while a wall stands between the eye and the rack.
+    const hidden = (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true
+      && sightBlocked(camera.position.x, camera.position.z, point.current.x, point.current.z);
+    point.current.project(camera);
     const { x, y, z } = point.current;
     const host = portal.current.host;
-    host.style.visibility = Math.abs(x) > 1 || Math.abs(y) > 1 || z < -1 || z > 1 ? 'hidden' : 'visible';
+    host.style.visibility = hidden || Math.abs(x) > 1 || Math.abs(y) > 1 || z < -1 || z > 1 ? 'hidden' : 'visible';
     const left = Math.max(8, Math.min(size.width - 244, (x + 1) * size.width / 2 + 48));
     host.style.transform = `translate(${left}px, ${(1 - y) * size.height / 2}px) translateY(-50%)`;
   });
@@ -38,7 +43,7 @@ function Readout({ children }: { children: ReactNode }) {
 }
 
 /** One scene anchor; no camera, Play controls, policy, or state mutations. */
-export function ServerRoom({ position = [7.1, 0, -0.8], replay = false }: { position?: [number, number, number]; replay?: boolean }) {
+export function ServerRoom({ position = [10.9, 0, -0.8], replay = false }: { position?: [number, number, number]; replay?: boolean }) {
   const [status, setStatus] = useState<Gx10Status | null>(null);
   useEffect(() => {
     // Replay is a recorded projection: never read live telemetry or arm its timer.

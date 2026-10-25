@@ -5,6 +5,9 @@ import { latestDenyRule } from '../../../lib/office/props/lobbyDeny';
 import type { SceneMountProps } from '../mounts/types';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
 import { useSceneTextNode } from './useSceneTextNode';
+import { LOBBY_BOARD } from '../../../lib/office/layout';
+
+const [BOARD_X, BOARD_Z] = LOBBY_BOARD;
 
 function Stamp({ rule }: { rule: string }) {
   const text = `DENIED · ${rule}`;
@@ -20,7 +23,7 @@ function Stamp({ rule }: { rule: string }) {
     ctx.textBaseline = 'middle';
     ctx.fillText(text, 384, 99, 696);
   }, [text]);
-  return <group name='prop:lobby-deny-stamp' position={[-5.9, 1.25, 3.98]} rotation={[0, 0, -0.09]}>
+  return <group name='prop:lobby-deny-stamp' position={[BOARD_X, 1.25, BOARD_Z + 0.11]} rotation={[0, 0, -0.09]}>
     <mesh>
       <planeGeometry args={[1.75, 0.44]} /><meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
     </mesh>

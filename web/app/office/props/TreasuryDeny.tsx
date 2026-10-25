@@ -12,8 +12,8 @@ import { useReducedMotion } from './useReducedMotion';
 import { ROLES } from '../../../lib/office/palette';
 
 const DENY_RED = ROLES.deny, RING_MAX = 2.4;
-// Frame just outside scene.tsx's door flash box (1.5 x 1.3 x 0.2 at (5, 0.65, 1.15), front face z 1.25).
-const RING_Z = 1.275, RING_T = 0.08, RING_D = 0.04, OPEN_W = 1.6, OPEN_H = 1.4;
+// Frame on the corridor side, just outside Doors.tsx's flash box (1.5 x 2.2 x 0.2 at the door, corridor face 0.1 before it).
+const RING_Z = TREASURY_DOOR[1] - 0.125, RING_T = 0.08, RING_D = 0.04, OPEN_W = 1.6, OPEN_H = 2.3;
 const RING: readonly { at: [number, number, number]; size: [number, number, number] }[] = [
   { at: [0, OPEN_H + RING_T / 2, 0], size: [OPEN_W + RING_T * 2, RING_T, RING_D] },
   { at: [0, 0.025, 0], size: [OPEN_W + RING_T * 2, 0.05, RING_D] },
@@ -21,7 +21,7 @@ const RING: readonly { at: [number, number, number]; size: [number, number, numb
   { at: [(OPEN_W + RING_T) / 2, OPEN_H / 2, 0], size: [RING_T, OPEN_H, RING_D] },
 ];
 // Free-standing sign on the aisle side of the door, right of the doorway and below the room label; faces +z.
-const SIGN_POS: [number, number, number] = [6.35, 0, 0.55];
+const SIGN_POS: [number, number, number] = [TREASURY_DOOR[0] + 1.35, 0, TREASURY_DOOR[1] - 0.6];
 const SIGN_W = 1.6, SIGN_H = 1.35, SIGN_Y = 1.25, TEX_W = 512, TEX_H = Math.round(TEX_W * SIGN_H / SIGN_W);
 
 function drawSign(ctx: CanvasRenderingContext2D, text: string) {

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { FLOOR_PAD_BOTTOM, FLOOR_PAD_TOP, MAX_OFFICE_LIGHTS, OFFICE_DIRECTIONAL_LIGHTS, OFFICE_LAMPS, OFFICE_LIGHTING, officeLightRig, officeLowPower } from './lighting';
 import { ROLES } from './palette';
+import { BUILDING } from './layout';
 
 function rgb(hex: string) {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -105,7 +106,9 @@ describe('office lighting', () => {
     const { position, near, scale } = OFFICE_LIGHTING.contactShadows;
     expect(position[1]).toBeGreaterThan(FLOOR_PAD_TOP);
     expect(position[1] + near).toBeGreaterThan(FLOOR_PAD_BOTTOM);
-    expect(scale).toEqual([16, 11]);
+    // Covers the whole building floor (24 x 15) with a small margin.
+    expect(scale[0]).toBeGreaterThanOrEqual(BUILDING.maxX - BUILDING.minX);
+    expect(scale[1]).toBeGreaterThanOrEqual(BUILDING.maxZ - BUILDING.minZ);
   });
 
   it('bounds the key shadow camera so the depth bias stays small in world units', () => {

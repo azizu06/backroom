@@ -33,12 +33,12 @@ export function mergeBoxes(pieces: readonly FurniturePiece[]): BufferGeometry {
   return merged;
 }
 
-export function StaticBoxes({ pieces, material = BASE_MATERIAL, castShadow = true }: {
-  pieces: readonly FurniturePiece[]; material?: Material; castShadow?: boolean;
+export function StaticBoxes({ pieces, material = BASE_MATERIAL, castShadow = true, receiveShadow = true }: {
+  pieces: readonly FurniturePiece[]; material?: Material; castShadow?: boolean; receiveShadow?: boolean;
 }) {
   const geometry = useMemo(() => mergeBoxes(pieces), [pieces]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  return <mesh geometry={geometry} material={material} castShadow={castShadow} receiveShadow matrixAutoUpdate={false} dispose={null} />;
+  return <mesh geometry={geometry} material={material} castShadow={castShadow} receiveShadow={receiveShadow} matrixAutoUpdate={false} dispose={null} />;
 }
 
 /** Static instance buffers are uploaded only when the layout changes, with no useFrame subscription. */

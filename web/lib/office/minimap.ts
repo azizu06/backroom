@@ -44,7 +44,7 @@ export function roomAt(position: Vec2, rooms: readonly AnchorId[]): string | und
     if (!isAnchorId(id)) continue;
     const [x, z] = OFFICE_ANCHORS[id].center;
     const distance = Math.hypot(position[0] - x, position[1] - z);
-    if (distance < 2.4 && (!nearest || distance < nearest.distance)) nearest = { name: OFFICE_ANCHORS[id].name, distance };
+    if (distance < 3 && (!nearest || distance < nearest.distance)) nearest = { name: OFFICE_ANCHORS[id].name, distance };
   }
   return nearest?.name;
 }

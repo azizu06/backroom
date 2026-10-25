@@ -107,8 +107,31 @@ async function bearing(page: Page, x: number, z: number) {
   const p = await player(page);
   return wrap(Math.atan2(-(x - p.x), -(z - p.z)) - p.yaw);
 }
+/** Turns toward (x, z), checking in the page every animation frame so slow headless frames cannot overshoot unseen. */
+async function face(page: Page, x: number, z: number, tolerance = 0.08) {
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const diff = await bearing(page, x, z);
+    if (Math.abs(diff) <= tolerance) return;
+    const key = diff > 0 ? 'ArrowLeft' : 'ArrowRight';
+    const { yaw } = await player(page);
+    await page.keyboard.down(key);
+    try {
+      await page.waitForFunction(({ x, z, yaw, diff }) => {
+        const element = document.querySelector<HTMLElement>('[data-player-yaw]');
+        if (!element) return false;
+        const next = Number(element.dataset.playerYaw);
+        if (Math.abs(diff) <= 0.35) return next !== yaw;
+        const raw = Math.atan2(-(x - Number(element.dataset.playerX)), -(z - Number(element.dataset.playerZ))) - next;
+        const remaining = Math.atan2(Math.sin(raw), Math.cos(raw));
+        return Math.abs(remaining) <= 0.3 || Math.sign(remaining) !== Math.sign(diff);
+      }, { x, z, yaw, diff }, { polling: 'raf' });
+    } finally { await page.keyboard.up(key); }
+  }
+  expect(Math.abs(await bearing(page, x, z))).toBeLessThanOrEqual(tolerance * 2);
+}
 
 test('play mode: facing a handoff agent and pressing E shows the handoff details', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto('/office?handoffs=mock');
   await requireWebGL(page);
   // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
@@ -117,9 +140,9 @@ test('play mode: facing a handoff agent and pressing E shows the handoff details
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
-  // Intake stands at (-6.0, 2.5), behind and to the left of the spawn; the path there is clear.
+  // Intake stands in the lobby at (-10, 4), behind and to the left of the spawn; the path through the lobby opening is clear.
   const prompt = page.getByText('E · Ask Intake about the handoff');
-  await holdUntil(page, 'ArrowLeft', async () => Math.abs(await bearing(page, -6, 2.5)) < 0.08);
+  await face(page, -10, 4);
   // Interact reach is short (#129): step toward Intake until the prompt appears.
   await holdUntil(page, 'w', () => prompt.isVisible());
   await expect(prompt).toBeVisible();

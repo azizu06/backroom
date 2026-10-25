@@ -43,8 +43,8 @@ test('Play hands control over after the intro and immediately with reduced motio
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await view.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  // No intro wait: the fresh spawn pose (z 0.900, not the previous session's) and movement must arrive before a 900 ms glide could finish.
-  await expect(surface(page)).toHaveAttribute('data-player-z', '0.900', { timeout: 400 });
+  // No intro wait: the fresh spawn pose (z 0.600, not the previous session's) and movement must arrive before a 900 ms glide could finish.
+  await expect(surface(page)).toHaveAttribute('data-player-z', '0.600', { timeout: 400 });
   await walkForward(page, 400);
   expect(errors).toEqual([]);
 });
