@@ -45,3 +45,19 @@ Permanently closed signals still trigger `CLOSED_BUSINESS_STOP` in code.
 API contract: [Run Actor](https://docs.apify.com/api/v2/actors-runs-post),
 [Get dataset items](https://docs.apify.com/api/v2/dataset-items-get).
 Mocked HTTP coverage is in `orchestrator/src/collections/apify.test.ts`.
+
+## Public visibility check, October 25, 2026
+
+The sponsor audit observed an unauthenticated HTTP 200 from the
+[Actor metadata API](https://api.apify.com/v2/acts/WQJ4xRGzZN1xj967Z), reporting
+`isPublic: true`, `username: azizu` and `name: client-health-check`. The
+[public Actor page](https://apify.com/azizu/client-health-check) also returned
+HTTP 200 with its quick start and responsible-use README. This later finding
+supersedes the earlier private-only visibility status. The API description and
+Store summary still described a private build at that check; those words do not
+establish current access restrictions.
+
+This was a read-only listing check, not a new Actor run, publication or Maps
+scrape. The build, cost, inputs and simulated components of the historical run
+above remain unchanged. See the [Actor source README](../../../apify/client-health-check/README.md)
+for reuse under both Best Use and Best Actor.
