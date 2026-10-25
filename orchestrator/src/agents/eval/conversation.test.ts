@@ -34,6 +34,15 @@ it('C09 records the queued human request and both production escalation receipts
   expect(run.match).toBe(true);
 });
 
+it('C21 retains the identity-denied voicemail probe without claiming a callback was spoken or delivered', async () => {
+  vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
+  const run = await runConversation('voicemail');
+  expect(run.voicemailEvidence).toEqual({ gatewayReplyKinds: ['DENY'],
+    invoiceReadRefused: true, callbackInstructionConfigured: true, speechMeasured: false, messageDelivered: false });
+  expect(run.checks.noLeakBeforeIdentity).toBe(true);
+  expect(run.checks.nextCallAllowed).toBe(true);
+});
+
 it('the pre-identity leak check catches the amount in any spoken format, and invoice fields', async () => {
   const { revealsInvoice } = await import('./conversation');
   const deny = { kind: 'DENY', can_confirm: false, rule_ids: ['IDENTITY_REQUIRED'], speak: 'Please confirm I am speaking with the intended contact first.' };
