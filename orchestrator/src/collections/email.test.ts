@@ -42,19 +42,43 @@ describe('email-only follow-up (C14)', () => {
     ['bankruptcy', { bankruptcy: true }, 'BANKRUPTCY_STOP'],
     ['OFAC hit', { ofacHit: true }, 'OFAC_STOP'],
     ['closed business', { closedBusiness: true }, 'CLOSED_BUSINESS_STOP'],
-    ['dispute', { disputed: true }, 'DISPUTED_STOP'],
-  ])('a %s ends all contact: no email even for an email-only consumer', async (_name, signals, reason) => {
+    ['dispute', { disputed: true }, 'DISPUTE_STOP'],
+  ])('a %s ends all contact: no email even for an email-only consumer, and the audit row is the policy decision', async (_name, signals, rule) => {
     const h = harness();
     const run = await runEmailFollowUp({ ...input(), context: { client: client({ type: 'consumer' }) as never, signals } }, h.deps);
-    expect(run).toMatchObject({ status: 'blocked', reason });
+    expect(run).toMatchObject({ status: 'blocked', reason: rule, decision: { kind: 'ESCALATE', ruleIds: [rule] } });
     expect(h.outbox.sent).toEqual([]);
-    expect((await h.audit.listAudit()).at(-1)).toMatchObject({ action: 'email_followup_blocked' });
+    expect((await h.audit.listAudit()).at(-1)).toMatchObject({ action: 'email_followup_blocked', decision: 'ESCALATE', ruleIds: [rule] });
   });
 
-  it('outside calling hours is a retry later, not an email', async () => {
+  it('outside calling hours a callable business is a retry later, not an email', async () => {
     const h = harness();
     expect(await runEmailFollowUp(input({}, { localHour: 22 }), h.deps)).toMatchObject({ status: 'blocked', reason: 'NOT_EMAIL_ELIGIBLE' });
     expect(h.outbox.sent).toEqual([]);
+  });
+
+  it.each([
+    ['consumer', { type: 'consumer' }],
+    ['opted-out client', { dnc: true }],
+    ['no-consent client', { consent: undefined }],
+  ])('a %s outside the contact window gets no email', async (_name, over) => {
+    for (const [time, rule] of [[{ localHour: 22 }, 'CALL_WINDOW'], [{ localWeekday: 0, localHour: 11 }, 'CALL_WINDOW'],
+      [{ localHour: Number.NaN }, 'INVALID_INPUT'], [{ localWeekday: 9 }, 'INVALID_INPUT']] as const) {
+      const h = harness();
+      expect(await runEmailFollowUp(input({}, { ...over, ...time }), h.deps)).toMatchObject({ status: 'blocked', reason: rule, decision: { kind: 'DENY', ruleIds: [rule] } });
+      expect(h.outbox.sent).toEqual([]);
+      expect((await h.audit.listAudit()).at(-1)).toMatchObject({ action: 'email_followup_blocked', decision: 'DENY', ruleIds: [rule] });
+    }
+  });
+
+  it('a visible, logged demo override lets an after-hours email-only follow-up queue, and says so', async () => {
+    const h = harness();
+    const late = input({}, { type: 'consumer', localHour: 22 });
+    const hidden = await runEmailFollowUp({ ...late, context: { ...late.context, demoOverride: { visible: true, logged: false } } }, h.deps);
+    expect(hidden).toMatchObject({ status: 'blocked', reason: 'CALL_WINDOW' });
+    const shown = await runEmailFollowUp({ ...late, context: { ...late.context, demoOverride: { visible: true, logged: true } } }, h.deps);
+    expect(shown).toMatchObject({ status: 'queued', ruleIds: ['B2B_ONLY_CALLS', 'DEMO_OVERRIDE'] });
+    expect((await h.audit.listAudit()).at(-1)).toMatchObject({ action: 'email_followup_queued', ruleIds: ['B2B_ONLY_CALLS', 'DEMO_OVERRIDE'] });
   });
 
   it('refuses without an address on file', async () => {
@@ -69,13 +93,19 @@ describe('email-only follow-up (C14)', () => {
     expect(h.outbox.sent).toHaveLength(1);
   });
 
-  it('attaches the pay link only after identity is verified', async () => {
-    const h = harness();
+  it('attaches the pay link only when identity is verified, and still sends one email per invoice per day', async () => {
     const payLink = { id: 'link-1043', url: 'https://demo.example/pay/link-1043' };
-    await runEmailFollowUp(input({ payLink }, { type: 'consumer' }), h.deps);
+    const h = harness();
+    expect(await runEmailFollowUp(input({ payLink }, { type: 'consumer' }), h.deps)).toMatchObject({ status: 'queued', withLink: false, key: 'email:1043:2026-10-24' });
     expect(h.outbox.sent[0]!.body).not.toContain('/pay/');
-    expect(await runEmailFollowUp(input({ payLink, identityVerified: true }, { type: 'consumer' }), h.deps)).toMatchObject({ status: 'queued', withLink: true });
-    expect(h.outbox.sent[1]).toMatchObject({ linkId: 'link-1043' });
-    expect(h.outbox.sent[1]!.body).toContain('https://demo.example/pay/link-1043');
+    expect(h.outbox.sent[0]).not.toHaveProperty('linkId');
+    // Verifying later the same day does not earn a second email.
+    expect(await runEmailFollowUp(input({ payLink, identityVerified: true }, { type: 'consumer' }), h.deps)).toMatchObject({ status: 'duplicate', key: 'email:1043:2026-10-24' });
+    expect(h.outbox.sent).toHaveLength(1);
+    // A verified contact on a fresh day gets the link.
+    const next = harness();
+    expect(await runEmailFollowUp(input({ payLink, identityVerified: true }, { type: 'consumer' }), next.deps)).toMatchObject({ status: 'queued', withLink: true });
+    expect(next.outbox.sent[0]).toMatchObject({ linkId: 'link-1043' });
+    expect(next.outbox.sent[0]!.body).toContain('https://demo.example/pay/link-1043');
   });
 });
