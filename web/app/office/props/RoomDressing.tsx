@@ -73,9 +73,9 @@ export function RoomDressing({ snapshot }: { snapshot: OfficeSnapshot }) {
   const kit = useDeskKitReady();
   const dressing = useMemo(() => {
     const all = dressingFor(snapshot);
-    if (!baked) return all;
-    // Under ?art=baked the baked lobby brings its own plants; drop the procedural plant (pot and foliage) inside it.
-    // The loaded desk kit draws shelves and floor plants elsewhere (colliders are unchanged: same footprints).
+    if (!baked && !kit) return all;
+    // A loaded baked lobby brings its own plants; drop the procedural plant (pot and foliage) inside it.
+    // The loaded desk kit draws shelves and floor plants elsewhere, independent of the lobby (colliders are unchanged: same footprints).
     return { ...all,
       shelves: all.shelves.filter(shelf => !deskKitReplaces(kit, shelf.room)),
       plants: all.plants.filter(plant => !bakedReplacesProps(baked, plant.room) && !deskKitReplaces(kit, plant.room)) };
