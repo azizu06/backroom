@@ -628,6 +628,7 @@ html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-s
 .office-shell .help-terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 0; }
 .office-shell .help-terms > div { padding: 12px 14px; background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 18px; }
 .office-shell .help-terms dt { font-weight: 900; }
+.office-shell .help-terms dt a { color: inherit; text-underline-offset: 2px; }
 .office-shell .help-terms dd { margin: 4px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
 .office-shell .help-flows { display: grid; gap: 14px; }
 .office-shell .help-steps { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
