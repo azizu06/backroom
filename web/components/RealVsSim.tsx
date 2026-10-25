@@ -62,7 +62,7 @@ export function RealVsSim() {
         ))}
       </div>
       <p className="real-sim-note">{status ? (status.llmEnabled ? 'LLM enabled' : 'LLM OFF · model work paused') : 'Live status unavailable'} · Sandbox items never represent real money or identities.</p>
-      <p className="real-sim-note">Status refreshes every 10 seconds; service probes are cached for about 45 seconds. Verified means a fresh live probe or a committed receipt (its time is shown). Simulated means a fixture stands in for the service. Unreachable means the probe failed. Unverified means no fresh evidence is available. LLM control reflects this server process; separate processes need the shared state adapter.</p>
+      <p className="real-sim-note">Verified: a fresh live check or a saved receipt (time shown). Simulated: a stand-in replaces the service. Unreachable: the check failed. Unverified: no fresh evidence yet. Refreshes every 10 seconds.</p>
     </section>
   );
 }

@@ -18,7 +18,7 @@ export default function CallUnlock() {
     <header className={styles.header}><a href="/">Backroom</a><span>Office calls</span></header>
     <p className={styles.status}>Operator setup</p>
     <h1>Unlock the<br />desk phone.</h1>
-    <p className={styles.intro}>Once unlocked, Request call on the office desk phone rings the allowlisted demo phone. The AI discloses itself first; the number is server configuration and never leaves the host.</p>
+    <p className={styles.intro}>Once unlocked, Request call on the office desk phone rings the one approved demo phone. The AI says it is an AI before anything else, and the number stays on the server.</p>
     {result && <p className={result.ok ? styles.status : styles.error} role={result.ok ? 'status' : 'alert'}>{result.message}</p>}
     {result?.ok ? <p className={styles.section}><a href="/office">Back to the office</a></p>
       : <form className={styles.section} onSubmit={e => { e.preventDefault(); void unlock(); }}>
