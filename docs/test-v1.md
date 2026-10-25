@@ -29,8 +29,10 @@ controller **and audit** use `CONTROLLER_ENROLLMENT_SECRET`; policy uses
    Then run `pnpm demo:reset`, and open its **new approval URL immediately**.
    Four payments should cite `MAX_INSTALLMENTS`. Press **Deny with passkey**
    while the request is open (it stays open for the call, up to five minutes, and closes when the call ends); expect “Your decision is recorded.” This starts from a
-   synthetic, preverified caller, and the two-payment link is a separate ALLOW.
-2. Open the new pay URL. Press **Pay $2,475.00 with simulated card**; expect
+   synthetic, preverified caller. Reset seeds no payment link (`demo:reset`
+   prints `Pay: no active link until a call`).
+2. Send a two-payment ALLOW link on that synthetic call through the gateway
+   (`node tools/demo/rehearse.mjs` does this), then open its pay URL. Press **Pay $2,475.00 with simulated card**; expect
    “Payment matched. Invoice partially paid.” Reload: deposit stays recorded.
    This browser take exercises real code/reducers over **mock Nessie HTTP**.
 3. Open `/inbox`. Route presets **4419** and **4471**. Both must be held/

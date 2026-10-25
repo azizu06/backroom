@@ -65,8 +65,8 @@ other adapter is durable. Keep all mode and AI-caller disclosures visible. This 
 6. Click **Calls** and wait for **Payment link ready**, or click **Payment link ·
    ready** in navigation. Click **Pay $743.00** to open that authorized pay page
    (the phone can scan its QR instead), then press **Pay $743.00** on the page.
-   Wait for **Payment matched. Invoice partially paid.** Use the new call's link,
-   not the independent seeded payment. The lobby kiosk's QR/link is another
+   Wait for **Payment matched. Invoice partially paid.** Reset seeds no payment
+   link, so this is the call's own link. The lobby kiosk's QR/link is another
    route; the Payment link page has the explicit Pay button on current main.
 7. Finish the call so its outcome can be reconciled. Click **Audit wall** and
    follow the current call's evidence: exact amount/payment match, invoice 1042
@@ -153,7 +153,7 @@ spec §6. CLI commands remain available. Coverage and deliberate exclusions:
 | --- | --- |
 | `demo:up`, `demo:down`, build/install, tunnels, voice relay/attack-server startup | Retained as host bootstrap/recovery: a stopped app cannot start itself; process lifecycle belongs to the owned supervisor. The owned supervisor starts its mock attack server. |
 | `demo:up:gx10`, `demo:down:gx10`, SSH deploy, warm Mac provisioning, callback rebinding / host failover | Retained as deployment operations, never browser-driven shared infrastructure changes. Keep a prepared fallback URL. |
-| `demo:reset`, local `state:seed`, fresh approval/pay URLs | **Reset company** and **Refresh demo links**. Reset owns publish + seed + gateway setup. No separate seed button against a live database. Maincloud reset stays rejected by the existing supervisor. |
+| `demo:reset`, local `state:seed`, fresh approval URL | **Reset company** and **Refresh demo links**. Reset owns publish + seed + gateway setup. No separate seed button against a live database. Maincloud reset stays rejected by the existing supervisor. |
 | `demo:health [--live]`, `demo:health:gx10 --live`, `demo:preflight` | **Check dependencies** / **Run preflight**, using the same functions and running host's adapters. Probe results are reachability, not call/inference/payment proof. |
 | `demo:core` offline scenarios | **Run core scenarios**, the same CLI in an isolated memory process; output shown in console, not projected as live office state. |
 | `eval:run` scripted run | **Run scripted eval**, same CLI, no GX10 persona or graded/signoff override. Software authenticators and fake transports are labeled. |
@@ -163,7 +163,7 @@ spec §6. CLI commands remain available. Coverage and deliberate exclusions:
 | Pre-call company/credit refresh, consent and phone dial | Link to **Office · Request call**; owned by the call-button worker. Host pre-call evidence remains one-shot to avoid rebilling Apify; console health does not refresh it or manufacture consent/dial authority. |
 | Judge inbox / invoice submission and frozen trap runs | Link to existing **Judge inbox** form; raw submissions still traverse `/api/inbox`, policy and audit. No second intake pipeline. |
 | Controller enrollment, phone inbox and approve/deny | Link to **Controller inbox**; owned by the controller worker. Each approval stays bound to a passkey and its original expiry. |
-| Payment-link creation and pay/reconcile | **Refresh demo links** exposes seeded gateway links; **Authorized call payment** reuses the existing active-link/QR component. Actual link generation stays in the policy gateway; payment stays on its existing page. |
+| Payment-link creation and pay/reconcile | **Refresh demo links** exposes the seeded approval; reset seeds no payment link. **Authorized call payment** reuses the existing active-link/QR component. Actual link generation stays in the policy gateway; payment stays on its existing page. |
 | `x402:live` Payables vendor payment (#7) | **Pay vendor with x402 · OFFLINE** (in-process mock vendor/facilitator), **Try blocked x402 invoice · OFFLINE** (policy hold, zero signing) and **Pay vendor with x402 · TESTNET** (only with host `X402_LIVE=1`, macOS Keychain wallet; $0.01 Base Sepolia test USDC, once per host process). `x402:wallet` setup and faucet funding stay outside. See [x402](x402.md#in-the-app-operator-console). |
 | Attack-demo triggers | Link to existing **Attack demo** page, whose mock server is started by the owned supervisor. The console does not bypass its live/mock controls. |
 | Policy edits, audit unlock, cited ask-why, replay and real-vs-sim disclosure | Links to existing app views. Their own authorization and provenance labels remain in force. |
@@ -228,7 +228,7 @@ pnpm demo:up           # local DB + publish/import, production web, seats, mock 
 pnpm demo:preflight    # six read-only reachability checks, nonzero on RED
 pnpm demo:health       # local status + configured/missing; no external probes
 pnpm demo:health --live # read-only, bounded GX10 /models, Nessie account, tunnel probes
-pnpm demo:reset        # fresh local DB + scripted starting state; reprint fresh approve/pay links
+pnpm demo:reset        # fresh local DB + scripted starting state; reprint fresh approve link (no pay link until a call)
 pnpm demo:down         # stop only this supervisor's child process groups
 ```
 
@@ -368,7 +368,7 @@ and refuses reset; do not combine it with `DEMO_SPACETIME=maincloud`.
 Each reset publishes a new `backroom-demo-<time>-<random>` module, then the
 existing private reset API stops the old seat workers, imports the seed company
 via `seed_company`, installs the new StateStore and recreates the scripted
-approval/pay scenario through public gateway/reducer APIs. No reducer changes,
+approval through public gateway/reducer APIs; no payment link exists until a call sends one. No reducer changes,
 SQL deletes, clear-database flags, or fixture edits are involved. Old local and
 hosted databases remain for inspection; this is a clean **active run**, not data
 erasure. The runtime integration seam remains `/__demo/reset` with
@@ -675,7 +675,7 @@ directory.
 1. If GX10 degrades, open the already-warm Mac `/office` and the saved Mac public
    approval/pay pages. Keep the visible service/mode labels. No rebuild, SSH,
    credential copy or passkey registration belongs in this minute.
-2. For fresh seeded links, run `pnpm demo:reset` on the **local** standby, then
+2. For a fresh seeded approval, run `pnpm demo:reset` on the **local** standby, then
    use its current controller QR and Payment link navigation (the approval stays open for the call, up to five minutes, and closes when the call ends).
 3. When GX10 health recovers, switch back to its saved URLs after a read-only
    health check. Do not stop/restart either origin during a live take.
