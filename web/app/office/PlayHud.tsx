@@ -23,6 +23,7 @@ import { useHandoffPresentation } from './handoffs/HandoffPresentation';
 import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
+import { agentCues, cueKeyFor } from '../../lib/office/agent-motion';
 import './play.css';
 import './playfeel.css';
 
@@ -173,6 +174,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
   }, [hud, input]);
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
   useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
+  // The agent being talked to faces the player and listens until the dialog closes (view only).
+  useEffect(() => {
+    agentCues.setTalking(panel ? cueKeyFor(panel) : null);
+    return () => agentCues.setTalking(null);
+  }, [panel]);
   useEffect(() => {
     if (panel && !playPanel(snapshot, panel, handoffFor)) { setPanel(null); hud.current?.focus(); }
   }, [panel, snapshot, hud, handoffFor]);
@@ -204,6 +210,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat, lo
     input.clear();
     releasePointer();
     requestSceneFrame();
+    const cue = cueKeyFor(current);
+    if (cue) agentCues.greet(cue);
     setPanel(current);
     playOfficeCue('interact');
   }

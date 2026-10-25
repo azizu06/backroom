@@ -44,9 +44,15 @@ function badgeMaterial(): MeshStandardMaterial {
 
 export type BearCarry = 'none' | 'paw' | 'front';
 /** Pivots a parent's useFrame poses with poseBear; `carry` holds the arms instead of swinging them. */
-export interface BearRig { legs: Group | null; arms: Group | null; head: Group | null; chest: Group | null; carry: BearCarry }
+export interface BearRig {
+  legs: Group | null; arms: Group | null; head: Group | null; chest: Group | null; carry: BearCarry;
+  /** The whole bear (bob, lean, sway). */
+  root?: Group | null;
+  /** Set by an AgentAnimator, which then owns the head, chest and root; the built-in idle stands down. */
+  driven?: boolean;
+}
 export function createBearRig(): BearRig {
-  return { legs: null, arms: null, head: null, chest: null, carry: 'none' };
+  return { legs: null, arms: null, head: null, chest: null, carry: 'none', root: null, driven: false };
 }
 function holdArm(arm: { rotation: { x: number; z: number } }, side: number, pose: ArmPose) {
   arm.rotation.x = pose.pitch;
@@ -96,11 +102,12 @@ export function Bear({ color, seed, rig: external, carry, ghost, paw }: {
   }, [color, ghost]);
   const shadow = !ghost;
   useFrame(state => {
+    if (rig.driven) return;
     const idle = bearIdle(state.clock.elapsedTime, phase, reduced);
     if (rig.head) { rig.head.rotation.z = idle.tilt; rig.head.rotation.x = idle.nod; }
     if (rig.chest) { rig.chest.scale.x = 1 + idle.breath; rig.chest.scale.z = 1 + idle.breath; }
   });
-  return <group name='bear'>
+  return <group name='bear' ref={group => { rig.root = group; }}>
     <group ref={group => { rig.chest = group; }}>
       <Part {...BEAR.torso} material={look.fur} shadow={shadow} />
       <Part {...BEAR.belly} material={look.muzzle} />
