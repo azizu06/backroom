@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { visibleRooms } from '../../../lib/office/state';
 import { bakedReplacesAuditBoard } from '../../../lib/office/baked-art';
-import { useBakedArtRequested } from './BakedArt';
+import { useBakedLobbyReady } from './BakedArt';
 import { Block } from './shared';
 import type { SceneMountProps } from './types';
 import { PALETTE, ROLES } from '../../../lib/office/palette';
@@ -13,10 +14,18 @@ import { PALETTE, ROLES } from '../../../lib/office/palette';
  * Under ?art=baked in first person the board hides (bakedReplacesAuditBoard); the counter always stays.
  */
 export function LobbyCounter({ snapshot }: SceneMountProps) {
-  const baked = useBakedArtRequested();
+  const baked = useBakedLobbyReady();
   const overview = useThree(state => (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera === true);
-  if (!visibleRooms(snapshot).includes('lobby')) return null;
+  const host = useThree(state => state.gl.domElement.parentElement);
+  const lobby = visibleRooms(snapshot).includes('lobby');
   const board = !bakedReplacesAuditBoard(baked, overview);
+  // Test hook: whether the procedural audit board is drawn (`shown`) or replaced by the loaded baked lobby (`baked`).
+  useEffect(() => {
+    if (!host || !lobby) return;
+    host.dataset.lobbyAuditBoard = board ? 'shown' : 'baked';
+    return () => { delete host.dataset.lobbyAuditBoard; };
+  }, [host, lobby, board]);
+  if (!lobby) return null;
   return <group position={[-5.9, 0, 3.9]}>
     {board && <Block at={[0, 1.25, 0]} size={[2, 1.45, 0.15]} color={ROLES.frame} />}
     {board && snapshot.audit.slice(-3).map((row, i) => <Block key={row.id} at={[0, 1.65 - i * 0.35, -0.09]} size={[1.55, 0.09, 0.04]} color={row.decision === 'DENY' ? ROLES.deny : PALETTE.mint} />)}
