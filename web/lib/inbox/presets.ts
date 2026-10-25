@@ -13,10 +13,9 @@ export const inboxPresets: InboxPreset[] = planted.map(([id, label]) => {
   return { id, label, kind: 'invoice', senderDomain: northfieldSource(id).senderDomain,
     text: `Please process invoice #${id}.\n\n${JSON.stringify(fields, null, 2)}` };
 });
-const cedar = northfield.bankChanges.find(row => row.id === 'bc-legitimate');
-if (cedar) {
-  const change = northfieldChange(cedar.id);
-  inboxPresets.push({ id: cedar.id, label: 'Cedar bank change', kind: 'email',
+for (const changeRecord of northfield.bankChanges.filter(row => ['bc-legitimate', 'bc-lookalike'].includes(row.id))) {
+  const change = northfieldChange(changeRecord.id);
+  inboxPresets.push({ id: changeRecord.id, label: changeRecord.id === 'bc-legitimate' ? 'Cedar bank change' : 'Lookalike bank-change email', kind: 'email',
     senderDomain: change.source.senderDomain,
     text: `Please update our payment account.\n\n${JSON.stringify(change.fields, null, 2)}` });
 }
