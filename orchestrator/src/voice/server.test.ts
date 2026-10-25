@@ -9,11 +9,12 @@ const call: GatewayCall = { callId: 'session-1', invoiceId: '1042', clientId: 'c
   amountCents: 495000, receivable: { principalCents: 480000, lateFeeCents: 15000 }, currency: 'USD', policyVersion: 1, identityConfirmed: false,
   status: 'active', audits: [], plans: [], escalations: [], links: [], outbox: [], deliveries: {} };
 const welcome = renderWelcome({ businessName: 'Northfield Studio', invoiceId: '1042', contactName: 'Jordan' });
-async function fixture(extra: Pick<Parameters<typeof createVoiceHandler>[0], 'interpretAnswer' | 'answerWaitMs'> = {}, fields: Partial<VoiceSession> = {}) {
+async function fixture(extra: Pick<Parameters<typeof createVoiceHandler>[0], 'interpretAnswer' | 'answerWaitMs' | 'approvalHoldMs' | 'approvalPollMs'> = {}, fields: Partial<VoiceSession> = {},
+  store = new MemoryGatewayStore([structuredClone(call)])) {
   const journal = new VoiceJournal();
   const session: VoiceSession = { id: 'session-1', contactName: 'Jordan', welcome, nonce: 'nonce-1', providerCallId: 'ac-1', disclosureComplete: false, stopped: false, deliveries: {}, ...fields };
   await journal.register(session);
-  const gateway = vi.fn(createGateway({ secret: () => 'gateway-secret', store: new MemoryGatewayStore([structuredClone(call)]) }));
+  const gateway = vi.fn(createGateway({ secret: () => 'gateway-secret', store }));
   const handle = createVoiceHandler({ journal, eventSecret: 'event-secret', toolSecret: 'relay-secret', gatewaySecret: 'gateway-secret', gateway, answerWaitMs: 0, ...extra });
   const event = (id: string, turn: Record<string, unknown>) => handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
     body: JSON.stringify({ type: 'call_turn', call_id: 'ac-1', webhook_request_id: id, turn }) }));
@@ -323,6 +324,67 @@ describe('voice HTTP boundary with the actual tool gateway', () => {
     expect(blocked.body.rule_ids).toEqual(['CALL_STOPPED']);
     expect(f.gateway).toHaveBeenCalledTimes(1);
     expect(f.gateway.mock.calls[0]?.[0]).toBe('request_human');
+  });
+  describe('holding the line while Dana reviews', () => {
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    /** Identity, invoice and a seven-installment request that escalates to Dana. */
+    async function escalated(options: { approvalHoldMs: number; approvalPollMs: number }) {
+      const store = new MemoryGatewayStore([structuredClone(call)]);
+      const f = await fixture(options, {}, store);
+      await f.event('greeting', { role: 'assistant', text: welcome, was_interrupted: false });
+      await f.event('yes', { role: 'user', text: 'Yes, this is Jordan.', was_interrupted: false });
+      const verified = await f.tool('verify_identity_result', 'nonce-1', { result: 'confirmed' });
+      const context = await f.tool('get_invoice_context', verified.body.next_delivery_nonce);
+      const proposed = await f.tool('propose_plan', context.body.next_delivery_nonce, { installments: 7, first_payment_pct: 15, duration_days: 30, waive_fee: false, discount_pct: 0 });
+      expect(proposed.body).toMatchObject({ kind: 'ESCALATE', can_confirm: false });
+      const decide = (kind: 'Approve' | 'Deny') => store.transact('session-1', c => {
+        const row = c.escalations.find(e => e.id === proposed.body.escalation_id)!;
+        row.status = kind === 'Approve' ? 'approved' : 'denied'; row.method = 'passkey'; row.decision = { kind };
+      });
+      return { ...f, escalationId: proposed.body.escalation_id as string, nonce: proposed.body.next_delivery_nonce as string, decide };
+    }
+    it('returns the confirm step as soon as Dana approves mid-hold, with no caller turn', async () => {
+      const f = await escalated({ approvalHoldMs: 5000, approvalPollMs: 20 });
+      const started = Date.now();
+      const held = f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      await sleep(150);
+      await f.decide('Approve');
+      const approved = await held;
+      expect(Date.now() - started).toBeLessThan(2000);
+      expect(approved.body).toMatchObject({ kind: 'ALLOW', can_confirm: true, approval_status: 'approved', next_step: 'confirm_plan',
+        plan: { installments: 7, firstPaymentPct: 15 } });
+      expect(String(approved.body.speak)).toContain('payment link');
+      const link = await f.tool('send_payment_link', approved.body.next_delivery_nonce, { plan_id: approved.body.plan_id });
+      expect(link.body).toMatchObject({ kind: 'RECORDED', can_confirm: false });
+    });
+    it('ends a still-pending hold with a short holding line and asks the agent to poll again', async () => {
+      const f = await escalated({ approvalHoldMs: 120, approvalPollMs: 20 });
+      const pending = await f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      expect(pending.body).toMatchObject({ kind: 'PENDING', can_confirm: false, approval_status: 'pending', next_step: 'poll_again',
+        speak: 'Still waiting on Dana, thanks for holding.' });
+      await f.decide('Deny');
+      const denied = await f.tool('check_approval', pending.body.next_delivery_nonce, { escalation_id: f.escalationId });
+      expect(denied.body).toMatchObject({ approval_status: 'denied', can_confirm: false });
+      expect(denied.body).not.toHaveProperty('next_step', 'poll_again');
+    });
+    it('keeps call events flowing during a hold and returns early when the caller speaks', async () => {
+      const f = await escalated({ approvalHoldMs: 5000, approvalPollMs: 20 });
+      const started = Date.now();
+      const held = f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      await sleep(100);
+      expect((await f.event('caller', { role: 'user', text: 'Any news?', was_interrupted: false })).status).toBe(200);
+      const pending = await held;
+      expect(Date.now() - started).toBeLessThan(2000);
+      expect(pending.body).toMatchObject({ approval_status: 'pending', next_step: 'poll_again' });
+    });
+    it('stops holding when the call ends', async () => {
+      const f = await escalated({ approvalHoldMs: 5000, approvalPollMs: 20 });
+      const held = f.tool('check_approval', f.nonce, { escalation_id: f.escalationId });
+      await sleep(100);
+      await f.handle(new Request('https://relay.test/api/voice/cartesia', { method: 'POST', headers: { 'x-webhook-secret': 'event-secret' },
+        body: JSON.stringify({ type: 'call_completed', call_id: 'ac-1', webhook_request_id: 'ended' }) }));
+      expect((await held).body).toMatchObject({ can_confirm: false, rule_ids: ['CALL_STOPPED'] });
+    });
   });
   it('rejects unauthenticated, malformed, and invented invocation identifiers', async () => {
     const f = await fixture();

@@ -35,6 +35,12 @@ returns `next_step: ask_again_once`; the second returns `offer_callback_and_end`
 and stops the call. `answer-eval.ts` is the opt-in live matrix
 (`VOICE_ANSWER_EVAL=yes`). Webhook tools use an 8 s deadline: 2 s dropped both
 identity deliveries on the 2026-10-25 venue call before they reached the relay.
+`check_approval` uses 20 s: while Dana's decision is pending, the relay re-reads it
+for up to 12 s (`APPROVAL_HOLD_MS`) and answers as soon as she decides, the caller
+speaks or the call ends. A still-pending answer carries `next_step: poll_again` and a
+short holding line, so the agent re-checks about every 15 s without a caller turn;
+an approval carries `next_step: confirm_plan`. Inactivity hang-up is 240 s, the
+Cartesia maximum.
 
 ## Disclosure, stops, and retries
 
