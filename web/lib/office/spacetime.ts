@@ -34,11 +34,14 @@ export function projectOfficeRows(rows: OfficeRows): OfficeSnapshot {
       rooms: row.allowedRooms, limits: object(row.limits) }] : []);
   const audit = [...rows.audit].sort((a, b) => a.seq < b.seq ? -1 : a.seq > b.seq ? 1 : 0).map(row => {
     const inputs = object(row.inputs);
+    const emailPreview = row.action === 'email_followup_queued' || row.action === 'email_followup_duplicate';
+    const toDomain = typeof inputs.toDomain === 'string' ? inputs.toDomain : undefined;
     return { id: row.id, agentId: typeof inputs.agentId === 'string' ? inputs.agentId : '', seatId: row.seat,
       action: row.action, decision: row.decision === 'ALLOW' || row.decision === 'DENY' || row.decision === 'ESCALATE'
         ? row.decision : 'RECORDED' as const,
       ruleIds: row.ruleIds, room: typeof inputs.room === 'string' ? anchor(inputs.room) : undefined,
-      summary: `${row.action.replaceAll('_', ' ')} · ${row.refs.join(', ')}`, at: row.ts, refs: row.refs } satisfies OfficeAudit & { at: number; refs: string[] };
+      summary: emailPreview ? `Email preview (simulated, not sent)${toDomain ? ` · ${toDomain}` : ''}`
+        : `${row.action.replaceAll('_', ' ')} · ${row.refs.join(', ')}`, at: row.ts, refs: row.refs } satisfies OfficeAudit & { at: number; refs: string[] };
   });
   const denials = audit.flatMap(row => row.action === 'request_room_entry' && row.decision === 'DENY' && row.room && row.agentId
     ? [{ room: row.room, agentId: row.agentId, auditId: row.id, at: row.at }] : []);
@@ -50,7 +53,7 @@ export function projectOfficeRows(rows: OfficeRows): OfficeSnapshot {
       pos: [row.posX, row.posZ] as const, rowAt: Number(row.heartbeatAt.microsSinceUnixEpoch / 1000n),
       escalationId: targetAnchor === 'dana' ? escalation?.id : undefined }];
   });
-  const inboxReceipts = audit.filter(row => ['submit_inbox_item', 'judge_inbox_decision', 'route_inbox_item'].includes(row.action));
+  const inboxReceipts = audit.filter(row => ['submit_inbox_item', 'judge_inbox_decision', 'route_inbox_item', 'email_followup_queued'].includes(row.action));
   return { agents, rooms, badges, audit, denials, inboxReceipts, inboxCount: inboxReceipts.length,
     ...(rows.handoffs ? { handoffs: projectHandoffRows(rows.handoffs) } : {}),
     connection: 'live', llmEnabled: rows.control.find(row => row.id === 'global')?.llmEnabled ?? null };

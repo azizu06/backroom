@@ -170,6 +170,28 @@ it('records FAKE CRS and fixture health signals, replays as a no-op, and still r
   logged.mockRestore();
 });
 
+it('rebuilds only email-eligible refused calls as trusted planner cases', async () => {
+  const plan = { tone: 'neutral' as const, offerOrder: ['pay_in_full' as const],
+    plan: { installments: 1, firstPaymentPct: 100, totalDays: 0, waiveFees: false, discountPct: 0 } };
+  const modelRoute = (async () => ({ output: plan, route: 'cloud' as const, model: 'test', latencyMs: 1, costUsd: 0 })) as typeof route;
+  const services = await createDemoServices({ env: { NODE_ENV: 'test', DEMO_LIVE: '1', NESSIE_API_KEY: 'private',
+    NESSIE_ACCOUNT_ID: 'sandbox-account', PRECALL_APIFY: 'fake' }, fetch: vi.fn(), modelRoute });
+  const { MemoryStateStore } = await import('@backroom/orchestrator');
+  const state = new MemoryStateStore();
+  await services.prepare(state);
+  const planner = services.collectionsPlanner(state);
+  const consumer = await planner.caseFor({ outcome: 'refused', code: 'CALL_DENIED', detail: 'B2B_ONLY_CALLS' });
+  expect(consumer).toMatchObject({ precall: { context: { client: { type: 'consumer' } } },
+    emailContact: { address: 'billing@client.example' } });
+  await expect(planner.voice.start(consumer!.dial)).rejects.toThrow('REFUSED_CALL_CANNOT_DIAL');
+  expect(await planner.caseFor({ outcome: 'refused', code: 'CALL_DENIED', detail: 'DNC' }))
+    .toMatchObject({ precall: { context: { client: { dnc: true } } } });
+  expect(await planner.caseFor({ outcome: 'refused', code: 'CALL_DENIED', detail: 'CONSENT_REQUIRED' }))
+    .not.toHaveProperty('precall.context.client.consent');
+  expect(await planner.caseFor({ outcome: 'refused', code: 'CALL_DENIED', detail: 'BANKRUPTCY_STOP' })).toBeUndefined();
+  expect(await planner.caseFor({ outcome: 'refused', code: 'RELAY_REFUSED', detail: 'B2B_ONLY_CALLS' })).toBeUndefined();
+});
+
 it('records the live website signal for invoice 1042 and the card reads that same row', async () => {
   const runId = '7LJbWDdDqZkk5iRJh';
   const observedAt = '2026-10-24T23:54:18.992Z';

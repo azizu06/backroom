@@ -58,6 +58,19 @@ describe('anonymous office projection', () => {
     expect(snapshot.inboxCount).toBe(1);
     expect(snapshot.audit[0]?.decision).toBe('RECORDED');
   });
+  it('projects one simulated email preview into the existing inbox and audit feed without a mailbox', () => {
+    const data = rows();
+    data.audit.push({ ...data.audit[0]!, seq: 3n, id: 'email-1', seat: 'collections', action: 'email_followup_queued',
+      decision: 'ALLOW', ruleIds: ['B2B_ONLY_CALLS'], refs: ['client-02', '1042'],
+      inputs: JSON.stringify({ simulated: true, label: 'SIMULATED: email preview, not sent', toDomain: 'client.example' }) });
+    data.audit.push({ ...data.audit[0]!, seq: 4n, id: 'email-2', seat: 'collections', action: 'email_followup_duplicate',
+      decision: 'ALLOW', ruleIds: ['B2B_ONLY_CALLS'], refs: ['client-02', '1042'],
+      inputs: JSON.stringify({ simulated: true, label: 'SIMULATED: email preview, not sent', toDomain: 'client.example' }) });
+    const snapshot = projectOfficeRows(data);
+    expect(snapshot.inboxCount).toBe(1);
+    expect(snapshot.inboxReceipts?.[0]).toMatchObject({ id: 'email-1', summary: 'Email preview (simulated, not sent) · client.example' });
+    expect(JSON.stringify(snapshot)).not.toContain('billing@client.example');
+  });
   it('selects live mode from the backend and serializes only anonymous coordinates', () => {
     expect(officeConfig({})).toBeNull();
     expect(officeConfig({ STATE_STORE: 'spacetime', SPACETIMEDB_URI: 'ws://localhost:3115', SPACETIMEDB_DATABASE: 'demo', SPACETIMEDB_TOKEN: 'private' }))
