@@ -182,3 +182,29 @@ describe('collections pre-call', () => {
     expect((await audit()).map((entry: AuditInput) => entry.action)).toEqual(['can_call']);
   });
 });
+
+describe('phone mismatch (C17)', () => {
+  it('lets the call proceed but records PHONE_MISMATCH_WARN when Apify finds a different public number', async () => {
+    const { deps, audit } = harness();
+    deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: false, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+    expect(await runPreCall(input(), deps)).toMatchObject({ status: 'ready', warnings: ['PHONE_MISMATCH_WARN'] });
+    expect((await audit()).find((entry: AuditInput) => entry.action === 'phone_mismatch_warn'))
+      .toMatchObject({ decision: 'ALLOW', ruleIds: ['PHONE_MISMATCH_WARN'], inputs: { identityCaution: true } });
+  });
+  it('records no warning when the public number matches', async () => {
+    const { deps, audit } = harness();
+    deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: true, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+    const result = await runPreCall(input(), deps);
+    expect(result).toMatchObject({ status: 'ready' });
+    expect(result).not.toHaveProperty('warnings');
+    expect((await audit()).some((entry: AuditInput) => entry.action === 'phone_mismatch_warn')).toBe(false);
+  });
+});
+
+it('a phone mismatch on a call blocked by an unavailable OFAC check leaves no ALLOW warning row', async () => {
+  const { deps, audit } = harness();
+  deps.health.check = vi.fn(async () => ({ signals: [{ type: 'phone_match' as const, value: false, sourceUrl: 'https://example.com/listing', observedAt: '2026-10-24T01:00:00Z' }] }));
+  deps.credit.check = vi.fn(async () => { throw new Error('CRS down'); });
+  expect(await runPreCall(input(), deps)).toMatchObject({ status: 'blocked' });
+  expect((await audit()).some((entry: AuditInput) => entry.action === 'phone_mismatch_warn')).toBe(false);
+});

@@ -1,4 +1,5 @@
 import { createMockCallFeed } from './calls-mock';
+import type { PrecallCard } from '../calls/precall';
 
 export type CallStatus = 'idle' | 'ringing' | 'live' | 'ended';
 export type CallDirection = 'inbound' | 'outbound';
@@ -136,4 +137,24 @@ export const callStore = {
   getSnapshot: () => snapshot,
   getServerSnapshot: () => IDLE_CALL,
   dispatch(event: CallEvent) { const next = callReducer(snapshot, event); if (next !== snapshot) { snapshot = next; notify(); } },
+};
+
+const PRECALL_ENDPOINT = '/api/calls/precall';
+let precall: PrecallCard | null = null;
+const precallListeners = new Set<() => void>();
+/** The host's pre-call evidence card, read once per panel open. The scripted preview never fetches it. */
+export const precallStore = {
+  subscribe(listener: () => void) { precallListeners.add(listener); return () => { precallListeners.delete(listener); }; },
+  getSnapshot: () => precall,
+  getServerSnapshot: (): PrecallCard | null => null,
+  async load(): Promise<void> {
+    if (typeof window === 'undefined' || isMockCalls(window.location.search)) return;
+    try {
+      const response = await fetch(PRECALL_ENDPOINT, { cache: 'no-store' });
+      if (!response.ok) throw new Error(String(response.status));
+      const body = await response.json() as { card?: PrecallCard };
+      precall = body.card ?? null;
+    } catch { precall = null; }
+    precallListeners.forEach(listener => listener());
+  },
 };
