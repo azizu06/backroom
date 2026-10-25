@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { MeshBasicMaterial, MeshStandardMaterial, type Group } from 'three';
 import { matchingDenial, type OfficeSnapshot } from '../../../lib/office/state';
-import { DENY_MOMENT_MS, ECHO_START, ECHO_WALK, TREASURY_DOOR, TREASURY_DOOR_INTERACTION, createDenyPose, denyPose, denyReceipt, type DenyReceipt } from '../../../lib/office/props/treasuryDeny';
+import { DENY_MOMENT_MS, ECHO_START, pacedDenyAge, ECHO_WALK, TREASURY_DOOR, TREASURY_DOOR_INTERACTION, createDenyPose, denyPose, denyReceipt, type DenyReceipt } from '../../../lib/office/props/treasuryDeny';
 import { Bear, createBearRig, poseBear } from '../avatars/Bear';
 import { canvasTextLines } from '../../../lib/office/props/readability';
 import { PROP_FONT, useCanvasTexture } from './useCanvasTexture';
@@ -79,10 +79,14 @@ function Moment({ receipt, at, reduced, onEnd }: { receipt: DenyReceipt; at: num
     }, Math.max(0, DENY_MOMENT_MS - (Date.now() - at)));
     return () => clearTimeout(timer);
   }, [reduced, at, onEnd, invalidate, receipt.auditId]);
+  const paced = useRef<{ age: number; now: number } | null>(null);
   useFrame(state => {
     if (ended.current || !root.current) return;
-    // Ages clamp at 0 inside denyPose: clock skew can put a row's `at` ahead of this clock.
-    const age = Date.now() - at;
+    // Ages clamp at 0: clock skew can put a row's `at` ahead of this clock. Slow frames play in slow
+    // motion (pacedDenyAge), so a contended GPU still shows the sign for most of the beat.
+    const now = Date.now();
+    const age = pacedDenyAge(paced.current?.age ?? null, now - (paced.current?.now ?? now), now - at);
+    paced.current = { age, now };
     if (age >= DENY_MOMENT_MS) {
       if (reduced) return;
       ended.current = true;
