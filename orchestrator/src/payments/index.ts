@@ -27,6 +27,10 @@ interface Options {
   /** Trusted host schedules/runs reconciliation; errors retain the pending receipt. */
   onPosted?: (linkId: string) => Promise<void>;
 }
+/** Bank memo for one authorized link. It names the link, so a deposit an earlier link left in the external
+ * sandbox (which a company reset does not wipe) never matches; exact amount matching still applies. */
+export const paymentLinkMemo = (link: Pick<AuthorizedPaymentLink, 'id' | 'invoiceId' | 'installment'>) =>
+  paymentMemo({ invoiceId: link.invoiceId, installment: link.installment, linkId: link.id });
 const cents = (amount: number) => Number.isFinite(amount) && Number.isSafeInteger(amount * 100) ? amount * 100 : NaN;
 
 /** Process-local reference queue. Nessie Claims MUST be shared/durable across writers.
@@ -66,10 +70,11 @@ export class PaymentService {
       const previous = this.records.get(id);
       if (link.amountCents % 100 !== 0) throw new PaymentError('SANDBOX_WHOLE_DOLLARS_REQUIRED');
       if (previous) return structuredClone(previous);
-      // Nessie uses invoice/installment as the durable idempotency reference, across links and process restarts.
+      // The link-scoped memo is Nessie's durable idempotency reference across process restarts; the reducer
+      // receipt (invoice/installment) still stops two links from counting the same installment.
       try {
         const deposit = await this.options.bank.deposit({ accountId: this.options.accountId, invoiceId: link.invoiceId,
-          installment: link.installment, amountCents: link.amountCents });
+          installment: link.installment, amountCents: link.amountCents, linkId: link.id });
         const record: PaymentRecord = { linkId: id, invoiceId: link.invoiceId, installment: link.installment,
           amountCents: link.amountCents, depositId: deposit._id, status: 'pending_reconciliation' };
         this.records.set(id, record); return structuredClone(record);
@@ -98,7 +103,7 @@ export class PaymentService {
           if (!(error instanceof PaymentError)) throw error;
           skipped.push({ linkId, reason: error.code }); continue;
         }
-        const evidence = inspectPaymentEvidence({ linkId, memo: paymentMemo(link), amountCents: link.amountCents }, feed);
+        const evidence = inspectPaymentEvidence({ linkId, memo: paymentLinkMemo(link), amountCents: link.amountCents }, feed);
         if (evidence.ruleId) {
           skipped.push({ linkId, reason: evidence.ruleId === 'RECON_UNMATCHED' ? 'NOT_POSTED' : evidence.ruleId }); continue;
         }
@@ -148,7 +153,7 @@ export class PaymentService {
       if (record.status === 'paid' || record.status === 'partially_paid') return structuredClone(record);
       await store.assertLease(lease, this.now());
       const feed = await this.options.bank.listDeposits(this.options.accountId);
-      const evidence = inspectPaymentEvidence({ linkId: link.id, memo: paymentMemo(link), amountCents: link.amountCents, depositId: record.depositId }, feed);
+      const evidence = inspectPaymentEvidence({ linkId: link.id, memo: paymentLinkMemo(link), amountCents: link.amountCents, depositId: record.depositId }, feed);
       if (evidence.ruleId) {
         const issue = this.exception(link, evidence.ruleId, evidence.depositIds);
         if (issue.followup !== 'email') {

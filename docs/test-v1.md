@@ -52,8 +52,10 @@ controller **and audit** use `CONTROLLER_ENROLLMENT_SECRET`; policy uses
 ## Live web mode (no phone)
 
 Stop the owned rehearsal before changing modes. Keep `.nessie-state/claims`
-between starts; changing links, resetting the company or retrying payment reuses
-`backroom:invoice=1042:installment=1`, never deliberately posts another installment.
+between starts; retrying a link's payment reuses its memo
+`backroom:invoice=1042:installment=1:link=<link id>` and never posts twice. A new
+link (for example after resetting the company) has its own memo, so deposits an
+earlier link left in the sandbox are ignored.
 
 ```sh
 pnpm demo:down

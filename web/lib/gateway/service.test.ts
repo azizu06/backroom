@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { executeTool } from "./service";
+import { DEFAULT_POLICY, savePolicy } from "../../../policy/src/index";
 import type { Invocation } from "./parser";
 import type { GatewayCall, PlanTerms, ToolResult } from "./store";
 
@@ -112,5 +113,51 @@ describe("Dana's passkey decision unlocks exactly the terms she authorized", () 
     c.policyState = { signals: { bankruptcy: true } };
     expect(link(c, approved.plan_id)).toMatchObject({ kind: "ESCALATE", can_confirm: false, rule_ids: ["BANKRUPTCY_STOP"] });
     expect(c.links).toHaveLength(0);
+  });
+});
+
+describe("one open escalation per call", () => {
+  const three: PlanTerms = { installments: 3, firstPaymentPct: 50, durationDays: 30, waiveFee: false, discountPct: 0 };
+  const saveV2 = (c: GatewayCall) => {
+    const policy = savePolicy(DEFAULT_POLICY, { ...DEFAULT_POLICY, badges: { ...DEFAULT_POLICY.badges,
+      collections: { ...DEFAULT_POLICY.badges.collections, limits: { ...DEFAULT_POLICY.badges.collections.limits, maxInstallments: 3 } } } });
+    c.policyState = { ...c.policyState, policy };
+    c.policyVersion = policy.policyVersion;
+  };
+
+  it("a pending request the saved policy now allows on its own does not block the next over-limit escalation", () => {
+    const c = call();
+    escalated(c, three);
+    saveV2(c);
+    expect(propose(c, three)).toMatchObject({ kind: "ALLOW", can_confirm: true, rule_ids: ["IN_BADGE"] });
+    const four = propose(c, { ...three, installments: 4 });
+    expect(four).toMatchObject({ kind: "ESCALATE", can_confirm: false, rule_ids: ["MAX_INSTALLMENTS"], escalation_id: expect.any(String) });
+    expect(c.audits.find(a => a.id === four.audit_id)).toMatchObject({ kind: "ESCALATE", policyVersion: 2,
+      decision: { policyVersion: 2, quote: { text: expect.stringContaining("3 in v2") } } });
+    expect(c.escalations).toHaveLength(2);
+  });
+
+  it("a pending request that still needs Dana keeps blocking, and stop rules and DENY are unchanged", () => {
+    const c = call();
+    escalated(c, three);
+    expect(propose(c, { ...three, installments: 4 })).toMatchObject({ kind: "DENY", can_confirm: false, rule_ids: ["ESCALATION_OPEN"] });
+    saveV2(c);
+    escalated(c, { ...three, installments: 4 });
+    expect(propose(c, { ...three, installments: 5 })).toMatchObject({ kind: "DENY", can_confirm: false, rule_ids: ["ESCALATION_OPEN"] });
+    expect(propose(c, { ...three, waiveFee: true })).toMatchObject({ kind: "DENY", can_confirm: false, rule_ids: ["FEES_NON_WAIVABLE"] });
+    expect(c.escalations).toHaveLength(2);
+  });
+
+  it("a stop signal keeps a pending request open and never becomes ALLOW", () => {
+    const c = call();
+    escalated(c, three);
+    saveV2(c);
+    c.policyState = { ...c.policyState, signals: { bankruptcy: true } };
+    expect(propose(c, three)).toMatchObject({ kind: "DENY", can_confirm: false, rule_ids: ["ESCALATION_OPEN"] });
+    const fresh = call();
+    saveV2(fresh);
+    fresh.policyState = { ...fresh.policyState, signals: { bankruptcy: true } };
+    expect(propose(fresh, three)).toMatchObject({ kind: "ESCALATE", can_confirm: false, rule_ids: ["BANKRUPTCY_STOP"] });
+    expect([...c.plans, ...fresh.plans]).toEqual([]);
   });
 });

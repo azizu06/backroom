@@ -17,9 +17,9 @@ const snapshot: OfficeSnapshot = {
 
 describe('a11y names', () => {
   it('includes the agent name and state, and the folder target only when escalating', () => {
-    expect(seatLabel(agent)).toBe('Alex · collections_1, working');
+    expect(seatLabel(agent)).toBe('Alex, working');
     expect(seatLabel({ ...agent, escalationId: 'escalation-1' }))
-      .toBe('Alex · collections_1, working, escalation folder to Dana’s Desk');
+      .toBe('Alex, working, escalation folder to Dana’s Desk');
     expect(seatLabel({ ...agent, escalationId: 'escalation-1', targetAnchor: 'payables' }))
       .toContain('escalation folder to Payables');
   });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isReplayPage } from '../lib/replay/mode';
 import { disclosureItems, getDisclosureStatus, LOCAL_LABEL, type DemoStatus, type DisclosureItem } from '../lib/real-vs-sim';
 import './RealVsSim.css';
 
@@ -8,7 +9,7 @@ import './RealVsSim.css';
 export function useDemoStatus(enabled = true) {
   const [status, setStatus] = useState<DemoStatus | null>(null);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || isReplayPage()) return;
     const controller = new AbortController();
     let active = true;
     let timer: ReturnType<typeof setTimeout>;

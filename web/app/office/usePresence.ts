@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { isReplayPage } from '../../lib/replay/mode';
 import { createBroadcastPresence, createSpacetimePresence, presenceTransportKind, getViewerId, PRESENCE_HEARTBEAT, PRESENCE_RATE, PRESENCE_TTL, viewerColor, viewerName, type PresencePeer, type PresenceSource } from '../../lib/office/presence';
 import type { OfficeSnapshot, OfficeState } from '../../lib/office/state';
 import type { ViewMode } from '../../lib/office/view';
@@ -14,7 +15,7 @@ export function usePresence({ mode, hud, source, connectionMode }: { mode: ViewM
     setEnabled(new URLSearchParams(location.search).get('presence') === '1');
   }, []);
   useEffect(() => {
-    if (!enabled) { setPeers([]); return; }
+    if (!enabled || connectionMode === 'replay' || isReplayPage()) { setPeers([]); return; }
     const connection = source.getPresenceConnection?.();
     const transport = presenceTransportKind(connectionMode, connection) === 'spacetime' && connection
       ? createSpacetimePresence(connection, id.current) : createBroadcastPresence('backroom-office-presence');
