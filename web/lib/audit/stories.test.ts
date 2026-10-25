@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { auditStories, currentRun, isPlumbing, whyQuestion } from './stories';
+import { MemoryStateStore } from '@backroom/orchestrator';
 import { demoRunSnapshot } from './testing/demoRun';
 
 describe('audit stories', () => {
@@ -50,5 +51,21 @@ describe('audit stories', () => {
       .toBe('Why was invoice 1042 escalated to Dana under MAX_INSTALLMENTS?');
     expect(whyQuestion(entries.find(entry => entry.action === 'judge_inbox_decision')!))
       .toBe('Why was the bank change inbox item denied under LOOKALIKE_DOMAIN?');
+  });
+
+  it('keeps the simulated email preview in the refused call story and shows only its domain', async () => {
+    const store = new MemoryStateStore();
+    const append = (action: string, inputs: Record<string, unknown>, decision?: 'ALLOW' | 'DENY') => store.appendAudit({
+      ts: Date.now(), actor: 'code', seat: 'collections', action, ruleIds: decision ? ['B2B_ONLY_CALLS'] : [],
+      policyVersion: 1, refs: ['client-02', '1042'], route: 'code', latencyMs: 0, costUsd: 0,
+      ...(decision ? { decision } : {}), inputs,
+    });
+    await append('office_call_requested', { source: 'office_button' });
+    await append('office_call_refused', { code: 'CALL_DENIED' }, 'DENY');
+    await append('email_followup_queued', { simulated: true, label: 'SIMULATED: email preview, not sent', toDomain: 'client.example' }, 'ALLOW');
+    const stories = auditStories(await store.listAudit());
+    expect(stories).toHaveLength(1);
+    expect(stories[0]!.lines.at(-1)).toMatchObject({ text: 'Email preview (simulated, not sent) · client.example', outcome: 'ALLOW' });
+    expect(JSON.stringify(stories)).not.toContain('billing@client.example');
   });
 });
