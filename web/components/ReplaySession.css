@@ -1,6 +1,26 @@
 /* Shared palette tokens (app/theme.css). */
-.replay-session { color: var(--ink); min-height: 100dvh; font: 14px/1.45 var(--font-ui); }
-.replay-controls { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 20px; background: var(--pastel-yellow); color: var(--on-pastel); border-bottom: 3px solid #ffffff; }
+.replay-session {
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  font: 14px/1.45 var(--font-ui);
+}
+.replay-controls {
+  position: relative;
+  z-index: 1100;
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--pastel-yellow);
+  color: var(--on-pastel);
+  border-bottom: 3px solid #ffffff;
+}
 .replay-controls strong { font-size: 18px; }
 .replay-controls label { display: flex; align-items: center; gap: 6px; }
 .replay-controls button, .replay-controls select { font: inherit; color: var(--on-pastel); background: #ffffff; border: 2px solid var(--pastel-aqua); padding: 6px 12px; border-radius: 999px; }
@@ -12,5 +32,16 @@
 .replay-session > p { padding: 20px; }
 .replay-scrub { flex: 1; min-width: 180px; }
 .replay-scrub input { flex: 1; min-width: 60px; accent-color: var(--on-pastel); }
-.replay-session .office-shell { height: calc(100dvh - 64px); }
-@media (max-width: 760px) { .replay-controls { padding: 10px 12px; gap: 8px; font-size: 12px; }.replay-controls > span { width: calc(100% - 90px); overflow-wrap: anywhere; }.replay-session .office-shell { height: auto; } }
+/* Stage owns the remaining viewport so Full Screen cannot cover the banner. */
+.replay-stage { position: relative; flex: 1; min-height: 0; overflow: auto; }
+.replay-session .office-shell { height: 100% !important; min-height: 0 !important; }
+.replay-session .office-shell[data-fullscreen] {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  height: 100% !important;
+}
+@media (max-width: 760px) {
+  .replay-controls { padding: 10px 12px; gap: 8px; font-size: 12px; }
+  .replay-controls > span { width: calc(100% - 90px); overflow-wrap: anywhere; }
+}

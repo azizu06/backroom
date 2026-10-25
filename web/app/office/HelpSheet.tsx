@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { DEMO_GUIDE_STEPS, OFFICE_SHORTCUTS } from '../../lib/office/guide';
 
-type Entry = { term: string; detail: string };
+type Entry = { term: string; detail: string; href?: string };
 
 const GETTING_AROUND: readonly Entry[] = [
   { term: 'Play (First Person)', detail: 'Walk the floor yourself. WASD or arrow keys to move, E to talk to an agent or inspect a desk, Esc to leave.' },
@@ -12,6 +12,7 @@ const GETTING_AROUND: readonly Entry[] = [
   { term: 'Tour', detail: 'The camera visits each room on its own. Any key or click stops it.' },
   { term: 'Story Mode', detail: 'A guided walkthrough of the key moments, chapter by chapter (←/→ to move, Esc to exit).' },
   { term: 'Full Screen', detail: 'The square button top right of the scene. Hides the sidebar and top bar; the camera picker and status chips stay at the top left.' },
+  { term: 'Watch a recorded session', detail: 'Play the bundled offline recording in the office. No live calls or model requests.', href: '/office?replay=core-offline' },
   { term: 'Sidebar Groups', detail: 'Pages are grouped by job: Calls (place a call, then the payment link), Approvals (Dana’s Controller and the badge Policy), Attack Lab, and Setup (Operator and System Status). Each opens over the office with tabs; “Open page ↗” opens the full page in a new tab.' },
 ];
 
@@ -74,7 +75,10 @@ export function HelpSheet() {
     </label>
     {empty && <p role='status'>Nothing matches “{query}”.</p>}
     {!!around.length && <section aria-labelledby='help-around'><h3 id='help-around'>Getting Around</h3>
-      <dl className='help-terms'>{around.map(entry => <div key={entry.term}><dt>{entry.term}</dt><dd>{entry.detail}</dd></div>)}</dl>
+      <dl className='help-terms'>{around.map(entry => <div key={entry.term}>
+        <dt>{entry.href ? <a href={entry.href}>{entry.term}</a> : entry.term}</dt>
+        <dd>{entry.detail}</dd>
+      </div>)}</dl>
     </section>}
     {!!flows.length && <section aria-labelledby='help-flows'><h3 id='help-flows'>How Things Flow</h3>
       <div className='help-flows'>{flows.map(flow => <div key={flow.title}><h4>{flow.title}</h4><ol className='sheet-steps help-steps'>{flow.steps.map(step => <li key={step}>{step}</li>)}</ol></div>)}</div>
