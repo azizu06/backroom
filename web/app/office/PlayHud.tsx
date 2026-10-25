@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { isCloseKey, REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { setBakedTalkingAgent } from '../../lib/office/baked-character';
@@ -78,11 +78,34 @@ export function focusAskWhy(question?: string) {
   field?.focus({ preventScroll: true });
 }
 
-function PlaySettingsDialog({ settings, change, close, tryWalking }: {
+function PlaySettingsDialog({ settings, change, close, tryWalking, anchor }: {
   settings: PlaySettings; change: (next: PlaySettings, feedback?: string) => void; close: () => void; tryWalking: () => void;
+  anchor: RefObject<HTMLButtonElement | null>;
 }) {
   const headingId = useId();
   const motionNoteId = useId();
+  const dialog = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const button = anchor.current;
+    const panel = dialog.current;
+    if (!button || !panel) return;
+    const position = () => {
+      const rect = button.getBoundingClientRect();
+      const width = panel.getBoundingClientRect().width;
+      const top = rect.bottom + 8;
+      panel.style.top = `${top}px`;
+      panel.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
+      panel.style.maxHeight = `${Math.max(0, window.innerHeight - top - 8)}px`;
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(button);
+    observer.observe(panel);
+    // A wrapped row can move the button without changing the button's own size.
+    if (button.parentElement) observer.observe(button.parentElement);
+    window.addEventListener('resize', position);
+    return () => { observer.disconnect(); window.removeEventListener('resize', position); };
+  }, [anchor]);
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia(REDUCED_MOTION_QUERY).matches);
   useEffect(() => {
     const query = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -109,7 +132,7 @@ function PlaySettingsDialog({ settings, change, close, tryWalking }: {
   useEffect(() => {
     (first.current?.getClientRects().length ? first.current : controlsSummary.current)?.focus();
   }, []);
-  return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+  return <section ref={dialog} className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <header><h2 id={headingId}>Play Settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
@@ -224,6 +247,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   useEffect(() => { requestSceneFrame(); }, []);
   useImmersiveAudio(hud, snapshot);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsButton = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const [chatOpen, setChatOpen] = useState(false);
@@ -415,9 +439,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    {onOverview && <button className='play-overview' aria-label='Overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
-    <button className='play-exit' onClick={onExit}>Exit Play</button>
-    <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
+    <div className='play-controls'>
+      {onOverview && <button className='play-overview' aria-label='Overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
+      <button className='play-exit' onClick={onExit}>Exit Play</button>
+      <button ref={settingsButton} className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
+    </div>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
@@ -426,7 +452,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
       </div>
       {aim === 'target' && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
-    {settingsOpen && <PlaySettingsDialog settings={settings} change={applySettings} close={closeSettings} tryWalking={() => hud.current?.focus()} />}
+    {settingsOpen && <PlaySettingsDialog anchor={settingsButton} settings={settings} change={applySettings} close={closeSettings} tryWalking={() => hud.current?.focus()} />}
     <div className='play-settings-toast' role='status' aria-live='polite'>{settingsToast?.text}</div>
     {chat && <ProximityChat chat={chat} open={chatOpen} onOpen={openChat} onClose={() => setChatOpen(false)} hud={hud} />}
     {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} />}

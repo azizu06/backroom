@@ -1,0 +1,43 @@
+/* Theme-aware shell tokens with the scene's roomPad and aisle roles. */
+.office-shell .floor-plan {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(94%, 68dvh); height: auto; box-sizing: border-box; overflow: hidden;
+  color: var(--office-navy); background: var(--office-cream);
+  border: 2px solid var(--office-lavender); border-radius: 22px;
+  box-shadow: var(--office-plate-shadow); font: inherit; isolation: isolate;
+}
+.office-shell .floor-plan .plan-pod,
+.office-shell .floor-plan .plan-aisle,
+.office-shell .floor-plan .plan-desk,
+.office-shell .floor-plan .plan-fixture { position: absolute; box-sizing: border-box; transform: none; }
+.office-shell .floor-plan .plan-pod { background: color-mix(in srgb, var(--plan-room-pad) 12%, var(--office-cream)); border: 1px solid var(--office-lavender); border-radius: 8px; }
+.office-shell .floor-plan .plan-aisle { left: 0; width: 100%; background: color-mix(in srgb, var(--plan-aisle) 16%, var(--office-cream)); }
+.office-shell .floor-plan .plan-desk { background: var(--office-peach); border: 1px solid var(--office-slate); border-radius: 3px; }
+.office-shell .floor-plan .plan-desk::after { content: ''; position: absolute; left: 30%; width: 40%; height: 3px; background: var(--office-aqua); border: 1px solid var(--office-slate); border-radius: 3px; }
+.office-shell .floor-plan .plan-desk[data-seat-side='north']::after { bottom: calc(100% + 2px); }
+.office-shell .floor-plan .plan-desk[data-seat-side='south']::after { top: calc(100% + 2px); }
+.office-shell .floor-plan .plan-fixture { background: var(--office-aqua); border: 1px solid var(--office-slate); border-radius: 2px; min-width: 3px; min-height: 3px; }
+.office-shell .floor-plan .plan-fixture[data-fixture='vault'],
+.office-shell .floor-plan .plan-fixture[data-fixture='server'] { background: var(--office-lavender); border: 2px solid var(--office-slate); }
+.office-shell .floor-plan button.plan-room,
+.office-shell .floor-plan .plan-fixture-label {
+  position: absolute; visibility: hidden; transform: none; width: max-content; height: auto;
+  max-width: min(110px, 32%); box-sizing: border-box; margin: 0; padding: 3px 5px;
+  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender);
+  border-radius: 7px; font: inherit; font-size: 11px; line-height: 1.25; text-align: left;
+  white-space: normal; overflow-wrap: anywhere; z-index: 1;
+}
+.office-shell .floor-plan button.plan-room { cursor: pointer; }
+.office-shell .floor-plan button.plan-room:hover { border-color: var(--office-aqua); box-shadow: 0 0 0 1px var(--office-navy); }
+.office-shell .floor-plan .plan-fixture-label { background: transparent; border-color: transparent; pointer-events: none; }
+.office-shell .floor-plan .plan-agent {
+  position: absolute; transform: translate(-7px, -7px); display: grid; grid-template-columns: 12px minmax(0, 1fr);
+  gap: 1px 3px; width: max-content; max-width: 94px; padding: 0; border-radius: 6px;
+  background: var(--office-cream); color: var(--office-navy); font: inherit; font-size: 11px; line-height: 1.25; z-index: 2;
+}
+.office-shell .floor-plan .plan-agent-dot { width: 12px; height: 12px; box-sizing: border-box; border: 1px solid var(--office-navy); border-radius: 50%; background: var(--plan-agent-color); }
+.office-shell .floor-plan .plan-agent[data-human='true'] .plan-agent-dot { border-radius: 3px; }
+.office-shell .floor-plan .plan-agent-name { padding-right: 3px; overflow-wrap: anywhere; }
+.office-shell .floor-plan .plan-agent-status { grid-column: 2; max-width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 3px; border-radius: 4px; background: var(--plan-status-color); color: var(--on-pastel); }
+.office-shell .floor-plan .plan-agent[role='button'] { cursor: pointer; }
+.office-shell .floor-plan :focus-visible { outline: 2px solid var(--office-navy); outline-offset: 2px; }
