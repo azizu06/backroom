@@ -1,8 +1,9 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ReplayFrame } from '@backroom/orchestrator';
+import { openSheet } from './office-menu';
 
 const out = resolve(process.cwd(), '../docs/evidence/replay');
 const frames = readFileSync(resolve(process.cwd(), '../fixtures/replays/core-offline.jsonl'), 'utf8')
@@ -17,6 +18,16 @@ async function seek(page: Page, ms: number) {
   await expect(page.getByRole('slider', { name: 'Replay position' })).toHaveValue(String(ms));
 }
 
+/** True when two visible boxes share any pixel (including edges that sit on each other). */
+async function boxesOverlap(a: Locator, b: Locator) {
+  const A = await a.boundingBox();
+  const B = await b.boundingBox();
+  expect(A, 'missing first box').toBeTruthy();
+  expect(B, 'missing second box').toBeTruthy();
+  if (!A || !B) return false;
+  return !(A.x + A.width <= B.x || B.x + B.width <= A.x || A.y + A.height <= B.y || B.y + B.height <= A.y);
+}
+
 test('plays and scrubs the original state/audit into 3D, floor plan and audit wall without network effects', async ({ page }) => {
   await mkdir(out, { recursive: true });
   const errors: string[] = [], api: string[] = [];
@@ -29,8 +40,11 @@ test('plays and scrubs the original state/audit into 3D, floor plan and audit wa
   await expect(page.locator('canvas')).toBeVisible();
   const escalation = frames.find(frame => frame.phase === 'collections-1042' && frame.operation === 'createCallEscalation')!;
   await seek(page, escalation.atMs + 100);
-  await expect(page.locator('[data-agent-id="collections-demo"]')).toHaveAttribute('data-target', 'dana');
-  await expect(page.getByText('▱ Folder → Dana’s desk')).toBeVisible();
+  // Seat rows live in the Full Floor sheet after the sidebar shell (#351).
+  const overview = await openSheet(page, 'overview');
+  await expect(overview.locator('[data-agent-id="collections-demo"]')).toHaveAttribute('data-target', 'dana');
+  await expect(overview.getByText('▱ Folder → Dana’s desk')).toBeVisible();
+  await overview.getByRole('button', { name: 'Close Today at Backroom', exact: true }).click();
   const position = await page.getByRole('slider', { name: 'Replay position' }).inputValue();
   await page.waitForTimeout(400);
   await expect(page.getByRole('slider', { name: 'Replay position' })).toHaveValue(position);
@@ -75,3 +89,42 @@ test('phone and invalid recordings keep an explicit replay label', async ({ page
   await expect(page.getByLabel('Replay disclosure')).toContainText('REPLAY');
   await expect(page.locator('canvas')).toHaveCount(0);
 });
+
+test('Help Getting Around links into the offline recording', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('/office');
+  const splash = page.getByTestId('play-splash');
+  if (await splash.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'Overview (map view)', exact: true }).click();
+    await expect(splash).toHaveCount(0);
+  }
+  const help = await openSheet(page, 'help');
+  await expect(help.getByRole('link', { name: 'Watch a recorded session', exact: true })).toBeVisible();
+  await help.getByRole('link', { name: 'Watch a recorded session', exact: true }).click();
+  await expect(page).toHaveURL(/\/office\?replay=core-offline/);
+  await expect(page.getByLabel('Replay controls')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+});
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+  test(`replay banner stays clear of shell chrome at ${viewport.width}px`, async ({ page }, info) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/office?replay=core-offline');
+    await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    const banner = page.getByLabel('Replay controls');
+    const sidebar = page.getByRole('complementary', { name: 'Office navigation' });
+    const topbar = page.getByTestId('office-topbar');
+    await expect(banner).toBeVisible();
+    await expect(sidebar).toBeVisible();
+    await expect(topbar).toBeVisible();
+    expect(await boxesOverlap(banner, sidebar), 'banner vs sidebar').toBe(false);
+    expect(await boxesOverlap(banner, topbar), 'banner vs topbar').toBe(false);
+    await page.getByRole('button', { name: 'Full Screen', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Exit Full Screen', exact: true })).toBeVisible();
+    await expect(banner).toBeVisible();
+    const hud = page.getByRole('group', { name: 'Full screen status' });
+    await expect(hud).toBeVisible();
+    expect(await boxesOverlap(banner, hud), 'banner vs fullscreen HUD').toBe(false);
+    await page.screenshot({ path: info.outputPath(`banner-layout-${viewport.width}.png`), fullPage: true });
+  });
+}

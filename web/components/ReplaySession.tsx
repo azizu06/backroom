@@ -37,7 +37,9 @@ export function ReplaySession({ recording, view }: { recording: ReplayRecording;
           {[...new Set(recording.frames.map(frame => frame.phase))].map(phase => <option key={phase}>{phase}</option>)}
         </select></label></details>
     </header>
-    {view === 'office' ? <><Office source={player.source} /><AuditWall key={snapshot.phase} recording={audit} /></> : <AuditWall key={snapshot.phase} recording={audit} />}
+    <div className='replay-stage'>
+      {view === 'office' ? <><Office source={player.source} /><AuditWall key={snapshot.phase} recording={audit} /></> : <AuditWall key={snapshot.phase} recording={audit} />}
+    </div>
   </div>;
 }
 export function ReplayUnavailable() {
