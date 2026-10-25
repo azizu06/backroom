@@ -201,9 +201,8 @@ function CameraRig({ focus, fixed, tour }: { focus: AnchorId | null; fixed: bool
       viewport.dataset.officeTargetX = String(controls.current.target.x);
       viewport.dataset.officeTargetZ = String(controls.current.target.z);
     }}
-    enablePan={false} enableZoom={!fixed} enableRotate={!fixed} enableDamping dampingFactor={0.1}
-    minZoom={Math.min(size.width / 33, size.height / 25)} maxZoom={Math.min(size.width / 10, size.height / 8)}
-    minPolarAngle={0.3} maxPolarAngle={1.3} minAzimuthAngle={Math.atan2(13, 17) - 1.2} maxAzimuthAngle={Math.atan2(13, 17) + 1.2} />;
+    enablePan={false} enableZoom={false} enableRotate={!fixed}
+    minPolarAngle={0.45} maxPolarAngle={1.1} minAzimuthAngle={-0.7} maxAzimuthAngle={0.9} />;
 }
 function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
