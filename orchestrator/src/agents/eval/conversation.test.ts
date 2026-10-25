@@ -32,7 +32,7 @@ it('without the host-declared pairing the Reconciler refuses under the Dispatche
   expect(run.match).toBe(false);
 });
 
-it('C09 records the queued human request and both production escalation receipts without grading callback speech', async () => {
+it('C09 assigns the callback to Dana in her review inbox, with no plan or amount, and acknowledges in code', async () => {
   vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
   const run = await runConversation('human_request');
   expect(run.humanFollowup).toEqual({
@@ -41,9 +41,12 @@ it('C09 records the queued human request and both production escalation receipts
     mirroredEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN'] }],
     postcallEscalations: [{ decision: 'ESCALATE', ruleIds: ['CALL_HUMAN_REQUESTED'] }],
     gatewayReviewRecipients: [],
+    danaCallback: { toHuman: 'Dana', ruleIds: ['REQUEST_HUMAN'], status: 'pending', quote: 'NF-001', inInbox: true, noMoney: true },
+    acknowledged: true,
   });
   expect(run.checks.humanFollowupQueued).toBe(true);
   expect(run.checks.humanEscalationMirrored).toBe(true);
+  expect(run.checks.danaCallbackAssigned).toBe(true);
   expect(run.match).toBe(true);
 });
 
