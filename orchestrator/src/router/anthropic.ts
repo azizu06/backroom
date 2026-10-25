@@ -32,6 +32,8 @@ const tokens = (value: number): number => {
 export async function completeAnthropic(options: {
   http: typeof fetch; apiKey: string; model: string; signal: AbortSignal;
   system: string; input: string | AnthropicContent[];
+  /** Latency-bound callers (live voice) lower these; defaults keep existing tasks unchanged. */
+  maxTokens?: number; effort?: 'low' | 'medium' | 'high';
 }) {
   rates(options.model); // Fail before spending if the configured model cannot be priced.
   let response: Response;
@@ -39,8 +41,8 @@ export async function completeAnthropic(options: {
     method: 'POST', signal: options.signal,
     headers: { 'Content-Type': 'application/json', 'x-api-key': options.apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model: options.model, max_tokens: 4096, system: options.system,
-      output_config: { effort: 'high' },
+      model: options.model, max_tokens: options.maxTokens ?? 4096, system: options.system,
+      output_config: { effort: options.effort ?? 'high' },
       messages: [{ role: 'user', content: options.input }],
     }),
   });
