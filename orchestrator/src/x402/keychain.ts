@@ -26,3 +26,25 @@ export function testnetKeyPresent(role: 'payer' | 'vendor') {
   if (process.platform !== 'darwin') return false;
   return spawnSync('/usr/bin/security', ['find-generic-password', '-s', service, '-a', role], { stdio: 'ignore' }).status === 0;
 }
+
+/** CDP credentials are read only in the host process, never from environment/files. */
+export function cdpCredentials() {
+  if (process.platform !== 'darwin') throw new Error('CDP_UNAVAILABLE_MACOS_KEYCHAIN_REQUIRED');
+  const read = (item: string) => {
+    const result = spawnSync('/usr/bin/security', ['find-generic-password', '-s', item, '-w'], { encoding: 'utf8' });
+    if (result.status !== 0 || !result.stdout.trim()) throw new Error('CDP_UNAVAILABLE_KEYCHAIN_CREDENTIALS');
+    return result.stdout.trim();
+  };
+  try {
+    const api = JSON.parse(read('backroom-cdp-api-key')) as { id?: unknown; privateKey?: unknown };
+    const walletSecret = read('backroom-cdp-wallet-secret');
+    if (typeof api.id !== 'string' || !api.id || typeof api.privateKey !== 'string' || !api.privateKey) throw new Error();
+    return { apiKeyId: api.id, apiKeySecret: api.privateKey, walletSecret };
+  } catch { throw new Error('CDP_UNAVAILABLE_KEYCHAIN_CREDENTIALS'); }
+}
+
+/** Presence only; never reads secret values. */
+export function cdpCredentialsPresent() {
+  return process.platform === 'darwin' && ['backroom-cdp-api-key', 'backroom-cdp-wallet-secret'].every(item =>
+    spawnSync('/usr/bin/security', ['find-generic-password', '-s', item], { stdio: 'ignore' }).status === 0);
+}
