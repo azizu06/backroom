@@ -25,7 +25,7 @@ export function RealSimDetails() {
         <h3>{kind === 'real' ? 'Live Services' : 'Partner Services'}</h3>
         <ul>{disclosureItems.filter(item => item.kind === kind).map(item => <DisclosureRow key={item.id} item={item} status={status} detailed={false} />)}</ul>
       </section>)}
-      <p className='real-sim-tile-foot'><a href='/real-vs-sim'>System Status ↗</a></p>
+      <p className='real-sim-tile-foot'><a href='/real-vs-sim'>System Status</a></p>
     </div>
   </aside>;
 }

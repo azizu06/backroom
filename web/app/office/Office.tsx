@@ -2,7 +2,7 @@
 
 import { visibleSeatAgents } from '../../lib/office/agent-labels';
 
-import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ComponentType, type MouseEvent, type ReactNode, type RefObject } from 'react';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
@@ -40,10 +40,12 @@ import { ReceiptList } from './ReceiptList';
 import { RoomInspector } from './RoomInspector';
 import { DetailSheet } from './DetailSheet';
 import { HelpSheet } from './HelpSheet';
+import { InboxTray } from '../../components/InboxTray';
+import type { InboxPreset } from '../../lib/inbox/types';
 import { RealSimDetails } from './RealSimDetails';
 import { ViewBoundary } from './ViewBoundary';
 import { PlaySplash } from './PlaySplash';
-import { COMPACT_QUERY, markSplashSeen, readStartView, saveStartView, splashSeen, startView } from '../../lib/office/start-mode';
+import { COMPACT_QUERY, markSplashSeen, saveStartView, splashSeen, startView } from '../../lib/office/start-mode';
 import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
 import type { AgentTagLookup } from './scene';
 import '../office.css';
@@ -88,6 +90,12 @@ const PAGE_SHEETS: Record<PageHref, ComponentType> = {
   '/real-vs-sim': dynamic(() => import('../../components/RealVsSim').then(module => module.RealVsSim)),
 };
 const isPageSheet = (sheet: DetailSheetId | null): sheet is PageHref => !!sheet && sheet in PAGE_SHEETS;
+/** The office is the only page: a same-site link to another view opens that view's sheet instead. */
+function sheetForPath(pathname: string): DetailSheetId | null {
+  const path = pathname.replace(/\/+$/, '');
+  if (path === '/inbox' || path === '/audit') return path.slice(1) as 'inbox' | 'audit';
+  return path in PAGE_SHEETS ? path as PageHref : null;
+}
 // A short "how this works" strip above each page sheet, so the order of steps is obvious before the form.
 const PAGE_STEPS: Partial<Record<PageHref, readonly string[]>> = {
   '/calls': ['Enter the operator code and unlock office calls.', 'Press Request call on the Collections desk phone in the office.', 'Alex says it is an AI, then walks to Dana if the client asks for more than the badge allows.'],
@@ -216,7 +224,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   useEffect(() => {
     if (!storyStart && !window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
     if (storyStart || source.getSnapshot().connection === 'replay' || splashSeen()) return;
-    if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') { markSplashSeen(); setSplash(true); }
+    // The splash greets every new session (it offers both Play and the overview), so a stored overview choice does not hide it.
+    if (startView({ search: window.location.search, stored: null, compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') { markSplashSeen(); setSplash(true); }
   // Decided once on mount; later prop changes never reopen the splash.
   }, []);
   const inspectorOpener = useRef<HTMLElement | null>(null);
@@ -399,11 +408,18 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const handoffContent = (<ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>);
   const inboxContent = (<>{inboxTray ? <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby Inbox Tray · {snapshot.inboxCount}</h2>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
-      </section> : <div className='detail-sheet-empty'>
-        <p>Receipts on the inbox page are not synced into this scene.</p>
-        <a className='detail-sheet-cta' href='/inbox'>Open the inbox</a>
-      </div>}</>);
-  return <HandoffPresentation value={presentation}><section ref={shellRef} className='office-shell' aria-label='Backroom office' data-fullscreen={fullscreen || undefined} data-office-mode={mode === 'play' ? 'play' : touring || storyActive ? 'tour' : 'overview'} data-connection={snapshot.connection} data-theme={theme} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
+      </section> : <p className='detail-sheet-empty' role='status'>No inbox tray in this scene.</p>}</>);
+  function openLinkedSheet(event: MouseEvent) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = (event.target as Element).closest?.('a[href]');
+    if (!(link instanceof HTMLAnchorElement)) return;
+    const url = new URL(link.href, window.location.href);
+    const next = url.origin === window.location.origin ? sheetForPath(url.pathname) : null;
+    if (!next) return;
+    event.preventDefault();
+    openSheet(next);
+  }
+  return <HandoffPresentation value={presentation}><section ref={shellRef} onClick={openLinkedSheet} className='office-shell' aria-label='Backroom office' data-fullscreen={fullscreen || undefined} data-office-mode={mode === 'play' ? 'play' : touring || storyActive ? 'tour' : 'overview'} data-connection={snapshot.connection} data-theme={theme} data-hud={mode === 'play' && layers.scene?.visible ? 'diegetic' : undefined}>
     {source.getSnapshot().connection !== 'replay' && <h1 className='visually-hidden'>Northfield Studio Back Office</h1>}
     <aside className='office-sidebar' aria-label='Office navigation'>
       <a className='office-sidebar-logo' href='/office' aria-label='Backroom office home'><img src='/icon.png' alt='' /><span>Backroom</span></a>
@@ -513,7 +529,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       const steps = PAGE_STEPS[sheet];
       const tabbed = group.pages.length > 1;
       // Keyed by group: switching tabs keeps the dialog (and focus) instead of reopening it.
-      return <DetailSheet key={group.id} title={group.label} icon={group.icon} size='wide' page={sheet.slice(1)} onClose={closeSheet} href={sheet}>
+      return <DetailSheet key={group.id} title={group.label} icon={group.icon} size='wide' page={sheet.slice(1)} onClose={closeSheet}>
         {tabbed && <div className='sheet-tabs' role='tablist' aria-label={group.label}>
           {group.pages.map(href => <button key={href} type='button' role='tab' id={`sheet-tab-${href.slice(1)}`} aria-selected={href === sheet} aria-controls='sheet-tab-panel'
             data-ready={(href === PAYMENT_LINK_HREF && !!paymentLink) || undefined} onClick={() => setSheet(href)}>
@@ -522,7 +538,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         </div>}
         <div id='sheet-tab-panel' className='sheet-tab-panel' role={tabbed ? 'tabpanel' : undefined} aria-labelledby={tabbed ? `sheet-tab-${sheet.slice(1)}` : undefined}>
           {steps && <ol className='sheet-steps' aria-label='How this works'>{steps.map(step => <li key={step}>{step}</li>)}</ol>}
-          <ViewBoundary name={title} resetKey={sheet} fallback={<p role='status'>{title} could not be displayed here. <a href={sheet}>Open the full page</a>.</p>}><Page /></ViewBoundary>
+          <ViewBoundary name={title} resetKey={sheet} fallback={<p role='status'>{title} could not be displayed here.</p>}><Page /></ViewBoundary>
         </div>
       </DetailSheet>;
     })()}
@@ -551,14 +567,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   </section></HandoffPresentation>;
 }
 /** Explicit preview producer; its controls cannot call reducers, tools or models. */
-export function MockOffice({ storyStart = false }: { storyStart?: boolean }) {
+export function MockOffice({ storyStart = false, presets }: { storyStart?: boolean; presets?: InboxPreset[] }) {
   const [mock] = useState(createMockOfficeState);
   const snapshot = useSyncExternalStore(mock.source.subscribe, mock.source.getSnapshot, () => INITIAL_OFFICE);
   const atDana = snapshot.agents[0]?.targetAnchor === 'dana';
-  return <Office source={mock.source} storyStart={storyStart} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
+  return <Office source={mock.source} storyStart={storyStart} inboxTray={presets && <InboxTray presets={presets} headingLevel={3} />} storyPreview={preview => { if (preview === 'denial') mock.denyTreasury(); if (preview === 'escalation') mock.setTargetAnchor('dana'); }} auditWall={(snapshot, focus) => <OfficeLobby snapshot={snapshot} focus={focus} />} controls={<div className='mock-controls'>
     <span>Scenarios</span>
-    <a href='/inbox'>Judge inbox</a>
-    <span>Receipts there are not synced into this static scene.</span>
     <button onClick={() => mock.setTargetAnchor(atDana ? 'collections' : 'dana')}>{atDana ? 'Return to Collections' : 'Show escalation'}</button>
     <button onClick={() => mock.denyTreasury()}>Show Treasury denial</button>
   </div>} />;

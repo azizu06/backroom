@@ -15,5 +15,5 @@ export default async function OfficePage({ searchParams }: { searchParams: Promi
   }
   const config = officeConfig(process.env);
   const storyStart = demo === 'story';
-  return <main>{config ? <LiveOffice config={config} presets={inboxPresets} storyStart={storyStart} /> : <MockOffice storyStart={storyStart} />}</main>;
+  return <main>{config ? <LiveOffice config={config} presets={inboxPresets} storyStart={storyStart} /> : <MockOffice storyStart={storyStart} presets={inboxPresets} />}</main>;
 }
