@@ -1,11 +1,11 @@
 /* Shared palette tokens (app/theme.css); layout and bubble styling ported from AJ's 271-cozy-office-ui. */
-.page { color: var(--ink); min-height: 100svh; padding: 0 24px 96px; font: 16px/1.5 var(--font-ui); overflow-wrap: anywhere; }
+.page { box-sizing: border-box; max-width: var(--page-max); min-height: 100svh; margin: 0 auto; padding: 0 var(--page-gutter) 96px; color: var(--ink); font: 16px/1.5 var(--font-ui); overflow-wrap: anywhere; }
 .page *, .page *::before, .page *::after { box-sizing: border-box; }
-.content { max-width: 760px; min-width: 0; margin: auto; }
+.content { max-width: 760px; min-width: 0; }
 .card, .steps > li, .advanced section { background: var(--bubble-glass); border: var(--bubble-border); border-radius: var(--bubble-radius); box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); }
 .page a { color: inherit; font-weight: 800; text-underline-offset: 4px; }
-.page h1 { font-size: 32px; line-height: 1.15; font-weight: 900; margin: 32px 0 6px; text-wrap: balance; }
-.lede { margin: 0 0 24px; color: var(--ink-soft); }
+.page h1 { font-size: 32px; line-height: 1.15; font-weight: 900; margin: 32px 0 8px; text-wrap: balance; }
+.lede { max-width: 65ch; margin: 0 0 24px; color: var(--ink-soft); }
 .page h2 { font-size: 19px; font-weight: 800; margin: 0 0 4px; }
 .page p { margin: 4px 0; }
 .card { padding: 20px 24px; }
@@ -20,12 +20,12 @@
 .grow { flex: 1 1 260px; }
 .row:has(> .grow) { align-items: flex-end; }
 .page input { width: 100%; min-width: 0; min-height: 44px; padding: 8px 14px; border: 2px solid var(--pastel-aqua); border-radius: 999px; background: var(--field); color: var(--ink); font: inherit; }
-.page button, .cta { display: inline-flex; align-items: center; justify-content: center; max-width: 100%; background: var(--field); color: var(--ink); border: 2px solid var(--pastel-aqua); border-radius: 999px; padding: 9px 16px; min-height: 44px; font: inherit; font-weight: 800; cursor: pointer; text-decoration: none; text-align: center; transition: transform 160ms ease, box-shadow 160ms ease; }
+.page button, .cta { display: inline-flex; align-items: center; justify-content: center; max-width: 100%; background: var(--field); color: var(--ink); border: 2px solid var(--pastel-aqua); border-radius: 999px; padding: 9px 16px; min-height: 44px; font: inherit; font-weight: 800; cursor: pointer; text-decoration: none; text-align: center; transition: border-color 150ms ease, box-shadow 150ms ease; }
 .page .primary, .page .cta { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 :root[data-theme='dark'] .page :is(.primary, .cta) { background: var(--pastel-yellow); color: var(--on-pastel); border-color: var(--pastel-yellow); }
-.page button:disabled { background: var(--line); color: var(--ink-soft); border-color: var(--line); cursor: wait; }
-.page button:not(:disabled):hover, .cta:hover { transform: translateY(-1px); box-shadow: var(--bubble-shadow); }
-.page button:not(:disabled):active, .cta:active { transform: scale(0.97); }
+.page button:disabled, :root[data-theme='dark'] .page button:disabled { background: var(--line); color: var(--ink-soft); border-color: var(--line); cursor: wait; }
+.page button:not(:disabled):hover { border-color: var(--ink); }
+.page :is(.primary, .cta):not(:disabled):hover { box-shadow: var(--bubble-shadow); }
 .page :is(a, button, summary, input):focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 .session { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
 .qr { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; }
@@ -45,14 +45,11 @@
 .facts dt { font-weight: 800; }
 .facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 650px) {
-  .page { padding-inline: 16px; }
+  .page h1 { margin-top: 24px; font-size: 28px; }
   .steps > li { padding-left: 56px; padding-right: 14px; }
   .steps > li::before { left: 12px; width: 30px; height: 30px; }
   .action { align-items: stretch; flex-direction: column; gap: 8px; }
   .facts { grid-template-columns: minmax(0, 1fr); }
   .facts dd { margin-bottom: 8px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .page button, .cta { transition: none; }
-  .page button:not(:disabled):hover, .page button:not(:disabled):active, .cta:hover, .cta:active { transform: none; }
-}
+@media (prefers-reduced-motion: reduce) { .page button, .cta { transition: none; } }

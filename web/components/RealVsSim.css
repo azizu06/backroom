@@ -2,7 +2,11 @@
 .real-sim { box-sizing: border-box; color: var(--ink); background: var(--bubble-glass); font-family: var(--font-ui); border: var(--bubble-border); box-shadow: var(--bubble-shadow); font-size: 13px; line-height: 1.4; }
 .real-sim * { box-sizing: border-box; }
 .real-sim h1, .real-sim h2, .real-sim h3, .real-sim p, .real-sim dl, .real-sim dd { margin: 0; }
-.real-sim-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+/* Page header on the page background, in the shared page frame; the service list is the one panel. */
+.real-sim-page { box-sizing: border-box; max-width: 960px; color: var(--ink); font-family: var(--font-ui); }
+.real-sim-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 32px 0 24px; }
+.real-sim-header h1 { margin: 0 0 8px; font-size: 32px; font-weight: 900; line-height: 1.15; }
+.real-sim-header .real-sim-intro { margin: 0; font-size: 16px; color: var(--ink-soft); }
 .real-sim-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; align-items: start; }
 .real-sim ul { list-style: none; padding: 0; margin: 0; }
 .real-sim-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -10,21 +14,19 @@
 .real-sim-good { color: var(--on-pastel); background: var(--pastel-aqua); border-color: transparent; font-weight: 800; }
 .real-sim-warning { color: var(--ink); background: var(--danger-soft); border-color: transparent; font-weight: 800; }
 .real-sim .real-sim-detail-line { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-soft); }
-.real-sim-detail { width: min(960px, 100%); padding: 32px; border-radius: var(--bubble-radius); }
-.real-sim-detail h1 { font-size: 32px; font-weight: 900; line-height: 1.15; }
-.real-sim-detail .real-sim-intro { margin-top: 6px; font-size: 15px; color: var(--ink-soft); }
-.real-sim-detail h2 { font-size: 13px; font-weight: 800; letter-spacing: .02em; color: var(--ink-soft); padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+.real-sim-detail { padding: 8px 28px 24px; border-radius: var(--bubble-radius); }
+.real-sim-detail h2 { padding: 16px 0 8px; font-size: 14px; font-weight: 800; color: var(--ink-soft); border-bottom: 2px solid var(--line); }
 .real-sim-detail li { display: grid; gap: 4px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .real-sim-detail .real-sim-row { font-size: 16px; }
 .real-sim-detail .real-sim-row strong { font-weight: 800; }
 .real-sim-detail li > p:last-child { font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
 .real-sim-detail .real-sim-detail-line { overflow-wrap: anywhere; }
-.real-sim .real-sim-legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 28px; font-size: 13px; color: var(--ink-soft); }
+.real-sim .real-sim-legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 24px; font-size: 13px; color: var(--ink-soft); }
 .real-sim-legend > div { display: flex; gap: 6px; }
 .real-sim-legend dt { font-weight: 800; color: var(--ink); }
 @media (max-width: 720px) {
-  .real-sim-detail { padding: 20px; }
-  .real-sim-header { flex-direction: column; gap: 12px; margin-bottom: 20px; }
-  .real-sim-detail .real-sim-groups { grid-template-columns: 1fr; gap: 28px; }
-  .real-sim-detail h1 { font-size: 28px; }
+  .real-sim-detail { padding: 4px 16px 20px; }
+  .real-sim-header { flex-direction: column; align-items: flex-start; gap: 12px; margin: 24px 0 20px; }
+  .real-sim-detail .real-sim-groups { grid-template-columns: 1fr; gap: 8px; }
+  .real-sim-header h1 { font-size: 28px; }
 }

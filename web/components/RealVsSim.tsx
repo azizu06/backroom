@@ -49,11 +49,12 @@ export function RealVsSim() {
   const status = useDemoStatus();
   const models = status ? (status.llmEnabled ? 'Models on' : 'Models off · model work paused') : 'Live status unavailable';
   return (
-    <section className="real-sim real-sim-detail" aria-label="System status">
+    <section className="real-sim-page" aria-label="System status">
       <header className="real-sim-header">
         <div><h1>System status</h1><p className="real-sim-intro">Current evidence for each service. Refreshes every 10 seconds.</p></div>
         <span className={`real-sim-status ${status?.llmEnabled ? 'real-sim-good' : status ? 'real-sim-warning' : ''}`}>{models}</span>
       </header>
+      <div className="real-sim real-sim-detail">
       <div className="real-sim-groups">
         {(['real', 'sandbox'] as const).map(kind => (
           <section key={kind} aria-label={kind === 'real' ? 'Live services' : 'Partner services'}>
@@ -70,6 +71,7 @@ export function RealVsSim() {
         <div><dt>Unreachable</dt><dd>The check failed.</dd></div>
         <div><dt>Unverified</dt><dd>No fresh evidence.</dd></div>
       </dl>
+      </div>
     </section>
   );
 }

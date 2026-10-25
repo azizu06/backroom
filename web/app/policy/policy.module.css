@@ -1,11 +1,11 @@
 /* Shared palette tokens (app/theme.css). */
-.page { color: var(--ink); min-height: 100svh; font: 16px/1.5 var(--font-ui); padding: 0 24px 96px; }
+.page { box-sizing: border-box; max-width: var(--page-max); min-height: 100svh; margin: 0 auto; padding: 0 var(--page-gutter) 96px; color: var(--ink); font: 16px/1.5 var(--font-ui); }
 .page * { box-sizing: border-box; }
-.content { max-width: 960px; margin: auto; }
+.content { max-width: 960px; }
 .page a { color: var(--ink); text-underline-offset: 4px; }
-.page h1 { font-size: 32px; line-height: 1.15; font-weight: 900; margin: 32px 0 6px; text-wrap: balance; }
+.page h1 { font-size: 32px; line-height: 1.15; font-weight: 900; margin: 32px 0 8px; text-wrap: balance; }
 .page h2 { font-size: 21px; margin: 0 0 16px; font-weight: 800; }
-.intro { margin: 0 0 24px; color: var(--ink-soft); }
+.intro { max-width: 65ch; margin: 0 0 24px; color: var(--ink-soft); }
 .auth { margin: 16px 0 0; font-size: 14px; color: var(--ink-soft); }
 .unlockGroup { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; max-width: 760px; }
 .unlock { display: grid; gap: 16px; padding: 20px 24px; background: var(--bubble-glass); border: var(--bubble-border); border-radius: var(--bubble-radius); box-shadow: var(--bubble-shadow); }
@@ -13,8 +13,9 @@
 .or { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink-soft); }
 .page label { display: grid; gap: 6px; font-size: 14px; }
 .page input { min-height: 44px; width: 100%; padding: 8px 14px; border: 2px solid var(--pastel-aqua); border-radius: 999px; background: var(--field); color: var(--ink); font: inherit; }
+.page button:not(:disabled):hover { border-color: var(--ink); }
 .page button { min-height: 44px; padding: 8px 18px; border: 2px solid var(--pastel-aqua); border-radius: 999px; background: var(--field); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; }
-.page button:disabled { opacity: .5; cursor: wait; }
+.page button:disabled, :root[data-theme='dark'] .page button:disabled { color: var(--ink-soft); background: var(--line); border-color: var(--line); cursor: wait; }
 .page :is(input, button, a):focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 .unlock button, .save button { color: var(--paper); background: var(--ink); border-color: var(--ink); }
 :root[data-theme='dark'] :is(.unlock, .save) button { color: var(--on-pastel); background: var(--pastel-yellow); border-color: var(--pastel-yellow); }
@@ -33,4 +34,4 @@
 .error { background: var(--danger-soft); border-color: var(--danger); }
 .notice { background: var(--bubble-glass); border-color: var(--ink); }
 .page footer { margin-top: 32px; padding: 16px 0; border-top: 1px solid var(--line); color: var(--ink-soft); }
-@media (max-width: 650px) { .page { padding-inline: 16px; } .unlockGroup { grid-template-columns: 1fr; } .or { text-align: center; } .fields { grid-template-columns: 1fr; } .toolbar { align-items: stretch; } .toolbar strong { width: 100%; } }
+@media (max-width: 650px) { .page h1 { margin-top: 24px; font-size: 28px; } .unlockGroup { grid-template-columns: 1fr; } .or { text-align: center; } .fields { grid-template-columns: 1fr; } .toolbar { align-items: stretch; } .toolbar strong { width: 100%; } }
