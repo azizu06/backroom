@@ -1,0 +1,38 @@
+/* Office chrome tokens (corner menu, overview panel, prompts, demo pill, drawer, overlays), AJ's names from branch 271-cozy-office-ui.
+   Mirrors CHROME in web/lib/office/palette.ts; lib/office/overlay-contrast.test.ts checks the values and AA pairs.
+   Only the chrome reads these: the 3D world (materials, sky, outdoors) stays on PALETTE/ROLES. */
+.office-shell {
+  --ink: #19213B;
+  --ink-soft: #4B5577;
+  --paper: #FFFDF4;
+  --line: #D6F0F5;
+  --pastel-aqua: #A9F6FF;
+  --pastel-yellow: #FFF3A6;
+  --focus: #19213B;
+  /* Re-point the overlay tokens the office stylesheets already use (lobby.css :root keeps the base for other pages). */
+  --office-navy: var(--ink);
+  --office-slate: var(--ink-soft);
+  --office-cream: var(--paper);
+  --office-peach: var(--pastel-yellow);
+  --office-aqua: var(--pastel-aqua);
+  --office-lavender: var(--line);
+}
+.office-shell :focus-visible { outline-color: var(--focus); }
+
+.office-shell[data-theme=dark] {
+  --ink: #FFF8DC;
+  --ink-soft: #C7CEE6;
+  --paper: #222C4E;
+  --line: #2E3A63;
+  --pastel-aqua: #A9F6FF;
+  --pastel-yellow: #FFF3A6;
+  --focus: #FFF8DC;
+  /* Pastel plates carry cream ink in dark mode, so they become deep navy surfaces; the pastel accents stay for borders and dark-ink chips. */
+  --office-peach: #2B3660;
+  --office-blush: #3A3463;
+  --office-aqua: #1F4E5A;
+  --office-plate-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+  color: var(--ink);
+  background-color: #19213B;
+}
