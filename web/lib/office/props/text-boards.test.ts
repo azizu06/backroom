@@ -48,16 +48,39 @@ describe('canvas board painters', () => {
     expect(task.at(-1)!.y).toBeLessThan(260);
   });
 
-  it('wraps a plate task and status without colliding with the name or changing font', () => {
+  it.each([
+    'Jules · Checking vendor evidence',
+    'Alex · Reviewing invoice 1042',
+    'Ask me about issues/PRs',
+    'Jules · Checking vendor evidence and reviewing invoice 1042 with the team before approval',
+  ])('preserves full card text across up to three lines: %s', text => {
     const { ctx, painted } = canvas(624, 320);
-    const task = 'Checking vendor evidence and reviewing invoice 1042';
-    drawPlate(ctx, { agentId: 'jules', name: 'Jules', desk: 'Vendor Onboarding', task,
-      tone: 'held', status: 'Held for a human · folder to Dana’s Desk', at: [0, 0] });
-    const lines = painted.filter(row => row.font.startsWith('600 34px'));
-    expect(lines).toHaveLength(2);
-    expect(lines.map(row => row.text).join(' ')).toBe(task);
-    expect(lines[0]!.y - 34).toBeGreaterThan(122);
-    expect(lines.at(-1)!.y + 7).toBeLessThan(238);
+    drawPlate(ctx, { agentId: 'jules', title: text, line: text,
+      tag: 'NEEDS YOU', colourRole: 'statusWarn', agentColour: 'lavender' });
+    const title = painted.filter(row => row.font.startsWith('800 34px'));
+    const detail = painted.filter(row => row.font.startsWith('600 32px'));
+    for (const lines of [title, detail]) {
+      expect(lines.length).toBeLessThanOrEqual(3);
+      expect(lines.map(row => row.text).join(' ')).toBe(text);
+      if (text.includes('with the team')) expect(lines).toHaveLength(3);
+    }
+    expect(title.at(-1)!.y + 7).toBeLessThan(detail[0]!.y - 32);
+    expect(detail.at(-1)!.y + 7).toBeLessThan(258);
+    expect(painted.at(-1)!.text).toBe('NEEDS YOU');
+  });
+
+  it('ellipsizes only the third card line when text overflows', () => {
+    const { ctx, painted } = canvas(624, 320);
+    const text = 'Checking vendor evidence and reviewing invoice 1042 '.repeat(5);
+    drawPlate(ctx, { agentId: 'jules', title: text, line: text,
+      tag: 'WORKING', colourRole: 'screenGlow', agentColour: 'lavender' });
+    for (const font of ['800 34px', '600 32px']) {
+      const lines = painted.filter(row => row.font.startsWith(font));
+      expect(lines).toHaveLength(3);
+      expect(lines[0]!.text + lines[1]!.text).not.toContain('…');
+      expect(lines[2]!.text).toMatch(/…$/);
+      expect(text.startsWith(lines.map(row => row.text).join(' ').slice(0, -1))).toBe(true);
+    }
   });
 
   it('wraps all four notice receipts above the footer', () => {
