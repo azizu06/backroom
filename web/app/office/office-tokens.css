@@ -27,12 +27,13 @@
   --pastel-aqua: #A9F6FF;
   --pastel-yellow: #FFF3A6;
   --focus: #FFF8DC;
-  /* Pastel plates carry cream ink in dark mode, so they become deep navy surfaces; the pastel accents stay for borders and dark-ink chips. */
-  --office-peach: #2B3660;
-  --office-blush: #3A3463;
-  --office-aqua: #1F4E5A;
-  --office-plate-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  /* AJ's dark theme: peach/aqua stay on the pastel accents, lavender deepens; cream/navy follow --paper/--ink. */
+  --office-lavender: #34406A;
   color-scheme: dark;
   color: var(--ink);
   background-color: #19213B;
 }
+/* Pastel plates (yellow, aqua, blush) keep dark navy ink in both themes; dark panels use --paper with cream --ink. */
+.office-shell[data-theme=dark] :is(.play-chat-off button, .coworker-bubble, .office-disconnected, .room-inspector button, .play-panel button:not([aria-pressed='true']),
+  .tour-stop:hover, .story-mode button, .office-sound-toggle[aria-pressed='true'], .agent-talk-line, .agent-talk-recent li[data-tone='fail'],
+  .agent-talk-reply[data-tone='fail'], .agent-talk-recent li[data-tone='correction']) { color: #19213B; }
