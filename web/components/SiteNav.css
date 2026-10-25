@@ -13,8 +13,8 @@
 .site-nav a:focus-visible, .site-nav-theme:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
 .site-nav-theme { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; color: var(--on-pastel); background: var(--pastel-yellow); border: 0; border-radius: 50%; font: 18px/1 system-ui, sans-serif; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .site-nav a { transition: none; } }
-/* Below 1100px the links wrap onto their own row under brand, status and theme, so no label is ever clipped. */
-@media (max-width: 1100px) {
+/* Below 1200px the links wrap onto their own row under brand, status and theme, so no label is ever clipped. */
+@media (max-width: 1200px) {
   .site-nav { flex-wrap: wrap; border-radius: 24px; padding: 8px 8px 8px 16px; }
   .site-nav ul { order: 1; flex: 1 0 100%; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--line); }
 }

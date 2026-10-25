@@ -6,8 +6,8 @@ import { formatUsd, useActivePaymentLink } from './useActivePaymentLink';
 export default function PaymentLinkPanel({ title = 'Scan to pay', payButton = false, idle = true }: { title?: string; payButton?: boolean; idle?: boolean }) {
   const { link: active, error } = useActivePaymentLink();
   if (!idle && !active) return null;
-  return <section aria-label="Call payment link" style={{ boxSizing: "border-box", maxWidth: 360, padding: "4px 24px 20px", background: "var(--bubble-glass)", color: "var(--ink)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", fontFamily: "var(--font-ui)" }}>
-    <h2>{title}</h2>
+  return <section aria-label="Call payment link" style={{ boxSizing: "border-box", maxWidth: 360, padding: payButton ? "20px 24px" : "4px 24px 20px", background: "var(--bubble-glass)", color: "var(--ink)", border: "var(--bubble-border)", borderRadius: "var(--bubble-radius)", boxShadow: "var(--bubble-shadow)", fontFamily: "var(--font-ui)" }}>
+    <h2 style={payButton ? { margin: "0 0 12px", fontSize: 19, fontWeight: 800 } : undefined}>{title}</h2>
     {active?.localOnly ? <p>Local link only; a phone cannot open it.</p> : null}
     {error ? <p role="status">Payment link unavailable. Reconnecting…</p> : active ? <>
       {/* QR is generated locally; the payment capability is never sent to an image service. */}
