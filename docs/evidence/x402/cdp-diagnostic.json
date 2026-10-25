@@ -1,0 +1,35 @@
+{
+  "network": "eip155:84532",
+  "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "payerType": "EOA",
+  "hasContractCode": false,
+  "sdkAccountType": "evm-server",
+  "balanceAtomic": "1000000",
+  "tokenName": "USDC",
+  "decimals": 6,
+  "facilitator": "0xd407e409E34E0b9afb99EcCeb609bDbcD5e7f1bf",
+  "facilitatorGasWei": "311662343260899707",
+  "block": "50080179",
+  "at": "2026-10-25T14:18:24.757Z",
+  "domain": {
+    "name": "USDC",
+    "version": "2",
+    "chainId": 84532,
+    "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "onChainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+    "expectedSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+    "matches": true
+  },
+  "invoice": {
+    "amountAtomic": "10000",
+    "amountCents": 1,
+    "payTo": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180"
+  },
+  "authorizationWindow": {
+    "validAfter": "0",
+    "validBefore": "SDK signing time + 60 seconds",
+    "source": "@x402/evm 2.28.0 exact client"
+  },
+  "originalFacilitatorReason": "not retained by original run; cannot recover without the signed payload"
+}

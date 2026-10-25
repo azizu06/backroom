@@ -6,11 +6,12 @@ import { MemoryStateStore } from '../store';
 import { controllerForLease, MemoryFinanceRepository, PayablesSeat } from '../payables';
 import { X402_LABEL, X402_NETWORK, X402_USDC } from './index';
 import { testnetAccount } from './keychain';
+import { loadTestnetWallet } from './cdp';
 import { startTestnetVendor } from './vendor';
 
 async function main() {
   if (process.env.X402_LIVE !== '1' || process.env.PAYMENT_RAIL !== 'x402') throw new Error('Opt in with X402_LIVE=1 PAYMENT_RAIL=x402');
-  const payer = testnetAccount('payer'), vendor = testnetAccount('vendor');
+  const payer = await loadTestnetWallet(), vendor = testnetAccount('vendor');
   const chain = createPublicClient({ chain: baseSepolia, transport: http('https://sepolia.base.org', { timeout: 20_000, retryCount: 0 }) });
   if (await chain.getChainId() !== 84532) throw new Error('WRONG_CHAIN');
   const balance = await chain.readContract({ address: X402_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [payer.address] });

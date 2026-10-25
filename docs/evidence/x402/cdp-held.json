@@ -1,0 +1,316 @@
+{
+  "label": "x402 testnet",
+  "network": "eip155:84532",
+  "tool": "mcp__backroom__coinbase_x402_pay",
+  "walletLabel": "Coinbase CDP server wallet",
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "recipient": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+  "invoiceId": "acme-x402-inapp-1",
+  "amountCents": 1,
+  "status": "held",
+  "verdict": "ESCALATE",
+  "ruleIds": [
+    "INVALID_INPUT"
+  ],
+  "policyVersion": 1,
+  "policySentence": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+  "rail": "x402 testnet",
+  "escalationId": "cdp-testnet-held",
+  "evidenceRefs": [
+    "invoice:cdp-testnet",
+    "acme-x402-inapp-1"
+  ],
+  "auditChain": {
+    "length": 9,
+    "headHash": "4a84b545821679af3254a2bad12610ad0dae4d965f3f4074c10c78673fd4208f",
+    "valid": true,
+    "firstBrokenSeq": null
+  },
+  "audit": [
+    {
+      "action": "pay_invoice",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:1",
+      "inputs": {
+        "bankChanged": false,
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "fence": "not_applicable",
+        "invoiceId": "acme-x402-inapp-1",
+        "paymentRail": "x402 testnet",
+        "scenario_source": "seed",
+        "senderDomain": "acme.example",
+        "vendorDomain": "acme.example",
+        "vendorId": "acme-x402"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "refs": [
+        "invoice:cdp-testnet",
+        "acme-x402-inapp-1"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 1,
+      "ts": 1792937681860,
+      "hash": "148d16296f6166bca3b88edf07fadff8f2bca1add97adcdaf1526031fe5c1fe2"
+    },
+    {
+      "action": "x402_testnet_policy",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:2",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "148d16296f6166bca3b88edf07fadff8f2bca1add97adcdaf1526031fe5c1fe2",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 2,
+      "ts": 1792937681861,
+      "hash": "ae83c1ecc5024838b91b931ce8fb228b75734dc152b8d83db287f43e7ac40956"
+    },
+    {
+      "action": "x402_testnet_attempt",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:3",
+      "inputs": {
+        "amountCents": 1,
+        "network": "eip155:84532",
+        "payTo": "0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "ae83c1ecc5024838b91b931ce8fb228b75734dc152b8d83db287f43e7ac40956",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 3,
+      "ts": 1792937681862,
+      "hash": "0deb2836be7ae5a24be9e005717eb92209765796f2ecb96688ec4aba0347032f"
+    },
+    {
+      "action": "x402_testnet_policy",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:4",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "0deb2836be7ae5a24be9e005717eb92209765796f2ecb96688ec4aba0347032f",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 4,
+      "ts": 1792937681865,
+      "hash": "f893c0338222fb0855334b90c4ec3f0f3ab7a9c6e06a27e2ca32e9b3beb64ab0"
+    },
+    {
+      "action": "x402_testnet_policy",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:5",
+      "inputs": {
+        "decision": {
+          "kind": "ALLOW",
+          "policyVersion": 1,
+          "ruleIds": [
+            "IN_BADGE"
+          ]
+        },
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "f893c0338222fb0855334b90c4ec3f0f3ab7a9c6e06a27e2ca32e9b3beb64ab0",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "IN_BADGE"
+      ],
+      "seat": "payables",
+      "seq": 5,
+      "ts": 1792937681865,
+      "hash": "cdf41f60809e9df8e82c5230cfc4fa282f5358e5d4cf2a15a6901e06608c3eef"
+    },
+    {
+      "action": "x402_testnet_wallet",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ALLOW",
+      "id": "audit:6",
+      "inputs": {
+        "network": "eip155:84532",
+        "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+        "paymentRail": "x402 testnet",
+        "walletLabel": "Coinbase CDP server wallet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "cdf41f60809e9df8e82c5230cfc4fa282f5358e5d4cf2a15a6901e06608c3eef",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 6,
+      "ts": 1792937681865,
+      "hash": "a9a54b31298b5a135e1c7bed7b0d8c83e6f57aa7c46e10742b95f4e32e53820f"
+    },
+    {
+      "action": "x402_testnet_settlement",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "id": "audit:7",
+      "inputs": {
+        "authorizationNonce": "0x7ce966f45320d571857cce0799111823ff5a2f4a020431c267184d86f2a8bcb2",
+        "network": "eip155:84532",
+        "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+        "paymentRail": "x402 testnet",
+        "settlementNetwork": "eip155:84532",
+        "success": false,
+        "transaction": "",
+        "walletLabel": "Coinbase CDP server wallet"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "a9a54b31298b5a135e1c7bed7b0d8c83e6f57aa7c46e10742b95f4e32e53820f",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 7,
+      "ts": 1792937682892,
+      "hash": "dbb58200a3ae9600e54190eede5336feefad4096c3117dd6c6b9af46782f848d"
+    },
+    {
+      "action": "x402_testnet_rejected",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "id": "audit:8",
+      "inputs": {
+        "network": "eip155:84532",
+        "paymentRail": "x402 testnet",
+        "reason": "Payment held; reconcile before retrying."
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "dbb58200a3ae9600e54190eede5336feefad4096c3117dd6c6b9af46782f848d",
+      "refs": [
+        "acme-x402-inapp-1",
+        "acme-x402"
+      ],
+      "route": "code",
+      "ruleIds": [],
+      "seat": "payables",
+      "seq": 8,
+      "ts": 1792937682892,
+      "hash": "9c5331c9556203bc4169b32da17b16fb7e01a5209ca3526e358aafe1dd69bb9f"
+    },
+    {
+      "action": "payment_uncertain",
+      "actor": "code",
+      "costUsd": 0,
+      "decision": "ESCALATE",
+      "id": "audit:9",
+      "inputs": {
+        "decision": {
+          "kind": "ESCALATE",
+          "policyVersion": 1,
+          "quote": {
+            "sentenceId": "NF-026",
+            "text": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission."
+          },
+          "reason": "Reject incomplete, malformed, or stale policy inputs rather than treating them as permission.",
+          "ruleIds": [
+            "INVALID_INPUT"
+          ],
+          "toHuman": "Dana"
+        },
+        "paymentRail": "x402 testnet",
+        "scenario_source": "seed"
+      },
+      "latencyMs": 0,
+      "policyVersion": 1,
+      "prevHash": "9c5331c9556203bc4169b32da17b16fb7e01a5209ca3526e358aafe1dd69bb9f",
+      "refs": [
+        "invoice:cdp-testnet",
+        "acme-x402-inapp-1"
+      ],
+      "route": "code",
+      "ruleIds": [
+        "INVALID_INPUT"
+      ],
+      "seat": "payables",
+      "seq": 9,
+      "ts": 1792937682892,
+      "hash": "4a84b545821679af3254a2bad12610ad0dae4d965f3f4074c10c78673fd4208f"
+    }
+  ],
+  "at": "2026-10-25T14:14:42.893Z"
+}

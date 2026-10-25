@@ -1,14 +1,15 @@
 import { x402Client, x402HTTPClient } from '@x402/core/client';
 import { ExactEvmScheme } from '@x402/evm/exact/client';
 import type { PaymentRequirements } from '@x402/core/types';
-import type { PrivateKeyAccount } from 'viem/accounts';
+import type { ClientEvmSigner } from '@x402/evm';
 import { createPublicClient, decodeEventLog, erc20Abi, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { evaluate } from '@backroom/policy';
 import { masterPayment } from '../payment-boundary';
 import { domain } from '../payables/decisions';
 import type { FinanceRepository, PayablesClient, SeatOptions } from '../payables/types';
-import { testnetAccount } from './keychain';
+import { loadTestnetWallet, type WalletLabel } from './cdp';
+import { facilitatorReason } from './diagnostics';
 
 export const X402_NETWORK = 'eip155:84532' as const;
 export const X402_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
@@ -17,13 +18,15 @@ export const X402_LABEL = 'x402 testnet';
 /** In-process mock vendor/facilitator rail: no keys, chain or internet. */
 export const X402_SIMULATED_LABEL = 'x402 simulated';
 export type X402Label = typeof X402_LABEL | typeof X402_SIMULATED_LABEL;
-type Signer = Pick<PrivateKeyAccount, 'address' | 'signTypedData'>;
+type Signer = ClientEvmSigner & { walletLabel?: WalletLabel };
 export interface Transfer { transaction: `0x${string}`; payer: string; payTo: string; amount: bigint; authorizationNonce: `0x${string}` }
 export interface X402Options {
   repository: FinanceRepository; state: SeatOptions['state'];
   /** Trusted bootstrap config, never a field extracted from an invoice. */
-  vendorOrigin?: string; fetch?: typeof fetch; signer?: () => Signer;
+  vendorOrigin?: string; fetch?: typeof fetch; signer?: () => Signer | Promise<Signer>;
   confirm?: (transfer: Transfer) => Promise<void>;
+  /** Trusted console/CLI opt-in only; defaults retain the existing 120s cap. */
+  maxAuthorizationSeconds?: 120 | 600;
   /** Simulated runs must also inject signer and confirm; the label never selects a network. */
   label?: X402Label;
 }
@@ -31,6 +34,8 @@ const authorizationAbi = [{ type: 'event', name: 'AuthorizationUsed', inputs: [
   { name: 'authorizer', type: 'address', indexed: true }, { name: 'nonce', type: 'bytes32', indexed: true },
 ] }] as const;
 const lower = (value: string) => value.toLowerCase();
+// Shared by console, direct seat and MCP routes. A failed/uncertain signature is never retried.
+const live = globalThis as typeof globalThis & { backroomX402SignatureAttempted?: boolean };
 const lines = (items: { description: string; quantity: number; unitPriceCents: number }[]) => JSON.stringify(items.map(
   item => [item.description.trim().toLowerCase().replace(/\s+/g, ' '), item.quantity, item.unitPriceCents],
 ).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
@@ -111,15 +116,23 @@ export function x402Payables(options: X402Options): PayablesClient {
         const amount = String(BigInt(input.amountCents) * 10_000n);
         const valid = (req: PaymentRequirements) => req.scheme === 'exact' && req.network === X402_NETWORK &&
           lower(req.asset) === lower(X402_USDC) && lower(req.payTo) === lower(payTo) && req.amount === amount &&
-          req.maxTimeoutSeconds > 0 && req.maxTimeoutSeconds <= 120 &&
+          req.maxTimeoutSeconds > 0 && req.maxTimeoutSeconds <= (options.maxAuthorizationSeconds ?? 120) &&
           req.extra?.name === 'USDC' && req.extra?.version === '2' &&
           (!req.extra.assetTransferMethod || req.extra.assetTransferMethod === 'eip3009') &&
           (!req.extra.paymentFlow || req.extra.paymentFlow === 'authorization');
         if (required.x402Version !== 2 || required.resource.url !== url || required.accepts.length !== 1 ||
             !valid(required.accepts[0]!) || (required.extensions && Object.keys(required.extensions).length)) throw new Error('X402_UNSAFE_CHALLENGE');
         payTo = await gate();
-        // Load Keychain only after both trusted-state gates and untrusted challenge validation.
-        const signer = (options.signer ?? (() => testnetAccount('payer')))();
+        // Load credentials only after policy and invoice-bound challenge validation.
+        const signer = await (options.signer ?? loadTestnetWallet)();
+        await gate(); // Wallet creation/faucet may take time; refresh policy before signing.
+        if (!options.confirm) {
+          if (process.env.X402_LIVE !== '1' || input.amountCents !== 1) throw new Error('X402_LIVE_ONE_CENT_ONLY');
+          if (live.backroomX402SignatureAttempted) throw new Error('X402_ALREADY_ATTEMPTED_THIS_PROCESS');
+          live.backroomX402SignatureAttempted = true;
+        }
+        const walletLabel = signer.walletLabel ?? (label === X402_SIMULATED_LABEL ? 'ephemeral simulated wallet' : 'direct testnet key');
+        await log('wallet', 'ALLOW', { payer: signer.address, walletLabel });
         const client = new x402Client().register(X402_NETWORK, new ExactEvmScheme(signer));
         client.setSpendControls({ maxAmountPerPayment: '$2000' });
         client.registerPolicy((version, requirements) => version === 2 ? requirements.filter(valid) : []);
@@ -127,10 +140,17 @@ export function x402Payables(options: X402Options): PayablesClient {
         const payload = await protocol.createPaymentPayload(required);
         const authorization = payload.payload.authorization as { nonce?: unknown } | undefined;
         if (typeof authorization?.nonce !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(authorization.nonce)) throw new Error('X402_INVALID_AUTHORIZATION');
+        const signed = payload.payload.authorization as Record<string, unknown>;
+        await log('authorization', 'ALLOW', { payer: signer.address, payTo, amount, asset: X402_USDC,
+          domain: { name: 'USDC', version: '2', chainId: 84532 },
+          validAfter: signed.validAfter, validBefore: signed.validBefore });
         const paid = await request(protocol.encodePaymentSignatureHeader(payload));
         const settlement = protocol.getPaymentSettleResponse(name => paid.headers.get(name));
+        const errorReason = facilitatorReason(settlement.errorReason);
         // Preserve facilitator hash even when later HTTP/chain confirmation fails.
         await log('settlement', settlement.success ? 'ALLOW' : 'ESCALATE', {
+          payer: signer.address, walletLabel,
+          ...(errorReason ? { errorReason } : {}),
           transaction: settlement.transaction, authorizationNonce: authorization.nonce, success: settlement.success, settlementNetwork: settlement.network,
         });
         if (!paid.ok || !settlement.success || settlement.network !== X402_NETWORK ||

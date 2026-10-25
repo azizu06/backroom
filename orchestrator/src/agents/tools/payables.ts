@@ -4,12 +4,14 @@ import { RULE_SENTENCES, POLICY_SENTENCES } from '@backroom/policy';
 import { hold } from '../../payables/decisions';
 import type { ControllerPort, FinanceRepository, InboxSource, InvoiceFields, PayablesSeat, SeatResult } from '../../payables';
 import type { DomainTool, Json, ToolContext } from '../contracts';
+import { cdpWalletBalance } from '../../x402/cdp';
+import { cdpCredentialsPresent } from '../../x402/keychain';
 
 /** Trusted case record for this activation. Resolved server-side from the activation's
  * artifact refs; the model never supplies invoice fields, amounts, vendor or sender. */
 export interface PayablesCase { fields: InvoiceFields; source: InboxSource }
 export interface PayablesToolDeps {
-  seat: Pick<PayablesSeat, 'assess' | 'process'>;
+  seat: Pick<PayablesSeat, 'assess' | 'process'> & { readonly paymentRail?: PayablesSeat['paymentRail'] };
   repository: Pick<FinanceRepository, 'getPO' | 'listInvoices'>;
   controller: ControllerPort;
   loadCase(ctx: ToolContext): Promise<PayablesCase>;
@@ -124,5 +126,22 @@ export function createPayablesTools(deps: PayablesToolDeps): readonly DomainTool
       return run;
     },
   };
-  return [readPo, readHistory, evaluateInvoice, requestPayment, requestHuman];
+  const coinbasePay: DomainTool<z.infer<typeof none>, Json> = {
+    name: 'coinbase_x402_pay', input: none,
+    description: 'Pay THIS approved one-cent vendor invoice with the Coinbase CDP server wallet over x402 on Base Sepolia TESTNET ONLY. Requires host X402_LIVE=1 and an x402-configured seat. Re-evaluates policy and invoice-bound recipient/asset/network; no arguments. Shares request_payment dedupe. Never approves a hold.',
+    execute: (ctx) => guarded(ctx, async () => {
+      if (process.env.X402_LIVE !== '1' || deps.seat.paymentRail !== 'x402 testnet' || !cdpCredentialsPresent()) {
+        return { status: 'UNAVAILABLE', reason: 'Requires testnet host opt-in, an x402 seat, and CDP Keychain credentials.' };
+      }
+      const { fields } = await deps.loadCase(ctx);
+      if (fields.amountCents !== 1) return { status: 'UNAVAILABLE', reason: 'This testnet tool only pays a one-cent invoice.' };
+      return requestPayment.execute(ctx, {});
+    }),
+  };
+  const coinbaseBalance: DomainTool<z.infer<typeof none>, Json> = {
+    name: 'coinbase_wallet_balance', input: none,
+    description: 'Read the named Backroom Payables CDP server wallet public address and Base Sepolia test-USDC balance. Read-only: never creates, funds, signs or pays. No arguments.',
+    execute: ctx => guarded(ctx, cdpWalletBalance),
+  };
+  return [readPo, readHistory, evaluateInvoice, requestPayment, requestHuman, coinbasePay, coinbaseBalance];
 }
