@@ -29,6 +29,13 @@ describe('lobby v2 projections', () => {
     expect(latestLobbyDecisions(snapshot).map(entry => entry.id)).toEqual(['7', '6', '5', '4', '3']);
   });
 
+  it('hides RECORDED rows that have no rule ids', () => {
+    const empty = { ...row('noise', 'RECORDED'), ruleIds: [] as string[], summary: '' };
+    const snapshot = { ...INITIAL_OFFICE, audit: [row('1', 'ALLOW'), empty, row('2', 'RECORDED'), row('3', 'DENY')] };
+    expect(latestLobbyDecisions(snapshot).map(entry => entry.id)).toEqual(['3', '2', '1']);
+    expect(latestLobbyDecisions(snapshot).some(entry => entry.id === 'noise')).toBe(false);
+  });
+
   it('never returns non-finite count values and labels preview modes', () => {
     expect(lobbyStats({ ...INITIAL_OFFICE, inboxCount: Number.NaN }).inbox).toBe(0);
     expect(lobbyModeLabel('preview')).toBeUndefined();
