@@ -1,3 +1,4 @@
+import { runApDebit } from './ap-debit';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -120,12 +121,13 @@ for (const invoice of northfield.arInvoices) {
   if (expected && expected !== actual) gaps.push({ id: scenario.id, detail: `Reconciler expected ${expected}, got ${actual}.` });
 }
 const legacy = await runEval({ persona: scriptedPersona });
-// The existing P01 decision measurement installs a mock debit port. Probe its absence separately;
+// Negative capability control: omit the AP debit port explicitly, even though production now supplies one;
 // neither a policy ALLOW nor a synthetic completed receipt proves the frozen pay-and-reconcile outcome.
 const p01DebitProbe = await runInvoice('4401', { caseId: 'P01:no-debit-adapter', payment: 'unavailable' });
 const p01DebitProbeHeld = p01DebitProbe.actual === 'HOLD' && p01DebitProbe.result.status === 'held' &&
   p01DebitProbe.result.verdict === 'ESCALATE' && !p01DebitProbe.result.receiptId && p01DebitProbe.mockDebits === 0;
 if (!p01DebitProbeHeld) gaps.push({ id: 'P01:missing-adapter', detail: 'The missing AP debit adapter probe did not retain the expected hold; see p01DebitProbe.' });
+const apDebit = await runApDebit();
 const durableRecovery = await runDurableRecoveryPreflight();
 const crsRecordedCoverage = await replayRecordedCrsCoverage();
 const recoveryRuns = [];
@@ -204,7 +206,7 @@ for (const row of legacy.reports) {
     continue;
   }
   if (row.id === 'P01' && row.seams.includes('integration:not_executed')) {
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.payables.P01.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}; requires ${key.payables.P01.requiredEvidence.join(', ')}. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ${p01DebitProbe.assessment.verdict} but request_payment returns ${p01DebitProbe.result.status}/${p01DebitProbe.result.verdict} [${p01DebitProbe.result.ruleIds}], with ${p01DebitProbe.mockDebits} debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open.` });
+    if (!apDebit.match) gaps.push({ id: row.id, detail: 'The production AP debit/reconciliation path did not match P01; see apDebit.' });
     continue;
   }
   if (row.id === 'C05' && row.seams.includes('integration:not_executed')) {
@@ -240,7 +242,9 @@ const metrics = score(observations);
 const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extraction.ts
 const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
+gaps.push({ id: 'P01:scope', detail: 'The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.' });
 const rates = {
+  dispatcherApDebit: fraction(apDebit.match ? 1 : 0, 1),
   extractionMockFieldFidelity: fraction(fieldCorrect, fieldTotal),
   // Recorded live GX10 run (pdf-extraction.ts); the deterministic scoreboard only reads its committed result.
   sourceDocumentExtractionAccuracy: pdfRun ? { ...fraction(pdfRun.fieldsCorrect, pdfRun.fieldsTotal), exactItems: pdfRun.exactItems, items: pdfRun.items,
@@ -269,7 +273,7 @@ const report = {
   schemaVersion: 1, mode: 'deterministic-mock', command,
   provenance: { frozenManifestVerifiedFiles: Object.keys(manifest.sha256).length, baseCommit: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim(),
     evaluatorHashMethod: 'SHA-256 of UTF-8 evaluator source with CRLF normalized to LF. The recorded CRS text receipt uses the same LF normalization; frozen fixture and other input hashes remain byte-exact.',
-    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'email-dispatcher.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
+    evaluatorSources: Object.fromEntries(['chain.ts', 'conversation.ts', 'inbox-team.ts', 'judge.ts', 'pdf-extraction.ts', 'precall.ts', 'call-button.ts', 'failover.ts', 'runtime.ts', 'bank-change.ts', 'badge-attack.ts', 'recovery.ts', 'durable-recovery.ts', 'crs-availability.ts', 'ap-debit.ts', 'email-dispatcher.ts', 'approval-expiry.ts', 'provenance.ts', 'score.ts', 'scoreboard.ts'].map(name => {
       const path = `orchestrator/src/agents/eval/${name}`; return [path, evaluatorSourceHash(readFileSync(join(root, path)))];
     })),
     recoveryRuntimeSources: Object.fromEntries(['handoff-engine.ts', 'handoff-store.ts', 'dispatcher.ts'].map(name => {
@@ -277,6 +281,8 @@ const report = {
     })),
     voicemailRuntimeSources: { 'orchestrator/src/voice/tools.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/voice/tools.ts'))) },
     crsRuntimeSources: { 'orchestrator/src/collections/crs.ts': evaluatorSourceHash(readFileSync(join(root, 'orchestrator/src/collections/crs.ts'))) },
+    apDebitRuntimeSources: Object.fromEntries(['integrations/nessie/src/index.ts', 'orchestrator/src/payables/payments.ts',
+      'orchestrator/src/payables/index.ts', 'orchestrator/src/agents/tools/payables.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     emailRuntimeSources: Object.fromEntries(['orchestrator/src/agents/roles/collections.ts', 'orchestrator/src/agents/tools/collections.ts',
       'orchestrator/src/agents/roles/index.ts', 'orchestrator/src/collections/email.ts'].map(path => [path, evaluatorSourceHash(readFileSync(join(root, path)))])),
     inputs: Object.fromEntries(['fixtures/company/northfield.json', 'fixtures/answer-key/expected.json',
@@ -290,6 +296,7 @@ const report = {
     providers: 'Synthetic GX10, bank, CRS public-records and Apify responses. No network calls, keys, real calls or money. Positive runtime cost entries are synthetic accounting tests, not spend.',
     fraudDefinition: 'Only key steps with LOOKALIKE_DOMAIN; one planted fraud item. Sanctions and routine bank-change holds are not relabeled fraud.',
     payablesDefinition: 'Keyed invoice initial pay/hold decisions and P08 evidence gate; includes P03 sender variants. P04 has a separate two-dispatcher-run bank application measurement. P10 probes Collections tool isolation; NOT_IN_BADGE stays a separate direct policy reference. P11 measures expired memory activation takeover after a persisted mock receipt and with the stale runner parked before payment I/O (synchronous effect fence), not an OS kill or durable restart. P12 replays keyed AP steps of its comparison scenarios with GX10 healthy, then cut, and requires the same outcome vector.',
+    apDebit: apDebit.scope,
     recovery: recoveryRuns[0]!.scope,
     durableRecovery: durableRecovery.scope,
     emailDispatcher: emailDispatcher.scope,
@@ -313,6 +320,7 @@ const report = {
     tools: p01DebitProbe.trace.map(row => `${row.role}.${row.tool}`),
     scope: 'Production Dispatcher + ClaudeAgentRuntime and all five AP roles, with the AP debit port explicitly absent. Fixture extraction and vendor checks, no network. This measures the unavailable-adapter hold, not a Nessie payment or debit reconciliation.' },
   recovery: recoveryRuns,
+  apDebit,
   crsRecordedCoverage,
   emailDispatcher,
   durableRecovery,
@@ -362,6 +370,7 @@ const lines = [
   `| Authoritative AP decision rule agreement | ${display(rates.exactAPRules)} |`,
   `| Collections pre-call permit agreement | ${display(rates.collectionsPermits)} |`,
   `| Keyed bank-feed reconciliation agreement | ${display(rates.reconciliation)} |`,
+  `| P01 AP withdrawal + reconciliation through the Dispatcher (synthetic bank HTTP, once per invoice) | ${display(rates.dispatcherApDebit)} |`,
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| C14 simulated email fallback through the Dispatcher (trusted contact, daily dedupe, no amount or dial) | ${display(rates.dispatcherEmailFollowup)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | ${display(rates.arConversations)} |`,
@@ -392,4 +401,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (!emailDispatcher.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (!apDebit.match || !emailDispatcher.match || rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
