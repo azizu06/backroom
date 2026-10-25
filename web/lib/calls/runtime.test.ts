@@ -3,7 +3,7 @@ import { createGateway } from '../gateway/http';
 import { installGatewayStore } from '../gateway/runtime';
 import { MemoryGatewayStore, type GatewayCall } from '../gateway/store';
 import { recordVoiceCallEvent, voiceCallLifecycle } from './lifecycle';
-import { activeCall } from './runtime';
+import { activeCall, officeCallAuditDecision } from './runtime';
 
 const SESSION = '00000000-0000-4000-8000-0000000000aa';
 const call = (callId: string, agentId: string): GatewayCall => ({ callId, agentId, invoiceId: '1042', clientId: 'northfield-jordan', contactName: 'Jordan',
@@ -42,5 +42,20 @@ describe('desk phone feed', () => {
     const stopped = (await activeCall())!;
     expect(stopped).toMatchObject({ status: 'ended', endReason: 'Opt-out recorded', endedAt: expect.any(Number) });
     expect(await activeCall(stopped.endedAt! + 2 * 60_000 + 1)).toBeNull();
+  });
+});
+
+describe('office call audit decisions', () => {
+  it('keeps operational refusals out of the policy decision feed', () => {
+    expect(officeCallAuditDecision({ outcome: 'refused', code: 'VOICE_NOT_RUNNING' })).toBeUndefined();
+    expect(officeCallAuditDecision({ outcome: 'refused', code: 'RELAY_UNCONFIRMED' })).toBeUndefined();
+    expect(officeCallAuditDecision({ outcome: 'refused', code: 'COOLDOWN' })).toBeUndefined();
+  });
+
+  it('retains decisions for accepted calls and policy or guardrail refusals', () => {
+    expect(officeCallAuditDecision({ outcome: 'accepted', code: 'DIAL_ACCEPTED' })).toBe('ALLOW');
+    expect(officeCallAuditDecision({ outcome: 'refused', code: 'PRECALL_BLOCKED' })).toBe('DENY');
+    expect(officeCallAuditDecision({ outcome: 'refused', code: 'CALL_DENIED' })).toBe('DENY');
+    expect(officeCallAuditDecision({ outcome: 'refused', code: 'CLIENT_STOPPED' })).toBe('DENY');
   });
 });

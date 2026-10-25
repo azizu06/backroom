@@ -44,6 +44,14 @@ it('rejects voice credentials, origin forgery, arbitrary policy fields, invalid 
   expect((await edit(req({ expectedVersion: 1, limits }))).status).toBe(409);
   expect((await state.listAudit()).length).toBe(1);
 });
+it('accepts only the declared demo loopback beside the configured policy origin', async () => {
+  const state = new MemoryStateStore();
+  const edit = createPolicyHTTP({ store: () => state, pin: () => pin, origin: () => 'https://demo.example',
+    loopbackOrigin: () => 'http://127.0.0.1:3477' });
+  expect((await edit(req({ expectedVersion: 1, limits }, pin, 'http://127.0.0.1:3477'))).status).toBe(200);
+  expect((await edit(req({ expectedVersion: 2, limits }, pin, 'http://localhost:3477'))).status).toBe(403);
+  expect((await edit(req({ expectedVersion: 2, limits }, pin, 'http://127.0.0.1:3478'))).status).toBe(403);
+});
 it('fails closed without config and limits online PIN guessing for one minute', async () => {
   const state = new MemoryStateStore(); let clock = 1;
   const edit = createPolicyHTTP({ store: () => state, pin: () => pin, origin: () => origin, now: () => clock });

@@ -8,7 +8,7 @@
     "evaluatorHashMethod": "SHA-256 of UTF-8 evaluator source with CRLF normalized to LF; frozen fixture/input hashes remain byte-exact.",
     "evaluatorSources": {
       "orchestrator/src/agents/eval/chain.ts": "280f7b5b559d795066cc1cfd893c7ced6a22c00ff2793f2b20155883aaf1f27a",
-      "orchestrator/src/agents/eval/conversation.ts": "e39fb9a975bb89e4b9d0bdaf9585dab4ddbac80c02b5644062ab5911374bb0bc",
+      "orchestrator/src/agents/eval/conversation.ts": "2923b6c6d14e00bdb5035405d1024534b44e381e6f6db7f1bd7b9f706bfbc889",
       "orchestrator/src/agents/eval/inbox-team.ts": "772a5906f8647b53bf9b2c5f26756feb64824f4fa845ba33494173fcffd29dc1",
       "orchestrator/src/agents/eval/judge.ts": "b86421b5314a99e62eded7d642ed3f2703ef6636c6b7fc0709653c757125822f",
       "orchestrator/src/agents/eval/pdf-extraction.ts": "7650992147152c78b6ec194a12e28ccd40dfdd98e47444ae75fab391264b0a97",
@@ -23,12 +23,15 @@
       "orchestrator/src/agents/eval/approval-expiry.ts": "2196bf24bd6812338a0c72f3863429eb89d38c77dea9b5dddde4a4c8d1d97be1",
       "orchestrator/src/agents/eval/provenance.ts": "06a3f6cfa02243be24d50f6d24ba4ade36aec4a6b7a64023008c06eec2e45d82",
       "orchestrator/src/agents/eval/score.ts": "8acd63411be20295061974290eb2c36bdae7d6b14bb307aa25c814e5c3fd5a7a",
-      "orchestrator/src/agents/eval/scoreboard.ts": "c7814f259921a3a2f8f0bb3945f135656cf5b1fad0b446654899ea02e80b892b"
+      "orchestrator/src/agents/eval/scoreboard.ts": "06fbc2eec85c4fc9f0527b7a46d59c9992b58aa1fe9cb79cdd3e82de696de07a"
     },
     "recoveryRuntimeSources": {
       "orchestrator/src/agents/handoff-engine.ts": "5fbc6887c7ed1ac4850ca2fa3d2f5714160a8c162209763896bf441dea99011d",
       "orchestrator/src/agents/handoff-store.ts": "b963299b3a356a2e5dba32746af5c02f4518904196d3b5c06927bde072eeecc7",
       "orchestrator/src/agents/dispatcher.ts": "64690fe5c34675e5202d715ffad9cf4fc439b29e1407892b9aca2f328c88984e"
+    },
+    "voicemailRuntimeSources": {
+      "orchestrator/src/voice/tools.ts": "d1393bf106fa1a599065f34e4fca7c831cd6056916055c38425a1bb677599f9a"
     },
     "inputs": {
       "fixtures/company/northfield.json": "1198aeba24e6389c8fe71261942696371a960665219377d00edc31d1ae908df0",
@@ -14507,6 +14510,15 @@
       ],
       "cleared": false,
       "reconRules": [],
+      "voicemailEvidence": {
+        "gatewayReplyKinds": [
+          "DENY"
+        ],
+        "invoiceReadRefused": true,
+        "callbackInstructionConfigured": true,
+        "speechMeasured": false,
+        "messageDelivered": false
+      },
       "gatewayTools": [
         "get_invoice_context:DENY"
       ],
@@ -15756,7 +15768,7 @@
     },
     {
       "id": "C21",
-      "detail": "At least one integration step is unexecuted by the existing eval; do not claim full scenario completion."
+      "detail": "Frozen integrationOutcome: leave_generic_callback_only_no_invoice_details_no_amount. The scripted production gateway -> Dispatcher run refuses invoice context before identity (DENY); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (true), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open."
     }
   ]
 }

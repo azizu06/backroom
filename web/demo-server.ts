@@ -7,7 +7,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createDemoRuntime } from './lib/demo/runtime';
 import { recordVoiceCallEvent } from './lib/calls/lifecycle';
-import { localOperatorRequest, operatorSession } from './lib/operator/session';
+import { localOperatorRequest } from './lib/operator/session';
+import { localOperatorSessionCookie } from './lib/operator/sign-in';
 import { operatorAudit } from './lib/operator/audit';
 import { proxyStateHTTP, proxyStateUpgrade, stateProxyEnabled } from './lib/demo/state-proxy';
 
@@ -35,7 +36,7 @@ async function main() {
         res.writeHead(403).end('Unlock on the host’s local operator page.'); return;
       }
       try {
-        const cookie = operatorSession(process.env, `http://127.0.0.1:${port}`);
+        const cookie = localOperatorSessionCookie(process.env, `http://127.0.0.1:${port}`);
         await operatorAudit('session', 'operator:local-host', 'completed');
         res.setHeader('Set-Cookie', cookie); res.end('{}');
       } catch { res.writeHead(503).end('Operator session unavailable.'); }

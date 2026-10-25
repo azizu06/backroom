@@ -4,6 +4,7 @@ import { createNorthfieldRepository, getStateStore, PayablesSeat, processInbox, 
 
 import { narrateInbox, type InboxNarration } from '../demo/agents';
 import { noteEscalation } from '../approvals/inbox';
+import { declaredLoopbackOfficeOrigin } from '../calls/loopback-origin';
 
 import { createInboxVendorGate } from './checks';
 import { matchPreset, presetFields } from './presets';
@@ -14,13 +15,16 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 const LIMIT = 4 * 1024 * 1024;
 
 /** Public synthetic judge intake. No payment adapter. Vendor checks follow DEMO_LIVE; a passkey applies a bank change. */
-export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>; origin?: () => string | undefined; env?: Record<string, string | undefined>; fetch?: typeof fetch } = {}) {
+export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>;
+  origin?: () => string | undefined; loopbackOrigin?: () => string | undefined; env?: Record<string, string | undefined>; fetch?: typeof fetch } = {}) {
   const origin = options.origin ?? (() => process.env.DEMO_PUBLIC_URL || process.env.WEBAUTHN_ORIGIN);
+  const loopbackOrigin = options.loopbackOrigin ?? declaredLoopbackOfficeOrigin;
   return async (request: Request) => {
     // Compare the browser Origin with the deployment origin. Next rewrites request.url
     // (127.0.0.1 becomes localhost; a tunnel can gain an explicit port) and Host is not a source of truth.
     const allowed = origin();
-    if (!allowed || request.headers.get('origin') !== allowed) return json({ error: 'Origin rejected.' }, 403);
+    const requestOrigin = request.headers.get('origin');
+    if (!allowed || (requestOrigin !== allowed && requestOrigin !== loopbackOrigin())) return json({ error: 'Origin rejected.' }, 403);
     if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) return json({ error: 'Use the inbox form.' }, 415);
     if (Number(request.headers.get('content-length')) > LIMIT + 64000) return json({ error: 'Attachment must be 4 MB or smaller.' }, 413);
     let form: FormData;
