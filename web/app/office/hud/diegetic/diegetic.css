@@ -10,7 +10,8 @@
 :root[data-theme='dark'] .office-shell :is(.office-mode-chip, .overview-menu [role='menuitem']:is(:hover, :focus-visible),
   [data-overview] .desk-label:is(:hover, :focus-visible, [aria-expanded='true']), .office-corner-panel .office-tools > button:hover,
   .office-corner-panel .room-navigation button:hover, .office-map-button:not([aria-expanded='true']), .office-corner-controls .mock-controls button,
-  .agent-tag:has(.agent-tag-pick:is(:hover, :focus-visible, [aria-expanded='true']))) { color: var(--on-pastel); }
+  .agent-tag:has(.agent-tag-pick:is(:hover, :focus-visible, [aria-expanded='true'])), .overview-map-room:not([data-locked]):is(:hover, :focus-visible, [aria-expanded='true']),
+  .overview-map-room:not([data-locked]):is(:hover, :focus-visible, [aria-expanded='true']) span, .overview-map-agent:is(:hover, :focus-visible, [aria-expanded='true']), .overview-map-dot) { color: var(--on-pastel); }
 
 /* The scene takes the whole window; the toolbar and the dashboard strip stay in the page, covered. */
 html body .office-shell[data-hud='diegetic'] .office-viewport { position: fixed; inset: 0; z-index: 60; height: auto; min-height: 0; flex: none; }
@@ -34,9 +35,9 @@ body:has(.office-shell[data-hud='diegetic']) { overflow: hidden; }
 .office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle):is(:hover, :focus-visible),
 .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator']:is(:hover, :focus-visible) { opacity: 1; }
 .office-shell[data-hud='diegetic'] .play-exit { right: 12px !important; }
-.office-shell[data-hud='diegetic'] .play-settings-toggle { right: 96px !important; }
-.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { right: 176px !important; }
-.office-shell[data-hud='diegetic'] .office-sound-toggle { right: 258px !important; z-index: 4; }
+.office-shell[data-hud='diegetic'] .play-settings-toggle { right: 120px !important; }
+.office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { right: 200px !important; }
+.office-shell[data-hud='diegetic'] .office-sound-toggle { right: 282px !important; z-index: 4; }
 .office-shell[data-hud='diegetic'] .play-panel.play-settings { top: 46px; }
 
 /* Controls hint: top left, clear of the disclosure line; fades once the player has had a look. */
@@ -132,7 +133,7 @@ body:has(.office-shell[data-hud='diegetic']) { overflow: hidden; }
   color: var(--office-cream); background: var(--office-navy); border: 1px solid var(--office-navy); border-radius: 999px; box-shadow: var(--office-plate-shadow);
 }
 .office-shell .overview-toggle:hover { background: var(--office-slate); }
-.office-shell :is(.overview-toggle, .play-overview) kbd {
+.office-shell :is(.overview-toggle, .play-exit) kbd {
   margin-left: 6px; padding: 0 5px; font-size: 11px; font-weight: 700; line-height: 1.5; font-family: inherit; border-radius: 4px;
   color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender);
 }
@@ -148,18 +149,9 @@ body:has(.office-shell[data-hud='diegetic']) { overflow: hidden; }
 }
 .office-shell .overview-menu [role='menuitem']:is(:hover, :focus-visible) { background: var(--office-butter); }
 .office-shell .overview-menu-hint { font-size: 11px; font-weight: 400; color: var(--office-slate); }
-/* In Play the Overview button joins the quiet control row (left of Sound). */
-.office-shell .play-overview { position: absolute; top: 12px; }
-.office-shell[data-hud='diegetic'] .play-overview {
-  top: 12px; right: 346px; padding: 4px 10px; font-size: 12px; line-height: 1.4; font-weight: 600; cursor: pointer;
-  color: var(--office-navy); background: var(--office-cream); border: 1px solid var(--office-lavender); border-radius: 999px;
-  box-shadow: var(--office-plate-shadow); opacity: .62; transition: opacity 120ms ease;
-}
-.office-shell[data-hud='diegetic'] .play-overview:is(:hover, :focus-visible) { opacity: 1; }
-.office-shell[data-hud='diegetic'] .play-overview kbd { padding: 0 4px; font-size: 10px; }
+.office-shell[data-hud='diegetic'] .play-exit kbd { padding: 0 4px; font-size: 10px; }
 /* Overview talk card: the agent speaks in the card; the old floating bubble would double it. */
 .office-shell:has(.diegetic-card) .agent-talk-bubble { display: none; }
-@media (prefers-reduced-motion: reduce) { .office-shell[data-hud='diegetic'] .play-overview { transition: none; } }
 /* Agents are the main Overview targets: their tags sit above the room labels. */
 .office-shell [data-overview] .agent-tags { z-index: 3; }
 /* Overview room labels: one compact line (badge and limits are under Details); the full text stays in the aria-label. */
@@ -281,9 +273,9 @@ html body .office-shell .office-drawer {
 
 /* First person shows only the crosshair, the E prompt and the disclosure pill. The control row and hint stay
    reachable by keyboard and hover (Esc exits, O opens the Overview), but sit invisible until then. */
-.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle, .play-overview),
+.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle),
 .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { opacity: 0 !important; }
-.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle, .play-overview):is(:hover, :focus-visible),
+.office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-toggle, .office-sound-toggle):is(:hover, :focus-visible),
 .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator']:is(:hover, :focus-visible) { opacity: 1 !important; }
 .office-shell[data-hud='diegetic'] .office-caption { animation: none; opacity: 0; }
 .office-shell:has(.overview-map) .office-caption { display: none; }

@@ -13,9 +13,9 @@ async function pose(page: Page) {
 }
 async function openOverview(page: Page, errors: string[]) {
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await expect(page.getByRole('button', { name: /First person/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /first person/i })).toBeVisible();
 }
 /** Alex's seat (OFFICE_ANCHORS.collections.position), where the preview keeps him. */
 const ALEX = { x: -5, z: -1.8 };
@@ -52,7 +52,7 @@ test('O toggles Overview and first person, and the buttons do the same', async (
   await expect(select).toHaveValue('walk');
   await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeFocused();
   // The corner's First person button enters first person too.
-  await page.getByRole('button', { name: /First person/ }).click();
+  await page.getByRole('button', { name: /first person/i }).click();
   await expect(surface(page)).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(surface(page)).toHaveCount(0);
