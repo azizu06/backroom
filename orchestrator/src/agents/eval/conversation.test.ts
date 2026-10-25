@@ -3,10 +3,23 @@ import { CONVERSATIONS, runConversation } from './conversation';
 
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(CONVERSATIONS)('%s: scripted call through the gateway, then the Dispatcher, matches the key outcome', async name => {
+it.each(CONVERSATIONS)('%s: scripted call through the gateway, then the Dispatcher, passes the measured code checks', async name => {
   vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
   const run = await runConversation(name);
   expect(run.checks).toEqual(Object.fromEntries(Object.keys(run.checks).map(key => [key, true])));
+  expect(run.match).toBe(true);
+});
+
+it('C05 reports the generic human stop separately from the unexecuted hostile speech and dedicated rule', async () => {
+  vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
+  const run = await runConversation('hostile');
+  expect(run.humanFollowup).toMatchObject({ queuedRequests: 1,
+    gatewayEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN'] }],
+    postcallEscalations: [{ decision: 'ESCALATE', ruleIds: ['CALL_HUMAN_REQUESTED'] }] });
+  expect(run.hostileEvidence).toEqual({ requiredRule: 'HOSTILE_ESCALATE', dedicatedRuleRecorded: false,
+    speechMeasured: false, providerEndCallExecuted: false });
+  expect(run.checks.noOfferAfterStop).toBe(true);
+  expect(run.checks.nextCallRefused).toBe(true);
   expect(run.match).toBe(true);
 });
 

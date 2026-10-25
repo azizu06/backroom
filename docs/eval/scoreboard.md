@@ -8,7 +8,7 @@ Reproduce from the repo root after `pnpm install --frozen-lockfile`:
 pnpm --filter @backroom/orchestrator exec tsx src/agents/eval/scoreboard.ts
 ```
 
-Base commit: `ad465bf25b5e44a12cc685fba7f1c45218f49009`. Answer key: northfield-v1; signoff: **approved**.
+Base commit: `221151484e581e52532eff39b17500a91355728d`. Answer key: northfield-v1; signoff: **approved**.
 Frozen manifest verified: 170 files.
 Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreboard.json).
 
@@ -75,7 +75,7 @@ Input SHA-256 hashes and item-level observations are in [scoreboard.json](scoreb
 - **P07**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **P11**: Production Dispatcher.recoverCase with the production SpacetimeHandoffStore refuses AGENT_RECOVERY_UNAVAILABLE before any database or runtime activation. No OS kill, database connection, provider debit or restart executed; not durable restart evidence. The P11 integration gap remains open. Frozen integrationOutcome: kill_after_provider_debit_before_complete_then_expire_lease_and_restart.
 - **P12:scope**: No keyed AP invoice step to replay for P10; their GX10 failover is not measured here.
-- **C05**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
+- **C05**: Frozen integrationOutcome: one_deescalation_then_end_escalate_stop_further_calls_HOSTILE_ESCALATE. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: false. One spoken de-escalation and provider end-call are not executed; keep the integration gap open.
 - **C08**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
 - **C09**: Frozen integrationOutcome: acknowledge_persist_callback_owed_to_Dana_end_without_pressure. Scripted production gateway -> Dispatcher run queues 1 request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has 0 review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.
 - **C15**: At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.
