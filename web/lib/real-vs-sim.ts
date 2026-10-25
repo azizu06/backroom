@@ -18,10 +18,10 @@ export const disclosureItems = [
   { id: 'gx10', kind: 'real', label: 'GX10 local model', description: 'On-site model for routine tasks. Verified by a live, read-only probe of /v1/models.' },
   { id: 'apify', kind: 'real', label: 'Apify public data', description: 'Public web data, not private financial records. Verified from the last Apify run receipt, or from the one capped run in this demo host.' },
   { id: 'policy', kind: 'real', label: 'Policy engine', description: 'Deterministic server-side rules decide permissions and commitments. Verified from a policy decision receipt; enforcement is independent of this view.' },
-  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live SpacetimeDB database probe, or shown as a fixture when the in-memory store is used.' },
+  { id: 'spacetime', kind: 'real', label: 'SpacetimeDB', description: 'Shared state and audit subscriptions. Verified by a live database probe; simulated when the server runs in memory.' },
   { id: 'crs', kind: 'sandbox', label: 'CRS test identities', description: 'Sandbox identities only; no real customer credit reports.' },
   { id: 'nessie', kind: 'sandbox', label: 'Nessie bank', description: 'Sandbox bank accounts and transactions; no real money moves.' },
-  { id: 'company', kind: 'sandbox', label: 'Company, vendors & emails', description: 'Northfield Studio and its business records are fictional demo fixtures.' },
+  { id: 'company', kind: 'sandbox', label: 'Company, vendors & emails', description: 'Northfield Studio and its records are fictional.' },
   { id: 'card', kind: 'sandbox', label: 'Pay page card', description: 'Simulated card payment; the demo creates a sandbox Nessie deposit.' },
 ] as const satisfies readonly DisclosureItem[];
 

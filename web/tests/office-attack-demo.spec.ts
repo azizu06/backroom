@@ -49,7 +49,7 @@ test('judge selects each server preset and sees its trace, policy and money evid
     await expect(page.getByRole('heading', { name: 'Intake code', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Intake mock', exact: true })).toBeVisible();
     await expect(page.getByText('<script>untrusted email</script>', { exact: true })).toBeVisible();
-    await expect(page.getByText('Untrusted data · isolated synthetic company', { exact: true })).toBeVisible();
+    await expect(page.getByText('Untrusted data', { exact: true })).toBeVisible();
     await expect(page.getByText('Not reached: Treasury, Reconciler', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Final decision: DENY' })).toBeVisible();
     await expect(page.locator('.attack-rules code')).toHaveText(ruleIds[index]!);
