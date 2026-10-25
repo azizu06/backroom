@@ -1,21 +1,8 @@
 'use client';
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { DEMO_GUIDE_STEPS, OFFICE_SHORTCUTS } from '../../lib/office/guide';
+import { OFFICE_SHORTCUTS } from '../../lib/office/guide';
 import './help.css';
-
-export function DemoGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const headingId = useId();
-  const closeButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (open) closeButton.current?.focus(); }, [open]);
-  if (!open) return null;
-  return <section className='office-help office-guide' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); }
-  }}>
-    <header><h2 id={headingId}>Try this</h2><button ref={closeButton} type='button' onClick={onClose}>Close</button></header>
-    <ol>{DEMO_GUIDE_STEPS.map(step => <li key={step.id}><strong>{step.title}</strong><span>{step.detail}</span></li>)}</ol>
-  </section>;
-}
 
 export function KeyboardShortcuts({ open, onClose }: { open: boolean; onClose: () => void }) {
   const headingId = useId();
@@ -52,10 +39,9 @@ function isEditable(target: EventTarget | null) {
   return target instanceof Element && !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
 }
 
+/** The keyboard shortcuts dialog (? or the office-help event). The old "Try this" guide now lives in the sidebar's Help sheet. */
 export function OfficeHelp() {
-  const [guideOpen, setGuideOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const guideOpener = useRef<HTMLButtonElement>(null);
   const shortcutRestore = useRef<HTMLElement | null>(null);
   const wasShortcutsOpen = useRef(false);
   useEffect(() => {
@@ -82,11 +68,8 @@ export function OfficeHelp() {
       window.removeEventListener('office-help', openShortcuts);
     };
   }, []);
-  function closeGuide() { setGuideOpen(false); guideOpener.current?.focus(); }
   function closeShortcuts() { setShortcutsOpen(false); }
   return <>
-    <button ref={guideOpener} type="button" className="office-guide-trigger" onClick={() => setGuideOpen(true)}>Guide</button>
-    <DemoGuide open={guideOpen} onClose={closeGuide} />
     <KeyboardShortcuts open={shortcutsOpen} onClose={closeShortcuts} />
   </>;
 }

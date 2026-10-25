@@ -29,23 +29,28 @@
   gap: 16px;
   padding: 16px;
   color: var(--ink);
+  /* The sky lives on the body (below), so the drifting page bubbles show around the sidebar and topbar. */
+  background: transparent;
+  font: 700 14px/1.45 'Nunito', ui-rounded, 'Avenir Next', system-ui, sans-serif;
+}
+
+body:has(.office-shell) {
   background:
     radial-gradient(circle at 12% 8%, #ffffffcc 0 6%, transparent 28%),
-    radial-gradient(circle at 92% 4%, var(--pastel-yellow) 0, transparent 38%),
+    radial-gradient(circle at 92% 4%, #FFF3A6 0, transparent 38%),
     radial-gradient(circle at 70% 100%, #ffffffaa 0, transparent 40%),
-    linear-gradient(165deg, var(--pastel-aqua) 0%, #d8fbff 50%, var(--pastel-yellow) 100%);
-  font: 700 14px/1.45 'Nunito', ui-rounded, 'Avenir Next', system-ui, sans-serif;
+    linear-gradient(165deg, #A9F6FF 0%, #d8fbff 50%, #FFF3A6 100%) fixed;
 }
 
 /* ---------- Sidebar ---------- */
 .office-shell .office-sidebar {
-  flex: 0 0 168px;
+  flex: 0 0 128px;
   min-height: 0;
   max-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 14px 10px;
+  padding: 12px 8px;
   background: var(--bubble-glass);
   border: var(--bubble-border);
   border-radius: var(--bubble-radius);
@@ -71,7 +76,7 @@
 .office-shell .office-sidebar-links { display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; }
 .office-shell .office-sidebar-links { margin-top: auto; padding-top: 8px; border-top: 3px dotted var(--pastel-aqua); }
 .office-shell .room-navigation button,
-.office-shell .office-sidebar-links :is(a, button) {
+.office-shell :is(.office-sidebar-links, .office-sidebar-help) :is(a, button) {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -103,7 +108,7 @@
   box-shadow: 0 3px 8px rgba(25, 33, 59, 0.12);
 }
 .office-shell .room-navigation button:hover,
-.office-shell .office-sidebar-links :is(a, button):hover { background: #ffffffd9; transform: translateY(-1px) scale(1.02); }
+.office-shell :is(.office-sidebar-links, .office-sidebar-help) :is(a, button):hover { background: #ffffffd9; transform: translateY(-1px) scale(1.02); }
 .office-shell .room-navigation button[aria-pressed=true],
 .office-shell .office-sidebar-links button[aria-pressed=true] {
   background: var(--pastel-yellow);
@@ -129,7 +134,12 @@
 .office-shell .office-toolbar > div:first-child { flex: none; white-space: nowrap; }
 .office-shell .office-tools { flex: 1 0 auto; flex-wrap: nowrap; justify-content: flex-end; }
 .office-shell .office-tools > * { flex: none; white-space: nowrap; }
-.office-shell .theme-toggle { margin-left: auto; box-shadow: 0 3px 8px rgba(25, 33, 59, 0.15); flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 22px; background: var(--pastel-yellow); border-color: #ffffff; }
+.office-shell .theme-toggle { box-shadow: 0 3px 8px rgba(25, 33, 59, 0.15); flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 22px; background: var(--pastel-yellow); border-color: #ffffff; }
+/* The theme switch sits beside the topbar pill, not inside it: a round bubble exactly as tall as the bar. */
+.office-shell .office-topbar-row { flex: none; display: flex; align-items: stretch; gap: 12px; min-width: 0; }
+.office-shell .office-topbar-row > .office-toolbar { flex: 1 1 auto; min-width: 0; }
+.office-shell .office-topbar-row > .theme-toggle { align-self: stretch; width: auto; height: auto; aspect-ratio: 1; font-size: 28px; border: var(--bubble-border); box-shadow: var(--bubble-shadow); transition: transform 0.15s ease; }
+.office-shell .office-topbar-row > .theme-toggle:hover { transform: rotate(-12deg) scale(1.04); }
 .office-shell .office-toolbar strong { font-weight: 900; font-size: 22px; }
 .office-shell .toolbar-divider { color: var(--ink-soft); }
 .office-shell .office-tools a { color: var(--ink); font-weight: 800; }
@@ -174,7 +184,7 @@
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 24px 24px 24px 200px;
+  padding: 24px 24px 24px 160px;
   background: rgba(25, 33, 59, 0.22);
   backdrop-filter: blur(4px);
   animation: sheet-fade 0.18s ease-out;
@@ -332,10 +342,13 @@ body:has(.office-shell) .real-sim-overlay.real-sim-docked {
   --bubble-border: 3px solid #2E3A63;
   --bubble-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color-scheme: dark;
+  background: transparent;
+}
+body:has(.office-shell[data-theme=dark]) {
   background:
     radial-gradient(circle at 14% 10%, rgba(169, 246, 255, 0.16) 0 6%, transparent 30%),
     radial-gradient(circle at 90% 6%, rgba(255, 243, 166, 0.14) 0, transparent 36%),
-    linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%);
+    linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%) fixed;
 }
 .office-shell[data-theme=dark] :is(.room-icon, select, button, .seat-statuses > div, .lobby-v2-panel, .office-lobby .audit-wall, .detail-sheet :is(input, textarea)) { background-color: #2B3660; border-color: #3B4A7E; }
 .office-shell[data-theme=dark] .office-sidebar :is(.room-navigation, .office-sidebar-links) :is(a, button) { background: transparent; border-color: transparent; }
@@ -345,7 +358,7 @@ body:has(.office-shell) .real-sim-overlay.real-sim-docked {
   .room-navigation button[aria-pressed=true], .office-sidebar-links button[aria-pressed=true]) { color: #19213B; }
 .office-shell[data-theme=dark] :is(.room-navigation button[aria-pressed=true], .office-sidebar-links button[aria-pressed=true]) { background: var(--pastel-yellow); border-color: #2E3A63; }
 .office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) button[aria-pressed=true] .room-icon { color: #19213B; background: var(--pastel-aqua); }
-.office-shell[data-theme=dark] .office-toolbar button.theme-toggle.theme-toggle { color: #19213B; background-color: var(--pastel-yellow); border-color: #2E3A63; box-shadow: -10px 0 12px -4px var(--bubble-glass); }
+.office-shell[data-theme=dark] .office-topbar-row button.theme-toggle.theme-toggle { color: #19213B; background-color: var(--pastel-yellow); border-color: #2E3A63; }
 .office-shell[data-theme=dark] :is(.detail-sheet-header, .detail-sheet-backdrop .room-inspector header) :is(h2, button) { color: #19213B; }
 .office-shell[data-theme=dark] :is(.detail-sheet-close, .detail-sheet-backdrop .room-inspector header button) { color: #19213B; background: #EEF1F6; border-color: #2E3A63; }
 .office-shell[data-theme=dark] :is(.detail-sheet-close, .detail-sheet-backdrop .room-inspector header button):hover { background: #ffffff; }
@@ -396,7 +409,8 @@ body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !impo
   z-index: 6;
   right: 14px;
   bottom: 14px;
-  width: min(300px, calc(100% - 28px));
+  width: auto;
+  max-width: calc(100% - 28px);
   color: var(--ink);
   background: var(--bubble-glass);
   border: var(--bubble-border);
@@ -407,7 +421,7 @@ body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !impo
   transition: width 0.28s cubic-bezier(.22, 1, .36, 1);
 }
 .office-shell .real-sim-tile[data-open=true] { width: min(440px, calc(100% - 28px)); }
-.office-shell .real-sim-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; }
+.office-shell .real-sim-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; }
 .office-shell .real-sim-tile-head > div { display: grid; min-width: 0; }
 .office-shell .real-sim-tile-head strong { font-size: 13px; font-weight: 900; }
 .office-shell .real-sim-tile-note { font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -507,3 +521,130 @@ html:has(.office-shell[data-theme=dark]) {
 .office-shell, .office-shell[data-theme=dark] { background: transparent; }
 .office-shell[data-theme=dark] .office-sidebar :is(.room-navigation, .office-sidebar-links) button[aria-pressed=true] { background: var(--pastel-yellow); border-color: #ffffff; color: var(--on-pastel); }
 .office-shell[data-theme=dark] .office-tools .office-enter-play { background: var(--pastel-yellow); border-color: #ffffff; color: var(--on-pastel); }
+
+/* ---------- View controls: icon-only sound and full screen, top right of the scene ---------- */
+.office-shell .office-view-controls { position: absolute; z-index: 6; top: 14px; right: 18px; display: flex; gap: 8px; }
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle) {
+  position: static !important; display: grid; place-items: center; width: 44px; height: 44px; padding: 0 !important; font-size: 22px !important;
+  color: var(--ink) !important; background: var(--bubble-glass) !important; border: var(--bubble-border) !important; border-radius: 50% !important;
+  box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); cursor: pointer; transition: transform 0.15s ease, background-color 0.15s ease;
+}
+/* Same bubbly hover as the sidebar and theme buttons: lift, grow a touch, settle with a soft overshoot. */
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle) { transition: transform 0.22s cubic-bezier(.34, 1.56, .64, 1), background-color 0.15s ease, box-shadow 0.15s ease !important; }
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle):is(:hover, :focus-visible) { background: var(--pastel-yellow) !important; transform: translateY(-2px) scale(1.1); box-shadow: 0 8px 18px rgba(25, 33, 59, 0.2); }
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle):active { transform: scale(0.92); }
+html body .office-shell .office-view-controls .office-sound-toggle:hover svg { animation: sound-wiggle 0.4s ease; }
+html body .office-shell .office-view-controls .office-fullscreen-toggle:hover svg { animation: fullscreen-pulse 0.4s ease; }
+@keyframes sound-wiggle { 30% { transform: rotate(-12deg); } 60% { transform: rotate(8deg); } }
+@keyframes fullscreen-pulse { 50% { transform: scale(1.22); } }
+@media (prefers-reduced-motion: reduce) { html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle), html body .office-shell .office-view-controls svg { transition: none !important; animation: none !important; } }
+html body .office-shell .office-view-controls .office-sound-toggle[aria-pressed='true'] { background: var(--pastel-aqua) !important; }
+.office-shell[data-theme=dark] .office-view-controls :is(.office-sound-toggle[aria-pressed='true'], .office-fullscreen-toggle:hover, .office-sound-toggle:hover) { color: #19213B !important; }
+/* First person keeps its quiet control row; the view controls join it, left of Operator. */
+.office-shell[data-hud='diegetic'] .office-view-controls { top: 8px; right: 367px; }
+html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle) { width: 34px; height: 34px; font-size: 17px !important; opacity: .7 !important; }
+html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle):is(:hover, :focus-visible) { opacity: 1 !important; }
+
+/* ---------- Full screen: the 3D room fills the screen; edge overlays keep the exit and key status ---------- */
+.office-shell[data-fullscreen] { position: fixed; inset: 0; z-index: 900; padding: 0; gap: 0; }
+.office-shell[data-fullscreen] :is(.office-sidebar, .office-topbar-row) { display: none; }
+.office-shell[data-fullscreen] .office-main { gap: 0; }
+.office-shell[data-fullscreen] .office-viewport { border: 0; border-radius: 0; box-shadow: none; }
+.office-shell[data-fullscreen] .detail-sheet-backdrop { padding-left: 24px; }
+.office-shell .office-fullscreen-hud { position: absolute; z-index: 6; left: 14px; top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: calc(100% - 480px); pointer-events: none; }
+.office-shell .office-fullscreen-hud > * { pointer-events: auto; }
+.office-shell .office-fullscreen-hud :is(.office-fullscreen-exit, .office-fullscreen-chip) {
+  padding: 6px 14px; color: var(--ink); background: var(--bubble-glass); border: var(--bubble-border); border-radius: 999px;
+  box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); font-size: 13px; font-weight: 800; white-space: nowrap;
+}
+.office-shell .office-fullscreen-hud .office-fullscreen-exit { background: var(--pastel-yellow); color: #19213B; }
+.office-shell .office-fullscreen-views { display: inline-flex; align-items: center; gap: 6px; padding: 4px; background: var(--bubble-glass); border: var(--bubble-border); border-radius: 999px; box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); }
+.office-shell .office-fullscreen-views :is(select, button) { padding: 4px 12px; font-size: 13px; }
+.office-shell .office-fullscreen-hud kbd { margin-left: 4px; padding: 0 6px; font: inherit; font-size: 11px; border: 1px solid currentColor; border-radius: 6px; opacity: .7; }
+.office-shell .office-fullscreen-chip[data-tone='alert'] { color: #19213B; background: #FFD7B5; }
+.office-shell .office-fullscreen-chip[data-tone='ready'] { color: #19213B; background: var(--pastel-aqua); }
+.office-shell[data-hud='diegetic'] .office-fullscreen-hud { opacity: .75; }
+/* First person shows its controls hint top left; the status row drops below it. */
+.office-shell[data-hud='diegetic'] .office-fullscreen-hud { top: 56px; }
+@media (max-width: 900px) { .office-shell .office-fullscreen-hud { max-width: calc(100% - 140px); } }
+
+/* ---------- Page sheets (Calls, Policy, Controller, …) open over the office instead of a new route ---------- */
+.office-shell .detail-sheet[data-size='wide'] { width: min(1080px, 100%); max-height: min(92dvh, 1100px); }
+/* Each sheet is as wide as its page needs, so forms are not stranded on the left of an empty modal. */
+.office-shell .detail-sheet[data-page='calls'], .office-shell .detail-sheet[data-page='controller'] { width: min(720px, 100%); }
+.office-shell .detail-sheet[data-page='payment-link'] { width: min(640px, 100%); }
+.office-shell .detail-sheet[data-page='operator'] { width: min(860px, 100%); }
+.office-shell .detail-sheet[data-page='attack'] { width: min(960px, 100%); }
+.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body { display: grid; gap: 18px; }
+.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body > main { margin: 0; padding: 0; min-height: 0; max-width: none; background: transparent; }
+.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body > main > div,
+.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body > :is(.attack-panel, .real-sim-page) { width: 100%; max-width: none; margin: 0; padding: 0; }
+/* The sheet header already names the page; its own h1 stays for screen readers only. */
+.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body h1 { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.office-shell .detail-sheet[data-size='wide'] .detail-sheet-body :is(p[class*='intro'], p[class*='lede'], .real-sim-intro, .attack-panel > header > p) { margin-top: 0; }
+.office-shell .detail-sheet[data-page='attack'] .attack-panel > header { display: none; }
+/* Text areas keep a soft corner; the pill radius is for one-line fields only. */
+.office-shell .detail-sheet textarea { border-radius: 18px !important; padding: 12px 16px !important; }
+/* Secondary buttons read as buttons: white bubble with an aqua rim, yellow on hover. */
+.office-shell .detail-sheet .detail-sheet-body button:not(:disabled):not([aria-pressed='true']) { border: 2px solid var(--pastel-aqua); box-shadow: 0 2px 6px rgba(25, 33, 59, 0.08); cursor: pointer; transition: transform 0.15s ease, background-color 0.15s ease; }
+.office-shell .detail-sheet .detail-sheet-body button:not(:disabled):hover { background: var(--pastel-yellow); transform: translateY(-1px); }
+.office-shell .detail-sheet .detail-sheet-body button:disabled { cursor: not-allowed; opacity: .75; }
+/* The office's generic white button rule would flatten each page's own primary/secondary/deny buttons; keep their meaning. */
+.office-shell .detail-sheet-body button[class*='primary']:not(:disabled) { color: #FFFDF4; background: #19213B; border-color: #19213B; }
+.office-shell .detail-sheet-body button[class*='secondary']:not(:disabled) { color: #19213B; background: var(--pastel-aqua); border-color: #ffffff; }
+.office-shell .detail-sheet-body button[class*='deny']:not(:disabled) { color: #19213B; background: #FFE2DB; }
+.office-shell .detail-sheet-body button:is([class*='primary'], [class*='secondary'], [class*='deny']):not(:disabled):hover { color: #19213B; background: var(--pastel-yellow); }
+.office-shell[data-theme=dark] .detail-sheet-body button[class*='primary']:not(:disabled) { color: #19213B; background: var(--pastel-yellow); border-color: #2E3A63; }
+/* Operator and Policy: the steps strip already says the same thing as the page's intro line. */
+.office-shell .detail-sheet:is([data-page='operator'], [data-page='policy']) .detail-sheet-body > main > div > p:is([class*='lede'], [class*='intro']):first-of-type { display: none; }
+.office-shell .detail-sheet[data-page='policy'] { width: min(1000px, 100%); }
+.office-shell .detail-sheet[data-page='policy'] [class*='unlockGroup'] { max-width: none; }
+/* Calls: the numbered steps already say how to place a call. */
+.office-shell .detail-sheet[data-page='calls'] .detail-sheet-body > main > div > p[class*='intro']:first-of-type { display: none; }
+/* How-this-works strip: three numbered bubbles in a row. */
+.office-shell .sheet-steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.office-shell .sheet-steps li { counter-increment: step; position: relative; padding: 10px 12px 10px 46px; color: var(--ink); background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 18px; font-size: 13px; line-height: 1.35; }
+.office-shell .sheet-steps li::before { content: counter(step); position: absolute; left: 10px; top: 10px; display: grid; place-items: center; width: 26px; height: 26px; color: #19213B; background: var(--pastel-yellow); border-radius: 50%; font-weight: 900; }
+.office-shell[data-theme=dark] .sheet-steps li { background: #26315A; border-color: #3B4A7E; }
+.office-shell .detail-sheet-open { padding: 6px 14px; color: #19213B; background: #ffffff; border: 2px solid #ffffff; border-radius: 999px; font-size: 13px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.office-shell .detail-sheet-open:hover { background: var(--pastel-aqua); }
+.office-shell .office-sidebar-links .office-sidebar-ready { color: #0F766E; font-weight: 900; }
+.office-shell .office-sidebar-links button[data-ready] .room-icon { background: var(--pastel-aqua); border-color: #ffffff; box-shadow: 0 0 0 3px rgba(169, 246, 255, 0.6); }
+.office-shell[data-theme=dark] .office-sidebar-links .office-sidebar-ready { color: var(--pastel-aqua); }
+
+/* Help sits under the page links, set apart by the same dotted rule. */
+.office-shell .office-sidebar-help { display: flex; flex-direction: column; padding-top: 8px; border-top: 3px dotted var(--pastel-aqua); }
+.office-shell .office-sidebar-help button[aria-pressed=true] { background: var(--pastel-yellow); border-color: #ffffff; box-shadow: 0 4px 14px rgba(25, 33, 59, 0.16); }
+.office-shell[data-theme=dark] .office-sidebar-help button { background: transparent; border-color: transparent; }
+.office-shell[data-theme=dark] .office-sidebar-help button[aria-pressed=true] { color: #19213B; background: var(--pastel-yellow); }
+
+/* ---------- Help sheet ---------- */
+.office-shell .detail-sheet[data-page='help'] { width: min(980px, 100%); }
+.office-shell .help-sheet { display: grid; gap: 22px; }
+.office-shell .help-search { position: sticky; top: 0; z-index: 1; }
+.office-shell .help-search input { box-sizing: border-box; width: 100%; min-height: 44px; font-size: 15px; }
+.office-shell .help-sheet h3 { margin: 0 0 10px; font-size: 17px; font-weight: 900; }
+.office-shell .help-sheet h4 { margin: 0 0 8px; font-size: 14px; font-weight: 900; }
+.office-shell .help-terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 0; }
+.office-shell .help-terms > div { padding: 12px 14px; background: #ffffff; border: 2px solid var(--pastel-aqua); border-radius: 18px; }
+.office-shell .help-terms dt { font-weight: 900; }
+.office-shell .help-terms dd { margin: 4px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.office-shell .help-flows { display: grid; gap: 14px; }
+.office-shell .help-steps { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.office-shell .help-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 16px; margin: 0; }
+.office-shell .help-keys > div { display: flex; align-items: center; gap: 10px; }
+.office-shell .help-keys dt { display: flex; gap: 4px; flex: none; }
+.office-shell .help-keys dd { margin: 0; font-size: 13px; }
+.office-shell .help-keys kbd { min-width: 24px; padding: 2px 7px; text-align: center; color: #19213B; background: var(--pastel-yellow); border: 2px solid #ffffff; border-radius: 8px; font: 800 12px/1.4 'Nunito', ui-rounded, system-ui, sans-serif; box-shadow: 0 2px 4px rgba(25, 33, 59, 0.12); }
+.office-shell[data-theme=dark] .help-terms > div { background: #26315A; border-color: #3B4A7E; }
+
+/* Compact sidebar: twelve shortcuts plus Help fit a 900px-tall screen without scrolling. */
+.office-shell .office-sidebar { gap: 4px; }
+.office-shell .office-sidebar-logo { padding: 0 0 6px; font-size: 16px; }
+.office-shell .office-sidebar-logo img { width: 32px; height: 32px; border-radius: 11px; }
+.office-shell .office-sidebar :is(.room-navigation, .office-sidebar-links, .office-sidebar-help) { gap: 1px; }
+.office-shell .office-sidebar :is(.room-navigation, .office-sidebar-links, .office-sidebar-help) :is(a, button) { gap: 1px; padding: 3px 4px; font-size: 11px; line-height: 1.25; border-radius: 18px; }
+.office-shell .office-sidebar .room-icon { width: 30px; height: 30px; font-size: 18px; }
+.office-shell .office-sidebar-links { padding-top: 6px; }
+.office-shell .office-sidebar-help { padding-top: 6px; }
+@media (max-height: 760px) { .office-shell .office-sidebar .room-icon { width: 26px; height: 26px; font-size: 16px; } }

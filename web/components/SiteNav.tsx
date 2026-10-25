@@ -20,7 +20,7 @@ function SiteNavContent({ placement }: { placement: SiteNavPlacement }) {
   const { link } = useActivePaymentLink({ enabled: !hidden && placement === 'layout' && !params?.has('replay'), intervalMs: 5000 });
   if (hidden) return null;
   const current = (href: string) => isActive(pathname, href) ? 'page' as const : undefined;
-  return <nav className='site-nav' aria-label='Site' data-placement={placement}>
+  const nav = <nav className='site-nav' aria-label='Site' data-placement={placement}>
     <Link className='site-nav-brand' href='/office'>Backroom</Link>
     <ul>
       {navLinks.map(({ label, href }) => {
@@ -29,9 +29,9 @@ function SiteNavContent({ placement }: { placement: SiteNavPlacement }) {
       })}
     </ul>
     <Link className='site-nav-real' href={whatsRealLink.href} aria-current={current(whatsRealLink.href)}>{whatsRealLink.label}</Link>
-    {/* The office has its own theme toggle. */}
-    {placement === 'layout' && <ThemeToggle />}
   </nav>;
+  // The theme switch sits beside the nav pill, as tall as the bar. The office has its own theme toggle.
+  return placement === 'layout' ? <div className='site-nav-row'>{nav}<ThemeToggle /></div> : nav;
 }
 
 function ThemeToggle() {

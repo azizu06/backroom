@@ -4,10 +4,8 @@ export type ViewMode = "walk" | "tween" | "plan" | "tour" | "play";
 /** The office view menu, in order. A new view mode adds its ViewMode member above and one entry here. */
 export const VIEW_OPTIONS: readonly { readonly mode: ViewMode; readonly label: string }[] = [
   { mode: "walk", label: "Orbit camera" },
-  { mode: "tween", label: "Fixed camera" },
   { mode: "plan", label: "Floor plan" },
   { mode: "tour", label: "Tour" },
-  { mode: "play", label: "Play (first person)" },
 ];
 
 /** `sceneAttempt` identifies the mounted 3D scene; a new attempt means a fresh Canvas and WebGL context. */
