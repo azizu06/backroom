@@ -2,12 +2,14 @@ import { consumeVerifiedApproval, type VerifiedApproval } from './approvals/veri
 import { ReducerEngine } from './reducer-engine';
 import type { StateStore } from './store';
 import { bankTxnPayload, type BankTxnRow } from './payments/bank-feed';
+import { signalPayload, type SignalRow } from './collections/signals';
 export { hashAudit } from './audit';
 
 /** Process-local adapter over the same deterministic engine used by DB reducers. */
 export class MemoryStateStore implements StateStore {
   private readonly engine = new ReducerEngine();
   private readonly bankTxns = new Map<string, string>();
+  private readonly signals = new Map<string, string>();
   private modelController = new AbortController();
   async recordBankTxn(row: BankTxnRow): Promise<void> {
     if (!row.nessieId || !Number.isSafeInteger(row.amountCents) || row.amountCents <= 0 || !row.memo) throw new Error('INVALID_BANK_TXN');
@@ -18,6 +20,15 @@ export class MemoryStateStore implements StateStore {
     this.bankTxns.set(row.nessieId, payload);
   }
   async listBankTxns(): Promise<BankTxnRow[]> { return [...this.bankTxns.values()].map(payload => JSON.parse(payload)); }
+  async recordSignal(row: SignalRow): Promise<void> {
+    if (!row.source || !row.type || !Number.isFinite(row.confidence) || row.confidence < 0 || row.confidence > 1) throw new Error('INVALID_SIGNAL');
+    if (!row.id || row.id.length > 200) throw new Error('INVALID_EVENT_ID');
+    const payload = signalPayload(row);
+    const prior = this.signals.get(row.id);
+    if (prior !== undefined && prior !== payload) throw new Error('EVENT_ID_CONFLICT');
+    this.signals.set(row.id, payload);
+  }
+  async listSignals(): Promise<SignalRow[]> { return [...this.signals.values()].map(payload => JSON.parse(payload)); }
   get llmEnabled() { return this.engine.llmEnabled; }
   get llmSignal() { return this.modelController.signal; }
   async setLlmEnabled(enabled: boolean) {

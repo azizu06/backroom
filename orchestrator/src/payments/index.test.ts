@@ -82,7 +82,7 @@ it('requires previous installment receipts and sums only those receipts for the 
   await service.pay('second-link');
   expect(await service.reconcile('second-link', store, second, 'partially_paid')).toMatchObject({ status: 'paid' });
   expect(await store.getPayment('ar:1042:2')).toMatchObject({ result: { amountCents: 247500, invoiceState: 'paid' } });
-});
+}, 15_000); // The first FakeDemoBank import takes 3-5 s on Windows CI-less runs; the default 5 s flakes.
 it('leaves a posted receipt queued if the host reconciliation job fails', async () => {
   const bank = new (await import('../core-demo/bank')).FakeDemoBank();
   const service = new PaymentService({ bank, accountId: 'mock', lookup: async () => link,

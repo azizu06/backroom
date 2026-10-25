@@ -18,13 +18,27 @@ async function walkX(page: Page, goal: number) {
 }
 async function aimAtPhone(page: Page) {
   const phone = PHONE_INTERACTION.position;
-  let p = await pos(page);
-  let angle = Math.atan2(-(phone[0] - p.x), -(phone[1] - p.z));
-  let diff = Math.atan2(Math.sin(angle - p.yaw), Math.cos(angle - p.yaw));
-  for (let i = 0; Math.abs(diff) > 0.06 && i < 40; i++) {
-    await page.keyboard.press(diff > 0 ? 'ArrowLeft' : 'ArrowRight');
-    p = await pos(page); angle = Math.atan2(-(phone[0] - p.x), -(phone[1] - p.z)); diff = Math.atan2(Math.sin(angle - p.yaw), Math.cos(angle - p.yaw));
+  // A quick press can end before the demand-rendered rig consumes it. Hold until a
+  // rendered heading reaches the phone's cone rather than requiring sub-frame precision.
+  for (let i = 0; i < 16; i++) {
+    const p = await pos(page);
+    const angle = Math.atan2(-(phone[0] - p.x), -(phone[1] - p.z));
+    const diff = Math.atan2(Math.sin(angle - p.yaw), Math.cos(angle - p.yaw));
+    if (Math.abs(diff) <= 0.2) return;
+    const key = diff > 0 ? 'ArrowLeft' : 'ArrowRight';
+    await page.keyboard.down(key);
+    try {
+      await page.waitForFunction(({ phone, diff }) => {
+        const pose = document.querySelector<HTMLElement>('[data-player-yaw]')?.dataset;
+        if (!pose) return false;
+        const angle = Math.atan2(-(phone[0] - Number(pose.playerX)), -(phone[1] - Number(pose.playerZ)));
+        const raw = angle - Number(pose.playerYaw);
+        const remaining = Math.atan2(Math.sin(raw), Math.cos(raw));
+        return Math.abs(remaining) <= 0.2 || Math.sign(remaining) !== Math.sign(diff);
+      }, { phone, diff }, { polling: 'raf' });
+    } finally { await page.keyboard.up(key); }
   }
+  throw new Error('Could not face the desk phone');
 }
 test('collections desk phone plays a mock callback and keeps the preview from requesting calls', async ({ page }) => {
   const shots = process.env.BR_SHOTS === '1';
@@ -62,8 +76,10 @@ test('collections desk phone plays a mock callback and keeps the preview from re
   await expect(dialog.getByTestId('phone-transcript').locator('li').first()).toContainText('Collections');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-live.png' });
   await expect(dialog).toContainText('AI-disclosed');
+  await expect(dialog.getByTestId('phone-precall')).toContainText('Mock preview: no pre-call evidence');
   await expect.poll(() => dialog.getByTestId('phone-status').innerText(), { timeout: 15_000, intervals: [100] }).toContain('Ended');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-ended.png' });
+  await expect(dialog.getByTestId('phone-request')).toHaveAttribute('aria-disabled', 'false');
   await dialog.getByTestId('phone-request').click();
   await expect(dialog.getByTestId('phone-request-result')).toHaveText('Mock preview: no call placed');
   if (shots) await page.screenshot({ path: '/tmp/br-3d/phone-request.png' });
@@ -82,5 +98,19 @@ test('phone stays idle without the mock query', async ({ page }) => {
   await aimAtPhone(page);
   await expect(page.getByText('E · Use desk phone')).toBeVisible();
   await page.keyboard.press('e');
-  await expect(page.getByRole('dialog', { name: 'Collections desk phone' }).getByTestId('phone-status')).toHaveText('Idle · no call');
+  const dialog = page.getByRole('dialog', { name: 'Collections desk phone' });
+  await expect(dialog.getByTestId('phone-status')).toHaveText('Idle · no call');
+  // Plain next start has no demo host: the card reads unknown/not prepared, never open.
+  const card = dialog.getByRole('region', { name: 'Pre-call check' });
+  await expect(card).toHaveAttribute('data-business', 'unknown');
+  await expect(card).toContainText('No Apify evidence recorded');
+  await expect(card).toContainText('not prepared');
+  // Not ready: Request call is visibly disabled, says why, and clicking it places nothing.
+  const request = dialog.getByTestId('phone-request');
+  await expect(request).toHaveAttribute('aria-disabled', 'true');
+  await expect(request).toHaveAccessibleDescription('Pre-call not ready');
+  await expect(dialog.getByTestId('phone-request-gate')).toHaveText('Pre-call not ready');
+  await request.click({ force: true });
+  await expect(dialog.getByTestId('phone-request-result')).toHaveCount(0);
+  if (process.env.BR_SHOTS === '1') await card.screenshot({ path: '/tmp/br-3d/phone-precall.png' });
 });

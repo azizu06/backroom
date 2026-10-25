@@ -43,6 +43,8 @@ const equal = (a: string, b: string) => {
   return left.length === right.length && timingSafeEqual(left, right);
 };
 const normalize = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+/** Welcome with one leading hi/hello/hey removed. The rest must occur in full, in order. */
+const disclosureCore = (welcome: string) => normalize(welcome).replace(/^(?:hello|hey|hi)/, '');
 const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 const safeStops = ['record_opt_out', 'request_human', 'mark_dispute', 'report_already_paid'];
 
@@ -93,7 +95,8 @@ export function createVoiceHandler(options: { journal: VoiceJournal; eventSecret
             const toolOnly = turn?.role === 'assistant' && (turn.text === undefined || turn.text === null) && Array.isArray(turn.tool_calls) && turn.tool_calls.length > 0;
             if (!turn || (typeof turn.text !== 'string' && !toolOnly)) throw new HTTPError(400, 'INVALID_TURN');
             const text = turn.text ?? '';
-            if (turn.role === 'assistant' && turn.was_interrupted === false && normalize(text).startsWith(normalize(session.welcome)) && !session.disclosureComplete) {
+            const core = disclosureCore(session.welcome);
+            if (turn.role === 'assistant' && turn.was_interrupted === false && core.length > 0 && normalize(text).includes(core) && !session.disclosureComplete) {
               session.disclosureComplete = true; session.userReply = ''; // Earlier background speech is not an answer to this question.
             }
             if (turn.role === 'user') {
