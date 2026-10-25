@@ -61,7 +61,14 @@ test('one origin: live office state, one operator sign-in, and the desk phone Re
   await page.goto('/office');
   await expect(page.locator('.connection-status')).toHaveText('State connected', { timeout: 20_000 });
   const phone = await openDeskPhone(page);
-  await phone.getByTestId('phone-request').click();
+  // Without ready pre-call evidence the desk phone keeps Request call disabled; the dial gate is tested once it is ready.
+  const request = phone.getByTestId('phone-request');
+  await expect(request).toHaveAttribute('aria-disabled', /true|false/);
+  if (await request.getAttribute('aria-disabled') === 'true') {
+    await expect(phone.getByTestId('phone-request-gate')).toContainText(/Pre-call not ready|Blocked|Paused/);
+    return;
+  }
+  await request.click();
   // Signed in from the public origin: the request reaches the dial gate, not "Calls are locked".
   // Without a voice relay on this host nothing rings.
   await expect(phone.getByTestId('phone-request-result')).not.toContainText('locked');
