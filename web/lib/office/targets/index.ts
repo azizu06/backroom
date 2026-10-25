@@ -11,6 +11,8 @@ import { paylinkTarget } from "./paylink";
 import { phoneTarget } from "./phone";
 import { serverTarget } from "./server";
 import { treasuryTarget } from "./treasury";
+import { doorTarget } from './door';
+import { folderTarget } from './folder';
 import type { PlayTargetModule } from "./types";
 
 export const PLAY_TARGETS = [
@@ -23,6 +25,8 @@ export const PLAY_TARGETS = [
   serverTarget,
   coworkerTarget,
   inboxTarget,
+  doorTarget,
+  folderTarget,
 ] as const;
 
 type TargetOf<M> = M extends PlayTargetModule<infer T> ? T : never;
