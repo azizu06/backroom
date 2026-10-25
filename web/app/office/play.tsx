@@ -121,13 +121,6 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
 
   useFrame((state, delta) => {
     if (!camera.current) return;
-    // Keep the walking pose intact while the table owns the camera. The next frame restores it.
-    if (pingPongSession.getSnapshot()) {
-      input.clear();
-      velocity.current = [0, 0];
-      wasActive.current = false;
-      return;
-    }
     if (story) {
       const now = performance.now();
       // First-person from the first tour frame, even when entered from the overview.
@@ -159,6 +152,13 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
         hud.current.dataset.storyMoving = String(progress < 1);
       }
       if (progress < 1) state.invalidate();
+      return;
+    }
+    // Keep the walking pose intact while the table owns the camera. The next frame restores it.
+    if (pingPongSession.getSnapshot()) {
+      input.clear();
+      velocity.current = [0, 0];
+      wasActive.current = false;
       return;
     }
     if (!intro.done) {
@@ -220,7 +220,8 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers, en
     const picked: PlayTarget | null = pickTarget(next, yaw.current, interactCandidates(agents, visibleRooms(current), coworkers?.current, handoffAgents));
     const key = targetKey(picked);
     if (key !== target.current) { target.current = key; report(picked); }
-    if (hud.current && (moved || turned || !written.current)) {
+    // A remounted HUD surface starts without the pose, so write it again even when standing still.
+    if (hud.current && (moved || turned || !written.current || hud.current.dataset.playerZ === undefined)) {
       written.current = true;
       hud.current.dataset.playerX = next[0].toFixed(3);
       hud.current.dataset.playerZ = next[1].toFixed(3);
