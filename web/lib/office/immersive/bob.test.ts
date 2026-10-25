@@ -31,6 +31,15 @@ describe('head bob curve', () => {
     expect(headBob(1.3, 0, out)).toEqual({ y: 0, x: 0, roll: 0 });
     expect(headBob(Number.NaN, Number.NaN, out)).toEqual({ y: 0, x: 0, roll: 0 });
   });
+  it('scales sway and bob through the full slider range while keeping roll subtle', () => {
+    for (const intensity of [0.5, 1, 1.5]) {
+      const out = headBob(STEP_DISTANCE / 2, intensity, createHeadBob());
+      expect(out.y).toBeCloseTo(BOB_AMPLITUDE * intensity);
+      expect(out.x).toBeCloseTo(SWAY_AMPLITUDE * intensity);
+      expect(out.roll).toBeCloseTo(ROLL_AMPLITUDE * intensity);
+      expect(Math.abs(out.roll)).toBeLessThan(0.01);
+    }
+  });
   it('writes into the given object instead of allocating', () => {
     const out = createHeadBob();
     expect(headBob(0.4, 1, out)).toBe(out);
