@@ -116,7 +116,18 @@ try {
     await page.getByRole('button', { name: 'Deny with passkey' }).click();
     await expect(page.getByRole('heading', { name: 'Your decision is recorded.' })).toBeVisible();
     await shot('03-denied', `Passkey denial recorded while LLM ${live ? 'ON' : 'OFF'}`);
-    await page.goto(`${state.publicUrl}${state.payPath}`);
+    // Reset seeds no payment link; send one on the synthetic preverified call through the real gateway.
+    const gatewayTool = async (name, args) => {
+      const response = await context.request.post(`${state.publicUrl}/api/tools/${name}`, {
+        headers: { authorization: `Bearer ${controls.TOOL_GATEWAY_SECRET}` },
+        data: { call_id: 'demo-collections-1042', webhook_request_id: `rehearsal-${randomUUID()}`, ...args },
+      });
+      assert(response.ok(), `Gateway ${name} failed`); return response.json();
+    };
+    const plan = await gatewayTool('propose_plan', { installments: 2, first_payment_pct: 50, duration_days: 30, waive_fee: false, discount_pct: 0 });
+    assert.equal(plan.kind, 'ALLOW');
+    const sent = await gatewayTool('send_payment_link', { plan_id: plan.plan_id });
+    await page.goto(`${state.publicUrl}${sent.link_path}`);
     await page.getByRole('button', { name: 'Pay $2,475.00', exact: true }).click();
     await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
     await shot('04-pay', live ? 'Real Nessie sandbox deposit/reuse and exact reconciliation; display is not settlement' : 'Exact reconciliation; this web host uses mock Nessie HTTP transport');
