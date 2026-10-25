@@ -1,0 +1,316 @@
+{
+  "kit": "deskkit",
+  "sha256": "8490b60d31fd9e46315064323a64238e5630d0be6450ef1230744f625c84b9af",
+  "nodes": {
+    "desk": {
+      "minX": -1.125,
+      "maxX": 1.125,
+      "minZ": -0.525,
+      "maxZ": 0.525,
+      "minY": 0,
+      "maxY": 0.91,
+      "materials": [
+        "metal",
+        "panel",
+        "wood",
+        "wood_dark"
+      ]
+    },
+    "chair": {
+      "minX": -0.315,
+      "maxX": 0.315,
+      "minZ": -0.321,
+      "maxZ": 0.28,
+      "minY": 0,
+      "maxY": 1.08,
+      "materials": [
+        "metal",
+        "tint",
+        "trim"
+      ]
+    },
+    "monitor": {
+      "minX": -0.95,
+      "maxX": 0.95,
+      "minZ": -0.18,
+      "maxZ": 0.08,
+      "minY": 0,
+      "maxY": 1.22,
+      "materials": [
+        "metal",
+        "trim"
+      ]
+    },
+    "keyboard": {
+      "minX": -0.2,
+      "maxX": 0.2,
+      "minZ": -0.25,
+      "maxZ": 0.25,
+      "minY": -0.001,
+      "maxY": 0.04,
+      "materials": [
+        "blush",
+        "cream",
+        "metal"
+      ]
+    },
+    "desk_lamp": {
+      "minX": -0.095,
+      "maxX": 0.095,
+      "minZ": -0.095,
+      "maxZ": 0.219,
+      "minY": 0,
+      "maxY": 0.445,
+      "materials": [
+        "metal",
+        "shade",
+        "trim"
+      ]
+    },
+    "filing_cabinet": {
+      "minX": -0.25,
+      "maxX": 0.25,
+      "minZ": -0.3,
+      "maxZ": 0.332,
+      "minY": 0,
+      "maxY": 1.02,
+      "materials": [
+        "cream",
+        "lavender",
+        "metal",
+        "panel"
+      ]
+    },
+    "bookshelf": {
+      "minX": -0.7,
+      "maxX": 0.7,
+      "minZ": -0.17,
+      "maxZ": 0.17,
+      "minY": 0,
+      "maxY": 0.9,
+      "materials": [
+        "aqua",
+        "blush",
+        "butter",
+        "cream",
+        "lavender",
+        "mint",
+        "trim",
+        "wood",
+        "wood_dark"
+      ]
+    },
+    "plant_small": {
+      "minX": -0.106,
+      "maxX": 0.106,
+      "minZ": -0.106,
+      "maxZ": 0.106,
+      "minY": 0,
+      "maxY": 0.33,
+      "materials": [
+        "plant",
+        "plant_dark",
+        "plant_light",
+        "pot",
+        "soil"
+      ]
+    },
+    "plant_medium": {
+      "minX": -0.117,
+      "maxX": 0.117,
+      "minZ": -0.117,
+      "maxZ": 0.117,
+      "minY": 0,
+      "maxY": 0.5,
+      "materials": [
+        "plant",
+        "plant_dark",
+        "plant_light",
+        "pot",
+        "soil"
+      ]
+    },
+    "plant_large": {
+      "minX": -0.412,
+      "maxX": 0.418,
+      "minZ": -0.333,
+      "maxZ": 0.345,
+      "minY": 0,
+      "maxY": 1.165,
+      "materials": [
+        "plant",
+        "plant_dark",
+        "plant_light",
+        "pot",
+        "soil"
+      ]
+    },
+    "whiteboard": {
+      "minX": -0.9,
+      "maxX": 0.9,
+      "minZ": 0,
+      "maxZ": 0.13,
+      "minY": 0.86,
+      "maxY": 2,
+      "materials": [
+        "aqua",
+        "blush",
+        "cream",
+        "lavender",
+        "metal",
+        "trim"
+      ]
+    },
+    "wall_art": {
+      "minX": -0.4,
+      "maxX": 0.4,
+      "minZ": 0,
+      "maxZ": 0.1,
+      "minY": -0.25,
+      "maxY": 0.25,
+      "materials": [
+        "blush",
+        "butter",
+        "mint",
+        "tint",
+        "trim"
+      ]
+    },
+    "rug": {
+      "minX": -0.5,
+      "maxX": 0.5,
+      "minZ": -0.5,
+      "maxZ": 0.5,
+      "minY": 0,
+      "maxY": 0.014,
+      "materials": [
+        "cream",
+        "tint"
+      ]
+    },
+    "mug": {
+      "minX": -0.106,
+      "maxX": 0.058,
+      "minZ": -0.06,
+      "maxZ": 0.06,
+      "minY": 0,
+      "maxY": 0.101,
+      "materials": [
+        "aqua",
+        "coffee"
+      ]
+    },
+    "tray": {
+      "minX": -0.17,
+      "maxX": 0.17,
+      "minZ": -0.13,
+      "maxZ": 0.13,
+      "minY": 0,
+      "maxY": 0.125,
+      "materials": [
+        "butter",
+        "cream",
+        "lavender",
+        "metal"
+      ]
+    },
+    "vault_body": {
+      "minX": -0.92,
+      "maxX": 0.92,
+      "minZ": -0.645,
+      "maxZ": 0.645,
+      "minY": 0,
+      "maxY": 1.4,
+      "materials": [
+        "metal",
+        "trim"
+      ]
+    },
+    "vault_door": {
+      "minX": -0.749,
+      "maxX": 0.7,
+      "minZ": 0,
+      "maxZ": 0.142,
+      "minY": 0.175,
+      "maxY": 1.225,
+      "materials": [
+        "butter",
+        "metal",
+        "trim",
+        "vault"
+      ]
+    },
+    "safe": {
+      "minX": -0.3,
+      "maxX": 0.3,
+      "minZ": -0.275,
+      "maxZ": 0.315,
+      "minY": 0,
+      "maxY": 0.62,
+      "materials": [
+        "butter",
+        "metal",
+        "trim",
+        "vault"
+      ]
+    },
+    "meeting_table": {
+      "minX": -1.1,
+      "maxX": 1.1,
+      "minZ": -1.171,
+      "maxZ": 1.171,
+      "minY": 0,
+      "maxY": 1.08,
+      "materials": [
+        "lavender",
+        "metal",
+        "panel",
+        "trim",
+        "wood"
+      ]
+    },
+    "kitchen_counter": {
+      "minX": -0.82,
+      "maxX": 0.82,
+      "minZ": -0.31,
+      "maxZ": 0.33,
+      "minY": 0,
+      "maxY": 1.12,
+      "materials": [
+        "cream",
+        "metal",
+        "mint",
+        "trim",
+        "wood"
+      ]
+    },
+    "kettle": {
+      "minX": -0.103,
+      "maxX": 0.143,
+      "minZ": -0.09,
+      "maxZ": 0.09,
+      "minY": 0,
+      "maxY": 0.235,
+      "materials": [
+        "blush",
+        "cream",
+        "trim"
+      ]
+    },
+    "fridge": {
+      "minX": -0.35,
+      "maxX": 0.35,
+      "minZ": -0.34,
+      "maxZ": 0.385,
+      "minY": 0,
+      "maxY": 1.8,
+      "materials": [
+        "aqua",
+        "blush",
+        "cream",
+        "metal",
+        "trim"
+      ]
+    }
+  }
+}

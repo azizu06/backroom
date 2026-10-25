@@ -2,14 +2,49 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
-import type { Group, Material, Object3D } from 'three';
+import { MeshPhysicalMaterial, type Group, type Material, type Object3D } from 'three';
 import { visibleRooms, type AnchorId } from '../../../lib/office/state';
 import {
-  DESKKIT_GLB_URL, deskKitPlacements, deskKitReady, missingKitNodes, setDeskKitReady, subscribeDeskKit,
+  DESKKIT_GLB_URL, deskKitPlacements, workstationKitPlacements, deskKitReady, missingKitNodes, setDeskKitReady, subscribeDeskKit,
 } from '../../../lib/office/deskkit';
 import { buildDeskKitBatch } from '../../../lib/office/deskkit-merge';
 import { bakedArtRequested } from '../../../lib/office/baked-art';
 import type { SceneMountProps } from './types';
+import { Desks } from './Desks';
+import { StaticInstances, UNIT_BOX } from './StaticGeometry';
+import { WORKSTATIONS } from '../../../lib/office/layout';
+import { MONITOR_FACE } from '../../../lib/office/props/monitors';
+import { OFFICE_LIGHTING } from '../../../lib/office/lighting';
+import { ROLES } from '../../../lib/office/palette';
+import { DESKS } from '../../../lib/office/targets/desk';
+import { OFFICE_ANCHORS } from '../../../lib/office/state';
+import { deskScreenPiece, type FurniturePiece } from '../../../lib/office/furniture';
+
+const SCREEN_MATERIAL = new MeshPhysicalMaterial({ color: ROLES.wall, emissive: ROLES.wall, ...OFFICE_LIGHTING.screen });
+SCREEN_MATERIAL.onBeforeCompile = shader => {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    #ifdef USE_COLOR
+      totalEmissiveRadiance *= vColor.rgb;
+    #endif`);
+};
+SCREEN_MATERIAL.customProgramCacheKey = () => 'office-instance-screen-glow-v1';
+
+/** Keep the original fallback; a complete kit replaces every pod's boxes, never its live screen. */
+export function DeskKitDesks(props: SceneMountProps) {
+  const ready = useDeskKitReady();
+  const screens = useMemo(() => WORKSTATIONS.map(({ center: [x, z], flip }): FurniturePiece => {
+    const room = DESKS.find(room => OFFICE_ANCHORS[room].center[0] === x && OFFICE_ANCHORS[room].center[1] === z);
+    if (room) return deskScreenPiece(room);
+    return {
+      at: [x + flip * MONITOR_FACE.x, MONITOR_FACE.y, z + flip * (MONITOR_FACE.z + 0.05)],
+      size: [MONITOR_FACE.width, MONITOR_FACE.height, 0.015], color: ROLES.screenGlow,
+      rotation: [0, flip === -1 ? Math.PI : 0, 0],
+    };
+  }), []);
+  return ready
+    ? <StaticInstances pieces={screens} geometry={UNIT_BOX} material={SCREEN_MATERIAL} castShadow={false} />
+    : <Desks {...props} />;
+}
 
 /** True once deskkit.glb has loaded with every node the placements need (only ever under `?art=baked`). */
 export function useDeskKitReady(): boolean {
@@ -68,7 +103,8 @@ export function DeskKit({ snapshot }: SceneMountProps) {
   const roomsKey = visibleRooms(snapshot).join(',');
   const placed = useMemo(() => {
     if (!templates) return null;
-    const placements = deskKitPlacements(roomsKey ? roomsKey.split(',') as AnchorId[] : []);
+    const placements = [...workstationKitPlacements(),
+      ...deskKitPlacements(roomsKey ? roomsKey.split(',') as AnchorId[] : []).filter(piece => piece.source !== 'desk')];
     if (missingKitNodes(placements, new Set(templates.keys())).length) return null;
     try {
       return buildDeskKitBatch(templates, placements);

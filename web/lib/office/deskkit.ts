@@ -3,8 +3,9 @@ import { OFFICE_ANCHORS, type AnchorId } from './state';
 import { DESKS } from './targets/desk';
 import { MONITOR_FACE } from './props/monitors';
 import { DRESSING, type DressingPlant, type DressingShelf } from './props/dressing';
-import { ROOM_DETAILS, type RoomDetailItem } from './props/roomDetail';
-import { roomPoint } from './layout';
+import { type RoomDetailItem } from './props/roomDetail';
+import { roomPoint, WORKSTATIONS } from './layout';
+import { ROLES } from './palette';
 
 /**
  * Desk kit (tools/bake/deskkit.py -> deskkit.glb): named stylized props placed on the existing procedural anchors
@@ -33,7 +34,7 @@ export interface KitPlacement {
   /** Stable key. */
   id: string;
   node: DeskKitNode;
-  room: AnchorId;
+  room: AnchorId | 'work_room';
   source: DeskKitSource;
   at: [x: number, y: number, z: number];
   rotationY: number;
@@ -52,7 +53,7 @@ const CHAIR_LOCAL: readonly [x: number, z: number] = [0.05, 0.9];
 const KEYBOARD_LOCAL: readonly [x: number, z: number, turn: number] = [0.65, 0.1, -0.12];
 const ART_DEPTH = 0.04;
 
-export interface KitDesk { room: AnchorId; center: readonly [x: number, z: number]; flip: 1 | -1; tint: string }
+export interface KitDesk { id: string; room: AnchorId | 'work_room'; center: readonly [x: number, z: number]; flip: 1 | -1; tint: string }
 export interface KitSources {
   desks: readonly KitDesk[];
   shelves: readonly DressingShelf[];
@@ -62,9 +63,13 @@ export interface KitSources {
 }
 
 /** The live layout's anchors. A layout change (new rooms, moved anchors) flows through here unchanged. */
-export function kitSources(): KitSources {
+export type KitWorkstation = Pick<typeof WORKSTATIONS[number], 'id' | 'center' | 'flip'>;
+export function kitSources(workstations: readonly KitWorkstation[] = WORKSTATIONS): KitSources {
   return {
-    desks: DESKS.map(room => ({ room, center: OFFICE_ANCHORS[room].center, flip: room === 'dana' ? -1 : 1, tint: OFFICE_ANCHORS[room].color })),
+    desks: workstations.map(({ id, center, flip }) => {
+      const room = DESKS.find(room => OFFICE_ANCHORS[room].center[0] === center[0] && OFFICE_ANCHORS[room].center[1] === center[1]);
+      return { id, room: room ?? 'work_room', center, flip, tint: room ? OFFICE_ANCHORS[room].color : ROLES.partition };
+    }),
     shelves: DRESSING.shelves,
     plants: DRESSING.plants,
     details: [], // Partition decorations are detached in the open office.
@@ -81,18 +86,18 @@ const DETAIL_NODE: Record<KitDetailKind, DeskKitNode> = {
   rug: 'rug', art: 'wall_art', plant: 'plant_small', mug: 'mug', papers: 'tray', lamp: 'desk_lamp',
 };
 
-function deskPlacements({ room, center: [x, z], flip, tint }: KitDesk): KitPlacement[] {
+function deskPlacements({ id, room, center: [x, z], flip, tint }: KitDesk): KitPlacement[] {
   const facing = flip === -1 ? Math.PI : 0;
   const local = (lx: number, lz: number): [number, number] => [x + flip * lx, z + flip * lz];
   const [cx, cz] = local(...CHAIR_LOCAL);
   const [kx, kz] = local(KEYBOARD_LOCAL[0], KEYBOARD_LOCAL[1]);
   const [mx, mz] = local(MONITOR_FACE.x, MONITOR_FACE.z);
   return [
-    { id: `${room}:desk`, node: 'desk', room, source: 'desk', at: [x, 0, z], rotationY: facing },
-    { id: `${room}:chair`, node: 'chair', room, source: 'desk', at: [cx, 0, cz], rotationY: facing + Math.PI, tint },
-    { id: `${room}:keyboard`, node: 'keyboard', room, source: 'desk', at: [kx, DESK_TOP, kz], rotationY: facing + KEYBOARD_LOCAL[2] },
-    // Every live screen faces +z (deskScreenPiece), Dana's too, so the casing never turns.
-    { id: `${room}:monitor`, node: 'monitor', room, source: 'desk', at: [mx, DESK_TOP, mz], rotationY: facing },
+    { id: `${id}:desk`, node: 'desk', room, source: 'desk', at: [x, 0, z], rotationY: facing },
+    { id: `${id}:chair`, node: 'chair', room, source: 'desk', at: [cx, 0, cz], rotationY: facing + Math.PI, tint },
+    { id: `${id}:keyboard`, node: 'keyboard', room, source: 'desk', at: [kx, DESK_TOP, kz], rotationY: facing + KEYBOARD_LOCAL[2] },
+    // The shell follows the workstation facing, matching its procedural screen.
+    { id: `${id}:monitor`, node: 'monitor', room, source: 'desk', at: [mx, DESK_TOP, mz], rotationY: facing },
   ];
 }
 
@@ -117,9 +122,14 @@ function detailPlacement(detail: RoomDetailItem): KitPlacement | null {
   return { ...base, node, at: [x, bottom, z] };
 }
 
-/** Every kit placement for the visible rooms, in a stable order. */
+/** Permanent shared seats, independent of live department rows. */
+export function workstationKitPlacements(workstations: readonly KitWorkstation[] = WORKSTATIONS): KitPlacement[] {
+  return kitSources(workstations).desks.flatMap(deskPlacements);
+}
+
+/** Room-scoped placements, retained for department views and non-desk props. */
 export function deskKitPlacements(rooms: readonly AnchorId[], sources: KitSources = kitSources()): KitPlacement[] {
-  const shown = new Set(rooms.filter(kitCoversRoom));
+  const shown = new Set<string>(rooms.filter(kitCoversRoom));
   const out: KitPlacement[] = [];
   for (const desk of sources.desks) if (shown.has(desk.room)) out.push(...deskPlacements(desk));
   sources.shelves.forEach((shelf, i) => {
