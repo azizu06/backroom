@@ -19,6 +19,21 @@ it('without the host-declared pairing the Reconciler refuses under the Dispatche
   expect(run.match).toBe(false);
 });
 
+it('C09 records the queued human request and both production escalation receipts without grading callback speech', async () => {
+  vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
+  const run = await runConversation('human_request');
+  expect(run.humanFollowup).toEqual({
+    queuedRequests: 1,
+    gatewayEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN'] }],
+    mirroredEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN'] }],
+    postcallEscalations: [{ decision: 'ESCALATE', ruleIds: ['CALL_HUMAN_REQUESTED'] }],
+    gatewayReviewRecipients: [],
+  });
+  expect(run.checks.humanFollowupQueued).toBe(true);
+  expect(run.checks.humanEscalationMirrored).toBe(true);
+  expect(run.match).toBe(true);
+});
+
 it('the pre-identity leak check catches the amount in any spoken format, and invoice fields', async () => {
   const { revealsInvoice } = await import('./conversation');
   const deny = { kind: 'DENY', can_confirm: false, rule_ids: ['IDENTITY_REQUIRED'], speak: 'Please confirm I am speaking with the intended contact first.' };
