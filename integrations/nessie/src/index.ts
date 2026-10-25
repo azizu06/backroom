@@ -51,7 +51,9 @@ export interface Transaction {
   _id: string; amount: number; description: string; status: string;
   medium: string; transaction_date: string;
 }
-export interface Payment { accountId: string; invoiceId: string; installment: number; amountCents: number }
+/** linkId scopes the memo to one authorized pay link, so a deposit left by an earlier link (or an earlier
+ * company reset, which does not wipe the external sandbox) never matches a new link. */
+export interface Payment { accountId: string; invoiceId: string; installment: number; amountCents: number; linkId?: string }
 export interface WithdrawalPayment { accountId: string; vendorId: string; invoiceId: string; amountCents: number }
 export interface WithdrawalReconciliation {
   match: 'EXACT' | 'MISMATCH'; debitId: string; transactionId?: string; amountCents: number; reason?: string;
@@ -100,9 +102,11 @@ export interface ClientOptions {
   observe?: (event: { method: string; path: string; status: number; elapsedMs: number; shape: unknown }) => void;
 }
 const segment = (value: string) => encodeURIComponent(value);
-export function paymentMemo(payment: Pick<Payment, 'invoiceId' | 'installment'>): string {
-  if (!payment.invoiceId.trim() || !Number.isSafeInteger(payment.installment) || payment.installment < 1) throw new NessieError('invalid payment reference');
-  return `backroom:invoice=${segment(payment.invoiceId)}:installment=${payment.installment}`;
+export function paymentMemo(payment: Pick<Payment, 'invoiceId' | 'installment' | 'linkId'>): string {
+  if (!payment.invoiceId.trim() || !Number.isSafeInteger(payment.installment) || payment.installment < 1
+    || (payment.linkId !== undefined && !payment.linkId.trim())) throw new NessieError('invalid payment reference');
+  const memo = `backroom:invoice=${segment(payment.invoiceId)}:installment=${payment.installment}`;
+  return payment.linkId === undefined ? memo : `${memo}:link=${segment(payment.linkId)}`;
 }
 export function withdrawalMemo(payment: Pick<WithdrawalPayment, 'vendorId' | 'invoiceId'>): string {
   if (!payment.vendorId.trim() || !payment.invoiceId.trim()) throw new NessieError('invalid withdrawal reference');
