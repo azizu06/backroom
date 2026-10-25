@@ -23,7 +23,7 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   page.on('console', onConsole);
   await page.unrouteAll();
   if (!kit) await page.route('**/office-art/deskkit.glb', route => route.fulfill({ status: 404, body: 'missing' }));
-  await page.goto('/office?art=baked&perf=1');
+  await page.goto('/office?view=overview&art=baked&perf=1'); // Skip the Enter splash, as office-play.spec.ts does.
   const available = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     return !!(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
@@ -34,7 +34,9 @@ async function measure(page: Page, kit: boolean): Promise<Sample> {
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   if (kit) await expect(viewport.locator('canvas[data-deskkit="ready"]')).toHaveCount(1, { timeout: 30_000 });
   else await expect.poll(() => warnings.some(text => text.startsWith(KIT_WARNING))).toBe(true);
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  const select = page.getByLabel('Office view');
+  await expect(select).toHaveValue('walk');
+  await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
   await expect(page.getByTestId('office-perf-calls')).toHaveText(/^\d+$/);
