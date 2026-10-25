@@ -63,7 +63,7 @@ export function StoryMode({ chapters, onChapter, onExit, onPreview, reduced, sna
     {chapter.handoff && <div className='story-handoff' role='img' aria-label={`Scripted evidence folder handoff from ${OFFICE_ANCHORS[chapter.handoff[0]].name} to ${OFFICE_ANCHORS[chapter.handoff[1]].name}`}>
       <span>{OFFICE_ANCHORS[chapter.handoff[0]].name}</span><span aria-hidden='true'>▱ →</span><span>{OFFICE_ANCHORS[chapter.handoff[1]].name}</span>
     </div>}
-    {chapter.preview && !onPreview && <p className='story-preview-note'>(preview only in demo mode)</p>}
+    {chapter.preview && !onPreview && <p className='story-preview-note'>(shown in the walkthrough only)</p>}
     <div className='story-actions'>
       {!finished && <button onClick={togglePause}>{paused ? 'Resume' : 'Pause'}</button>}
       {finished && <button onClick={() => { select(0); setPaused(false); }}>Replay</button>}

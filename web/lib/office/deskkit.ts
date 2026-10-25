@@ -1,10 +1,10 @@
 import { BAKED_REPLACES } from './baked-art';
 import { OFFICE_ANCHORS, type AnchorId } from './state';
+import { roomPoint } from './layout';
 import { DESKS } from './targets/desk';
 import { MONITOR_FACE } from './props/monitors';
 import { DRESSING, type DressingPlant, type DressingShelf } from './props/dressing';
 import { ROOM_DETAILS, type RoomDetailItem } from './props/roomDetail';
-import { roomPoint } from './layout';
 
 /**
  * Desk kit (tools/bake/deskkit.py -> deskkit.glb): named stylized props placed on the existing procedural anchors

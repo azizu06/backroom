@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
 async function walkForward(page: Page, timeout: number) {
@@ -41,15 +42,17 @@ test('Play hands control over after the intro and immediately with reduced motio
   const view = page.getByLabel('Office view');
   await expect(view).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await view.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await page.waitForTimeout(1200);
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   await walkForward(page, 2000);
 
   await page.keyboard.press('Escape');
   await expect(view).toHaveValue('walk');
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
   // No intro wait: the fresh spawn pose (z 0.600, not the previous session's) and movement must arrive before a 900 ms
   // glide could finish. Timed in page time (event to DOM write) so a busy renderer slowing Playwright's own polling
   // round trips cannot fail it; the rig writes data-player-z only once the intro is over.

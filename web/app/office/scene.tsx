@@ -49,9 +49,9 @@ function pickHandlers(pick: OverviewPick, onPick: OverviewPickHandler) {
 function RoomPicks({ rooms, onPick }: { rooms: readonly AnchorId[]; onPick: OverviewPickHandler }) {
   useEffect(() => () => { document.body.style.cursor = ''; }, []);
   return <>{rooms.map(room => {
-    const { center } = OFFICE_ANCHORS[room];
-    return <mesh key={room} name={`room-pick:${room}`} position={[center[0], 0.06, center[1]]} rotation-x={-Math.PI / 2} {...pickHandlers({ kind: 'room', room }, onPick)}>
-      <planeGeometry args={[4.25, room === 'lobby' ? 3.6 : 3.4]} />
+    const pad = roomPad(SPACES[room].rect);
+    return <mesh key={room} name={`room-pick:${room}`} position={[(pad.minX + pad.maxX) / 2, 0.06, (pad.minZ + pad.maxZ) / 2]} rotation-x={-Math.PI / 2} {...pickHandlers({ kind: 'room', room }, onPick)}>
+      <planeGeometry args={[pad.maxX - pad.minX, pad.maxZ - pad.minZ]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>;
   })}</>;

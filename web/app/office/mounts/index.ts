@@ -23,15 +23,15 @@ import { RoomProps } from './RoomProps';
 import { Performance } from './Performance';
 import { ServerRoomMount } from './ServerRoomMount';
 import { TreasuryVault } from './TreasuryVault';
+import { AgentCardAnchor } from '../hud/diegetic/AgentCardAnchor';
+import { DeskStatusPlates } from '../hud/diegetic/DeskStatusPlates';
+import { LobbyNoticeBoard } from '../hud/diegetic/LobbyNoticeBoard';
 import { Outdoors } from './Outdoors';
 import { SharedRooms } from './SharedRooms';
 import { WorkRoom } from './WorkRoom';
 import { Atrium } from './Atrium';
 import { WorldShell } from './WorldShell';
 import { PingPong } from './PingPong';
-import { AgentCardAnchor } from '../hud/diegetic/AgentCardAnchor';
-import { DeskStatusPlates } from '../hud/diegetic/DeskStatusPlates';
-import { LobbyNoticeBoard } from '../hud/diegetic/LobbyNoticeBoard';
 import type { SceneMount } from './types';
 
 export type { SceneMount, SceneMountProps } from './types';

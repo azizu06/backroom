@@ -15,8 +15,7 @@ const CONTROLS: readonly (readonly [keys: string, action: string])[] = [
 /**
  * "Enter the office" gate (initial bundle, no WebGL imports). Pointer lock and audio need a user
  * gesture, so first person starts from this click or Enter key. Focus, Tab, Escape and the inert
- * background come from useModal. A positioned div, not `showModal`: the top layer would paint over
- * the demo disclosure, which must stay visible above the splash (splash.css).
+ * background come from useModal. A positioned div, not `showModal`, so the replay disclosure can stay visible above it.
  */
 export function PlaySplash({ onEnter, onOverview }: { onEnter: () => void; onOverview: () => void }) {
   const titleId = useId();
