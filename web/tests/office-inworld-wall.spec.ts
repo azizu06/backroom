@@ -69,7 +69,7 @@ async function walkTo(page: Page, x: number, z: number, tolerance = 0.2) {
 async function startPlay(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/office');
+  await page.goto('/office?view=overview');
   await requireWebGL(page);
   // Retry until hydrated: a click before hydration is a no-op. The denial adds a real preview audit row.
   await expect(async () => {
