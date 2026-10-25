@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TALK_CHIPS, chipForKey, talkReply, type AgentTalk, type TalkChip, type TalkLine } from '../../../lib/office/agent-talk';
 import type { PlayPanel } from '../../../lib/office/play';
+import { agentCues, cueKeyFor } from '../../../lib/office/agent-motion';
 import { HandoffText } from '../handoffs/HandoffText';
 import { HandoffRecord } from './HandoffPanel';
 import type { PlayPanelView } from './types';
@@ -37,6 +38,9 @@ function AgentTalkBody({ panel, askWhy }: { panel: PlayPanel; askWhy?: (question
   const [chip, setChip] = useState<TalkChip>();
   const name = talk?.speaker.name;
   useEffect(() => { setChip(undefined); }, [name]);
+  // A question gets a short thinking beat from the speaker's bear before it settles back to listening.
+  const speaker = talk ? cueKeyFor(talk.speaker.tag) : null;
+  useEffect(() => { if (chip && speaker) agentCues.think(speaker); }, [chip, speaker]);
   useEffect(() => {
     const dialog = root.current?.closest<HTMLElement>('[role=dialog]');
     if (!dialog) return;
