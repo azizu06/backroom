@@ -226,7 +226,9 @@ for (const row of legacy.reports) {
   }
   if (row.id === 'C05' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C05');
-    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C05.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher records a generic request_human escalation (REQUEST_HUMAN / CALL_HUMAN_REQUESTED), refuses further offers and blocks the next call. Dedicated HOSTILE_ESCALATE recorded: ${run?.hostileEvidence?.dedicatedRuleRecorded ?? false}. One spoken de-escalation and provider end-call are not executed; keep the integration gap open.` });
+    // Code-owned parts: dedicated HOSTILE_ESCALATE on gateway + Dispatcher mirror, stop, no offer after, next call refused.
+    if (run?.match && (run.checks as Record<string, boolean>).hostileRuleRecorded) continue;
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C05.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Dedicated HOSTILE_ESCALATE recorded: ${run?.hostileEvidence?.dedicatedRuleRecorded ?? false}; run match ${run?.match ?? false}. Keep the integration gap open.` });
     continue;
   }
   if (row.id === 'C21' && row.seams.includes('integration:not_executed')) {
@@ -258,6 +260,7 @@ const PDF_RESULT_PATH = 'docs/eval/pdf-extraction.json'; // written by pdf-extra
 const pdfRun = existsSync(join(root, PDF_RESULT_PATH)) ? JSON.parse(readFileSync(join(root, PDF_RESULT_PATH), 'utf8')) : undefined;
 const fraction = (n: number, d: number) => ({ numerator: n, denominator: d, percent: d ? Number((100 * n / d).toFixed(2)) : null });
 gaps.push({ id: 'C09:scope', detail: 'The callback owed to Dana is a StateStore review row in her inbox, made by the production approval bridge, and the acknowledgment is the gateway\'s code-owned line. Cartesia speaking it, ending the call without pressure on a real call, and Dana actually calling back are not executed.' });
+gaps.push({ id: 'C05:scope', detail: 'The gateway records the dedicated HOSTILE_ESCALATE when the voice agent sends request_human with reason hostile; that reason is a scripted tool choice here. The one calm de-escalation reply is prompt-driven agent speech, and it and the provider end-call are not executed on a real call.' });
 gaps.push({ id: 'C08:scope', detail: 'The wrong-person line is code-owned and graded on the production relay, with a scripted stand-in for the Haiku answer reader. Cartesia speaking it on a real call and the provider end-call are not executed.' });
 gaps.push({ id: 'P01:scope', detail: 'The production AP debit adapter and withdrawal reconciliation are measured offline with a synthetic bank HTTP transport. No live sandbox debit or real bank response is proved by this run; live smoke evidence remains separate.' });
 const rates = {

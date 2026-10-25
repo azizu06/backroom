@@ -20,15 +20,18 @@ export type Invocation = { callId: string; webhookRequestId: string } & (
     }
   | { tool: "check_approval"; escalationId: string }
   | { tool: "send_payment_link"; planId: string }
+  /** The voice agent's reading of why; code records it, and it never changes the stop. */
+  | { tool: "request_human"; reason?: HumanRequestReason }
   | {
       tool:
         | "get_invoice_context"
         | "mark_dispute"
         | "record_opt_out"
-        | "request_human"
         | "report_already_paid";
     }
 );
+export const humanRequestReasons = ["hostile", "asked_for_person", "other"] as const;
+export type HumanRequestReason = (typeof humanRequestReasons)[number];
 const invalid = (): never => {
   throw new GatewayError(400, "INVALID_TOOL_REQUEST");
 };
@@ -80,7 +83,7 @@ export function parseInvocation(tool: string, raw: unknown): Invocation {
     send_payment_link: ["plan_id"],
     mark_dispute: [],
     record_opt_out: [],
-    request_human: [],
+    request_human: ["reason"],
     report_already_paid: [],
   };
   if (
@@ -120,6 +123,11 @@ export function parseInvocation(tool: string, raw: unknown): Invocation {
       return { ...base, tool, escalationId: id(body.escalation_id) };
     case "send_payment_link":
       return { ...base, tool, planId: id(body.plan_id) };
+    case "request_human":
+      // Optional: the relay's own code-side stops forward request_human without a reason.
+      if (body.reason === undefined) return { ...base, tool };
+      if (!(humanRequestReasons as readonly unknown[]).includes(body.reason)) return invalid();
+      return { ...base, tool, reason: body.reason as HumanRequestReason };
     default:
       return {
         ...base,
@@ -127,7 +135,6 @@ export function parseInvocation(tool: string, raw: unknown): Invocation {
           | "get_invoice_context"
           | "mark_dispute"
           | "record_opt_out"
-          | "request_human"
           | "report_already_paid",
       };
   }

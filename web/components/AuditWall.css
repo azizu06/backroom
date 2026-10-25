@@ -2,19 +2,24 @@
 .audit-wall { --audit-bg: transparent; --audit-panel: var(--bubble-glass); --audit-line: var(--line); --audit-ink: var(--ink);
   color: var(--audit-ink); background: var(--audit-bg); font: 15px/1.5 var(--font-ui); padding: clamp(16px, 3vw, 40px); width: 100%; box-sizing: border-box; min-height: 100dvh; }
 .audit-wall * { box-sizing: border-box; }
+/* The /audit page and its replay sit in the shared page frame (app/theme.css). */
+:is(main, .replay-session) > .audit-wall { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--page-gutter) 96px; }
+:is(main, .replay-session) > .audit-wall .audit-heading { align-items: flex-end; padding-top: 32px; }
+:is(main, .replay-session) > .audit-wall h1 { margin-bottom: 8px; }
 .audit-wall h1, .audit-wall h2, .audit-wall h3, .audit-wall h4, .audit-wall p { margin: 0 0 12px; }
 .audit-wall h1 { font-weight: 900; font-size: 32px; line-height: 1.15; margin-bottom: 6px; }
 .audit-wall h2 { font-size: 19px; line-height: 1.3; }
 .audit-wall h3 { font-size: 14px; margin-top: 24px; }
 .audit-wall a { color: var(--audit-ink); text-underline-offset: 3px; }
 .audit-wall button { cursor: pointer; color: var(--paper); background: var(--ink); border: 2px solid var(--ink); border-radius: 999px; font: inherit; font-weight: 800; padding: 10px 18px; min-height: 44px; }
-.audit-wall button:disabled { cursor: not-allowed; opacity: .55; }
+.audit-wall button:disabled, :root[data-theme='dark'] .audit-wall button:disabled:not(.audit-entry, .audit-ask-row, .audit-more) { cursor: not-allowed; color: var(--ink-soft); background: var(--line); border-color: var(--line); }
 .audit-wall :focus-visible { outline: 2px solid var(--pastel-aqua); outline-offset: 2px; box-shadow: 0 0 0 4px var(--ink); }
 .audit-wall input, .audit-wall textarea { display: block; width: 100%; margin: 8px 0 14px; border: 2px solid var(--pastel-aqua); border-radius: 20px; background: var(--field); color: var(--audit-ink); padding: 12px; font: inherit; }
 .audit-wall textarea { resize: vertical; }
-.audit-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; margin: 0 auto 24px; max-width: 1400px; }
+.audit-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; margin: 0 0 24px; }
+.audit-heading > div > p:last-child { max-width: 65ch; }
 .audit-heading > div > p:last-child { margin: 0; color: var(--ink-soft); }
-.audit-wall .audit-eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.audit-wall .audit-eyebrow { font-size: 13px; font-weight: 800; color: var(--ink-soft); }
 .audit-muted { font-size: 13px; }
 .audit-chain { flex-shrink: 0; border: 2px solid #ffffff; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 800; color: var(--on-pastel); background: #ffffff; }
 .audit-verified { color: var(--on-pastel); background: var(--pastel-aqua); }
@@ -27,7 +32,7 @@
 .audit-section-heading > span { font-size: 12px; white-space: nowrap; }
 
 /* Default view: this run as stories. */
-.audit-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 24px; align-items: start; max-width: 1400px; margin: auto; }
+.audit-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
 .audit-layout-single { grid-template-columns: minmax(0, 1fr); }
 .audit-stories > ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
 .audit-story h2, .audit-story h3, .audit-story h4 { margin-bottom: 8px; }
@@ -60,7 +65,7 @@
 .audit-wall .audit-rules { font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
 
 /* Show all entries: the full chain, raw inputs and hashes. Closed by default. */
-.audit-advanced { max-width: 1400px; margin: 32px auto 0; }
+.audit-advanced { margin: 32px 0 0; }
 .audit-advanced > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 .audit-workspace { display: grid; grid-template-columns: minmax(300px, .95fr) minmax(0, 1.2fr); gap: 24px; align-items: start; margin-top: 12px; }
 .audit-entries { list-style: none; margin: 20px 0 0; padding: 0; }
@@ -71,7 +76,7 @@
 .audit-entry > span { font-size: 12px; }
 .audit-entry-top { display: flex; justify-content: space-between; gap: 16px; width: 100%; align-items: baseline; }
 .audit-id, .audit-metrics { font-family: ui-monospace, monospace; }
-.audit-wall .audit-quote { border-left: 2px solid var(--danger); padding-left: 10px; font-size: 13px; }
+.audit-wall .audit-quote { border-left: 2px solid var(--audit-line); padding-left: 10px; font-size: 13px; }
 .audit-replay { scroll-margin-top: 24px; }
 .audit-facts { margin: 18px 0; font-size: 13px; }
 .audit-facts > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); border-top: 1px solid var(--audit-line); padding: 10px 0; gap: 16px; }
@@ -80,10 +85,10 @@
 .audit-wall pre { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 2px solid var(--audit-line); padding: 14px; border-radius: 16px; background: var(--paper); font: 12px/1.65 ui-monospace, monospace; }
 .audit-wall details details { margin-top: 16px; }
 .audit-wall summary { cursor: pointer; min-height: 32px; }
-.audit-wall blockquote { margin: 16px 0; border-left: 3px solid var(--danger); padding: 0 0 0 14px; }
+.audit-wall blockquote { margin: 16px 0; border-left: 2px solid var(--audit-line); padding: 0 0 0 14px; }
 .audit-wall cite { display: block; font-size: 12px; margin-top: 8px; }
 .audit-footer { font-size: 12px; margin: 16px 0 0; }
-.audit-unlock { max-width: 480px; margin: 8px 0 0 max(0px, calc((100% - 1400px) / 2)); }
+.audit-unlock { max-width: 480px; margin: 8px 0 0; }
 .audit-unlock > button { margin-bottom: 12px; }
 .audit-unlock > p:last-child { margin: 0; }
 @media (max-width: 800px) {
@@ -99,4 +104,9 @@
   .audit-wall .audit-line .audit-quote { margin-left: 0; }
   .audit-entry-top { gap: 8px; }
   .audit-wall .audit-entry { padding: 12px; }
+}
+@media (max-width: 800px) { :is(main, .replay-session) > .audit-wall .audit-heading { align-items: flex-start; } }
+@media (max-width: 650px) {
+  :is(main, .replay-session) > .audit-wall .audit-heading { padding-top: 24px; }
+  :is(main, .replay-session) > .audit-wall h1 { font-size: 28px; }
 }

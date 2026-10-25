@@ -10,14 +10,16 @@ it.each(CONVERSATIONS)('%s: scripted call through the gateway, then the Dispatch
   expect(run.match).toBe(true);
 });
 
-it('C05 reports the generic human stop separately from the unexecuted hostile speech and dedicated rule', async () => {
+it('C05 records the dedicated HOSTILE_ESCALATE on the human stop; the de-escalation speech stays unexecuted', async () => {
   vi.stubGlobal('fetch', async () => { throw new Error('UNEXPECTED_NETWORK'); });
   const run = await runConversation('hostile');
   expect(run.humanFollowup).toMatchObject({ queuedRequests: 1,
-    gatewayEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN'] }],
+    gatewayEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN', 'HOSTILE_ESCALATE'] }],
+    mirroredEscalations: [{ decision: 'ESCALATE', ruleIds: ['REQUEST_HUMAN', 'HOSTILE_ESCALATE'] }],
     postcallEscalations: [{ decision: 'ESCALATE', ruleIds: ['CALL_HUMAN_REQUESTED'] }] });
-  expect(run.hostileEvidence).toEqual({ requiredRule: 'HOSTILE_ESCALATE', dedicatedRuleRecorded: false,
+  expect(run.hostileEvidence).toEqual({ requiredRule: 'HOSTILE_ESCALATE', dedicatedRuleRecorded: true,
     speechMeasured: false, providerEndCallExecuted: false });
+  expect(run.checks.hostileRuleRecorded).toBe(true);
   expect(run.checks.noOfferAfterStop).toBe(true);
   expect(run.checks.nextCallRefused).toBe(true);
   expect(run.match).toBe(true);

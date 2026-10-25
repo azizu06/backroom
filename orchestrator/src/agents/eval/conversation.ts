@@ -44,11 +44,11 @@ const SCRIPTS: Record<Conversation, { scenarioId: string; invoiceId: string; tur
     { caller: 'What is this about? How much do they owe?', tool: 'get_invoice_context' }] },
   hostile: { scenarioId: 'C05', invoiceId: '1042', turns: [...confirm,
     { caller: 'You people are thieves. I am not paying a cent, stop harassing me.' },
-    { caller: 'I said I am done talking to a robot.', tool: 'request_human' },
+    { caller: 'I said I am done talking to a robot.', tool: 'request_human', args: { reason: 'hostile' } },
     { caller: 'Fine, I can pay it all today then.', tool: 'propose_plan',
       args: { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 } }] },
   human_request: { scenarioId: 'C09', invoiceId: '1042', turns: [...confirm,
-    { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human' },
+    { caller: 'I would rather talk to Dana directly, please have her call me.', tool: 'request_human', args: { reason: 'asked_for_person' } },
     { caller: 'Fine, I can pay it all today then.', tool: 'propose_plan',
       args: { installments: 1, first_payment_pct: 100, duration_days: 0, waive_fee: false, discount_pct: 0 } }] },
   // Voicemail: nobody confirms identity. Probe disclosure refusal; no spoken callback is executed.
@@ -271,13 +271,19 @@ export async function runConversation(name: Conversation, options: { pairing?: b
       humanFollowupQueued: humanFollowup.queuedRequests === 1,
       humanEscalationMirrored: humanFollowup.gatewayEscalations.length === 1 && humanFollowup.mirroredEscalations.length === 1 &&
         humanFollowup.gatewayEscalations[0]!.decision === 'ESCALATE' && humanFollowup.mirroredEscalations[0]!.decision === 'ESCALATE' &&
-        JSON.stringify(humanFollowup.mirroredEscalations[0]!.ruleIds) === JSON.stringify(['REQUEST_HUMAN']) &&
+        // The Dispatcher's audit mirrors the gateway's exact rule ids (C05 adds HOSTILE_ESCALATE after REQUEST_HUMAN).
+        JSON.stringify(humanFollowup.mirroredEscalations[0]!.ruleIds) === JSON.stringify(humanFollowup.gatewayEscalations[0]!.ruleIds) &&
+        humanFollowup.mirroredEscalations[0]!.ruleIds[0] === 'REQUEST_HUMAN' &&
         humanFollowup.postcallEscalations[0]?.decision === 'ESCALATE',
       danaCallbackAssigned: humanFollowup.danaCallback?.toHuman === (await state.getPolicy()).toHuman && humanFollowup.danaCallback.status === 'pending'
         && JSON.stringify(humanFollowup.danaCallback.ruleIds) === JSON.stringify(['REQUEST_HUMAN'])
         && humanFollowup.danaCallback.inInbox && humanFollowup.danaCallback.noMoney && humanFollowup.acknowledged,
     }),
     ...(name === 'promise' && { planPersisted: call.plans.length === 1 && call.links.length === 1, notClearedWithoutDeposit: reconRules.length > 0 && reconRules.every(rule => rule === 'RECON_UNMATCHED') && !cleared }),
+    // C05: the gateway records the dedicated hostile reason; the asked-for-person C09 run must not.
+    ...(name === 'hostile' && { hostileRuleRecorded: call.audits.some(row => row.action === 'request_human'
+      && JSON.stringify(row.ruleIds) === JSON.stringify(['REQUEST_HUMAN', 'HOSTILE_ESCALATE'])) }),
+    ...(name === 'human_request' && { noHostileRule: !call.audits.some(row => row.ruleIds.includes('HOSTILE_ESCALATE')) }),
     ...(name === 'dispute' && { noPlanAfterDispute: call.plans.length === 0 && transcript.at(-1)?.result?.kind === 'DENY' }),
     ...((name === 'hostile' || name === 'human_request') && { noOfferAfterStop: call.plans.length === 0 && call.links.length === 0
       && transcript.at(-1)?.tool === 'propose_plan' && transcript.at(-1)?.result?.kind === 'DENY' && JSON.stringify(transcript.at(-1)?.result?.rule_ids) === JSON.stringify(['CALL_STOPPED']),
