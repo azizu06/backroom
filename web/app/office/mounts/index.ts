@@ -8,6 +8,7 @@ import { LobbyInbox } from '../props/LobbyInbox';
 import { ReceiptPrinter } from '../props/ReceiptPrinter';
 import { LobbyDenyStamp } from '../props/LobbyDenyStamp';
 import { AuditWallMount } from './AuditWallMount';
+import { TicketBoardMount } from './TicketBoardMount';
 import { Desks } from './Desks';
 import { DeskKit } from './DeskKit';
 import { CarryFolder } from './CarryFolder';
@@ -38,6 +39,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'desk-kit', instanced: false, Component: DeskKit },
   { id: 'baked-characters', instanced: false, moving: true, Component: BakedCharacters },
   { id: 'audit-wall', instanced: false, Component: AuditWallMount },
+  { id: 'ticket-board', instanced: false, Component: TicketBoardMount },
   { id: 'inbox-tray', instanced: false, Component: InboxTrayMount },
   { id: 'props', instanced: false, Component: OfficeProps },
   { id: 'lobby-inbox', instanced: false, Component: LobbyInbox },

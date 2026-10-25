@@ -1,6 +1,9 @@
 import type { ComponentType } from 'react';
 import type { OfficeSnapshot } from '../../../lib/office/state';
 
+/** Static mount footprint registered in lib/office/props/extraColliders, independent of React mounting. */
+export type SceneCollider = import('../../../lib/office/layout').Rect;
+
 /** Everything a scene mount receives. Mounts are view-only: they read the snapshot and never decide anything. */
 export interface SceneMountProps { readonly snapshot: OfficeSnapshot }
 export interface SceneMount {

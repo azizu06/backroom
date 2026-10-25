@@ -6,6 +6,7 @@ import { DEFAULT_FEEL, bobHeight, type FeelFlags } from "./playFeel";
 import { OPEN_DOORS, type DoorState } from './doors';
 import { PLANT_SPOTS } from './furniture';
 import { AUDIT_WALL } from './props/auditWall';
+import { extraColliders } from './props/extraColliders';
 import { WHITEBOARD, WHITEBOARD_INTERACTION } from './props/whiteboard';
 import { OFFICE_ANCHORS, type AnchorId, type OfficeSnapshot } from "./state";
 import { PLAY_TARGET_LIST, playTargetModule, type PlayTarget } from "./targets";
@@ -89,6 +90,7 @@ export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[
   if (!boxes.includes(SERVER_ROOM_BOX)) boxes.push(SERVER_ROOM_BOX);
   if (visible.has('lobby')) boxes.push(fixtureBounds(FLOOR_FIXTURES.lampWest));
   if (visible.has('treasury')) boxes.push(fixtureBounds(FLOOR_FIXTURES.lampEast));
+  boxes.push(...extraColliders);
   return boxes;
 }
 
