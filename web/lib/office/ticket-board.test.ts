@@ -103,15 +103,25 @@ describe('ticket board projection', () => {
     expect(model.columns.map(column => column.count)).toEqual([0, 0, 3, 2]);
     expect(model.columns[2]!.cards.every(card => card.id.startsWith('handoff:'))).toBe(true);
     const standalone = ticketBoard({ ...fixture, handoffs: [], agents });
-    expect(standalone.columns[2]!.cards[0]).toMatchObject({ caseDisplayId: 'e1', agent: 'Sam' });
+    expect(standalone.columns[2]!.cards[0]).toMatchObject({ caseDisplayId: 'Sam · Payables', agent: 'Sam' });
   });
   it('shows ESCALATE receipts once, newest first; normal intake receipts are not human waits', () => {
     const first = receipt('r1'), last = receipt('r2');
     const model = ticketBoard({ ...INITIAL_OFFICE, audit: [first, last], inboxReceipts: [first, last, receipt('ok', 'ALLOW')] });
-    expect(model.columns[2]!.cards.map(card => card.caseDisplayId)).toEqual(['r2', 'r1']);
+    expect(model.columns[2]!.cards.map(card => card.id)).toEqual(['receipt:r2', 'receipt:r1']);
     const linked = ticketBoard({ ...fixture, audit: [first], handoffs: [handoff('h', 'accepted', { decisionRef: 'r1' })] });
     expect(linked.columns[2]!.cards).toHaveLength(1);
     expect(linked.columns[2]!.cards[0]!.caseDisplayId).toBe('INV-h');
+  });
+  it('groups receipt waits by case while keeping unrelated unknown cases separate', () => {
+    const model = ticketBoard({ ...INITIAL_OFFICE, audit: [
+      { ...receipt('audit:38'), refs: ['4481'], summary: 'Bank change requested for vendor:acme' },
+      { ...receipt('review:uuid'), refs: ['4481'], summary: 'Bank change held for vendor:acme' },
+      { ...receipt('judge:39'), refs: ['4482'], summary: 'Invoice review required' },
+    ] });
+    expect(model.columns[2]!.count).toBe(2);
+    expect(model.columns[2]!.cards.find(card => card.caseDisplayId === 'INV-4481')?.summary).toBe('Held for Dana · bank change');
+    expect(ticketBoardText(model)).not.toMatch(/audit:|review:|judge:|vendor:acme/);
   });
   it.each(['preview', 'replay', 'disconnected'] as const)('keeps empty columns and a %s notice', connection => {
     const model = ticketBoard({ ...INITIAL_OFFICE, connection });
