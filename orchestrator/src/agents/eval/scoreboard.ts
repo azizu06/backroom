@@ -114,6 +114,12 @@ for (const invoice of northfield.arInvoices) {
   if (expected && expected !== actual) gaps.push({ id: scenario.id, detail: `Reconciler expected ${expected}, got ${actual}.` });
 }
 const legacy = await runEval({ persona: scriptedPersona });
+// The existing P01 decision measurement installs a mock debit port. Probe its absence separately;
+// neither a policy ALLOW nor a synthetic completed receipt proves the frozen pay-and-reconcile outcome.
+const p01DebitProbe = await runInvoice('4401', { caseId: 'P01:no-debit-adapter', payment: 'unavailable' });
+const p01DebitProbeHeld = p01DebitProbe.actual === 'HOLD' && p01DebitProbe.result.status === 'held' &&
+  p01DebitProbe.result.verdict === 'ESCALATE' && !p01DebitProbe.result.receiptId && p01DebitProbe.mockDebits === 0;
+if (!p01DebitProbeHeld) gaps.push({ id: 'P01:missing-adapter', detail: 'The missing AP debit adapter probe did not retain the expected hold; see p01DebitProbe.' });
 const durableRecovery = await runDurableRecoveryPreflight();
 const recoveryRuns = [];
 for (const variant of [{ lateCancel: false }, { lateCancel: true }, { checkpoint: 'before_provider' as const }]) {
@@ -185,6 +191,10 @@ for (const row of legacy.reports) {
   if (row.id === 'C09' && row.seams.includes('integration:not_executed')) {
     const run = conversations.find(run => run.scenarioId === 'C09');
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C09.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. Scripted production gateway -> Dispatcher run queues ${run?.humanFollowup?.queuedRequests ?? 0} request_human outbox event; gateway ESCALATE and post-call ESCALATE are measured on the same audit store. The gateway record has ${run?.humanFollowup?.gatewayReviewRecipients.length ?? 0} review recipients. A Dana callback assignment, spoken acknowledgment and ending without pressure are not executed or graded; keep the integration gap open.` });
+    continue;
+  }
+  if (row.id === 'P01' && row.seams.includes('integration:not_executed')) {
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.payables.P01.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}; requires ${key.payables.P01.requiredEvidence.join(', ')}. With no AP debit adapter installed, the production Dispatcher/ClaudeAgentRuntime chain assesses ${p01DebitProbe.assessment.verdict} but request_payment returns ${p01DebitProbe.result.status}/${p01DebitProbe.result.verdict} [${p01DebitProbe.result.ruleIds}], with ${p01DebitProbe.mockDebits} debits and no receipt. The separate decision run uses a synthetic completed receipt. Nessie debit and matched debit reconciliation remain unexecuted; P01 stays open.` });
     continue;
   }
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
@@ -264,6 +274,9 @@ const report = {
     historicalItems: invoiceRuns.filter(row => row.historical).length,
     historicalMockDebits: invoiceRuns.filter(row => row.historical).reduce((sum, row) => sum + row.mockDebits, 0) },
   rates, ap: invoiceRuns, gradedAP, permits, receivables,
+  p01DebitProbe: { ...p01DebitProbe, unavailableAdapterHeld: p01DebitProbeHeld, trace: undefined, extraction: undefined,
+    tools: p01DebitProbe.trace.map(row => `${row.role}.${row.tool}`),
+    scope: 'Production Dispatcher + ClaudeAgentRuntime and all five AP roles, with the AP debit port explicitly absent. Fixture extraction and vendor checks, no network. This measures the unavailable-adapter hold, not a Nessie payment or debit reconciliation.' },
   recovery: recoveryRuns,
   durableRecovery,
   badgeAttack: { ...badgeAttack, match: badgeIsolationMatch, policyReferenceMatch: badgePolicyMatch, policyExpected: badgePolicyExpected },
@@ -341,4 +354,4 @@ writeFileSync(join(out, 'scoreboard.json'), JSON.stringify(report, null, 2) + '\
 writeFileSync(join(out, 'scoreboard.md'), lines.join('\n'));
 console.log(JSON.stringify({ rates, gaps: gaps.length, output: process.env.BACKROOM_REPORT_DIR ? join(out, 'scoreboard.{md,json}') : 'docs/eval/scoreboard.{md,json}' }, null, 2));
 // Key disagreements are data to report, not a reason to suppress the generated artifact.
-if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
+if (rates.errors.length || invoiceRuns.some(row => row.actual === 'ERROR') || !p01DebitProbeHeld || !bankChangeMatch || bankChangeGuards.some(row => !row.match) || !badgeIsolationMatch || !badgePolicyMatch || recoveryRuns.some(row => row.outcome !== 'RECOVERED_ONE_MOCK_DEBIT') || conversations.some(row => !row.match) || !failoverComplete || precallStops.some(row => !row.match) || !callButton.match || !inboxTeam.match || !approvalExpiry.match || judgeRuns.some(row => !row.match)) process.exitCode = 1;
