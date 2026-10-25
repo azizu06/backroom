@@ -2,6 +2,7 @@ import { northfield, northfieldChange, northfieldInvoice, northfieldSource } fro
 import type { InboxPreset } from './types';
 
 const planted = [
+  ['4401', 'Normal approved invoice'],
   ['4419', 'Duplicate invoice +$37'], ['4471', 'Lookalike bank change'],
   ['4481', 'No PO'], ['4482', 'Over limit'],
   ['4483', 'Sanctions'], ['4484', 'Unapproved vendor'],

@@ -27,6 +27,10 @@ processInbox(email/invoice)
   trusted master/history. Payment destination always comes from the approved
   master. Pending bank-change proposals also hold payments to the old account. `bankAccountId` is an opaque ID for the complete bank details in that
   master; any differing ID holds payment. Money is integer USD cents.
+  `NO_PO` and `OVER_LIMIT` exceptions may be retried only after the exact persisted
+  escalation has a bound passkey Approve recorded within its decision window. Duplicate, sanctions,
+  bank-change, lookalike-domain and missing-master holds are never controller
+  overrides; they must be corrected and re-evaluated to an ordinary `ALLOW`.
 - `VendorSeat({ repository, state, controller, checks }).propose(fields, source)`
   runs fixed CRS business/OFAC and Apify footprint checks using a trusted
   vendor-ID-to-sandbox-identity mapping. Unknown OFAC, errors, missing footprint,
@@ -77,9 +81,16 @@ success. `FakeEffects(repository)` also validates inside its own boundary under
 the vendor lock, derives clean generic-worker destinations from the master, and
 strips raw source documents. Without a repository it uses an empty master and
 rejects payments. Effect-boundary rejections are audited by `SeatWorker` as
-`payment_boundary_rejected`, `DENY`, `PAYEE_NOT_IN_MASTER`. The current Nessie client provides deposits, not an AP debit method.
-**Leave `nessie` unset until the integration owner supplies a debit-capable
-adapter**; this path escalates and never claims payment. CRS sponsor product
+`payment_boundary_rejected`, `DENY`, `PAYEE_NOT_IN_MASTER`.
+
+`nessieDebitPayables(bank, accountId)` is the direct Capital One Nessie sandbox
+adapter. It withdraws from the server-configured `NESSIE_ACCOUNT_ID`, then performs
+a fresh withdrawal-feed match. `PayablesSeat` records `reconcile` with the debit ID,
+transaction ID, invoice, amount and `EXACT_PAYMENT_MATCH` or `RECON_MISMATCH`; only
+an exact completed match becomes `paid`. The Inbox host enables this only with
+`DEMO_LIVE=1`, `NESSIE_API_KEY` and `NESSIE_ACCOUNT_ID`, using `NESSIE_CLAIMS_DIR`
+or `.nessie-state/claims` for restart-safe reservations. It is sandbox money, not a
+production payment rail. Missing configuration still holds without a debit. CRS sponsor product
 configuration and the Apify adapter are also injected capabilities: missing or
 unknown evidence holds. No guessed provider endpoints or fabricated clearances.
 
@@ -100,9 +111,10 @@ only verified controller approval makes them approved master entries.
 specified isolated bank-change precondition), the Cedar passkey gate and next
 payment from the updated master, and the unmatched already-paid deposit.
 CRS/Apify/debits are mocked and the authenticator is software. This is local
-integration proof, not live sponsor evidence or an approved eval run. Real
-debit/reconciliation, provider identity mapping, physical passkey and tray UI
-remain separate integration gates. The red-team replay uses the same seed adapter;
+integration proof, not live sponsor evidence or an approved eval run. Live
+debit/reconciliation is opt-in through the Inbox host or
+`pnpm --filter @backroom/nessie debit:live -- --confirm-sandbox-debit`; provider
+identity mapping and a physical passkey remain separate integration gates. The red-team replay uses the same seed adapter;
 see `docs/redteam.md` for exact scope and limitations.
 
 Opt-in extraction-only check (no payments or master writes):

@@ -28,6 +28,7 @@ function verdict(decision: Decision): Record<string, Json> {
 function outcome(result: SeatResult): Record<string, Json> {
   return { status: result.status, ...verdict(result.decision), ...(result.paymentRail && { rail: result.paymentRail }),
     ...(result.receiptId && { receiptId: result.receiptId }), ...(result.escalationId && { escalationId: result.escalationId }),
+    ...(result.reconciliation && { reconciliation: result.reconciliation }),
     evidenceRefs: result.evidenceRefs };
 }
 const lines = (rows: InvoiceFields['lineItems']) => rows.slice(0, 20).map(row => ({

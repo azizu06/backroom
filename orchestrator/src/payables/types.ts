@@ -21,6 +21,7 @@ export interface SeatResult {
   status: 'paid' | 'held' | 'rejected' | 'awaiting_controller' | 'approved';
   paymentRail?: 'nessie' | 'x402 testnet' | 'x402 simulated';
   decision: Decision; escalationId?: string; receiptId?: string; evidenceRefs: string[];
+  reconciliation?: { match: 'EXACT' | 'MISMATCH'; debitId: string; transactionId?: string; amountCents: number; reason?: string };
 }
 export interface InvoiceRecord { source?: InboxSource; fields: InvoiceFields; policyInvoice: APInvoice; result: SeatResult; fingerprint: string; vendorRevision: number | null; paymentAttempted: boolean }
 export interface BankChange {
@@ -49,7 +50,7 @@ export interface PayablesClient {
   payInvoice(input: {
     idempotencyKey: string; invoiceId: string; vendorId: string; amountCents: number;
     sourceAccount: string; destinationAccountId: string;
-  }): Promise<{ id: string; status: 'completed' | 'pending' }>;
+  }): Promise<{ id: string; status: 'completed' | 'pending'; reconciliation?: NonNullable<SeatResult['reconciliation']> }>;
 }
 /** Request-only binding to StateStore.createEscalation. Decisions are written only
  * by the shared ControllerApprovals service and read directly from StateStore. */
