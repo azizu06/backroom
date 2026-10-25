@@ -53,6 +53,8 @@ export async function auditCase(store: MemoryStateStore, id: string, refs: strin
 
 export async function runInvoice(id: string, options: { caseId?: string; pendingBankChange?: boolean; senderDomain?: string;
   candidate?: InvoiceFields; repository?: FinanceRepository; state?: MemoryStateStore;
+  /** Explicitly omit the AP debit port to measure the current host's unavailable-capability path. */
+  payment?: 'mock' | 'unavailable';
   /** P12: route extraction through the production router with GX10 healthy or cut; records routing audits. */
   gx10?: 'healthy' | 'cut' } = {}) {
   const caseId = options.caseId ?? `ap:${id}`;
@@ -99,7 +101,7 @@ export async function runInvoice(id: string, options: { caseId?: string; pending
   const receipts: string[] = [];
   const destinations: string[] = [];
   const seat = new PayablesSeat({ repository, state, controller, paymentRail: 'nessie', bankChangeRisk: verifier.bankChangeRisk,
-    nessie: { payInvoice: async payment => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt);
+    nessie: options.payment === 'unavailable' ? undefined : { payInvoice: async payment => { const receipt = `mock-receipt:${caseId}`; receipts.push(receipt);
       destinations.push(payment.destinationAccountId); return { id: receipt, status: 'completed' }; } } });
   const store = new MemoryHandoffStore({ audit: state });
   const ledger = new MemoryUsageLedger();
