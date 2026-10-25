@@ -2,7 +2,7 @@
  * Per-viewer Play preferences: look sensitivity, invert Y and walking speed. Pure and storage-agnostic;
  * the HUD reads and writes them through `loadPlaySettings` / `savePlaySettings` (localStorage, best effort).
  */
-import { LOOK_SENSITIVITY } from "./play";
+import { SENSITIVITY_MAX, SENSITIVITY_MIN, sensitivityGain } from "./immersive/look";
 import { DEFAULT_FEEL, type FeelFlags } from "./playFeel";
 
 export interface PlaySettings {
@@ -24,7 +24,7 @@ export interface SettingRange { readonly min: number; readonly max: number; read
 export const DEFAULT_PLAY_SETTINGS: PlaySettings = {
   sensitivity: 1, invertY: false, speed: 1, smoothMove: DEFAULT_FEEL.smoothing, headBob: DEFAULT_FEEL.bob, fovKick: DEFAULT_FEEL.fovKick,
 };
-export const SENSITIVITY_RANGE: SettingRange = { min: 0.25, max: 3, step: 0.25 };
+export const SENSITIVITY_RANGE: SettingRange = { min: SENSITIVITY_MIN, max: SENSITIVITY_MAX, step: 0.25 };
 export const SPEED_RANGE: SettingRange = { min: 0.5, max: 2, step: 0.25 };
 export const PLAY_SETTINGS_KEY = "backroom.office.play-settings.v1";
 
@@ -79,7 +79,7 @@ export function savePlaySettings(storage: Writer | null | undefined, settings: P
  * looks up (pitch increases), matching the default Play mapping. `scale` lets touch drag look faster.
  */
 export function lookDelta(dx: number, dy: number, settings: PlaySettings, scale = 1): [dYaw: number, dPitch: number] {
-  const gain = LOOK_SENSITIVITY * settings.sensitivity * scale;
+  const gain = sensitivityGain(settings.sensitivity) * scale;
   return [-dx * gain || 0, (settings.invertY ? dy : -dy) * gain || 0];
 }
 

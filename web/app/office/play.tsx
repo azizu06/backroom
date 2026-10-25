@@ -16,6 +16,7 @@ import {
   frameLookYaw, pickTarget, targetKey, turnIntent, type PlayBridge, type PlayTarget,
 } from '../../lib/office/play';
 import { playSpawn } from '../../lib/office/play-spawn';
+import { useImmersiveRig } from './immersive/rig';
 import { interactionStore } from '../../lib/office/interactions';
 import { bakedArtRequested } from '../../lib/office/baked-art';
 import { LOBBY_PROP_BOXES, lobbyCollisionExtras } from '../../lib/office/baked-colliders';
@@ -46,6 +47,7 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
   const feel = useRef<FeelState>(INITIAL_FEEL);
   const velocity = useRef<[number, number]>([0, 0]);
   const fov = useRef(BASE_FOV);
+  const immersive = useImmersiveRig();
   const wasActive = useRef(false);
   const feelSettling = useRef(false);
   const written = useRef(false);
@@ -103,13 +105,14 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
       intro.done = true;
     }
     const flags = effectiveFeel(input.feel, reduced.current);
-    const coasting = velocity.current[0] !== 0 || velocity.current[1] !== 0 || feelSettling.current;
+    const coasting = velocity.current[0] !== 0 || velocity.current[1] !== 0 || feelSettling.current || immersive.settling;
     const active = input.active() || coasting;
     // The first frame after idle has a stale clock delta; treat it as one display frame.
     const dt = wasActive.current ? Math.min(delta, 0.1) : 1 / 60;
     wasActive.current = active;
     const [lookYaw, lookPitch] = input.consumeLook();
-    const look = applyLook(yaw.current, pitch.current, frameLookYaw(lookYaw, turnIntent(input, dt), input.consumeTurnTap()), lookPitch);
+    immersive.damp(lookYaw, lookPitch, dt, flags.smoothing);
+    const look = applyLook(yaw.current, pitch.current, frameLookYaw(immersive.yaw, turnIntent(input, dt), input.consumeTurnTap()), immersive.pitch);
     const turned = look.yaw !== yaw.current || look.pitch !== pitch.current;
     yaw.current = look.yaw;
     pitch.current = look.pitch;
@@ -126,16 +129,14 @@ export function PlayRig({ input, motions, snapshot, onTarget, hud, coworkers }: 
     const frame = advanceFeel(feel.current, { speed: travelled / dt, travelled, dt, flags });
     feel.current = frame.state;
     feelSettling.current = frame.settling;
-    if (frame.steps > 0) playOfficeCue('step');
+    if (frame.steps > 0) { immersive.step(travelled / dt); playOfficeCue('step'); }
     if (camera.current) {
       if (Math.abs(camera.current.fov - frame.fov) > 1e-3) {
         camera.current.fov = frame.fov;
         camera.current.updateProjectionMatrix();
       }
       fov.current = frame.fov;
-      camera.current.position.set(next[0], EYE_HEIGHT + frame.bobY, next[1]);
-      camera.current.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
-      camera.current.updateMatrixWorld();
+      immersive.pose(camera.current, next[0], EYE_HEIGHT + frame.bobY, next[1], yaw.current, pitch.current, feel.current.distance, feel.current.bob);
     }
     const { snapshot: current, onTarget: report } = latest.current;
     const agents = current.agents.map(agent => ({ id: agent.id, position: motions.get(agent).position }));

@@ -6,7 +6,7 @@ import { requestSceneFrame } from '../../lib/office/frame';
 import { playOfficeCue } from '../../lib/office/sound-events';
 import { applyTurnTap, playPanel, targetKey, targetLabel, type PlayControl, type PlayInput, type PlayTarget } from '../../lib/office/play';
 import {
-  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, loadPlaySettings, lookDelta, savePlaySettings, type PlaySettings,
+  DEFAULT_PLAY_SETTINGS, SENSITIVITY_RANGE, SPEED_RANGE, feelFlags, formatMultiplier, lookDelta, type PlaySettings,
 } from '../../lib/office/playSettings';
 import type { OfficeSnapshot } from '../../lib/office/state';
 import { crosshairView } from '../../lib/office/playFeel';
@@ -19,6 +19,9 @@ import { useGamepad } from './useGamepad';
 import { PlayMinimap } from './PlayMinimap';
 import { PLAY_PANEL_VIEWS } from './panels';
 import { useHandoffPresentation } from './handoffs/HandoffPresentation';
+import { usePlaySettings } from './immersive/usePlaySettings';
+import { requestPointerLock, usePointerLockChrome } from './immersive/usePointerLock';
+import { useImmersiveAudio } from './immersive/useImmersiveAudio';
 import { RoomEntryLabel } from './RoomEntryLabel';
 import { ProximityChat } from './ProximityChat';
 import type { PlayChat } from './useProximityChat';
@@ -67,11 +70,6 @@ function focusAskWhy(question?: string) {
   }
   const field = input ?? mount.querySelector<HTMLElement>('textarea:not([disabled])') ?? mount.querySelector<HTMLElement>('button:not([disabled])');
   field?.focus({ preventScroll: true });
-}
-
-/** localStorage can be missing or throw (private windows, blocked site data). */
-function viewerStorage(): Storage | null {
-  try { return typeof window === 'undefined' ? null : window.localStorage; } catch { return null; }
 }
 
 function PlaySettingsDialog({ settings, change, close }: { settings: PlaySettings; change: (next: PlaySettings) => void; close: () => void }) {
@@ -146,7 +144,9 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: 
   const local = useSyncExternalStore(interactionStore.subscribe, interactionStore.getSnapshot, interactionStore.getServerSnapshot);
   const handoffFor = useHandoffPresentation()?.handoffFor;
   const [panel, setPanel] = useState<PlayTarget | null>(null);
-  const [settings, setSettings] = useState<PlaySettings>(() => loadPlaySettings(viewerStorage()));
+  const [settings, changeSettings] = usePlaySettings();
+  usePointerLockChrome(hud);
+  useImmersiveAudio(hud, snapshot);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -209,10 +209,6 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: 
     setSettingsOpen(false);
     hud.current?.focus();
   }
-  function changeSettings(next: PlaySettings) {
-    setSettings(next);
-    savePlaySettings(viewerStorage(), next);
-  }
   function openChat() {
     releaseStick();
     input.clear();
@@ -266,11 +262,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, chat }: 
     requestSceneFrame();
   }
   function requestLook(element: HTMLDivElement) {
-    if (touch || locked(element) || typeof element.requestPointerLock !== 'function') return;
-    try {
-      const request = element.requestPointerLock() as unknown;
-      if (request instanceof Promise) request.catch(() => { /* Pointer lock is optional; keys still turn. */ });
-    } catch { /* Unavailable (e.g. sandboxed frame); keys still turn. */ }
+    if (!touch) requestPointerLock(element);
   }
   function onSurfacePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (!touch) return;
