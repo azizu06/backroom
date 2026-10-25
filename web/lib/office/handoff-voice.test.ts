@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { createHandoffProxy, HANDOFF_UPSTREAM } from './handoff-proxy';
-import { HandoffVoice, handoffVoiceLine, voiceCues, type VoiceCue } from './handoff-voice';
+import { HandoffVoice, createAudioPlayer, unlockOnFirstGesture, handoffVoiceLine, voiceCues, type VoiceCue } from './handoff-voice';
 import { planHandoffs } from './handoff-plan';
 
 const ORIGIN = 'http://localhost:3035';
@@ -87,10 +87,12 @@ describe('handoff voice lines', () => {
 describe('HandoffVoice', () => {
   const cue = (key: string): VoiceCue => ({ key, at: 0, line: { role: 'auditor', text: key } });
   const flush = () => new Promise(resolve => setTimeout(resolve, 0));
-  it('stays silent until sound is enabled, then speaks each cue once', async () => {
+  it('defaults on, honors explicit off, then speaks each cue once when reenabled', async () => {
     const fetchAudio = vi.fn(async () => new Blob(['x']));
     const play = vi.fn(async () => {});
     const voice = new HandoffVoice(fetchAudio, play);
+    expect(voice.enabled).toBe(true);
+    voice.setEnabled(false);
     voice.say(cue('a'));
     await flush();
     expect(fetchAudio).not.toHaveBeenCalled();
@@ -168,5 +170,55 @@ describe('handoff proxy body cap', () => {
     const transport = vi.fn();
     expect((await proxy(transport as unknown as typeof fetch)(request)).status).toBe(413);
     expect(transport).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('office voice gesture unlock', () => {
+  it.each(['pointerdown', 'keydown'])('unlocks on the first %s anywhere and removes both listeners', event => {
+    const target = new EventTarget();
+    const unlock = vi.fn();
+    const cleanup = unlockOnFirstGesture(target, unlock);
+    target.dispatchEvent(new Event(event));
+    target.dispatchEvent(new Event('pointerdown'));
+    target.dispatchEvent(new Event('keydown'));
+    expect(unlock).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+  it('removes listeners when the office unmounts before a gesture', () => {
+    const target = new EventTarget();
+    const unlock = vi.fn();
+    unlockOnFirstGesture(target, unlock)();
+    target.dispatchEvent(new Event('keydown'));
+    expect(unlock).not.toHaveBeenCalled();
+  });
+  it('unlocks the audio player once and plays the next cue after a gesture', async () => {
+    const audio = Object.assign(new EventTarget(), { src: '', play: vi.fn(async () => {}), pause: vi.fn() });
+    vi.stubGlobal('Audio', function () { return audio; });
+    try {
+      const target = new EventTarget();
+      const player = createAudioPlayer();
+      unlockOnFirstGesture(target, player.unlock);
+      expect(audio.play).not.toHaveBeenCalled();
+      target.dispatchEvent(new Event('pointerdown'));
+      expect(audio.play).toHaveBeenCalledTimes(1);
+      target.dispatchEvent(new Event('keydown'));
+      const played = player.play(new Blob(['x']), new AbortController().signal);
+      expect(audio.play).toHaveBeenCalledTimes(2);
+      audio.dispatchEvent(new Event('ended'));
+      await played;
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('cleanup stops playback without turning the default off', () => {
+    const voice = new HandoffVoice(vi.fn(), vi.fn());
+    voice.stop();
+    expect(voice.enabled).toBe(true);
+    voice.setEnabled(false);
+    voice.stop();
+    expect(voice.enabled).toBe(false);
+  });
+  it('skips playback before unlock without creating audio or throwing', async () => {
+    const player = createAudioPlayer();
+    await expect(player.play(new Blob(['x']), new AbortController().signal)).resolves.toBeUndefined();
   });
 });
