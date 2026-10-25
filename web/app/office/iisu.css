@@ -211,13 +211,55 @@
   border-bottom: 3px solid #ffffff;
 }
 .office-shell .detail-sheet-header h2 { flex: 1; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.3px; }
-.office-shell .detail-sheet-close { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 18px; }
+/* One close button for every modal: a light-grey bubble that spins a quarter turn on hover and squishes on press. */
+.office-shell .detail-sheet-close,
+.office-shell .detail-sheet-backdrop .room-inspector header button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink);
+  background: #EEF1F6;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(25, 33, 59, 0.12);
+  transition: transform 0.22s cubic-bezier(.34, 1.56, .64, 1), background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.office-shell .detail-sheet-close:hover,
+.office-shell .detail-sheet-backdrop .room-inspector header button:hover {
+  background: #ffffff;
+  transform: rotate(90deg) scale(1.08);
+  box-shadow: 0 4px 12px rgba(25, 33, 59, 0.18);
+}
+.office-shell .detail-sheet-close:active,
+.office-shell .detail-sheet-backdrop .room-inspector header button:active { transform: rotate(90deg) scale(0.9); }
 .office-shell .detail-sheet-body { padding: 20px 24px 28px; }
 .office-shell .detail-sheet-empty { display: grid; gap: 6px; justify-items: start; font-size: 15px; }
 .office-shell .detail-sheet-cta { margin-top: 8px; padding: 10px 18px; color: var(--ink); background: var(--pastel-aqua); border: 3px solid #ffffff; border-radius: 999px; font-weight: 900; text-decoration: none; box-shadow: 0 4px 12px rgba(25, 33, 59, 0.15); }
-@keyframes sheet-fade { from { opacity: 0; } }
-@keyframes sheet-pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
-@media (prefers-reduced-motion: reduce) { .office-shell .detail-sheet-backdrop, .office-shell .detail-sheet, .office-shell .detail-sheet-backdrop .room-inspector { animation: none; } }
+/* Bubbly entrance: the backdrop fades and blurs in, the sheet rises, overshoots a touch and settles;
+   its header and content follow a beat later so the open feels like a soft bubble popping into place. */
+@keyframes sheet-fade { from { opacity: 0; backdrop-filter: blur(0); } }
+@keyframes sheet-pop {
+  0% { opacity: 0; transform: translateY(18px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-3px) scale(1.015); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes sheet-content { from { opacity: 0; transform: translateY(6px); } }
+.office-shell .detail-sheet-backdrop { animation-duration: 0.2s; }
+.office-shell .detail-sheet,
+.office-shell .detail-sheet-backdrop .room-inspector { animation: sheet-pop 0.34s cubic-bezier(.22, 1, .36, 1) both; transform-origin: 50% 60%; }
+.office-shell .detail-sheet-body,
+.office-shell .detail-sheet-backdrop .room-inspector > :not(header) { animation: sheet-content 0.28s ease-out 0.08s both; }
+.office-shell .detail-sheet-header .room-icon { animation: icon-bounce 0.5s cubic-bezier(.34, 1.56, .64, 1) 0.1s both; }
+@keyframes icon-bounce { 0% { transform: scale(0.4) rotate(-15deg); } 70% { transform: scale(1.12) rotate(4deg); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .office-shell .detail-sheet-backdrop, .office-shell .detail-sheet, .office-shell .detail-sheet-backdrop .room-inspector,
+  .office-shell .detail-sheet-body, .office-shell .detail-sheet-backdrop .room-inspector > :not(header), .office-shell .detail-sheet-header .room-icon { animation: none; }
+  .office-shell .detail-sheet-close, .office-shell .detail-sheet-backdrop .room-inspector header button { transition: none; }
+}
 
 /* Content inside sheets: white bubbles instead of dark slabs. */
 .office-shell .detail-sheet .seat-statuses { display: flex; gap: 12px; margin-bottom: 16px; }
@@ -307,7 +349,8 @@ body:has(.office-shell) .real-sim-overlay.real-sim-docked {
 .office-shell[data-theme=dark] :is(.room-navigation, .office-sidebar-links) button[aria-pressed=true] .room-icon { color: #19213B; background: var(--pastel-aqua); }
 .office-shell[data-theme=dark] .office-toolbar button.theme-toggle.theme-toggle { color: #19213B; background-color: var(--pastel-yellow); border-color: #2E3A63; box-shadow: -10px 0 12px -4px var(--bubble-glass); }
 .office-shell[data-theme=dark] :is(.detail-sheet-header, .detail-sheet-backdrop .room-inspector header) :is(h2, button) { color: #19213B; }
-.office-shell[data-theme=dark] .detail-sheet-close { background: #ffffff; }
+.office-shell[data-theme=dark] :is(.detail-sheet-close, .detail-sheet-backdrop .room-inspector header button) { color: #19213B; background: #EEF1F6; border-color: #2E3A63; }
+.office-shell[data-theme=dark] :is(.detail-sheet-close, .detail-sheet-backdrop .room-inspector header button):hover { background: #ffffff; }
 .office-shell[data-theme=dark] :is(.lobby-v2-stats > div, .lobby-v2-roster > li, .office-lobby-ask) { background: #26315A; border-color: #3B4A7E; }
 .office-shell[data-theme=dark] .lobby-v2-stats > div:nth-child(odd) { background: #2F3A5E; border-color: #5E5A3A; }
 .office-shell[data-theme=dark] .office-lobby-pay > section { background: #26315A !important; border-color: #3B4A7E !important; }
@@ -339,3 +382,76 @@ body:has(.office-shell[data-theme=dark]) .real-sim-toggle { color: #19213B !impo
   .office-shell [data-testid=gx10-readout] { width: 168px !important; padding: 8px !important; font-size: 10px !important; }
   .office-shell [data-testid=gx10-readout] strong { font-size: 12px !important; }
 }
+
+/* Theme switch: the browser cross-fades nothing; the new theme is revealed as a circle from the toggle (Office.tsx). */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.office-shell .theme-toggle svg { transition: transform 0.45s cubic-bezier(.34, 1.56, .64, 1); }
+.office-shell .theme-toggle:hover svg { transform: rotate(-18deg) scale(1.1); }
+.office-shell[data-theme=dark] .theme-toggle svg { animation: toggle-spin 0.5s cubic-bezier(.34, 1.56, .64, 1); }
+.office-shell[data-theme=light] .theme-toggle svg { animation: toggle-spin-back 0.5s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes toggle-spin { from { transform: rotate(-120deg) scale(0.5); } }
+@keyframes toggle-spin-back { from { transform: rotate(120deg) scale(0.5); } }
+@media (prefers-reduced-motion: reduce) { .office-shell .theme-toggle svg { animation: none; transition: none; } }
+
+/* ---------- Real vs. simulated: compact tile with a Details dropdown (RealSimDetails.tsx) ---------- */
+.office-shell .real-sim-tile {
+  position: absolute;
+  z-index: 6;
+  right: 14px;
+  bottom: 14px;
+  width: min(300px, calc(100% - 28px));
+  color: var(--ink);
+  background: var(--bubble-glass);
+  border: var(--bubble-border);
+  border-radius: 22px;
+  box-shadow: var(--bubble-shadow);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition: width 0.28s cubic-bezier(.22, 1, .36, 1);
+}
+.office-shell .real-sim-tile[data-open=true] { width: min(440px, calc(100% - 28px)); }
+.office-shell .real-sim-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; }
+.office-shell .real-sim-tile-head > div { display: grid; min-width: 0; }
+.office-shell .real-sim-tile-head strong { font-size: 13px; font-weight: 900; }
+.office-shell .real-sim-tile-note { font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.office-shell .real-sim-tile-toggle { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; font-size: 12px; background: var(--pastel-aqua); border-color: #ffffff; }
+.office-shell .real-sim-tile-caret { transition: transform 0.25s cubic-bezier(.34, 1.56, .64, 1); }
+.office-shell .real-sim-tile[data-open=true] .real-sim-tile-caret { transform: rotate(180deg); }
+.office-shell .real-sim-tile-body { display: grid; gap: 10px; max-height: min(52dvh, 420px); overflow: auto; padding: 4px 14px 12px; border-top: 2px dotted var(--pastel-aqua); animation: tile-rise 0.28s cubic-bezier(.22, 1, .36, 1); }
+.office-shell .real-sim-tile-body[hidden] { display: none; }
+.office-shell .real-sim-tile-body h3 { margin: 6px 0 2px; font-size: 12px; font-weight: 900; }
+.office-shell .real-sim-tile-body ul { margin: 0; padding: 0; list-style: none; }
+.office-shell .real-sim-tile-body .real-sim-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; font-size: 12px; }
+.office-shell .real-sim-tile-body .real-sim-status { font-size: 11px; white-space: nowrap; }
+.office-shell .real-sim-tile-body .real-sim-detail-line { margin: 0 0 2px; font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.office-shell .real-sim-tile-body .real-sim-good { color: #0F7A4E; }
+.office-shell .real-sim-tile-body .real-sim-warning { color: #9A5B00; }
+.office-shell .real-sim-tile-foot { margin: 0; font-size: 11px; color: var(--ink-soft); }
+.office-shell .real-sim-tile-foot a { color: var(--ink); font-weight: 800; }
+@keyframes tile-rise { from { opacity: 0; transform: translateY(8px); } }
+.office-shell[data-theme=dark] .real-sim-tile .real-sim-tile-toggle.real-sim-tile-toggle { color: #19213B; background-color: var(--pastel-aqua); border-color: #2E3A63; }
+.office-shell[data-theme=dark] .real-sim-tile-body .real-sim-good { color: #8BDEB0; }
+.office-shell[data-theme=dark] .real-sim-tile-body .real-sim-warning { color: #FFD082; }
+@media (prefers-reduced-motion: reduce) { .office-shell .real-sim-tile, .office-shell .real-sim-tile-caret { transition: none; } .office-shell .real-sim-tile-body { animation: none; } }
+
+/* ---------- Shared site nav inside the office: same bubbly pill as the header ---------- */
+.office-shell .site-nav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pastel-aqua) transparent;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--bubble-glass);
+  border: var(--bubble-border);
+  border-radius: 999px;
+  box-shadow: var(--bubble-shadow);
+}
+.office-shell .site-nav ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.office-shell .site-nav a { padding: 4px 10px; color: var(--ink); font-weight: 800; text-decoration: none; border-radius: 999px; }
+.office-shell .site-nav a:hover, .office-shell .site-nav a[aria-current=page] { background: var(--pastel-yellow); color: #19213B; }
+.office-shell .site-nav .demo-pill { color: #19213B; background: var(--pastel-aqua); border-color: #ffffff; }

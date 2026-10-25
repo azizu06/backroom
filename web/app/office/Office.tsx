@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { LlmToggle } from '../../components/LlmToggle';
@@ -15,6 +16,7 @@ import { INITIAL_VIEWPORT, VIEW_OPTIONS, isFixedCamera, viewportLayers, viewport
 import { TOUR_INTERRUPT_EVENTS, TOUR_STEP_MS, tourCaption, tourIndexAt, tourStops } from '../../lib/office/tour';
 import { OfficeLobby } from './OfficeLobby';
 import { OfficeHelp } from './OfficeHelp';
+import { RealSimDetails } from './RealSimDetails';
 import { StoryMode } from './StoryMode';
 import { useStoryMode } from './useStoryMode';
 import type { StoryChapter } from '../../lib/office/story';
@@ -98,11 +100,23 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   // Light by default; the viewer's choice is a per-browser convenience, so storage failures are ignored.
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   useEffect(() => { try { if (localStorage.getItem('backroom-theme') === 'dark') setTheme('dark'); } catch {} }, []);
-  const toggleTheme = useCallback(() => setTheme(current => {
-    const next = current === 'dark' ? 'light' : 'dark';
-    try { localStorage.setItem('backroom-theme', next); } catch {}
-    return next;
-  }), []);
+  const toggleTheme = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    const apply = () => setTheme(current => {
+      const next = current === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('backroom-theme', next); } catch {}
+      return next;
+    });
+    // The new theme spreads out from the toggle as a growing circle; no animation without View Transitions or with reduced motion.
+    const doc = document as Document & { startViewTransition?: (update: () => void) => { ready: Promise<void> } };
+    if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { apply(); return; }
+    const { left, top, width, height } = event.currentTarget.getBoundingClientRect();
+    const x = left + width / 2, y = top + height / 2;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    doc.startViewTransition(() => flushSync(apply)).ready.then(() => {
+      document.documentElement.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 520, easing: 'cubic-bezier(.22, 1, .36, 1)', pseudoElement: '::view-transition-new(root)' });
+    }).catch(() => {});
+  }, []);
   const [motions] = useState(() => new MotionRegistry());
   // Play is first person over the same scene; exiting returns to the view chosen before it.
   const [playTarget, setPlayTarget] = useState<PlayTarget | null>(null);
@@ -221,6 +235,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     </header>
     <div ref={viewportRef} className='office-viewport' data-testid='office-viewport'>
       <SoundToggle snapshot={snapshot} />
+      <RealSimDetails />
       <p className='visually-hidden'>3D office view. Use the room buttons to inspect badges and limits.</p>
       <ViewBoundary name='3D scene' resetKey={sceneAttempt} fallback={<FloorPlan snapshot={snapshot} motions={motions} select={inspect} />} onFailure={onFailure}>
         {!layers.scene ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : <>

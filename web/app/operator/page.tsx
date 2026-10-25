@@ -28,6 +28,11 @@ function X402Summary({ receipt }: { receipt: X402Receipt }) {
   </dl>;
 }
 export default function OperatorPage() {
+  const [theme, setTheme] = useState('light');
+  useEffect(() => {
+    try { setTheme(localStorage.getItem('backroom-theme') === 'dark' ? 'dark' : 'light'); }
+    catch { setTheme('light'); }
+  }, []);
   const [authorized, setAuthorized] = useState(false), [busy, setBusy] = useState('');
   const [offBusy, setOffBusy] = useState(false), [code, setCode] = useState('');
   const [error, setError] = useState(''), [receipt, setReceipt] = useState<Receipt>();
@@ -86,7 +91,7 @@ export default function OperatorPage() {
     return <div className={styles.action} key={action}><div><strong>{operatorActions[action][0]}</strong><p>{operatorActions[action][1]}</p></div>{trigger(action)}</div>;
   }
   const controllerUrl = links.publicUrl ? `${links.publicUrl}/controller` : '';
-  return <main className={styles.page}><div className={styles.content}>
+  return <main className={styles.page} data-theme={theme}><div className={styles.content}>
     <header><a href='/office'>Backroom office</a><span className={styles.pill}>Demo · synthetic company · sandbox money</span><a href='/real-vs-sim'>What is real?</a></header>
     <h1>Demo operator</h1>
     <p className={styles.lede}>Run the demo top to bottom. Every action is audited; approvals still need Dana&rsquo;s passkey.</p>

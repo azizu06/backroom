@@ -18,3 +18,32 @@
   .site-nav-note { order: 1; flex-basis: 100%; padding-bottom: 8px; }
   .site-nav .demo-pill { white-space: normal; }
 }
+
+/* Cozy pass (#271): the shared nav becomes a frosted pastel pill on every page, matching the office shell. */
+.site-nav {
+  margin: 12px 16px 0;
+  max-width: calc(100% - 32px);
+  min-height: 44px;
+  padding: 2px 10px 2px 18px;
+  align-items: center;
+  color: #19213B;
+  background: rgba(255, 255, 255, 0.82);
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(25, 33, 59, 0.12);
+  backdrop-filter: blur(10px);
+  font: 800 13px/1.3 'Nunito', ui-rounded, 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+}
+.site-nav a { height: 34px; padding: 0 12px; border-radius: 999px; transition: background-color 0.15s ease, transform 0.15s ease; }
+.site-nav .site-nav-brand { font-size: 16px; font-weight: 900; }
+.site-nav a:hover { color: #19213B; background: #A9F6FF; text-decoration: none; transform: translateY(-1px); }
+.site-nav a[aria-current='page'] { color: #19213B; background: #FFF3A6; box-shadow: none; }
+.site-nav a:focus-visible { outline: 3px solid #19213B; outline-offset: 1px; }
+.site-nav .demo-pill { color: #19213B; background: #A9F6FF; border-color: #ffffff; }
+body:has([data-theme='dark']) .site-nav { color: #FFF8DC; background: rgba(25, 33, 59, 0.88); border-color: #2E3A63; }
+body:has([data-theme='dark']) .site-nav a:hover, body:has([data-theme='dark']) .site-nav a[aria-current='page'] { color: #19213B; }
+@media (prefers-reduced-motion: reduce) { .site-nav a { transition: none; } }
+@media (max-width: 760px) { .site-nav { margin: 8px 8px 0; max-width: calc(100% - 16px); border-radius: 24px; padding: 4px 10px; } }
+/* Pages behind the floating nav share the cozy background, so the pill never sits on a bare canvas. */
+body:has(> .site-nav) { background: linear-gradient(165deg, #A9F6FF 0%, #d8fbff 50%, #FFF3A6 100%) fixed; }
+body:has(> .site-nav):has([data-theme='dark']) { background: linear-gradient(165deg, #10162B 0%, #19213B 55%, #2A2650 100%) fixed; }
