@@ -30,11 +30,11 @@ test('OFF cannot clear a pending proof action and failed proof output stays visi
 
 test('x402 buttons label each rail, explain an unavailable testnet and show the hold proof', async ({ page }) => {
   await page.route('**/api/operator/session', route => route.fulfill({ json: { authorized: true,
-    x402Testnet: { available: false, reason: 'Testnet is off. Restart the demo host with X402_LIVE=1 to opt in. Simulated is available.' } } }));
+    x402Testnet: { available: false, reason: 'Testnet is off. Host opt-in requires X402_LIVE=1. OFFLINE is available.' } } }));
   await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
   await page.route('**/api/operator/x402_simulated', route => route.fulfill({ json: { auditHref: '/audit?entry=op-1', result: {
     rail: 'x402 simulated', note: 'Simulated money', scenario: 'simulated', status: 'paid', amount: '$1,250.00', asset: 'simulated USDC',
-    vendor: 'Acme Supply (demo)', invoiceId: 'acme-x402-simulated-1', recipient: '0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180',
+    vendor: 'Acme Supply', invoiceId: 'acme-x402-simulated-1', recipient: '0xf3582f2183d22BB09d9AA2B1aC7f721eC4f61180',
     policy: { decision: 'ALLOW', ruleIds: [] }, transaction: `0x${'ab'.repeat(32)}`, proof: { vendorRequests: 2, signatures: 1 },
     paymentAuditHref: '/audit?entry=pay-1' } } }));
   await page.route('**/api/operator/x402_blocked', route => route.fulfill({ json: { result: {
@@ -72,4 +72,28 @@ test('demo steps are visible in order and diagnostics stay collapsed', async ({ 
   await expect(page.getByRole('link', { name: 'https://demo.example/controller' })).toBeVisible();
   await expect(page.getByRole('img', { name: /Dana's controller/ })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Reload the office' })).toBeVisible();
+});
+
+test('a paid TESTNET session shows its transaction after reload and disables repeat payment', async ({ page }) => {
+  const receipt = { rail: 'x402 testnet', scenario: 'testnet', status: 'paid', amount: '$0.01',
+    asset: 'Base Sepolia test USDC', vendor: 'Acme Supply', transaction: `0x${'ab'.repeat(32)}`,
+    explorer: `https://sepolia.basescan.org/tx/0x${'ab'.repeat(32)}` };
+  let paid = false;
+  await page.route('**/api/operator/session', route => route.fulfill({ json: { authorized: true,
+    x402Testnet: paid ? { available: false, reason: 'Already paid this session', lastResult: receipt } : { available: true } } }));
+  await page.route('**/api/pay/active', route => route.fulfill({ json: { active: null } }));
+  let payments = 0;
+  await page.route('**/api/operator/x402_testnet', route => {
+    payments++; paid = true;
+    return route.fulfill({ json: { result: receipt } });
+  });
+  await page.goto('/operator');
+  await page.getByRole('button', { name: 'Pay vendor with x402 · TESTNET', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm pay vendor with x402 · testnet', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Already paid this session', exact: true })).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'View on Base Sepolia basescan' })).toHaveAttribute('href', receipt.explorer);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Already paid this session', exact: true })).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'View on Base Sepolia basescan' })).toHaveAttribute('href', receipt.explorer);
+  expect(payments).toBe(1);
 });

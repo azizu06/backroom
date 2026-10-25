@@ -54,6 +54,8 @@ export class PaymentService {
       || !Number.isSafeInteger(link.installment) || link.installment < 1) throw new PaymentError('ALLOW_REQUIRED');
     return link;
   }
+  /** Read-only readiness check; never reads the bank or initiates payment. */
+  hasRecordedPayment(id: string): boolean { return this.records.has(id); }
   async view(id: string) {
     const link = await this.link(id);
     return { linkId: link.id, invoiceId: link.invoiceId, installment: link.installment, amountCents: link.amountCents,

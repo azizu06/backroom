@@ -11,6 +11,9 @@ export function installPaymentService(service: PaymentService) { root.backroomPa
 export function installedBankDisclosure() {
   return root.backroomPaymentService?.bankDisclosure();
 }
+export function installedPaymentRecorded(id: string): boolean {
+  return root.backroomPaymentService?.hasRecordedPayment(id) ?? false;
+}
 export function getPaymentService(): PaymentService {
   if (root.backroomPaymentService) return root.backroomPaymentService;
   if (!process.env.NESSIE_API_KEY || !process.env.NESSIE_ACCOUNT_ID || !process.env.NESSIE_CLAIMS_DIR) {

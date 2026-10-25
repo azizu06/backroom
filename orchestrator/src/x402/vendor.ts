@@ -24,7 +24,7 @@ export async function startTestnetVendor(invoice: VendorInvoice, options: { port
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json');
-    const body = { label, vendor: 'Acme Supply (demo)', invoiceId: invoice.id, amountCents: invoice.amountCents, network: X402_NETWORK };
+    const body = { label, vendor: 'Acme Supply', invoiceId: invoice.id, amountCents: invoice.amountCents, network: X402_NETWORK };
     const reply = (status: number, data: unknown) => { res.writeHead(status); res.end(JSON.stringify(data)); };
     if (req.method !== 'GET' || req.url !== `/invoices/${encodeURIComponent(invoice.id)}`) return reply(404, { label, error: 'Unknown invoice' });
     const signature = req.headers['payment-signature'];

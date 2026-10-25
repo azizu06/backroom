@@ -1,10 +1,11 @@
+import { flowCaption } from '../workday/flow';
 /** Pure visual choreography for the public agent runtime projection (docs/agents.md / PR #152).
  * Sequence orders independent handoffs; status updates keep an existing courier's journey.
  * Offered carries the folder; accepted passes it to the worker; rejected carries it home.
  * Corrections are separate reverse rows. No business writes or decisions happen here.
  */
 import {
-  HANDOFF_AGENTS, HUMAN, compareHandoffs, handoffLine, handoffRoute, handoffSpot, isHandoffAgent, needsHandoffHuman, routeLength,
+  HANDOFF_AGENTS, HUMAN, compareHandoffs, handoffRoute, handoffSpot, isHandoffAgent, needsHandoffHuman, routeLength,
   upsertHandoffs, type Handoff, type HandoffAgentId,
 } from './handoffs';
 import type { FloorPosition } from './state';
@@ -90,7 +91,7 @@ export function planHandoffs(rows: readonly Handoff[], { speed = 1, previous = E
     const priorFolder = prior && previous.folders.find(folder => folder.handoffId === row.handoffId);
     const rejected = row.status === 'rejected';
     const addReturnBubble = (trip: Trip, actor: HandoffAgentId, at: number) => {
-      bubbles.push({ actor, start: at, end: trip.end + tail, text: handoffLine(row), tone: 'fail' });
+      bubbles.push({ actor, start: at, end: trip.end + tail, text: flowCaption(row), tone: 'fail' });
       if (needsHandoffHuman(row)) human.push([row.createdAt, (row.completedAt ?? trip.end) + tail]);
     };
     // Keep an interrupted journey immutable on subsequent updates to this same primary key.
@@ -159,10 +160,10 @@ export function planHandoffs(rows: readonly Handoff[], { speed = 1, previous = E
     }
     const tone: BubbleTone = rejected ? 'fail' : row.correction ? 'correction' : 'info';
     bubbles.push({ actor: courier, start, end: rejected ? end + tail : homeStart + tail,
-      text: handoffLine(row), tone });
+      text: flowCaption(row), tone });
     if (!rejected && row.status !== 'offered') bubbles.push({ actor: receiver,
       start: homeStart, end: Math.max(homeStart, row.completedAt ?? homeStart) + tail,
-      text: handoffLine(row), tone });
+      text: flowCaption(row), tone });
     if (needsHandoffHuman(row)) {
       const until = row.completedAt ?? (rejected ? end : Infinity);
       human.push([row.createdAt ?? start, until + tail]);

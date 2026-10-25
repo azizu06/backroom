@@ -2,12 +2,12 @@ import QRCode from 'qrcode';
 import { bankSurfaceCopy } from '@backroom/nessie';
 import { getGatewayStore } from '../../../../lib/gateway/runtime';
 import { activePaymentDelivery, paymentPublicOrigin } from '../../../../lib/payments/delivery';
-import { installedBankDisclosure } from '../../../../lib/payments/runtime';
+import { installedBankDisclosure, installedPaymentRecorded } from '../../../../lib/payments/runtime';
 export const runtime = 'nodejs';
 export async function GET() {
   const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
   try {
-    const link = await activePaymentDelivery(getGatewayStore());
+    const link = await activePaymentDelivery(getGatewayStore(), Date.now(), installedPaymentRecorded);
     if (!link) return Response.json({ active: null }, { headers });
     const published = paymentPublicOrigin();
     const url = `${published.origin}/p/${link.code}`;

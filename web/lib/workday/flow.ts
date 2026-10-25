@@ -11,10 +11,16 @@ export function flowCase(row: Handoff) {
   const label = row.caseDisplayId.trim();
   return /^(?:INV|CASE)-\d{1,12}$/i.test(label) || /^••[\p{L}\p{N}]{1,16}$/u.test(label) ? label : 'this case';
 }
-/** Code-owned job descriptions plus an actual public edge/state; never repeat a model's free-text claims. */
+/** Short code-owned phrases; payload text and internal identifiers stay on the audit wall. */
 export function flowCaption(row: Handoff) {
   const from = ROLE_WORK[row.fromRole], to = ROLE_WORK[row.toRole];
-  const state = row.status === 'offered' ? 'offer pending' : row.status === 'accepted' ? 'accepted'
-    : row.status === 'rejected' ? 'held for review' : 'turn completed';
-  return `${from.name}: ${from.job} (${flowCase(row)}) → ${to.name}: ${to.job} · ${row.correction ? 'correction · ' : ''}${state}`;
+  const work: Record<HandoffAgentId, string> = {
+    intake: 'sorting the documents', extractor: 'checking the fields', vendor: 'verifying vendor bank details',
+    payables: 'checking payment policy', auditor: 'checking the audit record', collections: 'reviewing the call outcome',
+    reconciler: 'matching the payment', human: 'held for Dana’s review',
+  };
+  const phrase = row.status === 'rejected' ? 'held for review'
+    : row.correction ? 'checking a correction'
+    : row.status === 'completed' ? 'finished the handoff' : work[row.toRole];
+  return `${from.name} → ${to.name} · ${flowCase(row)} · ${phrase}`;
 }
