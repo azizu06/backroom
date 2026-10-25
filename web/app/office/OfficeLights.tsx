@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react';
 import { ACESFilmicToneMapping, MeshStandardMaterial } from 'three';
-import { LOW_POWER_QUERY, OFFICE_LAMPS, OFFICE_EXPOSURE, officeLightRig, officeLowPower } from '../../lib/office/lighting';
+import { LOW_POWER_QUERY, OFFICE_LAMPS, OFFICE_EXPOSURE, lampPieces, officeLightRig, officeLowPower } from '../../lib/office/lighting';
 import { ROLES } from '../../lib/office/palette';
 import { visibleRooms, type OfficeSnapshot } from '../../lib/office/state';
 import type { FurniturePiece } from '../../lib/office/furniture';
@@ -44,11 +44,9 @@ function Lamps({ rooms }: { rooms: string }) {
     const bodies: FurniturePiece[] = [], shades: FurniturePiece[] = [];
     // Under ?art=baked the baked room brings its own lamp, so the procedural one would stand inside it.
     for (const lamp of OFFICE_LAMPS.filter(lamp => rooms.split(',').includes(lamp.room) && !bakedReplacesProps(baked, lamp.room))) {
-      const [x, y, z] = lamp.base;
-      const width = lamp.floor ? 0.35 : 0.22;
-      bodies.push({ at: [x, y + 0.025, z], size: [width, 0.05, width], color: ROLES.frame },
-        { at: [x, y + lamp.height / 2, z], size: [0.035, lamp.height, 0.035], color: ROLES.frame });
-      shades.push({ at: [x, y + lamp.height, z], size: [width + 0.1, 0.16, width + 0.1], color: ROLES.lampLight });
+      const [base, stem, shade] = lampPieces(lamp);
+      bodies.push(base!, stem!);
+      shades.push(shade!);
     }
     return { bodies, shades };
   }, [rooms, baked]);
@@ -60,7 +58,7 @@ function Lamps({ rooms }: { rooms: string }) {
 }
 
 export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot; lowPower: boolean }) {
-  const { key, fill, hemisphere, pointLights, contactShadows } = officeLightRig(lowPower);
+  const { key, fill, hemisphere, pointLights, ceilingFill, contactShadows } = officeLightRig(lowPower);
   const rooms = visibleRooms(snapshot);
   const baked = useBakedLobbyReady();
   return <>
@@ -71,6 +69,7 @@ export function OfficeLights({ snapshot, lowPower }: { snapshot: OfficeSnapshot;
       shadow-camera-left={key.shadow.left} shadow-camera-right={key.shadow.right} shadow-camera-top={key.shadow.top} shadow-camera-bottom={key.shadow.bottom} />
     <directionalLight position={fill.position} color={fill.color} intensity={fill.intensity} castShadow={fill.castShadow} />
     {pointLights.filter(light => rooms.includes(light.room)).map(({ room, ...light }) => <pointLight key={room} {...light} />)}
+    {ceilingFill && <pointLight name='office:ceiling-fill' {...ceilingFill} />}
     {/* Demand frames only; dropping this pass entirely is essential in low-power mode. Static casters bake once per room set. */}
     {contactShadows && <OfficeContactShadows config={contactShadows} version={`${rooms.join(',')}|${baked}`} />}
     <Lamps rooms={rooms.join(',')} />

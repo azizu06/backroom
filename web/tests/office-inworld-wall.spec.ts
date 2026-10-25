@@ -1,3 +1,7 @@
+import { AUDIT_WALL } from '../lib/office/props/auditWall';
+import { INBOX_TRAY } from '../lib/office/targets/inbox';
+import { workspaceRoute, ROOM_SPAWNS, type Vec2 } from '../lib/office/layout';
+import { OFFICE_ANCHORS } from '../lib/office/state';
 import { test, expect, type Page } from '@playwright/test';
 import { openMenu } from './office-menu';
 
@@ -67,6 +71,13 @@ async function walkTo(page: Page, x: number, z: number, tolerance = 0.2) {
   }
   expect((await bearingTo(page, x, z)).distance).toBeLessThanOrEqual(tolerance * 2);
 }
+/** Follow the same grid aisles as agents/story; never hard-code the retired room corridors. */
+async function followRoute(page: Page, target: Vec2) {
+  const at = await player(page);
+  const route = workspaceRoute([at.x, at.z], target);
+  expect(route.at(-1)).toEqual(target);
+  for (const [x, z] of route.slice(1)) await walkTo(page, x, z);
+}
 async function startPlay(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -74,16 +85,16 @@ async function startPlay(page: Page) {
   await requireWebGL(page);
   // Retry until hydrated: a click before hydration is a no-op. The denial adds a real preview audit row.
   await expect(async () => {
-    // Preview controls sit in the corner menu (closed by default); a pick closes it again.
-    const menu = page.getByRole('button', { name: 'Backroom menu' });
-    if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
-    await page.getByRole('button', { name: 'Show Treasury denial' }).click();
-    await expect(page.getByRole('button', { name: /^Treasury · .*entry denied/ })).toBeVisible({ timeout: 500 });
+    // Preview controls and receipts live in Full Floor; department scene labels were removed.
+    await page.getByRole('navigation', { name: 'Office shortcuts' }).getByRole('button', { name: 'Full Floor', exact: true }).click();
+    await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+    await expect(page.locator('[data-audit-id]').first()).toContainText('DENY', { timeout: 500 });
   }).toPass();
+  await page.keyboard.press('Escape');
   const select = page.getByLabel('Office view');
-  await expect(select).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
-  await openMenu(page);
+  await select.selectOption('tween');
+  await expect(select).toHaveValue('tween');
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
@@ -95,12 +106,10 @@ test('the audit wall hangs in the lobby and, on a preview feed, paints no receip
   const errors = await startPlay(page);
   const canvas = page.getByTestId('office-viewport').locator('canvas');
 
-  // East lobby wall (interior, so the west windows stay clear), centred at z = 5.3. Stand at arm's length and look straight at it.
-  await walkTo(page, -9, 2.6);
-  await walkTo(page, -7.1, 5.3);
-  await face(page, -6.11, 5.3);
+  await followRoute(page, [AUDIT_WALL.x + 0.9, AUDIT_WALL.z]);
+  await face(page, AUDIT_WALL.x, AUDIT_WALL.z);
   const at = await player(page);
-  expect(at.x).toBeGreaterThan(-7.6);
+  expect(at.x).toBeGreaterThan(AUDIT_WALL.x);
 
   // Local rows are not the audit log, so the wall paints none of them and says so (live ids are covered by the unit tests).
   expect(await canvas.getAttribute('data-audit-wall')).toBe('');
@@ -120,14 +129,10 @@ test('the inbox tray sits on the Payables desk: walk up, see E: open, open the i
   const canvas = page.getByTestId('office-viewport').locator('canvas');
   await expect(canvas).toHaveAttribute('data-inbox-prompt', '');
 
-  // Corridor, through the Payables doorway (x -4.15..-2.85), then to the aisle end of the desk.
-  await walkTo(page, -3.5, 0.3);
-  await walkTo(page, -3.5, -2.3);
-  await expect(page.locator('.play-prompt')).not.toContainText('inbox tray'); // Sam is ahead; the tray is out of reach
+  await followRoute(page, [INBOX_TRAY[0], INBOX_TRAY[1] + 2]);
   await expect(canvas).toHaveAttribute('data-inbox-prompt', '');
-
-  await walkTo(page, -4.3, -4.15);
-  await face(page, -4.3, -4.7);
+  await walkTo(page, INBOX_TRAY[0], INBOX_TRAY[1] + 1);
+  await face(page, ...INBOX_TRAY);
   await expect(page.getByText('E · Open inbox tray · 3 in inbox')).toBeVisible();
   await expect(canvas).toHaveAttribute('data-inbox-prompt', 'E: open');
 

@@ -67,8 +67,8 @@ describe('lobby collider loader', () => {
 
     const sofa = boxNamed(lobby, 'sofa');
     const outside: [number, number] = [-6.5, 3.5];
-    const blocked = movePlayer(outside, [-1, 0], on, PLAYER_RADIUS);
-    const open = movePlayer(outside, [-1, 0], off, PLAYER_RADIUS);
+    const blocked = movePlayer(outside, [-1, 0], lobbyCollisionExtras(true, lobby, []), PLAYER_RADIUS);
+    const open = movePlayer(outside, [-1, 0], lobbyCollisionExtras(false, lobby, []), PLAYER_RADIUS);
     expect(insideAny(blocked, [sofa], PLAYER_RADIUS)).toBe(false);
     expect(blocked[0]).toBeCloseTo(sofa.maxX + PLAYER_RADIUS, 3);
     expect(insideAny(open, [sofa], 0)).toBe(true);

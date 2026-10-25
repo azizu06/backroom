@@ -11,7 +11,7 @@ import { flushSync } from 'react-dom';
 import { isCloseKey } from '../../lib/office/a11y';
 import { PlayInput, type PlayBridge, type PlayTarget } from '../../lib/office/play';
 import { PLAY_HINT, PLAY_TOUCH_HINT, PlayHud, PlayPanelDialog, focusAskWhy, useTouch } from './PlayHud';
-import { roomLabel, seatLabel } from '../../lib/office/a11y';
+import { seatLabel } from '../../lib/office/a11y';
 import { MotionRegistry } from '../../lib/office/motion';
 import { createMockOfficeState } from '../../lib/office/preview';
 import { INITIAL_OFFICE, OFFICE_ANCHORS, anchorLabel, visibleRooms, type AnchorId, type OfficeSnapshot, type OfficeState } from '../../lib/office/state';
@@ -38,7 +38,7 @@ import { ViewBoundary } from './ViewBoundary';
 import { PlaySplash } from './PlaySplash';
 import { COMPACT_QUERY, readStartView, saveStartView, startView } from '../../lib/office/start-mode';
 import { HandoffLog, HandoffPresentation, HandoffTags, useOfficeHandoffs } from './handoffs/HandoffPresentation';
-import type { AgentTagLookup, RoomLabels } from './scene';
+import type { AgentTagLookup } from './scene';
 import '../office.css';
 import './a11y.css';
 import './lobby.css';
@@ -100,7 +100,6 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const recorded = snapshot.connection === 'replay';
   // The 3D scene renders on demand: request a frame here, not from effects inside the Canvas root.
   useEffect(() => { if (motions.sync(snapshot.agents, { recorded })) requestSceneFrame(); }, [motions, snapshot.agents, recorded]);
-  const labels: RoomLabels = { lobby: useRef(null), collections: useRef(null), payables: useRef(null), vendor_onboarding: useRef(null), dana: useRef(null), treasury: useRef(null) };
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
   const pickMode = useCallback((next: ViewMode) => dispatch({ type: 'pick', mode: next }), []);
@@ -324,7 +323,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? { ...play, story: storyChapter } : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? { ...play, story: storyChapter } : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
           </div>
           {/* In Overview each tag is a quick-action button (Tab through them). Elsewhere the footer seat statuses already
               announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
@@ -336,15 +335,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             </button> : <><strong>{agent.name}</strong><span className='agent-tag-state'>{agent.escalationId && '▱ '}{agent.state}</span></>}
           </div>)}</div>}
           {!layers.floorPlan && <HandoffTags />}
-          {layers.floorPlan ? <FloorPlan snapshot={snapshot} motions={motions} select={inspect} /> : visibleRooms(snapshot).map(room => {
-            const badge = snapshot.badges.find(row => row.seatId === room);
-            return <div key={room} ref={labels[room]} className='scene-label'>
-              <button className='desk-label' aria-haspopup={overview ? 'menu' : undefined} aria-expanded={overview ? menu?.pick.kind === 'room' && menu.pick.room === room : undefined}
-                onClick={event => overview ? openMenu({ kind: 'room', room }, event.currentTarget) : inspect(room, event.currentTarget)} aria-label={roomLabel(room, snapshot)}>
-                {OFFICE_ANCHORS[room].name}<span>{badge ? `Badge · v${badge.policyVersion}` : room === 'treasury' ? 'Locked · Dana only' : room === 'lobby' ? 'Audit wall + inbox' : 'Human approval'}</span>
-              </button>
-            </div>;
-          })}
+          {layers.floorPlan && <FloorPlan snapshot={snapshot} motions={motions} select={inspect} />}
         </>}
       </ViewBoundary>
       {mode === 'play' && layers.scene?.visible && (storyActive

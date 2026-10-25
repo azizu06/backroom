@@ -7,18 +7,18 @@ import { usePrecompile } from './usePrecompile';
 import { MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial } from 'three';
 import type { FurniturePiece } from '../../../lib/office/furniture';
 import { BUILDING, WALL_HEIGHT, wallPieces, windowPieces } from '../../../lib/office/layout';
-import { OFFICE_LIGHTING } from '../../../lib/office/lighting';
-import { OUTDOOR, ROLES } from '../../../lib/office/palette';
+import { OFFICE_LIGHTING, OFFICE_SHELL_MATERIALS } from '../../../lib/office/lighting';
+import { ROLES } from '../../../lib/office/palette';
 import { StaticBoxes, StaticInstances, UNIT_BOX } from './StaticGeometry';
 
 // Shared for the lazy scene's lifetime, like the other static batches. Instance colours (palette tokens) tint white materials.
 const WALL_MATERIAL = new MeshStandardMaterial({ vertexColors: true, roughness: OFFICE_LIGHTING.base.roughness });
 // Both directional lights come from the south, so north-facing wall faces would read grey; a faint cream glow keeps them warm.
 // Lambert: walls and ceiling fill most first-person pixels, so they use the cheaper diffuse model (they are matte anyway).
-const FULL_WALL_MATERIAL = new MeshLambertMaterial({ vertexColors: true, emissive: ROLES.wall, emissiveIntensity: 0.22 });
+const FULL_WALL_MATERIAL = new MeshLambertMaterial({ vertexColors: true, ...OFFICE_SHELL_MATERIALS.wall });
 const GLASS_MATERIAL = new MeshStandardMaterial({ transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.1, depthWrite: false });
 // The ceiling's underside faces away from the sky light, so it carries its own soft glow.
-const CEILING_MATERIAL = new MeshLambertMaterial({ emissive: ROLES.ceiling, emissiveIntensity: 0.35 });
+const CEILING_MATERIAL = new MeshLambertMaterial(OFFICE_SHELL_MATERIALS.ceiling);
 const PANEL_MATERIAL = new MeshBasicMaterial();
 
 const FULL_WALLS = wallPieces('full');
@@ -30,7 +30,7 @@ const SLAB = 0.1;
 const CEILING: FurniturePiece[] = [{ at: [0, WALL_HEIGHT + SLAB / 2, 0],
   size: [BUILDING.maxX - BUILDING.minX + 0.16, SLAB, BUILDING.maxZ - BUILDING.minZ + 0.16], color: ROLES.ceiling }];
 const PANELS: FurniturePiece[] = [-8, 0, 8].flatMap(x => [-4, 3].map(z => ({
-  at: [x, WALL_HEIGHT - 0.02, z], size: [1.1, 0.03, 0.6], color: OUTDOOR.ceilingPanel,
+  at: [x, WALL_HEIGHT - 0.02, z], size: [1.1, 0.03, 0.6], color: ROLES.lampLight,
 })));
 
 /**

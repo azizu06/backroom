@@ -98,3 +98,23 @@ export function noticeBoard(snapshot: OfficeSnapshot, rows = 4): NoticeBoard {
 export function noticeBoardKey(board: NoticeBoard): string {
   return JSON.stringify(board);
 }
+
+/** Wrap at words, split long identifiers, and ellipsize overflow without ever shrinking the font. */
+export function canvasTextLines(text: string, measure: (text: string) => number, width: number, maxLines: number): string[] {
+  if (width <= 0 || !Number.isFinite(maxLines) || maxLines < 1) return [];
+  maxLines = Math.floor(maxLines);
+  let rest = text.trim().replace(/\s+/g, ' ');
+  const lines: string[] = [];
+  while (rest && lines.length < maxLines) {
+    if (measure(rest) <= width) { lines.push(rest); break; }
+    let end = rest.length;
+    const last = lines.length === maxLines - 1;
+    while (end > 0 && measure(rest.slice(0, end).trimEnd() + (last ? '…' : '')) > width) end--;
+    if (!end) { if (last && measure('…') <= width) lines.push('…'); break; }
+    const space = rest.lastIndexOf(' ', end);
+    if (space > 0) end = space;
+    lines.push(rest.slice(0, end).trimEnd() + (last ? '…' : ''));
+    rest = rest.slice(end).trimStart();
+  }
+  return lines;
+}
