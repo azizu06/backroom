@@ -9,6 +9,8 @@ const equal = (actual: string, expected: string) => {
 /** Explicit rehearsal fallback. Separate from voice/tool credentials; no agent tool routes here. */
 export function createPolicyHTTP(config: {
   store: () => StateStore; pin: () => string | undefined; origin: () => string | undefined; now?: () => number;
+  /** Host office `http://127.0.0.1:<DEMO_PORT>`, accepted beside `origin`. No other localhost. */
+  loopbackOrigin?: () => string | undefined;
   /** The shared operator sign-in; an alternative to the PIN, never an approval. */
   signedIn?: (request: Request) => boolean;
 }) {
@@ -19,8 +21,9 @@ export function createPolicyHTTP(config: {
     if (!pin || pin.length < 8 || !origin) return json({ error: 'POLICY_EDITOR_NOT_CONFIGURED' }, 503);
     if (!['GET', 'POST'].includes(request.method)) return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
     // All requests use a non-simple header; only same-origin browsers can send it.
+    const requestOrigin = request.headers.get('origin');
     if (request.headers.get('sec-fetch-site') === 'cross-site'
-      || (request.method === 'POST' && request.headers.get('origin') !== origin)) return json({ error: 'ORIGIN_REJECTED' }, 403);
+      || (request.method === 'POST' && requestOrigin !== origin && requestOrigin !== config.loopbackOrigin?.())) return json({ error: 'ORIGIN_REJECTED' }, 403);
     const authMethod = config.signedIn?.(request) ? 'operator_session' : 'demo_pin';
     if (authMethod === 'demo_pin') {
       if (retryAfter && now() >= retryAfter) { failures = 0; retryAfter = 0; }

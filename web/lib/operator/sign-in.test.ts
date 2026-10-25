@@ -4,7 +4,7 @@ import { createAuditHTTP } from '../audit/http';
 import { createCallRequestHTTP } from '../calls/request';
 import { createPolicyHTTP } from '../policy-editor/http';
 import { createOperatorHTTP } from './http';
-import { createOperatorSignIn, createSignInHTTP, hostOrigins, operatorSignedIn } from './sign-in';
+import { createOperatorSignIn, createSignInHTTP, hostOrigins, localOperatorSessionCookie, operatorSignedIn } from './sign-in';
 
 const PUBLIC = 'https://demo.example', LOOPBACK = 'http://127.0.0.1:3397', CODE = 'private-operator-code';
 const env = { DEMO_CONTROL_SECRET: 'private-host-key', DEMO_PORT: '3397', DEMO_PUBLIC_URL: PUBLIC, WEBAUTHN_ORIGIN: PUBLIC, CONTROLLER_ENROLLMENT_SECRET: CODE };
@@ -59,6 +59,12 @@ describe('one operator sign-in for the demo origin', () => {
     const response = await h.signIn(CODE, { origin: LOOPBACK });
     expect(response.status).toBe(200);
     expect(response.headers.get('set-cookie')).not.toContain('Secure');
+  });
+  it('uses the shared session cookie for the code-free host unlock', async () => {
+    const h = host();
+    const cookie = localOperatorSessionCookie(env, LOOPBACK, 1_000_000);
+    expect(cookie).toMatch(/^backroom_session=\d+\.[a-f0-9]{64}; Path=\/; HttpOnly;/);
+    expect(await h.surfaces(cookieOf(new Response(null, { headers: { 'set-cookie': cookie } })))).toEqual([200, 200, 200, 200]);
   });
   it('rejects foreign origins, both at sign-in and on every surface', async () => {
     const h = host();
