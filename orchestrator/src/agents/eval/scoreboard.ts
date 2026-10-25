@@ -209,6 +209,11 @@ for (const row of legacy.reports) {
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C21.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The scripted production gateway -> Dispatcher run refuses invoice context before identity (${run?.voicemailEvidence?.gatewayReplyKinds.join(', ')}); no amount or invoice detail escapes and the next call remains allowed. A callback instruction is configured (${run?.voicemailEvidence?.callbackInstructionConfigured}), but generated voicemail speech and message delivery are not executed or graded; keep the integration gap open.` });
     continue;
   }
+  if (row.id === 'C15' && row.seams.includes('integration:not_executed')) {
+    const run = precallStops.find(run => run.id === 'C15');
+    gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.collections.C15.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The production planner/runtime and direct dial enforce fixture-context OFAC_STOP; no dial or email is queued. Injected credit-check calls: ${run?.sanctionsEvidence?.creditCheckCalls ?? 0}, because the fixture hit blocks before credit lookup. This is synthetic stop enforcement, not an actual CRS sanctions identity or response. A labelled sandbox OFAC result remains unavailable/unexecuted; keep C15 open.` });
+    continue;
+  }
   if (row.id === 'P07' && row.seams.includes('integration:not_executed')) {
     gaps.push({ id: row.id, detail: `Frozen integrationOutcome: ${key.payables.P07.expectedSteps.find((step: any) => step.integrationOutcome)?.integrationOutcome}. The production agent chain catches the synthetic fixture OFAC_STOP and does not pay; that is not a CRS sanctions response. Committed sandbox receipt ${CRS_RECEIPT_PATH} records ${crsRecordedCoverage.recordedProducts.join(', ')}, not OFAC. Replaying its public-records identity #${crsRecordedCoverage.recordedTestIdentityId} through the production adapter yields OFAC=${crsRecordedCoverage.replay.ofacStatus} (${crsRecordedCoverage.replay.ofacAvailability}); it is not mapped to the sanctioned vendor. Live OFAC identity/response remains unexecuted; keep P07 open.` });
     continue;
