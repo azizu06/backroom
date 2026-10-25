@@ -31,7 +31,7 @@ function Readout({ children }: { children: ReactNode }) {
     anchor.current.getWorldPosition(point.current);
     // First person: hide the readout while a wall stands between the eye and the rack.
     const hidden = (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true
-      && sightBlocked([camera.position.x, camera.position.z], [point.current.x, point.current.z]);
+      && sightBlocked(camera.position.x, camera.position.z, point.current.x, point.current.z);
     point.current.project(camera);
     const { x, y, z } = point.current;
     const host = portal.current.host;

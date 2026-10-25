@@ -18,6 +18,6 @@ export function usePrecompile(group: RefObject<Object3D | null>) {
     target.visible = true;
     try { gl.compile(scene, camera); } catch { /* best effort: the first visible frame compiles instead */ }
     target.visible = false;
-    // Only once per mount; later camera swaps reuse the compiled programs.
-  }, [gl, scene]);
+    // Re-runs on a camera swap only while the group is still hidden; compiled programs are cached, so it is cheap.
+  }, [gl, scene, camera]);
 }

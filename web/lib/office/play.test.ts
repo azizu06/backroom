@@ -8,6 +8,8 @@ import { createMockOfficeState } from "./preview";
 import { OFFICE_ANCHORS, type AnchorId } from "./state";
 import { BUILDING, DOORWAYS, WALL_THICKNESS, spaceAt } from "./layout";
 import { doorPosition } from "./doors";
+import { roomPropColliders } from './room-props';
+import { PINGPONG_COLLIDER } from './pingpong/table';
 
 const ALL = Object.keys(OFFICE_ANCHORS) as AnchorId[];
 const colliders = officeColliders(ALL);
@@ -34,6 +36,19 @@ describe("play constants", () => {
 describe("collisions", () => {
   const [cx, cz] = OFFICE_ANCHORS.collections.center;
   const wallFace = WALL_THICKNESS / 2;
+  it("keeps both room dressing and ping-pong solid after merging their mounts", () => {
+    for (const rooms of [ALL, []] as const) {
+      const merged = officeColliders(rooms);
+      for (const footprint of [...roomPropColliders(rooms), PINGPONG_COLLIDER]) {
+        expect(merged).toContainEqual(footprint);
+        const x = (footprint.minX + footprint.maxX) / 2;
+        const start: Vec2 = [x, footprint.maxZ + PLAYER_RADIUS + 0.15];
+        const end = movePlayer(start, [0, -0.3], merged);
+        expect(end[1]).toBeGreaterThanOrEqual(footprint.maxZ + PLAYER_RADIUS);
+      }
+    }
+  });
+
   it("cannot walk through a desk", () => {
     // From inside Collections straight into the desk front.
     const end = walk([cx, cz + 2.5], [0, -1], 3);
@@ -299,14 +314,14 @@ describe("targets", () => {
   it("offers the Treasury door only when the room is visible", () => {
     const visible = interactCandidates([], ALL);
     expect(visible.some(c => c.target.kind === "treasury" && c.position === TREASURY_DOOR)).toBe(true);
-    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "door:collections", "folder"]);
+    expect(interactCandidates([], ["lobby", "collections"]).map(c => targetKey(c.target))).toEqual(["desk:collections", "paylink", "phone", "server", "door:collections", "folder", "pingpong"]);
     expect(pickTarget([TREASURY_DOOR[0], TREASURY_DOOR[1] - 0.55], Math.PI, visible)).toEqual({ kind: "treasury" });
   });
 
   it("picks the GX10 server when standing in front of it facing it", () => {
     const candidates = interactCandidates([], ALL);
     expect(candidates).toContainEqual({ target: { kind: "server" }, position: SERVER_ROOM.position, radius: SERVER_ROOM.size.width / 2 });
-    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server"]);
+    expect(interactCandidates([], []).map(c => targetKey(c.target))).toEqual(["server", "pingpong"]);
     const front: Vec2 = [SERVER_ROOM.position[0], SERVER_ROOM_BOX.maxZ + PLAYER_RADIUS + 0.1];
     expect(pickTarget(front, 0, candidates)).toEqual({ kind: "server" });
     expect(pickTarget(front, Math.PI, candidates)).not.toEqual({ kind: "server" });

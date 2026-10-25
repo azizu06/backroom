@@ -16,6 +16,7 @@ import { PHONE_STAND } from "./props/phone";
 import { BUILDING, LOBBY_BOARD, ROOM_SPAWNS, WALL_THICKNESS, roomPoint, wallColliders } from "./layout";
 import { roomPropColliders } from './room-props';
 import { SHARED_ROOM_COLLIDERS } from "./shared-rooms";
+import { PINGPONG_COLLIDER } from './pingpong/table';
 import type { CoworkerSpot, HandoffResolver, PlayCandidateOf, PlayPanelEntry, PlayPanelOf, Vec2 } from "./targets/types";
 
 // Interact radii and positions live with their Play target modules (./targets); re-exported for callers.
@@ -66,7 +67,7 @@ const DOORS = ["collections", "payables", "vendor_onboarding"] as const satisfie
  */
 export function officeColliders(rooms: readonly AnchorId[], extra: readonly Box[] = [], doors: DoorState = OPEN_DOORS): Box[] {
   const visible = new Set(rooms);
-  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...roomPropColliders(rooms)];
+  const boxes: Box[] = [...extra, ...wallColliders(), ...SHARED_ROOM_COLLIDERS, ...roomPropColliders(rooms), PINGPONG_COLLIDER];
   for (const room of DESKS) {
     if (!visible.has(room)) continue;
     const [x, z] = OFFICE_ANCHORS[room].center;

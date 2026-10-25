@@ -60,7 +60,7 @@ describe('office sound cues', () => {
     expect(next.audit).toHaveLength(2);
   });
   it('catalogues only quiet synthesized cues and rejects invalid event kinds', () => {
-    expect(Object.keys(SOUND_CUES)).toEqual(['roomTone', 'handoff', 'deny', 'passkey', 'interact', 'step']);
+    expect(Object.keys(SOUND_CUES)).toEqual(['roomTone', 'handoff', 'deny', 'passkey', 'interact', 'step', 'pingHit', 'pingBounce']);
     for (const [kind, cue] of Object.entries(SOUND_CUES)) {
       expect(cue.gain).toBeGreaterThan(0);
       expect(cue.gain).toBeLessThanOrEqual(0.1);
@@ -76,6 +76,11 @@ describe('office sound cues', () => {
     expect(cooldownFor('step')).toBeLessThan(300);
     expect(cooldownFor('step')).toBeGreaterThan(0);
     for (const kind of ['handoff', 'deny', 'passkey', 'interact'] as const) expect(cooldownFor(kind)).toBe(SOUND_COOLDOWN_MS);
+  });
+  it('gives ping pong hits and bounces distinct short procedural cues', () => {
+    expect(SOUND_CUES.pingHit.frequencies).not.toEqual(SOUND_CUES.pingBounce.frequencies);
+    expect(cooldownFor('pingHit')).toBe(40);
+    expect(cooldownFor('pingBounce')).toBe(40);
   });
   it('reads and writes preference safely', () => {
     const values = new Map<string, string>();
