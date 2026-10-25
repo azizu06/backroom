@@ -34,7 +34,7 @@ describe('ask-why HTTP', () => {
     expect(await response.json()).toMatchObject({ citations: ['audit:2'], source: 'fallback', audio: null });
     expect(fetcher).not.toHaveBeenCalled();
   });
-  it('transcribes a clip and returns cited text and spoken entry ids as WAV', async () => {
+  it('transcribes a clip and returns linked text without reading citation ids aloud', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(Response.json({ text: 'Why did you hold invoice 4419?', duration: 3 }))
       .mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), { headers: { 'Content-Type': 'audio/wav' } }));
@@ -52,7 +52,8 @@ describe('ask-why HTTP', () => {
     expect(stt.body.get('file').type).toBe('audio/webm');
     expect(stt.headers.Authorization).toBe('Bearer test-key');
     const tts = JSON.parse(fetcher.mock.calls[1]![1].body);
-    expect(tts.transcript).toContain('entry audit 2');
+    expect(tts.transcript).toContain('a possible duplicate invoice');
+    expect(tts.transcript).not.toMatch(/entry audit 2|DUPLICATE_INVOICE|audit:2/);
     expect(tts.transcript).not.toContain('[entry:');
     expect(tts.output_format.container).toBe('wav');
   });
