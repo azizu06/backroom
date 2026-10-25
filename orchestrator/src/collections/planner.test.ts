@@ -31,15 +31,28 @@ describe('routed pre-call planner', () => {
     const http = vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status }));
     const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn();
-    await expect(createCallPlanner({ cloudRoute: cloud.route, fallbackRoute }).draft(input)).rejects.toThrow('Call planner unavailable');
+    await expect(createCallPlanner({ cloudRoute: cloud.route, fallbackRoute, reportFailure: vi.fn() }).draft(input)).rejects.toThrow('Call planner unavailable');
     expect(fallbackRoute).not.toHaveBeenCalled();
+  });
+
+  it('reports only a sanitized provider cause while keeping the public error generic', async () => {
+    const cloud = createRouter({ fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response('private provider payload', { status: 401 })),
+      cloudProvider: 'anthropic', anthropicApiKey: 'private-key', anthropicModel: 'claude-haiku-5-5' });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const planner = createCallPlanner({ cloudRoute: cloud.route, modelId: 'claude-haiku-5-5' });
+      await expect(planner.draft(input)).rejects.toThrow('Call planner unavailable');
+      expect(log).toHaveBeenCalledWith('call planner unavailable', { stage: 'cloud', status: 401,
+        errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5' });
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/private provider payload|private-key/);
+    } finally { log.mockRestore(); }
   });
 
   it('keeps a successful Claude result on cloud and returns safe failure when both providers fail', async () => {
     const http = vi.fn<typeof fetch>().mockResolvedValueOnce(response()).mockResolvedValueOnce(new Response('', { status: 402 }));
     const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn(async () => { throw new Error('private transport payload'); });
-    const planner = createCallPlanner({ cloudRoute: cloud.route, fallbackRoute });
+    const planner = createCallPlanner({ cloudRoute: cloud.route, fallbackRoute, reportFailure: vi.fn() });
     expect(await planner.draft(input)).toMatchObject({ output, route: 'cloud', model: 'anthropic/claude-sonnet-4.5' });
     await expect(planner.draft(input)).rejects.toThrow('Call planner unavailable');
   });
