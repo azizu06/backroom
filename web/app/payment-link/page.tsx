@@ -1,5 +1,5 @@
 import PaymentLinkPanel from '../../components/PaymentLinkPanel';
-export const metadata = { title: 'Call Payment Link', robots: { index: false, follow: false }, referrer: 'no-referrer' };
+export const metadata = { title: 'Payment link · Backroom', robots: { index: false, follow: false }, referrer: 'no-referrer' };
 /** Standalone display of the same panel the office lobby kiosk shows. */
 export default function PaymentLinkDisplay() {
   return <main className='page-frame'>
