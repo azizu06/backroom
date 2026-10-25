@@ -29,6 +29,7 @@ import { SharedRooms } from './SharedRooms';
 import { WorkRoom } from './WorkRoom';
 import { Atrium } from './Atrium';
 import { WorldShell } from './WorldShell';
+import { PingPong } from './PingPong';
 import type { SceneMount } from './types';
 
 export type { SceneMount, SceneMountProps } from './types';
@@ -38,6 +39,7 @@ export const SCENE_MOUNTS: readonly SceneMount[] = [
   { id: 'work-room', instanced: false, Component: WorkRoom },
   { id: 'atrium', instanced: false, Component: Atrium },
   { id: 'shared-rooms', instanced: false, Component: SharedRooms },
+  { id: 'ping-pong', instanced: false, Component: PingPong },
   { id: 'doors', instanced: true, Component: Doors },
   { id: 'interactive-doors', instanced: false, moving: true, Component: InteractiveDoors },
   { id: 'carry-folder', instanced: false, moving: true, Component: CarryFolder },
