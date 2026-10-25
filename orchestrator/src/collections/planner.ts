@@ -1,4 +1,5 @@
 import { createRouter, route, isLlmOff, type OutputSchema } from '../router';
+import { ModelFailure, ROUTER_FAILURE_KINDS, type RouterFailureKind } from '../router/failure';
 import type { CallPlanner, PlanningInput } from './types';
 
 export interface CallPlannerOptions {
@@ -15,8 +16,12 @@ export interface CallPlannerFailureDiagnostic {
   stage: 'cloud' | 'gx10_fallback' | 'planner';
   status?: number;
   errorType: string;
+  /** Redaction-safe router failure category, e.g. 'confidence' for a low self-confidence cloud plan. */
+  kind?: RouterFailureKind;
   code?: string;
   modelId: string;
+  /** Cloud attempts made; present only when the planner retried. */
+  attempts?: number;
 }
 
 const safeToken = (value: unknown, fallback: string): string =>
@@ -27,10 +32,12 @@ export function sanitizeCallPlannerFailure(error: unknown, stage: CallPlannerFai
   const row = error && typeof error === 'object' ? error as Record<string, unknown> : undefined;
   const status = row && typeof row.status === 'number' && Number.isInteger(row.status) && row.status >= 100 && row.status <= 599 ? row.status : undefined;
   const rawCode = row?.kind ?? row?.code;
+  const kind = ROUTER_FAILURE_KINDS.find(known => known === row?.kind);
   return {
     stage,
     ...(status !== undefined && { status }),
     errorType: safeToken(error instanceof Error ? error.constructor.name : typeof error, 'UnknownError'),
+    ...(kind && { kind }),
     ...(rawCode !== undefined && { code: safeToken(rawCode, 'UNKNOWN') }),
     modelId: safeToken(modelId, 'unknown'),
   };
@@ -54,8 +61,8 @@ export function createCallPlanner(options: CallPlannerOptions = {}): CallPlanner
       else console.error('call planner unavailable', failure);
     } catch { /* Diagnostics must not change the safe failure path. */ }
   };
-  const unavailable = (error: unknown, stage: CallPlannerFailureDiagnostic['stage'], failedModelId: string) => {
-    const diagnostic = sanitizeCallPlannerFailure(error, stage, failedModelId);
+  const unavailable = (error: unknown, stage: CallPlannerFailureDiagnostic['stage'], failedModelId: string, attempts = 1) => {
+    const diagnostic = { ...sanitizeCallPlannerFailure(error, stage, failedModelId), ...(attempts > 1 && { attempts }) };
     reportFailure(diagnostic);
     return new CallPlannerUnavailableError(diagnostic);
   };
@@ -101,10 +108,18 @@ export function createCallPlanner(options: CallPlannerOptions = {}): CallPlanner
           },
         },
       };
-      try { return await cloudRoute('call_plan', input, schema); }
+      let attempts = 0;
+      // A low self-confidence plan (or another non-transport router error) gets one fresh cloud attempt.
+      // Each attempt re-runs the router's OFF, confidence, usage and cost checks; HTTP failures never retry.
+      const attemptCloud = async (): Promise<Awaited<ReturnType<typeof route>>> => {
+        attempts++;
+        try { return await cloudRoute('call_plan', input, schema); }
+        catch (error) { if (attempts > 1 || error instanceof ModelFailure) throw error; return attemptCloud(); }
+      };
+      try { return await attemptCloud(); }
       catch (error) {
         const cloudFailure = sanitizeCallPlannerFailure(error, 'cloud', modelId);
-        if (cloudFailure.status !== 402) throw unavailable(error, 'cloud', modelId);
+        if (cloudFailure.status !== 402) throw unavailable(error, 'cloud', modelId, attempts);
         try {
           const result = await fallbackRoute('call_plan', input, schema);
           if (isLlmOff(result)) return result;

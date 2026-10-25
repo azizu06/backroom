@@ -228,7 +228,7 @@ export function createRouter(options: RouterOptions = {}) {
     let result: ReturnType<typeof decode<T>>;
     try { result = decode(response, schema); }
     catch (error) { reportFailure(taskType, preferredLocal ? 'cloud_fallback' : 'cloud', error); throw error; }
-    if (result.confidence < (options.confidenceThreshold ?? 0.7)) { reportFailure(taskType, preferredLocal ? 'cloud_fallback' : 'cloud', new ModelFailure('confidence', 'Low confidence')); throw new Error('Cloud model confidence too low; human review required'); }
+    if (result.confidence < (options.confidenceThreshold ?? 0.7)) { reportFailure(taskType, preferredLocal ? 'cloud_fallback' : 'cloud', new ModelFailure('confidence', 'Low confidence')); throw Object.assign(new Error('Cloud model confidence too low; human review required'), { kind: 'confidence' as const }); }
     if (signal.aborted || !state().llmEnabled) return llmOff();
     const usage = response.usage;
     const estimate = ((usage?.prompt_tokens ?? 0) * (options.cloudInputUsdPerMillion ?? 3) + (usage?.completion_tokens ?? 0) * (options.cloudOutputUsdPerMillion ?? 15)) / 1_000_000;
