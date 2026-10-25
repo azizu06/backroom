@@ -63,6 +63,6 @@ describe('recorded story evidence', () => {
 
   it('never uses unrelated receipts as evidence for the other scripted chapters', () => {
     const audit = [row(), row({ decision: 'ESCALATE', ruleIds: ['BANK_CHANGE_HOLD'] })];
-    for (const id of ['inbox', 'sort', 'collections', 'audit']) expect(match(id, { audit })).toEqual(notRecorded);
+    for (const id of ['inbox', 'sort', 'collections', 'handoff']) expect(match(id, { audit })).toEqual(notRecorded);
   });
 });

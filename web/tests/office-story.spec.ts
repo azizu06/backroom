@@ -1,18 +1,62 @@
 import { test, expect } from '@playwright/test';
+import { STORY_CHAPTERS, storyCameraPose } from '../lib/office/story';
 
-test('judge story can advance and exit with Escape', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`judge tour visits every stop and Skip retains first person (${reducedMotion})`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.emulateMedia({ reducedMotion });
+    await page.goto('/office');
+    await page.getByRole('button', { name: 'Take the tour', exact: true }).click();
+    const story = page.getByRole('complementary', { name: 'Judge story mode' });
+    const camera = page.getByTestId('story-camera');
+    await expect(page.getByLabel('Office view')).toHaveValue('play');
+    await expect(story.locator('.story-disclaimer')).toContainText('Scripted walkthrough · illustration, not recorded decisions');
+    await story.getByRole('button', { name: 'Pause', exact: true }).click();
+    for (const [index, chapter] of STORY_CHAPTERS.entries()) {
+      await expect(story.getByRole('heading')).toHaveText(chapter.title);
+      if (chapter.handoff) await expect(story.getByRole('img', { name: /Scripted evidence folder handoff/ })).toBeVisible();
+      await expect(camera).toHaveAttribute('data-story-anchor', chapter.anchor);
+      await expect(camera).toHaveAttribute('data-story-moving', 'false', { timeout: reducedMotion === 'reduce' ? 600 : 3000 });
+      const pose = storyCameraPose(chapter.anchor);
+      await expect(camera).toHaveAttribute('data-player-x', pose.position[0].toFixed(3));
+      await expect(camera).toHaveAttribute('data-player-z', pose.position[2].toFixed(3));
+      if (index < STORY_CHAPTERS.length - 1) {
+        if (index === 0) await page.keyboard.press('ArrowRight');
+        else await story.getByRole('button', { name: 'Next', exact: true }).click();
+      }
+    }
+    await story.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(story.getByRole('heading')).toHaveText('A human decides');
+    await page.keyboard.press('ArrowLeft');
+    await expect(story.getByRole('heading')).toHaveText('Vendor Desk → Payables');
+    await expect(camera).toHaveAttribute('data-story-moving', 'false');
+    const before = await camera.evaluate(element => ({ ...((element as HTMLElement).dataset) }));
+    await story.getByRole('button', { name: 'Skip', exact: true }).click();
+    await expect(story).toHaveCount(0);
+    await expect(page.getByLabel('Office view')).toHaveValue('play');
+    const surface = page.getByRole('application', { name: /First-person office/ });
+    await expect(surface).toBeFocused();
+    await expect(surface).toHaveAttribute('data-player-x', before.playerX!);
+    await expect(surface).toHaveAttribute('data-player-z', before.playerZ!);
+    await expect(surface).toHaveAttribute('data-player-yaw', before.playerYaw!);
+    await page.keyboard.down('s');
+    await expect.poll(async () => surface.getAttribute('data-player-z')).not.toBe(before.playerZ);
+    await page.keyboard.up('s');
+    expect(errors).toEqual([]);
+  });
+}
+
+test('story deep link starts in first person and Escape skips a moving tour', async ({ page }) => {
   await page.goto('/office?demo=story');
   const story = page.getByRole('complementary', { name: 'Judge story mode' });
-  await expect(story.locator('.story-disclaimer')).toContainText('Scripted walkthrough · illustration, not recorded decisions');
-  await expect(story.locator('.story-kicker')).toContainText(/Chapter 1 of/);
-  await expect(story).toContainText('In the demo, invoices and emails enter one queue for review.');
-  await expect(story.locator('.story-evidence')).toHaveText('Not recorded in this session');
-  await expect(story.locator('[aria-live]')).toHaveText(/^Scripted walkthrough:/);
-  await story.getByRole('button', { name: 'Next' }).click();
-  await expect(story.locator('.story-kicker')).toContainText(/Chapter 2 of/);
+  await expect(story.locator('.story-kicker')).toContainText('Chapter 1 of 7');
+  await expect(page.getByLabel('Office view')).toHaveValue('play');
+  await expect(page.getByTestId('story-camera')).toHaveAttribute('data-story-moving', 'false');
+  await story.getByRole('button', { name: 'Next', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(story).toHaveCount(0);
-  expect(errors).toEqual([]);
+  await expect(page.getByLabel('Office view')).toHaveValue('play');
+  await expect(page.getByRole('application', { name: /First-person office/ })).toBeFocused();
+  await expect(page).toHaveURL(/\/office$/);
 });

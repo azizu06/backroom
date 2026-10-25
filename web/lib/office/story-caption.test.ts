@@ -33,7 +33,7 @@ describe('story caption disclosure', () => {
   });
 
   it('renders received rule ids as a keyboard-accessible audit link', () => {
-    const html = render(2, { ...INITIAL_OFFICE, connection: 'live', audit: [{
+    const html = render(STORY_CHAPTERS.findIndex(chapter => chapter.id === 'vendor'), { ...INITIAL_OFFICE, connection: 'live', audit: [{
       id: 'audit:bank', agentId: 'jules', seatId: 'vendor_onboarding', action: 'verify_vendor',
       decision: 'ESCALATE', ruleIds: ['BANK_CHANGE_HOLD'], summary: 'Bank change held',
     }] });
