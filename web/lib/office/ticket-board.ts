@@ -31,16 +31,27 @@ const COLUMNS = [
   ['queued', 'Queued'], ['progress', 'In progress'], ['needs-you', 'Needs you'], ['done', 'Done'],
 ] as const;
 export const TICKET_COLUMN_LIMIT = 6;
-const summary = shortOfficeText;
+const summary = (text: string) => shortOfficeText(text) || 'Review needed';
+const referenceInvoice = (ref: string) => invoiceLabel(ref)
+  ?? /^(?:invoice:|ar_invoice:)?(\d+)$/i.exec(ref)?.[1]?.replace(/^(.*)$/, 'INV-$1');
+const referenceCase = (refs: readonly string[] = []) => refs.map(ref => ref.match(/\bjudge:[\w-]+/i)?.[0]).find(Boolean)
+  ?? refs.find(ref => /^case:/i.test(ref));
 const lexical = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 /** Pure projection; audit arrays are oldest-first. Case refs are optional on legacy snapshots. */
 export function ticketBoard(snapshot: OfficeSnapshot, now = Date.now()): TicketBoardModel {
-  type Row = { column: TicketColumnId; card: TicketCard; at: number; sequence: bigint };
+  type Row = { caseKey?: string; column: TicketColumnId; card: TicketCard; at: number; sequence: bigint };
   const rows: Row[] = [];
   const agents = new Map(snapshot.agents.map(agent => [agent.id, agent]));
   const cards = agentCards(snapshot, now);
   const receipts = new Map([...snapshot.audit, ...(snapshot.inboxReceipts ?? [])].map(row => [row.id, row]));
+  // Receipts can bridge an opaque inbox case to its extracted invoice number.
+  const caseInvoices = new Map<string, string>();
+  for (const receipt of receipts.values()) {
+    const key = referenceCase(receipt.refs);
+    const invoice = receipt.refs?.map(referenceInvoice).find(Boolean) ?? invoiceLabel(receipt.summary);
+    if (key && invoice) caseInvoices.set(key, invoice);
+  }
   const representedReceipts = new Set<string>();
   const representedAgents = new Set<string>();
   const owner = (id: string, role: string) => {
@@ -63,7 +74,7 @@ export function ticketBoard(snapshot: OfficeSnapshot, now = Date.now()): TicketB
       if (handoff.decisionRef) representedReceipts.add(handoff.decisionRef);
     }
     const rejected = handoff.status === 'rejected';
-    rows.push({ column, at: handoff.completedAt ?? handoff.acceptedAt ?? handoff.createdAt, sequence: BigInt(handoff.sequence), card: {
+    rows.push({ caseKey: invoiceLabel(handoff.caseDisplayId) ?? handoff.caseDisplayId, column, at: handoff.completedAt ?? handoff.acceptedAt ?? handoff.createdAt, sequence: BigInt(handoff.sequence), card: {
       id: `handoff:${handoff.handoffId}`, caseDisplayId: officeText(handoff.caseDisplayId) || 'Case review', summary: summary(task?.line ?? handoff.summary),
       ...owner(agentId, role), rejected,
       tag: rejected ? 'REJECTED' : terminal ? 'DONE' : waiting ? 'NEEDS YOU' : column === 'progress' ? 'WORKING' : 'READY',
@@ -73,10 +84,16 @@ export function ticketBoard(snapshot: OfficeSnapshot, now = Date.now()): TicketB
   let receiptOrder = 0;
   for (const receipt of receipts.values()) {
     receiptOrder++;
-    if (receipt.decision !== 'ESCALATE' || representedReceipts.has(receipt.id) || handoffAgentsWaiting.has(receipt.agentId)) continue;
+    const invoice = receipt.refs?.map(referenceInvoice).find(Boolean) ?? invoiceLabel(receipt.summary);
+    const rawCase = referenceCase(receipt.refs);
+    const caseKey = (rawCase ? caseInvoices.get(rawCase) : undefined) ?? invoice ?? rawCase;
+    const handoffRepresentsCase = (snapshot.handoffs ?? []).some(row => needsHandoffHuman(row)
+      && (invoiceLabel(row.caseDisplayId) ?? row.caseDisplayId) === caseKey);
+    if (receipt.decision !== 'ESCALATE' || representedReceipts.has(receipt.id)
+      || (handoffAgentsWaiting.has(receipt.agentId) && (!caseKey || handoffRepresentsCase))) continue;
     representedAgents.add(receipt.agentId);
-    rows.push({ column: 'needs-you', at: 0, sequence: BigInt(receiptOrder), card: {
-      id: `receipt:${receipt.id}`, caseDisplayId: invoiceLabel(receipt.summary) ?? receipt.refs?.map(ref => invoiceLabel(ref) ?? (/^\d+$/.test(ref) ? `INV-${ref}` : undefined)).find(Boolean) ?? 'Review needed', summary: receipt.ruleIds.includes('BANK_CHANGE_HOLD') || /bank.change/i.test(receipt.summary) ? 'Held for Dana · bank change' : summary(receipt.summary),
+    rows.push({ caseKey, column: 'needs-you', at: 0, sequence: BigInt(receiptOrder), card: {
+      id: `receipt:${receipt.id}`, caseDisplayId: invoice ?? (rawCase && caseInvoices.get(rawCase)) ?? 'Review needed', summary: receipt.ruleIds.includes('BANK_CHANGE_HOLD') || /bank.change/i.test(receipt.summary) ? 'Held for Dana · bank change' : summary(receipt.summary),
       ...owner(receipt.agentId, receipt.seatId), rejected: false, tag: 'NEEDS YOU',
     } });
   }
@@ -104,7 +121,7 @@ export function ticketBoard(snapshot: OfficeSnapshot, now = Date.now()): TicketB
     const row = rows[i]!;
     if (row.column !== 'needs-you') continue;
     const caseId = invoiceLabel(row.card.caseDisplayId + ' ' + row.card.summary);
-    const key = caseId ?? row.card.id;
+    const key = row.caseKey ?? caseId ?? row.card.id;
     const previous = waits.get(key);
     if (previous) {
       if (/bank.change/i.test(row.card.summary)) previous.card = { ...previous.card, summary: 'Held for Dana · bank change' };
