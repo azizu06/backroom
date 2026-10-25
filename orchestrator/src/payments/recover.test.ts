@@ -1,8 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { paymentMemo } from '@backroom/nessie';
 import { FakeDemoBank } from '../core-demo/bank';
 import { MemoryStateStore } from '../store';
-import { PaymentService, type AuthorizedPaymentLink, type BankEvidence } from './index';
+import { PaymentService, paymentLinkMemo, type AuthorizedPaymentLink, type BankEvidence } from './index';
 
 const link: AuthorizedPaymentLink = { id: 'link-1042', invoiceId: '1042', planId: 'plan-1042', auditId: 'allow-1042',
   policyVersion: 1, installment: 1, amountCents: 247500, totalCents: 495000, currency: 'USD' };
@@ -107,7 +106,7 @@ it('rejects a failed bank feed without restoring anything and allows a later rec
 it.each(['RECON_SHORT', 'RECON_DUPLICATE', 'RECON_FUZZY', 'RECON_MISMATCH'])(
   'keeps %s evidence out of memory without creating exceptions', async ruleId => {
     const { restart, feed, deposit } = setup(); const recovered = restart();
-    const row: BankEvidence = { _id: 'deposit', amount: link.amountCents / 100, description: paymentMemo(link),
+    const row: BankEvidence = { _id: 'deposit', amount: link.amountCents / 100, description: paymentLinkMemo(link),
       status: 'completed', medium: 'balance', transaction_date: '2026-10-24' };
     if (ruleId === 'RECON_SHORT') row.amount -= 1;
     if (ruleId === 'RECON_FUZZY') { row.description = 'untrusted memo'; row.paymentLinkRef = link.id; }

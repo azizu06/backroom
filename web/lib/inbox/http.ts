@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { FileClaims, NessieClient } from '@backroom/nessie';
 import { createNorthfieldRepository, getStateStore, nessieDebitPayables, PayablesSeat, processInbox, VendorSeat,
-  type InboxOptions, type InvoiceFields, type StateStore, type VendorFields } from '@backroom/orchestrator';
+  type InboxOptions, type SeatResult, type InvoiceFields, type StateStore, type VendorFields } from '@backroom/orchestrator';
 
 import { narrateInbox, type InboxNarration } from '../demo/agents';
 import { noteEscalation } from '../approvals/inbox';
@@ -19,6 +19,8 @@ const LIMIT = 4 * 1024 * 1024;
 /** Public judge intake. DEMO_LIVE plus server-only Nessie configuration enables sandbox AP debits.
  * Vendor checks follow DEMO_LIVE; a passkey applies a bank change. */
 export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?: InboxOptions['modelRoute']; agents?: (input: InboxNarration) => Promise<unknown>;
+  caseDisplayId?: string;
+  paymentMode?: 'hold'; // Trusted host only; never read from submitted form fields.
   origin?: () => string | undefined; loopbackOrigin?: () => string | undefined; env?: Record<string, string | undefined>; fetch?: typeof fetch } = {}) {
   const origin = options.origin ?? (() => process.env.DEMO_PUBLIC_URL || process.env.WEBAUTHN_ORIGIN);
   const loopbackOrigin = options.loopbackOrigin ?? declaredLoopbackOfficeOrigin;
@@ -67,13 +69,20 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       const env = options.env ?? process.env;
       const repository = await createNorthfieldRepository();
       const shared = { state, controller, repository };
-      const nessie = env.DEMO_LIVE === '1' && env.NESSIE_API_KEY && env.NESSIE_ACCOUNT_ID
+      const nessie = options.paymentMode !== 'hold' && env.DEMO_LIVE === '1' && env.NESSIE_API_KEY && env.NESSIE_ACCOUNT_ID
         ? nessieDebitPayables(new NessieClient({ apiKey: env.NESSIE_API_KEY, surface: 'nessie_sandbox',
             claims: new FileClaims(resolve(/*turbopackIgnore: true*/ env.NESSIE_CLAIMS_DIR || '.nessie-state/claims')),
             ...(options.fetch && { fetch: options.fetch }) }),
             env.NESSIE_ACCOUNT_ID)
         : undefined;
-      const payables = new PayablesSeat({ ...shared, nessie });
+      const paymentSeat = new PayablesSeat({ ...shared, nessie });
+      const payables = options.paymentMode === 'hold' ? { async process(value: InvoiceFields, envelope: Parameters<PayablesSeat['process']>[1]): Promise<SeatResult> {
+        const assessment = await paymentSeat.assess(value, envelope);
+        await state.appendAudit({ ts: Date.now(), actor: 'code', seat: 'payables', action: 'workday_invoice_hold',
+          decision: assessment.decision.kind, ruleIds: assessment.decision.ruleIds, policyVersion: assessment.decision.policyVersion,
+          refs: [envelope.id], route: 'code', latencyMs: 0, costUsd: 0, inputs: { noPayment: true, invoiceId: value.invoiceId } });
+        return { status: 'held' as const, decision: assessment.decision, evidenceRefs: [envelope.id] };
+      } } : paymentSeat;
       const gate = createInboxVendorGate(env, options.fetch);
       const vendor = new VendorSeat({ ...shared, checks: gate.checks, bankChangeRisk: gate.risk });
       const preset = !file && matchPreset(form.get('presetId'), String(kind), sender, text);
@@ -105,7 +114,7 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       // Narration is outside the decision boundary: it cannot change, delay or fail this response.
       try {
         void (options.agents ?? narrateInbox)({ item: { ...source, kind: kind as 'email' | 'invoice', text },
-          fields, repository, result, auditId: entry.id }).catch(() => {});
+          fields, repository, result, auditId: entry.id, displayId: options.caseDisplayId }).catch(() => {});
       } catch { /* A synchronous adapter failure also leaves the recorded decision intact. */ }
       const documentRoute = 'documentRoute' in result ? result.documentRoute : null;
       const documentModelAttempted = 'documentModelAttempted' in result && result.documentModelAttempted;
@@ -125,7 +134,7 @@ export function createInboxHTTP(options: { store?: () => StateStore; modelRoute?
       return json({ attachmentParsed: !!file && !!fields, documentRoute: documentRoute ?? null, id, scenario_source: 'judge', seat, fields, ...result, attachment,
         extractionSource: seeded ? 'seed' : fields ? 'model' : 'unrecognized',
         ...(bankChangeFraud ? { bankChangeFraud } : {}),
-        notice: debitNotice ?? (file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
+        notice: options.paymentMode === 'hold' ? 'Workday: held for review. Payment execution is unavailable.' : debitNotice ?? (file ? fields ? `Attachment extracted (${documentRoute ?? 'model'}). Code policy decided the receipt. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} File bytes are not retained.${documentRoute === 'cloud_fallback' ? ' Cloud fallback received document images after two local schema failures.' : ''}` : `Attachment could not be safely extracted; held for human review. File bytes are not retained.${documentModelAttempted ? ' Cloud fallback may have received document images after two local schema failures.' : ''}`
           : gate.simulated
             ? `CRS, OFAC, and Apify results come from offline records. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`
             : `CRS, OFAC, and Apify use the configured live clients. An unknown or missing check is not verified. ${nessie ? 'No debit was allowed for this result.' : 'No bank debit is configured.'} A bank-account change is applied only after Dana’s passkey.`),

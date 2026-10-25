@@ -40,7 +40,10 @@ export async function installPaymentDemo() {
   await state.insertInvoice({ id: invoice.id, kind: 'ar', state: 'promised' });
   await state.enqueueTask({ id: 'reconcile-demo-1042', seatId: 'collections', refs: [invoice.id],
     idempotencyKey: 'ar:1042:1', steps: [] });
-  const service: PaymentService = new PaymentService({ bank: new FakeDemoBank(), accountId: 'fake-demo-account', lookup: async id => {
+  // An earlier company reset's rehearsal left its deposit under the old invoice-only memo; this link must ignore it.
+  const bank = new FakeDemoBank();
+  await bank.deposit({ accountId: 'fake-demo-account', invoiceId: invoice.id, installment: 1, amountCents: 99000 });
+  const service: PaymentService = new PaymentService({ bank, accountId: 'fake-demo-account', lookup: async id => {
     const stored = await gatewayStore.findPaymentCall(id); return stored && authorizedPaymentLink(stored, id);
   }, onPosted: async id => {
     const now = Date.now();

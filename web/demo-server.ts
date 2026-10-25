@@ -1,7 +1,7 @@
 // Single local process: Next route chunks, seats, gateway and controller share globals.
 import next from 'next';
 import { demoBindHost, voiceRelayPath } from '../tools/demo/host';
-import { request as proxyRequest, type RequestListener } from 'node:http';
+import type { RequestListener } from 'node:http';
 import { listenDemo } from '../tools/demo/listen';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,7 @@ import { localOperatorRequest } from './lib/operator/session';
 import { localOperatorSessionCookie } from './lib/operator/sign-in';
 import { operatorAudit } from './lib/operator/audit';
 import { proxyStateHTTP, proxyStateUpgrade, stateProxyEnabled } from './lib/demo/state-proxy';
+import { proxyVoiceRelay } from './lib/demo/voice-proxy';
 
 async function main() {
   if (!['memory', 'spacetime'].includes(process.env.STATE_STORE || '')) throw new Error('DEMO_STATE_REQUIRED');
@@ -110,14 +111,7 @@ async function main() {
     const relayPath = voiceRelayPath(path);
     if (relayPath !== undefined) {
       if (process.env.DEMO_VOICE_RUNNING !== '1') { res.writeHead(503).end('Voice relay disabled'); return; }
-      const upstream = proxyRequest({ hostname: '127.0.0.1', port: Number(process.env.VOICE_PORT || 8788),
-        path: relayPath + new URL(req.url || '/', 'http://localhost').search, method: req.method,
-        headers: { ...req.headers, host: `127.0.0.1:${process.env.VOICE_PORT || 8788}` }, timeout: 10000 }, response => {
-        res.writeHead(response.statusCode || 502, response.headers); response.pipe(res);
-      });
-      upstream.on('timeout', () => upstream.destroy());
-      upstream.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end('Relay unavailable'); });
-      req.pipe(upstream); return;
+      proxyVoiceRelay(req, res, relayPath, Number(process.env.VOICE_PORT || 8788)); return;
     }
     let finish!: () => void;
     // Reset returns through the supervisor into /__demo/reset, which drains active requests.

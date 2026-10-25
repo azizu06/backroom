@@ -6,7 +6,7 @@ export interface ActivePaymentLink { readonly code: string; readonly expiresAt: 
 
 /** The link to announce: a live delivery the viewer has not been told about yet, else null. */
 export function paymentLinkToAnnounce(active: ActivePaymentLink | null | undefined, announced: ReadonlySet<string>, now: number): ActivePaymentLink | null {
-  if (!active || typeof active.code !== 'string' || !active.code || !(active.expiresAt > now)) return null;
+  if (!active || typeof active.code !== 'string' || !active.code.trim() || !Number.isFinite(active.expiresAt) || !(active.expiresAt > now)) return null;
   return announced.has(active.code) ? null : active;
 }
 

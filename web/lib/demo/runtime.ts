@@ -1,4 +1,5 @@
 /** Trusted, opt-in local rehearsal host. Never imported by normal Next bootstrap. */
+import { resetWorkday } from '../workday/http';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { MemoryStateStore, SpacetimeStateStore, SpacetimeTransport, type SpacetimeOptions, installStateStore, getStateStore, SeatWorker, FakeEffects,
@@ -88,7 +89,7 @@ export async function createDemoRuntime() {
   };
   async function stop() {
     disarmRetry(); installCallRefusalFollowUp(undefined); installEmailOnlyRefusal(undefined); installCallHandoffs(undefined);
-    presence.stop(); await resetInboxAgents();
+    presence.stop(); await Promise.all([resetWorkday(), resetInboxAgents()]);
     abort.abort(); await Promise.all(jobs); jobs = [];
   }
   async function reset(next?: SpacetimeOptions) {

@@ -39,7 +39,7 @@ describe('denyMoment', () => {
       rule: 'NOT_IN_BADGE', signText: 'DENIED · NOT_IN_BADGE', active: true,
     });
     const unknown = denyMoment(denied({ agents: [], audit: [row({ ruleIds: [], seatId: 'mystery' })] }), AT, false);
-    expect(unknown).toMatchObject({ agentName: 'collections-clerk', color: ROLES.shadow, rule: 'DENIED', signText: 'DENIED · DENIED' });
+    expect(unknown).toMatchObject({ agentName: 'Agent', color: ROLES.shadow, rule: 'DENIED', signText: 'DENIED · DENIED' });
   });
 
   it('plays the echo: faces the door, turns, then walks back toward the aisle and fades', () => {
