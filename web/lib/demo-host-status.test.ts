@@ -37,7 +37,7 @@ describe('demo host service source', () => {
     const since = new Date(started).toISOString();
     expect(snap.services.claude).toEqual({ state: 'verified', source: 'receipt', evidence: 'Host pre-call inference validated', at: since });
     expect(snap.services.apify).toEqual({ state: 'verified', source: 'receipt', evidence: 'Run run_AbC123', at: since });
-    expect(snap.services.crs).toMatchObject({ state: 'verified', at: since });
+    expect(snap.services.crs).toMatchObject({ state: 'verified', evidence: 'Partner test records + fraud risk', at: since });
     expect(snap.services.nessie).toMatchObject({ state: 'unverified' });
   });
   it('does not claim Verified without fresh evidence', () => {
@@ -59,7 +59,7 @@ describe('demo host service source', () => {
     });
     it('a successful sandbox read verifies it, dated at that read', () => {
       expect(nessie({ mode: 'sandbox', proof: { kind: 'sandbox_read', at } }))
-        .toEqual({ state: 'verified', source: 'receipt', evidence: 'Sandbox account read (read only)', at });
+        .toEqual({ state: 'verified', source: 'receipt', evidence: 'Test bank account read (read only)', at });
     });
     it('an EXACT_PAYMENT_MATCH deposit receipt verifies it and names the deposit', () => {
       expect(nessie({ mode: 'sandbox', proof: { kind: 'deposit_exact_match', at, depositId: '6717abc0ff' } }))

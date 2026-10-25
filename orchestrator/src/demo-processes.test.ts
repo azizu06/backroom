@@ -11,13 +11,18 @@ it('stops its child group and leaves an unrelated process alive', async () => {
   const unrelated = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)']);
   const owned = new OwnedProcesses(directory, process.env);
   const child = owned.start(process.execPath, ['-e', 'setInterval(()=>{},1000)'], join(directory, 'owned.log'));
+  const web = owned.start(process.execPath, ['-e', 'setInterval(()=>{},1000)'], join(directory, 'web.log'));
   try {
-    await Promise.all([once(child, 'spawn'), once(unrelated, 'spawn')]);
-    await owned.stop();
+    await Promise.all([once(child, 'spawn'), once(web, 'spawn'), once(unrelated, 'spawn')]);
+    await owned.stop(child);
     expect(child.signalCode).toBe('SIGTERM');
+    expect(() => process.kill(web.pid!, 0)).not.toThrow();
+    await owned.stop(unrelated); // A caller cannot signal an unowned child.
     expect(() => process.kill(unrelated.pid!, 0)).not.toThrow();
+    await owned.stop();
+    expect(web.signalCode).toBe('SIGTERM');
     await owned.stop(); // Repeated down cannot signal a reused persisted PID.
-  } finally { unrelated.kill(); await once(unrelated, 'exit'); rmSync(directory, { recursive: true }); }
+  } finally { await owned.stop(); unrelated.kill(); await once(unrelated, 'exit'); rmSync(directory, { recursive: true }); }
 });
 
 it('passes the same complete environment to every child without an allowlist', async () => {
