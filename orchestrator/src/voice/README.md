@@ -25,9 +25,16 @@ implement the same contract. HTTP errors and per-destination errors inside HTTP
 
 Only the invoice identifier and policy's `computeEnvelope` summary enter dynamic
 variables. Amounts live in the gateway and are unavailable until identity is
-confirmed. The relay uses the provider's actual completed user turn to classify
-identity conservatively: “speaking”, “that's me”, “this is Jordan”, etc. A model
-claim of `confirmed` cannot substitute for caller evidence.
+confirmed. The relay keeps every non-empty caller turn since the identity question
+was last asked (barge-in included) and, when `ANTHROPIC_API_KEY` is set, has
+`answer.ts` interpret them against that question (`affirm`/`deny`/`provide_value`/
+`unclear`, Haiku, 2.5 s bound). Code maps that to the identity result: a clear
+spoken no always wins, and a model failure falls back to a code-only yes/no
+reading. The agent's own `result` claim never counts. The first unclear answer
+returns `next_step: ask_again_once`; the second returns `offer_callback_and_end`
+and stops the call. `answer-eval.ts` is the opt-in live matrix
+(`VOICE_ANSWER_EVAL=yes`). Webhook tools use an 8 s deadline: 2 s dropped both
+identity deliveries on the 2026-10-25 venue call before they reached the relay.
 
 ## Disclosure, stops, and retries
 
@@ -40,8 +47,13 @@ repeat it when interrupted, and deny identity/invoice tools until a complete,
 uninterrupted matching assistant `call_turn` is received. Real speech/disclosure
 delivery remains a live-eval check; do not claim the prompt alone proves it.
 
-Caller opt-out/bankruptcy terms in actual user turns trigger a gateway stop in
-code, even before disclosure. The stopped relay refuses subsequent finance tools.
+Caller opt-out/bankruptcy terms and explicit requests for a person in actual user
+turns (`callerStop`) trigger a gateway stop in code, even before disclosure. The
+stopped relay refuses subsequent finance tools. The same refused request three
+times in a row is treated as a loop: the relay stops the call and returns
+`next_step: offer_callback_and_end`. The agent also enables Cartesia `skip_turn`
+(30 s hold) and a conservative `voicemail_detection` whose message names no
+contact, invoice or amount; the fixed disclosure still plays first.
 The local adapter persists these client stops across calls/restarts. Gateway
 disputes/already-paid/human requests also stop collection. Approvals remain in
 the existing gateway's trusted passkey path; no voice approval tool exists.

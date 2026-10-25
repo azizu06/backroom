@@ -8,6 +8,7 @@ import { createApprovalHTTP } from '../approvals/http';
 import { createInboxHTTP } from './http';
 import { inboxPresets } from './presets';
 import { readInboxBankChange } from './proposals';
+import * as vendorChecks from './checks';
 
 const tempDirs: string[] = [];
 
@@ -269,6 +270,23 @@ describe('judge inbox HTTP boundary', () => {
     expect(result.evidenceRefs.join(' ')).not.toContain('simulated:');
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(await readInboxBankChange(result.escalationId)).toBeUndefined();
+  });
+
+  it.each([69, 70, 88])('returns the audited CRS fraud score %s with the bank-change hold', async score => {
+    const state = new MemoryStateStore();
+    const base = vendorChecks.createInboxVendorGate({});
+    const gate = vi.spyOn(vendorChecks, 'createInboxVendorGate').mockReturnValue({ ...base, risk: {
+      async check() { return { score, label: 'CRS sandbox: test identity #13', checkedAt: '2026-10-24T18:05:00.000Z', responseHash: 'ab'.repeat(32) }; },
+    } });
+    try {
+      const preset = inboxPresets.find(row => row.id === 'bc-legitimate')!;
+      const result = await (await createInboxHTTP({ store: () => state, agents: async () => {} })(submission({ ...preset, presetId: preset.id }))).json();
+      expect(result.bankChangeFraud).toEqual({ score, label: 'CRS sandbox: test identity #13', checkedAt: '2026-10-24T18:05:00.000Z' });
+      expect(result.decision.ruleIds).toContain(score >= 70 ? 'FRAUD_RISK_HOLD' : 'BANK_CHANGE_HOLD');
+      expect(result.status).toBe(score >= 70 ? 'held' : 'awaiting_controller');
+      expect(result.receiptId).toBeUndefined();
+      expect((await state.listAudit()).find(row => row.action === 'bank_change_fraud_check')?.inputs?.fraudRiskScore).toBe(score);
+    } finally { gate.mockRestore(); }
   });
 
 });
