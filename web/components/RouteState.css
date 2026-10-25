@@ -1,23 +1,24 @@
-/* Office palette tokens (app/office/lobby.css). Fallbacks match those values on pages that do not load the office. */
+/* Shared palette tokens (app/theme.css). Fallbacks match the light theme for global-error, which renders without the root layout. */
 /* The root SiteNav sits above an in-layout state. Lock the page to the viewport and scroll this main, so 100svh here cannot add a second screen. */
-html:has(.route-state) { height: 100svh; overflow: hidden; }
-body:has(.route-state) { display: flex; flex-direction: column; height: 100%; margin: 0; overflow: hidden; background: var(--office-cream, #FFF7EC); color: var(--office-navy, #4A5A7A); }
+html:has(.route-state) { height: 100svh; overflow: hidden; background: var(--page-bg, linear-gradient(165deg, #A9F6FF 0%, #d8fbff 50%, #FFF3A6 100%)); }
+body:has(.route-state) { display: flex; flex-direction: column; height: 100%; margin: 0; overflow: hidden; color: var(--ink, #19213B); }
 
-.route-state { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; color-scheme: light; background: var(--office-cream, #FFF7EC); color: var(--office-navy, #4A5A7A); font: 16px/1.5 Avenir, 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; }
+.route-state { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; color: var(--ink, #19213B); font: 16px/1.5 var(--font-ui, 'Nunito', ui-rounded, system-ui, sans-serif); box-sizing: border-box; }
 .route-state * { box-sizing: border-box; }
-.route-state-bar { flex: none; display: flex; gap: 16px; align-items: center; min-height: 40px; padding: 0 16px; background: var(--office-navy, #4A5A7A); color: var(--office-cream, #FFF7EC); font: 13px/1.3 Avenir, 'Segoe UI', system-ui, sans-serif; }
-.route-state-content { width: 100%; max-width: 40rem; padding: 24px 24px 32px; }
-.route-state-status { margin: 0; font: 600 13px/1.4 ui-monospace, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; }
-.route-state h1 { font-size: 30px; font-weight: 600; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.route-state-bar { flex: none; align-self: stretch; display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; background: var(--bubble-glass, rgba(255, 255, 255, 0.78)); border-bottom: 1px solid var(--line, #D6F0F5); font-weight: 800; font-size: 14px; }
+.route-state-content { width: 100%; max-width: 40rem; padding: 32px 24px; }
+.route-state-status { display: inline-block; margin: 0; padding: 2px 12px; border-radius: 999px; background: var(--pastel-yellow, #FFF3A6); color: var(--on-pastel, #19213B); font-size: 13px; font-weight: 800; }
+.route-state h1 { font-size: 32px; font-weight: 900; line-height: 1.15; margin: 12px 0 12px; overflow-wrap: anywhere; text-wrap: balance; }
+.route-state-body { color: var(--ink-soft, #4B5577); }
 .route-state-body p { margin: 0 0 12px; }
-.route-state a { color: var(--office-navy, #4A5A7A); text-underline-offset: 4px; }
-.route-state-reference { font-size: 14px; overflow-wrap: anywhere; }
-.route-state-reference code { font: inherit; }
+.route-state a { color: var(--ink, #19213B); font-weight: 800; text-underline-offset: 4px; }
+.route-state-reference { font-size: 14px; color: var(--ink-soft, #4B5577); overflow-wrap: anywhere; }
+.route-state-reference code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .route-state-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 0; }
 .route-state-actions a, .route-state-actions button { min-height: 44px; display: inline-flex; align-items: center; }
-.route-state button { padding: 8px 16px; border: 1px solid var(--office-navy, #4A5A7A); border-radius: 4px; background: var(--office-navy, #4A5A7A); color: var(--office-cream, #FFF7EC); font: inherit; cursor: pointer; }
-.route-state :is(a, button):focus-visible { outline: 2px solid var(--office-navy, #4A5A7A); outline-offset: 3px; }
-.route-state-bar a { display: inline-flex; align-items: center; min-height: 40px; color: var(--office-cream, #FFF7EC); text-decoration: none; }
-.route-state-bar a:focus-visible { outline-color: var(--office-cream, #FFF7EC); }
-.route-state footer { padding: 16px 0 0; font-size: 14px; }
-@media (max-width: 650px) { .route-state-content { padding-inline: 16px; } .route-state h1 { font-size: 26px; } .route-state-actions { flex-direction: column; align-items: flex-start; } }
+.route-state button { padding: 8px 20px; border: 2px solid var(--ink, #19213B); border-radius: 999px; background: var(--ink, #19213B); color: var(--paper, #FFFDF4); font: inherit; font-weight: 800; cursor: pointer; }
+:root[data-theme='dark'] .route-state button { color: var(--on-pastel); background: var(--pastel-yellow); border-color: var(--pastel-yellow); }
+.route-state :is(a, button):focus-visible { outline: 3px solid var(--ink, #19213B); outline-offset: 3px; }
+.route-state-bar a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 8px; text-decoration: none; }
+.route-state footer { margin-top: 16px; padding: 16px 0 0; border-top: 1px solid var(--line, #D6F0F5); color: var(--ink-soft, #4B5577); font-size: 14px; }
+@media (max-width: 650px) { .route-state-content { padding: 24px 16px; } .route-state h1 { font-size: 28px; } .route-state-actions { flex-direction: column; align-items: flex-start; } }

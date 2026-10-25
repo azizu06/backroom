@@ -250,7 +250,7 @@ describe('probeServices', () => {
     it('reports the in-memory store as simulated without probing', async () => {
       const { deps: d, fetch } = deps();
       const result = await probeServices({ ...d, env: env({ STATE_STORE: undefined }) });
-      expect(result.spacetime).toEqual({ state: 'simulated', source: 'config', evidence: 'In-memory state fixture', at: null });
+      expect(result.spacetime).toEqual({ state: 'simulated', source: 'config', evidence: 'In-memory state', at: null });
       expect(urls(fetch).some(url => url.includes('/v1/database/'))).toBe(false);
     });
     it('converts ws:// to http:// and sends no Authorization header', async () => {

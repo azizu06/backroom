@@ -81,9 +81,9 @@ if (process.argv.includes('--paylink')) {
     assert.equal(decoded, `${initial.publicUrl}/p/${link.short_code}`);
     await shot('paylink-01-qr', 'Decoded the rendered QR pixels into the public HTTPS short URL');
     await page.goto(decoded);
-    await expect(page.getByRole('button', { name: 'Pay $2,475.00 with simulated card', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pay $2,475.00', exact: true })).toBeVisible();
     assert(page.url().endsWith(link.link_path));
-    await page.getByRole('button', { name: 'Pay $2,475.00 with simulated card', exact: true }).click();
+    await page.getByRole('button', { name: 'Pay $2,475.00', exact: true }).click();
     await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
     await page.reload();
     await expect(page.getByRole('button', { name: 'Deposit recorded', exact: true })).toBeDisabled();
@@ -117,7 +117,7 @@ try {
     await expect(page.getByRole('heading', { name: 'Your decision is recorded.' })).toBeVisible();
     await shot('03-denied', `Passkey denial recorded while LLM ${live ? 'ON' : 'OFF'}`);
     await page.goto(`${state.publicUrl}${state.payPath}`);
-    await page.getByRole('button', { name: 'Pay $2,475.00 with simulated card', exact: true }).click();
+    await page.getByRole('button', { name: 'Pay $2,475.00', exact: true }).click();
     await expect(page.getByText('Payment matched. Invoice partially paid.')).toBeVisible();
     await shot('04-pay', live ? 'Real Nessie sandbox deposit/reuse and exact reconciliation; display is not settlement' : 'Exact reconciliation; this web host uses mock Nessie HTTP transport');
     for (const preset of ['4419', '4471']) {

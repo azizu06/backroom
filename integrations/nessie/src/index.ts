@@ -15,21 +15,21 @@ export interface BankSurfaceCopy {
 }
 const MOCK_SURFACE: BankSurfaceCopy = {
   surface: 'mock',
-  sandboxLabel: 'Mock bank (offline)',
-  postedDepositsLabel: 'Mock bank balance + posted deposits (offline)',
-  cardNotice: 'Mock bank (offline); simulated card.',
-  panelLine: 'Mock bank (offline) · simulated card',
-  readbackLabel: 'Mock bank (offline) readback',
-  readNote: 'Read from the offline mock bank. This labeled display is not available funds or proof of settlement.',
+  sandboxLabel: 'Offline bank',
+  postedDepositsLabel: 'Offline bank balance + posted deposits',
+  cardNotice: 'Offline bank; no card is charged.',
+  panelLine: 'Offline bank · no card charged',
+  readbackLabel: 'Offline bank readback',
+  readNote: 'Read from the offline bank. This display is not available funds or proof of settlement.',
 };
 const SANDBOX_SURFACE: BankSurfaceCopy = {
   surface: 'nessie_sandbox',
-  sandboxLabel: 'Nessie = sandbox bank',
+  sandboxLabel: 'Nessie bank',
   postedDepositsLabel: 'Nessie account balance + Nessie-reported posted deposits',
-  cardNotice: 'Nessie = sandbox bank; simulated card.',
-  panelLine: 'Nessie sandbox · simulated card',
-  readbackLabel: 'Nessie sandbox readback',
-  readNote: 'Read from Nessie. This labeled sandbox display is not available funds or proof of settlement.',
+  cardNotice: 'Nessie bank; no card is charged.',
+  panelLine: 'Nessie bank · no card charged',
+  readbackLabel: 'Nessie readback',
+  readNote: 'Read from Nessie. This display is not available funds or proof of settlement.',
 };
 export function bankSurfaceCopy(surface: BankSurface = 'nessie_sandbox'): BankSurfaceCopy {
   return surface === 'mock' ? MOCK_SURFACE : SANDBOX_SURFACE;

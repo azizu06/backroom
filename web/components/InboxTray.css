@@ -4,10 +4,13 @@
 .inbox-tray * { box-sizing: border-box; }
 .inbox-tray h1, .inbox-tray h2, .inbox-tray h3, .inbox-tray h4 { margin: 0 0 12px; font-weight: 800; color: var(--ink); }
 .inbox-tray .inbox-title { font-weight: 900; font-size: 30px; letter-spacing: -.5px; margin: 0 0 4px; }
+/* The /inbox page shares the page header rhythm of the other product pages. */
+.inbox-page .inbox-tray { max-width: 1008px; padding: 0 24px 96px; }
+.inbox-page .inbox-tray .inbox-title { font-size: 32px; line-height: 1.15; letter-spacing: 0; margin: 32px 0 6px; }
 .inbox-tray p { margin: 0 0 12px; }
 .inbox-tray a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
-.inbox-heading { margin-bottom: 20px; }
-.inbox-heading p { margin: 0; }
+.inbox-heading { margin-bottom: 24px; }
+.inbox-heading p { margin: 0; color: var(--ink-soft); }
 
 .inbox-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .inbox-tray .inbox-card { display: grid; gap: 4px; text-align: left; min-height: 72px; padding: 12px 16px; background: var(--bubble-glass); color: var(--ink); border: var(--bubble-border); border-radius: 22px; box-shadow: var(--bubble-shadow); font: inherit; cursor: pointer; }
@@ -20,10 +23,10 @@
 .inbox-result { min-width: 0; background: var(--bubble-glass); border: var(--bubble-border); border-radius: var(--bubble-radius); box-shadow: var(--bubble-shadow); padding: 20px 24px; margin-bottom: 20px; }
 .inbox-result h2, .inbox-result > h4 { font-size: 16px; }
 .inbox-tray .inbox-empty { margin: 0; }
-.inbox-outcome { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 14px; border-radius: 20px; color: var(--on-pastel); background: var(--pastel-yellow); border-left: 5px solid var(--on-pastel); }
+.inbox-outcome { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 14px; border-radius: 20px; color: var(--on-pastel); background: var(--pastel-yellow); border: 2px solid var(--on-pastel); }
 .inbox-outcome strong { font-size: 22px; letter-spacing: .5px; }
 .inbox-outcome span { font-size: 13px; }
-.inbox-outcome[data-decision=DENY] { color: var(--ink); background: var(--danger-soft); border-left-color: var(--danger); }
+.inbox-outcome[data-decision=DENY] { color: var(--ink); background: var(--danger-soft); border-color: var(--danger); }
 .inbox-outcome[data-decision=ALLOW] { background: var(--pastel-aqua); }
 .inbox-facts { margin: 8px 0 12px; }
 .inbox-facts > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); padding: 8px 0; border-bottom: 1px solid var(--line); gap: 16px; font-size: 14px; }
@@ -71,6 +74,7 @@
 body:has(.inbox-page) .real-sim-overlay { position: static; width: 100%; border-radius: 0; }
 @media (max-width: 640px) {
   .inbox-tray { padding: 16px; }
+  .inbox-page .inbox-tray { padding: 0 16px 64px; }
   .inbox-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .inbox-result { padding: 16px; }
   .inbox-envelope { grid-template-columns: minmax(0, 1fr); gap: 0; }

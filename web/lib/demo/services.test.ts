@@ -16,7 +16,7 @@ it('keeps rehearsal offline even when sponsor credentials are present', async ()
   expect(services.status().bank).toBe('mock');
   expect(services.status().services.crs.mode).toBe('FAKE');
   expect(existsSync(cacheFile)).toBe(false);
-  expect((await services.bank.readBalanceWithPostedDeposits(services.accountId)).sandboxLabel).toBe('Mock bank (offline)');
+  expect((await services.bank.readBalanceWithPostedDeposits(services.accountId)).sandboxLabel).toBe('Offline bank');
   expect(http).not.toHaveBeenCalled();
 });
 it('live payments use real Nessie HTTP and reuse invoice memos across new hosts', async () => {
@@ -35,7 +35,7 @@ it('live payments use real Nessie HTTP and reuse invoice memos across new hosts'
   const again = await createDemoServices({ env, fetch: http });
   await again.bank.deposit(payment);
   expect(http.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
-  expect((await first.bank.readBalanceWithPostedDeposits(first.accountId)).sandboxLabel).toBe('Nessie = sandbox bank');
+  expect((await first.bank.readBalanceWithPostedDeposits(first.accountId)).sandboxLabel).toBe('Nessie bank');
   expect(first.status()).toMatchObject({ live: true, bank: 'nessie_sandbox', services: { crs: { mode: 'FAKE' } } });
   expect(JSON.stringify(first.status())).not.toContain('private');
 });
@@ -88,7 +88,7 @@ it('uses clean CRS identity #1 for the lead pre-call and reaches model planning'
     decision: 'ALLOW', ruleIds: ['DEMO_OVERRIDE'],
   });
   expect(precallRows(precallCard(services.precall()))).toContainEqual({
-    label: 'Warning', value: 'Sanctions check not available in CRS sandbox',
+    label: 'Warning', value: 'Sanctions check unavailable',
   });
   expect(modelRoute).toHaveBeenCalledTimes(1);
 });
