@@ -27,6 +27,17 @@ html body .office-shell[data-hud='diegetic'] :is(.play-exit, .play-settings-togg
 html body .office-shell[data-hud='diegetic'] .play-hud > a[href='/operator'] { opacity: 1 !important; }
 .office-shell[data-hud='diegetic'] .office-drawer-toggle { display: block; }
 .office-shell .office-viewport .overview-map { inset: 12px 12px 58px; overflow: auto; }
+/* Match the shared sheet entrance in the overview sheet variant. */
+html body .office-shell .aj-detail-backdrop { animation: sheet-fade 0.18s ease-out; }
+html body .office-shell .aj-detail-sheet { animation: sheet-pop 0.16s ease-out both; }
+html body .office-shell :is(.aj-detail-body, .aj-detail-icon) { animation: sheet-content 0.16s ease-out both; }
+html body .office-shell .aj-detail-close { transition: transform 0.15s ease-out, background-color 0.15s ease, box-shadow 0.15s ease; }
+html body .office-shell .aj-detail-close:hover { transform: translateY(-1px); }
+html body .office-shell .aj-detail-close:active { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) {
+  html body .office-shell :is(.aj-detail-backdrop, .aj-detail-sheet, .aj-detail-body, .aj-detail-icon) { animation: none; }
+  html body .office-shell .aj-detail-close { transition: none; }
+}
 @media (max-width: 760px) {
   .office-shell[data-hud='diegetic'] .play-overview { right: auto; left: 8px; top: 46px; }
   .office-shell[data-hud='diegetic'] .office-sound-toggle { right: auto !important; left: 8px; }
