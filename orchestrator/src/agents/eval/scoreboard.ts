@@ -172,6 +172,8 @@ for (const row of legacy.reports) {
   // C17's integration step (record PHONE_MISMATCH_WARN on Dana's audit wall, identity before any amount) is executed
   // end to end by the scripted phone_mismatch conversation; a live phone retest is still a separate, ungraded item.
   if (row.id === 'C17' && conversations.find(run => run.id === 'phone_mismatch')?.match) continue;
+  // C13: the desk-phone gate withholds Request call, the office request is refused, and a direct dial is rejected before the provider.
+  if (row.id === 'C13' && callButton.checks.noConsent && precallStops.find(run => run.id === 'C13')?.match) continue;
   if (row.seams.includes('integration:not_executed')) gaps.push({ id: row.id, detail: 'At least one integration step is unexecuted by the existing eval; do not claim full scenario completion.' });
 }
 const inboxTeam = await runInboxTeam();
@@ -298,7 +300,7 @@ const lines = [
   `| P11 expired memory activation recovery (late tool/cancel and pre-provider fence variants; no OS kill) | ${display(rates.dispatcherMemoryRecovery)} |`,
   `| AR scripted calls through the Dispatcher (promise, dispute, paid x2, wrong number, opt-out, hostile, human request, voicemail, phone mismatch) | ${display(rates.arConversations)} |`,
   `| Pre-call stops: planner refuses with the key rule, direct dial rejected before the provider (C11, C13-C16, C22) | ${display(rates.precallStops)} |`,
-  `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: 409, no provider attempt) | ${display(rates.callButton)} |`,
+  `| In-app call button and pre-call gate (blocked credit/OFAC: 409 PRECALL_BLOCKED, no provider attempt; a phone number is INVALID_REQUEST; a ready pre-call dials once; a second click is COOLDOWN; a foreign origin is refused; the declared loopback office dials once; C13 no consent: button withheld, 409, no provider attempt) | ${display(rates.callButton)} |`,
   `| Demo inbox agent team (production dispatcher, scripted QueryFn, ALLOW cannot pay, seat decision kept, DEMO_AGENTS=0, mismatched origin rejected) | ${display(rates.inboxTeam)} |`,
   `| P10 Collections dispatcher tool isolation (not policy rule agreement) | ${display(rates.runtimeBadgeIsolation)} |`,
   `| P04 dispatcher bank-change application (software passkey, fixture providers) | ${display(rates.dispatcherBankChange)} |`,
