@@ -10,6 +10,7 @@
 .story-evidence a { color: var(--office-navy); text-decoration: underline; }
 .story-evidence a:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 .story-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.story-handoff { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 10px; border: 1px solid var(--office-lavender); border-radius: 8px; background: var(--office-peach); color: var(--office-navy); font-size: 14px; }
 .story-mode button { padding: 6px 10px; color: var(--office-navy); background: var(--office-peach); border: 1px solid var(--office-navy); border-radius: 8px; cursor: pointer; }
 .story-mode button:disabled { opacity: .5; cursor: default; }
 .story-mode button:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }

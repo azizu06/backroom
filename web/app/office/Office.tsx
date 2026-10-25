@@ -102,13 +102,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const labels: RoomLabels = { lobby: useRef(null), collections: useRef(null), payables: useRef(null), vendor_onboarding: useRef(null), dana: useRef(null), treasury: useRef(null) };
   const onFailure = useCallback(() => dispatch({ type: 'lost', attempt: sceneAttempt }), [sceneAttempt]);
   const onRestored = useCallback(() => dispatch({ type: 'restored', attempt: sceneAttempt }), [sceneAttempt]);
-  function pickMode(next: ViewMode) { dispatch({ type: 'pick', mode: next }); }
+  const pickMode = useCallback((next: ViewMode) => dispatch({ type: 'pick', mode: next }), []);
   const tagElements = useRef(new Map<string, HTMLDivElement>());
   const agentTag = useCallback<AgentTagLookup>(id => tagElements.current.get(id), []);
   const touring = mode === 'tour';
   const [tour, setTour] = useState<{ stops: AnchorId[]; index: number } | null>(null);
   const rooms = visibleRooms(snapshot);
-  const { storyActive, reducedMotion, chapters, closeStory, changeStoryChapter, startStory, viewportRef } = useStoryMode({
+  const { storyActive, storyChapter, reducedMotion, chapters, closeStory, changeStoryChapter, startStory, viewportRef } = useStoryMode({
     rooms, storyStart, setFocus, setInspecting, setTour, pickMode,
   });
   const roomsRef = useRef(rooms);
@@ -149,7 +149,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   }, [touring, interruptTour, storyActive]);
   const tourStop = touring && tour ? tour.stops[tour.index] : undefined;
   useEffect(() => {
-    if (!window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
+    if (!storyStart && !window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches) dispatch({ type: 'prefer', mode: 'walk' });
     if (storyStart || source.getSnapshot().connection === 'replay') return;
     if (startView({ search: window.location.search, stored: readStartView(), compact: window.matchMedia(COMPACT_QUERY).matches }) === 'play') setSplash(true);
   // Decided once on mount; later prop changes never reopen the splash.
@@ -282,7 +282,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
             <strong>Backroom</strong><span aria-hidden='true'>{cornerOpen ? '▴' : '▾'}</span><span className='visually-hidden'> menu</span>
           </button>
           {lobbyModeLabel(snapshot.connection) && <span className='office-mode-chip'>{lobbyModeLabel(snapshot.connection)}</span>}
-          <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
+          <label htmlFor='office-view' className='office-corner-view'><span className='visually-hidden'>View</span><select disabled={storyActive} ref={viewSelect} id='office-view' aria-label='Office view' value={mode} onChange={e => chooseView(e.target.value as ViewMode)}>
             {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
           </select></label>
           <OfficeHelp />
@@ -294,8 +294,8 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         <div id='office-corner-panel' className='office-corner-panel' hidden={!cornerOpen}>
           <SiteNav placement='office' />
           <div className='office-tools'>
-            <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>Story mode</button>
-            <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Take the tour</button>
+            <button type='button' onClick={() => { setCornerOpen(false); if (storyActive) closeStory(); else startStory(); }}>{storyActive ? 'Skip tour' : 'Take the tour'}</button>
+            <button type='button' onClick={() => { setCornerOpen(false); pickMode('tour'); }}>Camera tour</button>
             <ThemeToggle className='theme-toggle office-theme-toggle' />
             <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
             <OfficeAdvanced replay={snapshot.connection === 'replay'}
@@ -321,7 +321,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? play : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} labels={labels} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? { ...play, story: storyChapter } : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
           </div>
           {/* In Overview each tag is a quick-action button (Tab through them). Elsewhere the footer seat statuses already
               announce every name and state (seatLabel), so the tags are hidden from assistive tech. */}
@@ -344,12 +344,14 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           })}
         </>}
       </ViewBoundary>
-      {mode === 'play' && layers.scene?.visible && <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} onOverview={toOverview} lookOnStart={lookOnEnter} chat={chat} keyOwners={{ story: storyActive, menu: !!menu }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />}
+      {mode === 'play' && layers.scene?.visible && (storyActive
+        ? <div ref={play.hud} data-testid='story-camera' aria-hidden='true' />
+        : <PlayHud snapshot={snapshot} input={play.input} target={playTarget} hud={play.hud} onExit={exitPlay} onOverview={toOverview} lookOnStart={lookOnEnter} chat={chat} keyOwners={{ story: storyActive, menu: !!menu }} onHelp={() => window.dispatchEvent(new CustomEvent('office-help'))} />)}
       {overview && <OverviewMap snapshot={snapshot} motions={motions} open={mapOpen} onPick={(pick, opener) => openMenu(pick, opener)} onFirstPerson={() => enterFirstPerson(play.last.current)} onClose={closeMap} />}
       {overview && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
       {overview && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
       {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} />}
-      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Overview · click someone for quick actions · click a room to jump in' : 'Overview · drag to look · click someone for quick actions · click a room to jump in'}</div>
+      <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : mode === 'tween' ? 'Overview · click someone for quick actions · click a room to jump in' : 'Overview · drag to look · click someone for quick actions · click a room to jump in'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
