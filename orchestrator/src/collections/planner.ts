@@ -109,12 +109,18 @@ export function createCallPlanner(options: CallPlannerOptions = {}): CallPlanner
         },
       };
       let attempts = 0;
-      // A low self-confidence plan (or another non-transport router error) gets one fresh cloud attempt.
-      // Each attempt re-runs the router's OFF, confidence, usage and cost checks; HTTP failures never retry.
+      // Share one retry across confidence and transient failures. Each attempt goes through
+      // the router again, preserving OFF, confidence, usage and cost checks.
       const attemptCloud = async (): Promise<Awaited<ReturnType<typeof route>>> => {
         attempts++;
         try { return await cloudRoute('call_plan', input, schema); }
-        catch (error) { if (attempts > 1 || error instanceof ModelFailure) throw error; return attemptCloud(); }
+        catch (error) {
+          const transient = error instanceof ModelFailure && (error.kind === 'transport'
+            || (error.kind === 'http' && (error.status === 429 || (error.status !== undefined && error.status >= 500 && error.status <= 599))));
+          if (attempts > 1 || (error instanceof ModelFailure && !transient)) throw error;
+          if (transient) await new Promise(resolve => setTimeout(resolve, 1000));
+          return attemptCloud();
+        }
       };
       try { return await attemptCloud(); }
       catch (error) {

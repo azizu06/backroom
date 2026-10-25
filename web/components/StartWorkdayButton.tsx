@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { pollWorkday } from '../lib/workday/poll';
 import { isReplayPage } from '../lib/replay/mode';
 
 /** Both placements share the operator-only endpoint and its per-reset batch claim. */
@@ -10,20 +11,15 @@ export function StartWorkdayButton() {
   useEffect(() => {
     if (isReplayPage()) return;
     let active = true;
-    const refresh = async () => {
-      try {
-        const response = await fetch('/api/operator/workday', { cache: 'no-store' });
-        if (!active) return;
-        setAuthorized(response.ok);
-        if (response.ok) {
-          const body = await response.json();
-          if (active && typeof body.message === 'string' && body.status !== 'ready') setMessage(body.message);
-        }
-      } catch { /* A failed poll cannot start a batch or claim success. */ }
-    };
-    void refresh();
-    const timer = setInterval(() => { void refresh(); }, 3000);
-    return () => { active = false; clearInterval(timer); };
+    const stop = pollWorkday(3000, async response => {
+      if (!active) return;
+      setAuthorized(response?.ok ?? false);
+      if (response?.ok) {
+        const body = await response.json();
+        if (active && typeof body.message === 'string' && body.status !== 'ready') setMessage(body.message);
+      }
+    }, () => { /* A failed poll cannot start a batch or claim success. */ });
+    return () => { active = false; stop(); };
   }, []);
   if (!authorized) return null;
   async function start() {
@@ -37,7 +33,7 @@ export function StartWorkdayButton() {
     finally { setBusy(false); }
   }
   return <span className='workday-control' style={{ display: 'inline-block', marginBlock: 12 }}>
-    <button type='button' disabled={busy} onClick={() => { void start(); }} title='Three seeded invoices and a bank-change attack through real agents. No payments.'>Start the Workday</button>
+    <button type='button' disabled={busy} onClick={() => { void start(); }} title='Three seeded invoices and a bank-change attack through real agents. No payments.'>Start the workday</button>
     {message && <small role='status' style={{ display: 'block', maxWidth: '32rem' }}>{message}</small>}
   </span>;
 }
