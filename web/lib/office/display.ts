@@ -38,9 +38,15 @@ export function officeText(text: string): string {
     .replace(/\b(-?\d[\d,]*)\s+(?:USD\s+)?cents?\b/gi, (_, n: string) => dollars(Number(n.replaceAll(',', ''))))
     .replace(/\bdemo-(?:collections|payables|vendor)-(\d+)\b/gi, 'INV-$1')
     .replace(/\b(?:audit|judge|review|escalation):[^\s·,;]+/gi, '')
-    .replace(/\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b/gi, '')
+    .replace(/\b(?:agent-)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b/gi, '')
     .replace(/\bvendor[-_:]([a-z][a-z0-9_-]*)/gi, (_, name: string) => plainWords(name))
-    .split('·').map(part => part.trim()).filter(Boolean).join(' · ').replace(/\s{2,}/g, ' ').trim();
+    .replace(/\bvendorId\b/g, 'vendor')
+    .replace(/\b(create escalation|agent narration hold|judge inbox decision)\b(?:\s*·\s*(?:agent-[^·]*|[,\s\d]+))?/gi,
+      (_, action: string) => action.toLowerCase() === 'create escalation' ? 'Escalated to Dana' : 'Held for review')
+    .replace(/\bagent-(?=\s*(?:,|·|$))/gi, '')
+    .split('·').map(part => part.replace(/^(?:\s*,)+|(?:,\s*)+$/g, '')
+      .replace(/,\s*(?:,\s*)+/g, ', ').trim())
+    .filter(Boolean).join(' · ').replace(/\s{2,}/g, ' ').trim();
 }
 export function shortOfficeText(text: string, limit = 40): string {
   const clean = officeText(text), points = Array.from(clean);
