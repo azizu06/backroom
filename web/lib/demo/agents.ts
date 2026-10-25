@@ -2,12 +2,14 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { resolve } from 'node:path';
-import { getStateStore, type StateStore, type StateTransport,
+import { getStateStore, type StateStore, type StateTransport, type Lease, type PaymentService,
   MemoryEmailOutbox, PayablesSeat, northfield, createCrsClientFromEnv, createCrsBankChangeRisk, createCrsPublicRecordsCheck, createPreCallHealthCheck, type FinanceInboxItem, type FinanceRepository,
   type InvoiceFields, type VendorFields, type SeatResult, type ControllerPort } from '@backroom/orchestrator';
 import { ClaudeAgentRuntime, Dispatcher, FileUsageLedger, MemoryHandoffStore, SpacetimeHandoffStore,
-  createRoleRegistry, auditorCorrections, type AgentCaseStore, type CaseResult,
-  type QueryFn, type UsageLedger, type Json, type RoleDeps } from '@backroom/orchestrator/agents';
+  createRoleRegistry, auditorCorrections, correctionReturns, toModule, type AgentCaseStore, type CaseResult,
+  type QueryFn, type UsageLedger, type Json, type RoleDeps, type RoleModule } from '@backroom/orchestrator/agents';
+import { paymentMemo, type NessieClient } from '@backroom/nessie';
+import type { CallRecordView } from '../../../orchestrator/src/agents/roles/collections';
 import { MemoryVendorEvidenceStore } from '../../../orchestrator/src/agents/tools/vendor';
 import { ApifyBudget, createContactRunner } from '../../../orchestrator/src/agents/tools/vendor-apify';
 import { hold } from '../../../orchestrator/src/payables/decisions';
@@ -25,6 +27,17 @@ export const demoAgentsEnabled = (env: Record<string, string | undefined> = proc
 type CollectionsPlannerDeps = NonNullable<RoleDeps['collectionsPlanner']>;
 type CollectionsCase = Awaited<ReturnType<CollectionsPlannerDeps['cases']['load']>>;
 export interface CallRefusal { outcome: 'refused'; code: string; detail?: string }
+/** Trusted host ports for the post-call AR chain (collections -> reconciler -> auditor). */
+export interface CallOutcomeHost {
+  /** The gateway's persisted record of a finished call; never caller input. */
+  read(callId: string): Promise<(Omit<CallRecordView, 'links'> & { invoiceId: string; clientId: string; amountCents: number;
+    links: { id: string; amountCents: number }[] }) | undefined>;
+  bank: Pick<NessieClient, 'listDeposits'>;
+  accountId: string;
+  payments?: () => Pick<PaymentService, 'view' | 'reconcile'> | undefined;
+  /** A fresh Collections task lease on the invoice, held (with the host's claim queue) until release. */
+  lease(invoiceId: string, key: string): Promise<{ lease: Lease; release(): Promise<void> }>;
+}
 export interface DemoCollectionsPlanner {
   caseFor(refusal: CallRefusal): Promise<CollectionsCase | undefined> | CollectionsCase | undefined;
   voice: CollectionsPlannerDeps['voice'];
@@ -38,6 +51,7 @@ export function createInboxAgents(options: {
   query?: QueryFn; credential?: () => string;
   vendor?: Partial<NonNullable<RoleDeps['vendor']>>;
   collectionsPlanner?: DemoCollectionsPlanner;
+  callOutcomes?: CallOutcomeHost;
 }) {
   const control = options.control;
   const store = options.store ?? (options.transport ? new SpacetimeHandoffStore(options.transport) : new MemoryHandoffStore({ audit: control }));
@@ -171,6 +185,72 @@ export function createInboxAgents(options: {
     const result = await done;
     return result?.status === 'done' && emailStatus ? { status: emailStatus } : undefined;
   }
+  /** After a live call ends: the existing AR chain on the call's persisted outcome, once per call. */
+  function submitCallOutcome(callId: string): Promise<CaseResult | undefined> {
+    const config = options.callOutcomes;
+    const caseId = `agent:call:${callId}`;
+    if (stopped || !config) return Promise.resolve(undefined);
+    const prior = cases.get(caseId);
+    if (prior) return prior.done;
+    const abort = new AbortController();
+    const leases = new Map<string, { lease: Lease; release(): Promise<void> }>();
+    const release = async (activationId: string) => {
+      const held = leases.get(activationId);
+      leases.delete(activationId);
+      await held?.release();
+    };
+    const opened = config.read(callId).then(async found => {
+      if (!found) throw new Error('CALL_RECORD_NOT_FOUND');
+      const call = structuredClone(found);
+      await store.openCase({ caseId, role: 'collections', artifactRefs: [`ar_invoice:${call.invoiceId}`], displayId: call.invoiceId });
+      return call;
+    });
+    const done = opened.then(async call => {
+      if (stopped) return undefined;
+      const link = call.links.at(-1);
+      const linkRef = link && `${caseId}:link:${link.id}`;
+      const registry = createRoleRegistry({
+        collections: { audit: control,
+          cases: { load: async id => {
+            if (id !== caseId) throw new Error('COLLECTIONS_CASE_NOT_FOUND');
+            return { sessionId: callId, precall: { clientId: call.clientId, invoiceId: call.invoiceId } } as unknown as CollectionsCase;
+          } },
+          outcomes: { read: async id => id === callId ? structuredClone(call) : undefined } },
+        reconciler: { store: control, bank: config.bank, payments: config.payments?.(),
+          loadCase: async ctx => {
+            const held = leases.get(ctx.activation.activationId);
+            if (!held) throw new Error('RECONCILIATION_CASE_MISMATCH');
+            const refs = ctx.activation.artifactRefs;
+            const viaLink = !!linkRef && refs.includes(linkRef);
+            return { caseId, invoiceId: call.invoiceId, accountId: config.accountId, state: 'promised', lease: held.lease,
+              invoiceRef: viaLink ? linkRef : refs.find(ref => ref.startsWith(`${caseId}:`)) ?? `${caseId}:call:${callId}`,
+              amountCents: viaLink ? link!.amountCents : call.amountCents,
+              expectedMemo: paymentMemo({ invoiceId: call.invoiceId, installment: 1 }),
+              correctionReturns: correctionReturns((await store.getCase(caseId))!, 'reconciler', 'collections'),
+              activationId: ctx.activation.activationId, ...(viaLink ? { paymentLinkId: link!.id } : {}) };
+          } },
+        auditor: { store: control, loadCase: async () => ({ refs: [call.invoiceId, callId],
+          correctionCount: auditorCorrections((await store.getCase(caseId))!) }) },
+      });
+      // The reconciler's tools act under the host's Collections task lease, held only for its activation.
+      const reconciler = toModule(registry.reconciler!);
+      const roles = { ...registry, reconciler: { ...reconciler,
+        async specialist(ctx) {
+          leases.set(ctx.activation.activationId, await config.lease(call.invoiceId, ctx.activation.activationId));
+          try { return await reconciler.specialist(ctx); }
+          catch (error) { await release(ctx.activation.activationId); throw error; }
+        },
+        async run(runtime, spec, ctx, input) {
+          try { return await (reconciler.run ? reconciler.run(runtime, spec, ctx, input) : runtime.run(spec, ctx, input)); }
+          finally { await release(ctx.activation.activationId); }
+        } } satisfies RoleModule };
+      const dispatcher = new Dispatcher({ runtime, store, ledger, control, roles, mode: 'demo', runnerId: `call-outcome:${randomUUID()}` });
+      return dispatcher.runCase({ caseId, role: 'collections', artifactRefs: [`ar_invoice:${call.invoiceId}`], displayId: call.invoiceId,
+        credentialOwnerId: 'aziz', signal: abort.signal, input: { note: 'The live collection call has ended.' } });
+    }).finally(() => Promise.all([...leases.keys()].map(release)));
+    cases.set(caseId, { abort, opened, done });
+    return done;
+  }
   async function drain() { await Promise.allSettled([...cases.values()].map(row => row.done)); }
   async function stop() {
     stopped = true;
@@ -193,18 +273,20 @@ export function createInboxAgents(options: {
     if (cancellations.some(row => row.status === 'rejected')) throw new Error('DEMO_AGENT_CANCEL_FAILED');
     cases.clear();
   }
-  return { submit, submitCallRefusal, stop, drain, store, ledger, emailOutbox };
+  return { submit, submitCallRefusal, submitCallOutcome, stop, drain, store, ledger, emailOutbox };
 }
 
 type Host = ReturnType<typeof createInboxAgents>;
-type HostConfig = { control: StateStore; transport?: StateTransport; collectionsPlanner?: DemoCollectionsPlanner };
+type HostConfig = { control: StateStore; transport?: StateTransport; collectionsPlanner?: DemoCollectionsPlanner;
+  store?: AgentCaseStore; callOutcomes?: CallOutcomeHost };
 const root = globalThis as typeof globalThis & {
   backroomInboxAgents?: Host;
   backroomInboxAgentConfig?: HostConfig;
 };
-export function installInboxAgents(control: StateStore, transport?: StateTransport, collectionsPlanner?: DemoCollectionsPlanner) {
+export function installInboxAgents(control: StateStore, transport?: StateTransport, collectionsPlanner?: DemoCollectionsPlanner,
+  shared: { store?: AgentCaseStore; callOutcomes?: CallOutcomeHost } = {}) {
   // Defer ledger/SDK construction until an inbox case; failure cannot break demo startup.
-  root.backroomInboxAgentConfig = demoAgentsEnabled() ? { control, transport, collectionsPlanner } : undefined;
+  root.backroomInboxAgentConfig = demoAgentsEnabled() ? { control, transport, collectionsPlanner, ...shared } : undefined;
 }
 export async function resetInboxAgents() {
   const prior = root.backroomInboxAgents;
@@ -234,4 +316,15 @@ export async function narrateCallRefusal(refusal: CallRefusal) {
     root.backroomInboxAgents = createInboxAgents(config);
   }
   return root.backroomInboxAgents.submitCallRefusal(refusal);
+}
+
+/** A live call ended: run the AR chain on its recorded outcome through the installed demo host. */
+export async function narrateCallOutcome(callId: string) {
+  if (!demoAgentsEnabled()) return;
+  if (!root.backroomInboxAgents) {
+    const config = root.backroomInboxAgentConfig;
+    if (!config) return;
+    root.backroomInboxAgents = createInboxAgents(config);
+  }
+  return root.backroomInboxAgents.submitCallOutcome(callId);
 }

@@ -1,4 +1,4 @@
-import { timingSafeEqual, randomUUID, randomBytes } from 'node:crypto';
+import { timingSafeEqual, randomUUID, randomBytes, createHash } from 'node:crypto';
 import {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse,
@@ -7,22 +7,27 @@ import {
 import type { StateStore } from '../store';
 import { parseControllerDecision, type ControllerDecision } from './types';
 import { issueVerifiedApproval } from './verified';
+import { loadControllerRecord, saveControllerRecord } from './credential-file';
 
 export interface ApprovalConfig {
   origin: string; rpID: string; enrollmentSecret: string; human?: string;
+  /** Persist the public credential, sign counter and session hashes here so a restart keeps Dana enrolled. */
+  credentialFile?: string;
 }
 interface Challenge {
   challenge: string; expiresAt: number;
   intent: { kind: 'register' } | { kind: 'session' } | { kind: 'decide'; id: string; decision: ControllerDecision };
 }
 const SESSION_MS = 12 * 60 * 60_000;
+const tokenHash = (token: string) => createHash('sha256').update(token).digest('base64url');
 /** Single-process controller service. Public credentials only; no biometric/private key leaves the authenticator.
+ * With `credentialFile`, the credential and sessions survive a restart; challenges stay process-local.
  * Replace together with StateStore for durable deployments. Never instantiate once per request.
  */
 export class ControllerApprovals {
   private credential?: WebAuthnCredential;
   private challenges = new Map<string, Challenge>();
-  /** Sign-in token -> expiry. A session only lists pending requests; it never decides one. */
+  /** sha256(sign-in token) -> expiry. A session only lists pending requests; it never decides one. */
   private sessions = new Map<string, number>();
   private human: string;
   constructor(private store: StateStore, private config: ApprovalConfig, private now = Date.now) {
@@ -30,6 +35,13 @@ export class ControllerApprovals {
     if (origin.origin !== config.origin || (origin.protocol !== 'https:' && origin.hostname !== 'localhost') ||
         (origin.hostname !== config.rpID && !origin.hostname.endsWith(`.${config.rpID}`))) throw new Error('INVALID_WEBAUTHN_ORIGIN');
     this.human = config.human ?? 'Dana';
+    const saved = config.credentialFile && config.enrollmentSecret ? loadControllerRecord(config.credentialFile, config, now()) : undefined;
+    if (saved) ({ credential: this.credential, sessions: this.sessions } = saved);
+  }
+  /** Call after every credential, counter or session change. A write failure fails the request. */
+  private persist(credential = this.credential) {
+    if (this.config.credentialFile && this.config.enrollmentSecret && credential)
+      saveControllerRecord(this.config.credentialFile, this.config, { credential, sessions: this.sessions });
   }
   isRegistered() { return !!this.credential; }
   private authorizeEnrollment(secret: unknown) {
@@ -66,7 +78,9 @@ export class ControllerApprovals {
     if (!result.verified || !result.registrationInfo) throw new Error('PASSKEY_INVALID');
     // Recheck after async crypto: a parallel enrollment must not replace Dana.
     this.authorizeEnrollment(secret);
-    this.credential = structuredClone(result.registrationInfo.credential);
+    const credential = structuredClone(result.registrationInfo.credential);
+    this.persist(credential);
+    this.credential = credential;
     this.challenges.clear();
     return { registered: true };
   }
@@ -94,10 +108,10 @@ export class ControllerApprovals {
       expectedChallenge: item.challenge, expectedOrigin: this.config.origin,
       expectedRPID: this.config.rpID, requireUserVerification: true });
     if (!result.verified) throw new Error('PASSKEY_INVALID');
-    const escalation = await this.store.decideEscalation(issueVerifiedApproval({ id, human: this.human,
-      decision: item.intent.decision, credentialId: credential.id }), this.now());
     credential.counter = Math.max(credential.counter, result.authenticationInfo.newCounter);
-    return escalation;
+    this.persist();
+    return this.store.decideEscalation(issueVerifiedApproval({ id, human: this.human,
+      decision: item.intent.decision, credentialId: credential.id }), this.now());
   }
   async sessionOptions() {
     if (!this.credential) throw new Error('CONTROLLER_NOT_REGISTERED');
@@ -118,11 +132,12 @@ export class ControllerApprovals {
     for (const [token, expiresAt] of this.sessions) if (expiresAt <= this.now()) this.sessions.delete(token);
     if (this.sessions.size >= 20) this.sessions.delete(this.sessions.keys().next().value!);
     const token = randomBytes(32).toString('base64url');
-    this.sessions.set(token, this.now() + SESSION_MS);
+    this.sessions.set(tokenHash(token), this.now() + SESSION_MS);
+    this.persist();
     return { token, maxAgeSeconds: SESSION_MS / 1000 };
   }
   hasSession(token: unknown) {
-    return typeof token === 'string' && (this.sessions.get(token) ?? 0) > this.now();
+    return typeof token === 'string' && (this.sessions.get(tokenHash(token)) ?? 0) > this.now();
   }
   /** Pending requests for this controller among `ids`, newest first. Expiry runs first, as in `get`. */
   async pending(ids: readonly string[]) {
