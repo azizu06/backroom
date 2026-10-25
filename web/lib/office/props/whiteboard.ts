@@ -23,11 +23,17 @@ export function whiteboardStats(snapshot: OfficeSnapshot): WhiteboardStats {
   };
 }
 
+/**
+ * Board size in metres (frame, then the drawn face) and its height above the floor. Centred at
+ * WHITEBOARD_INTERACTION.position[0] so it spans x -4.1..-1.7, clear of the north Payables window frame (from -1.47).
+ */
+export const WHITEBOARD = { width: 2.4, height: 1.4, bottom: 1.15, faceWidth: 2.26, faceHeight: 1.26 } as const;
+
 /** Mounted on the Payables back wall; shown only while the payables room is visible. */
 export const WHITEBOARD_INTERACTION: OfficePropInteraction = {
   id: 'whiteboard',
   prompt: 'Read whiteboard',
-  position: [-2.4, -6.95],
+  position: [-2.9, -6.95],
   radius: 1.6,
   visible: snapshot => visibleRooms(snapshot).includes('payables'),
   panel(snapshot) {
