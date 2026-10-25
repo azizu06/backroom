@@ -50,6 +50,36 @@ describe('demo host service source', () => {
     expect(mapHostServices({ ...live, apify: { mode: 'live', status: 'complete', runId: 'bad id/../x' } }, now, started).apify.state).toBe('unverified');
     expect(mapHostServices({ ...live, apify: { mode: 'live', status: 'unavailable_no_retry' } }, now, started).apify.state).toBe('unreachable');
   });
+  describe('Nessie sandbox evidence', () => {
+    const at = new Date(now - 60_000).toISOString();
+    const nessie = (value: HostServices['nessie']) => mapHostServices({ ...live, nessie: value }, now, started).nessie;
+    it('stays unverified with no proof, even with the live sandbox adapter configured', () => {
+      expect(nessie({ mode: 'sandbox' })).toEqual({ state: 'unverified', source: 'receipt',
+        evidence: 'No sandbox read or reconciled deposit in this host yet', at: null });
+    });
+    it('a successful sandbox read verifies it, dated at that read', () => {
+      expect(nessie({ mode: 'sandbox', proof: { kind: 'sandbox_read', at } }))
+        .toEqual({ state: 'verified', source: 'receipt', evidence: 'Sandbox account read (read only)', at });
+    });
+    it('an EXACT_PAYMENT_MATCH deposit receipt verifies it and names the deposit', () => {
+      expect(nessie({ mode: 'sandbox', proof: { kind: 'deposit_exact_match', at, depositId: '6717abc0ff' } }))
+        .toEqual({ state: 'verified', source: 'receipt', evidence: 'Deposit 6717abc0ff reconciled · EXACT_PAYMENT_MATCH', at });
+      expect(nessie({ mode: 'sandbox', proof: { kind: 'deposit_exact_match', at, depositId: 'bad id/../x' } }).evidence)
+        .toBe('Sandbox deposit reconciled · EXACT_PAYMENT_MATCH');
+    });
+    it('a failed sandbox read is unreachable, even after earlier proof', () => {
+      expect(nessie({ mode: 'sandbox', proof: { kind: 'sandbox_read', at }, unreachableAt: at }))
+        .toEqual({ state: 'unreachable', source: 'receipt', evidence: 'Sandbox read failed', at });
+    });
+    it('stale, future or unreadable proof is not Verified', () => {
+      for (const proofAt of [new Date(now - RECEIPT_MAX_AGE_MS - 1).toISOString(), new Date(now + 3600_000).toISOString(), 'not a time']) {
+        expect(nessie({ mode: 'sandbox', proof: { kind: 'sandbox_read', at: proofAt } }).state).toBe('unverified');
+      }
+    });
+    it('the mock bank is never Verified by proof', () => {
+      expect(nessie({ mode: 'mock', proof: { kind: 'sandbox_read', at } }).state).toBe('simulated');
+    });
+  });
   it('a throwing host read falls back to local probes', async () => {
     const snap = await createHostServiceSource({ readHost: () => { throw new Error('boom'); },
       local: { name: 'local', read: async () => localSnapshot }, now: () => now, hostStartedAt: () => started }).read();
