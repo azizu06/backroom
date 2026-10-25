@@ -18,6 +18,32 @@ html body .office-shell .office-main .office-viewport.office-viewport {
 .office-shell .office-toolbar .overview-toggle { position: static; inset: auto; z-index: auto; }
 /* Keep the disclosure link together so its visible bounds form one click target. */
 .office-shell .real-sim-tile-foot a { display: inline-block; }
+/* Full Floor keeps orientation compact; the report sections expand on demand. */
+.office-shell .detail-sheet[data-page='full-floor'] { overflow-anchor: none; }
+.office-shell .detail-sheet[data-page='full-floor'] .detail-sheet-header { height: 80px; box-sizing: border-box; }
+.office-shell .full-floor-summary { min-height: calc(86dvh - 132px); box-sizing: border-box; }
+.office-shell .full-floor-summary h3 { margin: 0 0 12px; }
+.office-shell .full-floor-counters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
+.office-shell .full-floor-counters > div { padding: 10px; border: 2px solid var(--pastel-aqua); border-radius: 18px; }
+.office-shell .full-floor-counters dt { font-size: 12px; }
+.office-shell .full-floor-counters dd { margin: 4px 0 0; font-size: 22px; font-weight: 900; }
+.office-shell .full-floor-roster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
+.office-shell .full-floor-roster li { min-width: 0; padding: 12px; border: 2px solid var(--pastel-aqua); border-radius: 22px; overflow-wrap: anywhere; }
+.office-shell .full-floor-roster strong { display: block; font-size: 14px; }
+.office-shell .full-floor-roster p { margin: 8px 0 0; font-size: 13px; }
+.office-shell .full-floor-tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 900; }
+.office-shell .full-floor-warnings { position: sticky; top: 80px; z-index: 1; padding: 10px; margin-bottom: 12px; color: #19213B; background: var(--pastel-yellow); border-radius: 16px; }
+.office-shell .full-floor-warnings ul { margin: 4px 0 0; padding-left: 20px; }
+.office-shell .full-floor-warnings + .full-floor-summary { min-height: calc(86dvh - 240px); }
+.office-shell .full-floor-disclosure { margin-top: 12px; }
+.office-shell .full-floor-disclosure h3 { margin: 0; }
+.office-shell .full-floor-disclosure h3 button { width: 100%; min-height: 44px; text-align: left; padding: 10px 14px; border-radius: 16px; }
+.office-shell .full-floor-disclosure > div:not(:empty) { padding-top: 12px; }
+@media (max-width: 760px) {
+  .office-shell .full-floor-roster { grid-template-columns: 1fr; gap: 8px; }
+  .office-shell .full-floor-roster li { padding: 10px; }
+  .office-shell .full-floor-counters { gap: 6px; }
+}
 /* The source Info tile owns the bottom-right corner; keep the integrated tour exit clear of it. */
 .office-shell .office-viewport > .tour-stop { top: 14px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); z-index: 7; }
 /* The source toolbar is shared by all views; obsolete corner visibility cannot hide it. */
