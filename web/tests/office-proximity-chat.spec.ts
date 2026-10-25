@@ -11,6 +11,8 @@ function chatLog(page: Page) {
   return page.getByRole('log', { name: 'Proximity chat messages' });
 }
 async function enterPlay(page: Page, url: string) {
+  // Each viewer needs foreground animation frames while its WebGL scene and fly-in become ready.
+  await page.bringToFront();
   await page.goto(url);
   const available = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -21,7 +23,7 @@ async function enterPlay(page: Page, url: string) {
   await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
-  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
+  await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 20_000 });
 }
 async function say(page: Page, text: string) {
   await surface(page).focus();
@@ -35,6 +37,8 @@ async function say(page: Page, text: string) {
 }
 
 test('proximity chat reaches a coworker in range and is dropped out of range', async ({ browser }) => {
+  // Three scene loads/fly-ins share this test; each has a bounded 20 s readiness wait below.
+  test.setTimeout(90_000);
   const context = await browser.newContext();
   const a = await context.newPage();
   const b = await context.newPage();
@@ -50,7 +54,7 @@ test('proximity chat reaches a coworker in range and is dropped out of range', a
   await say(a, 'hello from A');
   await expect(chatLog(b)).toContainText('hello from A', { timeout: 5000 });
 
-  // A re-enters Play 10 m away (test-only spawn), then speaks again.
+  // A re-enters Play 14 m away (test-only spawn), then speaks again.
   await enterPlay(a, `/office?presence=1&view=overview&playSpawn=${FAR.x},${FAR.z}`);
   await expect.poll(async () => Number(await surface(a).getAttribute('data-player-x'))).toBeCloseTo(FAR.x, 1);
   await say(a, 'too far to hear');
