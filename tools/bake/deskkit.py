@@ -82,10 +82,11 @@ MATS = {
     "trim": make_material("trim", hexlin(NAVY), 0.5),
     "metal": make_material("metal", hexlin(SLATE), 0.35, metallic=0.2),
     "cream": make_material("cream", hexlin(CREAM), 0.6),
-    "pot": make_material("pot", hexlin(BLUSH), 0.8),
+    "pot": make_material("pot", hexlin(PEACH), 0.8),
     "soil": make_material("soil", mix(hexlin(PEACH), hexlin(NAVY), 0.55), 1.0),
     "plant": make_material("plant", hexlin(MINT), 0.9),
-    "plant_dark": make_material("plant_dark", mix(hexlin(MINT), hexlin(SLATE), 0.25), 0.9),
+    "plant_dark": make_material("plant_dark", mix(hexlin(MINT), hexlin(NAVY), 0.20), 0.9),
+    "plant_light": make_material("plant_light", mix(hexlin(MINT), hexlin(BUTTER), 0.22), 0.9),
     "shade": make_material("shade", hexlin(BUTTER), 0.6, emit=0.35),
     "butter": make_material("butter", hexlin(BUTTER), 0.8),
     "aqua": make_material("aqua", hexlin(AQUA), 0.4),
@@ -315,35 +316,84 @@ def bookshelf():
         box("cream", SHELF_W / 2 - t - 0.07, floor + 0.05, 0.02, 0.1, 0.1, 0.18, bevel=0.01)
 
 
-def plant(scale_pot, height, leaves, pot_r_top=None):
-    r = scale_pot
-    cyl("pot", 0, height * 0.18, 0, r * 0.8, height * 0.36, segs=12, r_top=pot_r_top or r)
-    cyl("trim", 0, height * 0.36 + 0.004, 0, (pot_r_top or r) + 0.006, 0.012, segs=12)
-    cyl("soil", 0, height * 0.36 + 0.008, 0, (pot_r_top or r) * 0.86, 0.01, segs=12)
-    for i, (dx, dy, dz, lr) in enumerate(leaves):
-        ball("plant" if i % 2 == 0 else "plant_dark", dx, dy, dz, lr, squash=0.8, segs=10)
+def plant_pot(r, h, segs=12):
+    """Peach ceramic pot with chamfered foot/lip and an open rim around recessed soil."""
+    profile = ((0.0, 0.0), (0.80, 0.0), (0.83, 0.04), (0.98, 0.88),
+               (1.04, 0.90), (1.06, 0.94), (1.06, 0.98), (1.02, 1.0),
+               (0.86, 1.0), (0.84, 0.86), (0.0, 0.86))
+    bm = bmesh.new()
+    rings = []
+    for radius, y in profile:
+        rings.append([bm.verts.new(B(r * radius * math.cos(i * 2 * math.pi / segs), h * y,
+                                     r * radius * math.sin(i * 2 * math.pi / segs))) for i in range(segs)]
+                     if radius else [bm.verts.new(B(0, h * y, 0))])
+    for lower, upper in zip(rings, rings[1:]):
+        for i in range(segs):
+            j = (i + 1) % segs
+            if len(lower) == 1:
+                bm.faces.new((lower[0], upper[j], upper[i]))
+            elif len(upper) == 1:
+                bm.faces.new((lower[i], lower[j], upper[0]))
+            else:
+                bm.faces.new((lower[i], lower[j], upper[j], upper[i]))
+    _link(bm, "pot", smooth=False)
+    cyl("soil", 0, h * 0.885, 0, r * 0.835, h * 0.025, segs=segs)
+
+
+def plant_leaf(mat, base_y, angle, reach, rise, width, root=0.0):
+    """Separate pointed, curved blade with a raised central fold; flat faces catch the office lights."""
+    bm = bmesh.new()
+    dx, dz = math.cos(angle), math.sin(angle)
+    rings = []
+    for t, spread in ((0.0, 0.10), (0.32, 0.82), (0.65, 1.0), (0.86, 0.55)):
+        radius = root + reach * (0.25 * t + 0.75 * t * t)
+        x, y, z = dx * radius, base_y + rise * t, dz * radius
+        half = width * spread / 2
+        fold = width * spread * 0.16
+        rings.append([bm.verts.new(B(x - dz * half, y, z + dx * half)),
+                      bm.verts.new(B(x + dx * fold, y, z + dz * fold)),
+                      bm.verts.new(B(x + dz * half, y, z - dx * half)),
+                      bm.verts.new(B(x - dx * fold, y, z - dz * fold))])
+    bm.faces.new(tuple(reversed(rings[0])))
+    for lower, upper in zip(rings, rings[1:]):
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new((lower[i], lower[j], upper[j], upper[i]))
+    tip = bm.verts.new(B(dx * (root + reach), base_y + rise, dz * (root + reach)))
+    for i in range(4):
+        bm.faces.new((rings[-1][i], rings[-1][(i + 1) % 4], tip))
+    _link(bm, mat, smooth=False)
 
 
 def plant_small():
-    plant(0.1, 0.38, ((0, 0.2, 0, 0.07), (-0.045, 0.25, 0.02, 0.055), (0.04, 0.29, -0.02, 0.05)))
+    plant_pot(0.1, 0.148)
+    for i in range(7):
+        plant_leaf(("plant", "plant_dark", "plant_light")[i % 3], 0.132,
+                   i * 2 * math.pi / 7, 0.08 + (i % 2) * 0.012, 0.12 + (i % 3) * 0.027, 0.055)
+    plant_leaf("plant_light", 0.132, 0.4, 0.025, 0.198, 0.045)
 
 
 def plant_medium():
-    plant(0.11, 0.5, ((0, 0.27, 0, 0.08), (-0.05, 0.34, 0.03, 0.07), (0.05, 0.4, -0.02, 0.065),
-                      (0.0, 0.46, 0.02, 0.05)))
-    cyl("plant_dark", 0, 0.28, 0, 0.008, 0.2, segs=6)
+    plant_pot(0.11, 0.192)
+    for i in range(8):
+        plant_leaf(("plant_dark", "plant", "plant_light")[i % 3], 0.172,
+                   i * 2 * math.pi / 8 + 0.2, 0.092, 0.20 + (i % 3) * 0.046, 0.062, root=0.008)
+    plant_leaf("plant", 0.172, 1.0, 0.028, 0.328, 0.05)
 
 
 def plant_large():
-    """Floor plant at size 1: pot 0.46 wide and 0.44 tall, foliage within a 1 m footprint (PLANT_RADIUS 0.5)."""
-    cyl("pot", 0, 0.22, 0, 0.18, 0.44, segs=14, r_top=0.23)
-    cyl("trim", 0, 0.445, 0, 0.235, 0.02, segs=14)
-    cyl("soil", 0, 0.45, 0, 0.2, 0.012, segs=14)
-    cyl("plant_dark", 0, 0.6, 0, 0.02, 0.32, segs=6)
-    for i, (dx, dy, dz, lr) in enumerate(((0, 0.75, 0, 0.3), (-0.2, 0.68, 0.1, 0.22), (0.2, 0.7, -0.08, 0.22),
-                                         (0.05, 0.98, 0.04, 0.22), (-0.08, 0.9, -0.15, 0.18),
-                                         (0.12, 0.88, 0.17, 0.17))):
-        ball("plant" if i % 2 == 0 else "plant_dark", dx, dy, dz, lr, squash=0.85, segs=12)
+    """Snake plant: same floor origin, ~1.17 m height and foliage within the existing 1 m footprint."""
+    plant_pot(0.23, 0.455, segs=14)
+    for i in range(9):
+        angle = i * 2 * math.pi / 9 + 0.15
+        # Preserve the old canopy's ~0.84 x 0.68 footprint, inside PLANT_RADIUS 0.5.
+        reach = 1 / math.sqrt((math.cos(angle) / 0.425) ** 2 + (math.sin(angle) / 0.345) ** 2) - 0.035
+        plant_leaf(("plant_dark", "plant", "plant_light")[i % 3], 0.405,
+                   angle, reach,
+                   0.42 + (i % 3) * 0.07, 0.11, root=0.035)
+    for i in range(4):
+        plant_leaf(("plant", "plant_light", "plant_dark")[i % 3], 0.405,
+                   i * math.pi / 2 + 0.5, 0.12, 0.62 + (i % 3) * 0.07, 0.10, root=0.025)
 
 
 def whiteboard():
