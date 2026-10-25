@@ -24,6 +24,14 @@ function firstSentence(text: string) {
   return text.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? text;
 }
 
+/** Score beside its provenance label. A FAKE placeholder has no real score, and a cached label already carries its time. */
+function crsFraudText(fraud: NonNullable<InboxReceipt['bankChangeFraud']>) {
+  const scored = fraud.score !== undefined && !fraud.label.startsWith('FAKE');
+  const at = fraud.checkedAt && !fraud.label.includes('(cached at') ? new Date(fraud.checkedAt) : undefined;
+  const checked = at && Number.isFinite(at.getTime()) ? ` · checked ${at.toISOString().slice(11, 16)} UTC` : '';
+  return `${scored ? `${fraud.score} / 100 · ` : ''}${fraud.label}${checked}`;
+}
+
 function attachmentProblem(file: File) {
   if (!Object.hasOwn(attachmentTypes, file.type)) return `${file.name} is not a PDF, PNG, JPEG or WebP.`;
   if (file.size <= 0) return `${file.name} is empty.`;
@@ -122,6 +130,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
   const reason = receipt && 'reason' in receipt.decision ? receipt.decision.reason : undefined;
   const held = receipt?.status === 'held' || receipt?.decision.kind === 'ESCALATE';
   const why = reason ? firstSentence(reason) : quote?.text ?? (receipt?.decision.kind === 'ALLOW' ? 'Every check passed.' : receipt?.notice);
+  const fraudText = receipt?.bankChangeFraud && crsFraudText(receipt.bankChangeFraud);
   const fileHelp = `${uid}-file-help`, fileErrorId = `${uid}-file-error`;
   return <section className="inbox-tray" aria-labelledby={`${uid}-title`}>
     <header className="inbox-heading">
@@ -143,6 +152,7 @@ export function InboxTray({ presets = [], headingLevel = 1 }: { presets?: InboxP
         <dl className="inbox-facts">
           <div><dt>Seat</dt><dd>{seatName[receipt.seat]}</dd></div>
           <div><dt>Rule</dt><dd>{receipt.decision.ruleIds.join(', ') || 'None tripped'}</dd></div>
+          {fraudText && <div><dt>CRS fraud score</dt><dd>{fraudText}</dd></div>}
           <div><dt>Why</dt><dd>{why}</dd></div>
         </dl>
         <p className="inbox-links">

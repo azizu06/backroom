@@ -1,5 +1,25 @@
 import { test, expect } from '@playwright/test';
 
+test('synthetic CRS fraud receipt visibly holds a high-risk bank change with its sandbox label', async ({ page }) => {
+  await page.route('**/api/inbox', route => route.fulfill({ json: {
+    id: 'synthetic-crs-hold', scenario_source: 'judge', seat: 'vendor_onboarding', extractionSource: 'model',
+    fields: { kind: 'bank_change', vendorId: 'cedar', domain: 'cedarfreight.example', bankAccountId: 'synthetic-unapproved' },
+    status: 'held', decision: { kind: 'ESCALATE', ruleIds: ['FRAUD_RISK_HOLD'], policyVersion: 1,
+      reason: 'Dana must review the CRS fraud risk before this bank change or payment.' },
+    bankChangeFraud: { score: 88, label: 'CRS sandbox: test identity #13 (cached at 18:05 UTC)' },
+    evidenceRefs: [], attachment: null, notice: 'Synthetic UI test; no live CRS request.',
+    auditId: 'synthetic-audit', auditHref: '/audit?entry=synthetic-audit',
+  } }));
+  await page.goto('/inbox');
+  await page.getByRole('button', { name: /Cedar bank change/ }).click();
+  const receipt = page.getByRole('region', { name: 'Decision receipt' });
+  await expect(receipt.getByText('held', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('FRAUD_RISK_HOLD', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('CRS fraud score', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('88 / 100 · CRS sandbox: test identity #13 (cached at 18:05 UTC)', { exact: true })).toBeVisible();
+  await expect(receipt.getByText('Full receipt')).toBeVisible();
+});
+
 test('judge submits traps, original scenarios and uploads on laptop and phone', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -7,7 +27,7 @@ test('judge submits traps, original scenarios and uploads on laptop and phone', 
   await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible();
   await expect(page.getByText('Vendor bills and emails land here. Code checks every one before anything gets paid.')).toBeVisible();
   const cards = page.getByRole('group', { name: 'Planted scenarios' }).getByRole('button');
-  await expect(cards).toHaveText([/Duplicate invoice \+\$37/, /Lookalike bank change/, /No PO/, /Over limit/, /Sanctions/, /Unapproved vendor/, /Cedar bank change/]);
+  await expect(cards).toHaveText([/Normal approved invoice/, /Duplicate invoice \+\$37/, /Lookalike bank change/, /No PO/, /Over limit/, /Sanctions/, /Unapproved vendor/, /Cedar bank change/]);
   // The free-text form stays collapsed until the judge asks for it.
   await expect(page.getByRole('button', { name: 'Route scenario' })).toBeHidden();
   await page.getByRole('button', { name: /Lookalike bank change/ }).click();
