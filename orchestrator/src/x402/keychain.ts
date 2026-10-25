@@ -36,7 +36,8 @@ export function cdpCredentials() {
     return result.stdout.trim();
   };
   try {
-    const api = JSON.parse(read('backroom-cdp-api-key')) as { id?: unknown; privateKey?: unknown };
+    const raw = read('backroom-cdp-api-key');
+    const api = JSON.parse(/^(?:0x)?(?:[\da-f]{2})+$/i.test(raw) ? Buffer.from(raw.replace(/^0x/i, ''), 'hex').toString('utf8') : raw) as { id?: unknown; privateKey?: unknown };
     const walletSecret = read('backroom-cdp-wallet-secret');
     if (typeof api.id !== 'string' || !api.id || typeof api.privateKey !== 'string' || !api.privateKey) throw new Error();
     return { apiKeyId: api.id, apiKeySecret: api.privateKey, walletSecret };

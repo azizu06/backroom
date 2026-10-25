@@ -1,0 +1,13 @@
+{
+  "network": "eip155:84532",
+  "chainId": 84532,
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "authorizationNonce": "0x7ce966f45320d571857cce0799111823ff5a2f4a020431c267184d86f2a8bcb2",
+  "authorizationUsed": false,
+  "balanceAtomic": "1000000",
+  "blockNumber": "50079578",
+  "blockTimestamp": "1792937784",
+  "at": "2026-10-25T14:16:25.001Z",
+  "status": "held",
+  "transaction": null
+}

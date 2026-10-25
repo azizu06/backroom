@@ -349,7 +349,7 @@ This documentation does not enable or change either integration.
 
 - [Seven agent roles and runtime limits](docs/agents.md)
 - [GX10 model measurements](docs/t10-gx10.md), [ten-company burst](docs/evidence/burst/ten-company/README.md), and [document vision receipts](docs/evidence/gx10-vision/README.md)
-- [Base Sepolia testnet x402](docs/x402.md) (not real-money settlement)
+- [Coinbase Payment Agents: CDP wallet + x402 testnet](docs/x402.md#coinbase-payment-agents) (not real-money settlement)
 - [Payment-link delivery](docs/payment-delivery.md) and [isolated judge attack service](docs/attack-demo.md)
 - [Cost attribution](docs/cost-summary.md) and [offline scoreboard](docs/eval/scoreboard.md)
 
