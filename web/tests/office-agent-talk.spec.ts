@@ -35,7 +35,7 @@ async function startPlay(page: Page) {
   await expect(select).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await openMenu(page);
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return errors;

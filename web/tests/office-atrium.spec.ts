@@ -9,7 +9,7 @@ test('walks from the corridor into the atrium without a wall or furniture blocki
   const view = page.getByLabel('Office view');
   await expect(view).toBeEnabled();
   await openMenu(page);
-  await view.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   const surface = page.getByRole('application', { name: /First-person office/ });
   await expect(surface).toBeFocused();
   await expect(surface).toHaveAttribute('data-player-x', /-10\.8/, { timeout: 15_000 });

@@ -107,7 +107,7 @@ async function startPlay(page: Page, setup?: () => Promise<void>) {
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await select.selectOption('tween'); // Establish the view that Escape should restore, regardless of motion preference.
   await expect(select).toHaveValue('tween');
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/, { timeout: 15_000 });
   return errors;
@@ -287,7 +287,7 @@ test.describe('play mode on a phone', () => {
     // Narrow screens may prefer another initial view; retry until hydrated so the pick sticks.
     await expect(async () => {
       await openMenu(page);
-      await select.selectOption({ label: 'Play (first person)' });
+      await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
       await expect(surface(page)).toBeVisible({ timeout: 1_000 });
     }).toPass();
     await expect(select).toHaveValue('play');
@@ -329,7 +329,7 @@ test('play settings change speed and invert Y, persist per viewer and return foc
   // Leaving and re-entering Play keeps the saved values.
   await page.keyboard.press('Escape');
   await expect(page.getByLabel('Office view')).toHaveValue('tween');
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(dialog).toContainText('Movement speed 2×');

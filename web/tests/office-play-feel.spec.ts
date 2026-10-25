@@ -41,7 +41,7 @@ async function startPlay(page: Page) {
   await expect(select).toBeEnabled();
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
   await openMenu(page);
-  await select.selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   // Readiness, not a timing claim: the rig reports only after the first Play frames (shader compile) and the 0.9 s
   // fly-in, which a loaded machine can push past the default 5 s.
@@ -178,7 +178,7 @@ test('walking sends footstep cues, and they are silent unless the sound toggle i
   await page.getByRole('button', { name: 'Sound off', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sound on', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await openMenu(page);
-  await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
+  await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-fov', /\d/, { timeout: 20_000 }); // the intro fly-in has finished
   const before = await oscillatorCount(page);
