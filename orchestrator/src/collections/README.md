@@ -40,7 +40,10 @@ use the fixed disclosure and withhold invoice details until identity verificatio
 - `planner: createCallPlanner()` uses the shared router's `call_plan` cloud route.
   Only OpenRouter HTTP 402 permits the authorized `gpt-oss:120b` GX10 fallback,
   recorded as `route=gx10_fallback`, actual model ID, latency, and zero local API
-  cost. Other cloud failures block. The fallback sets low reasoning and reinforces the
+  cost. A low self-confidence plan (or other non-transport router error) gets one
+  fresh cloud attempt through the same OFF, confidence, usage and cost checks; HTTP
+  failures never retry. Other cloud failures block, with a redacted diagnostic
+  (`kind`, e.g. `confidence`, and `attempts`). The fallback sets low reasoning and reinforces the
   shared router JSON wrapper, using its injected HTTP transport. See
   [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility). Unit tests inject the same exported router
   API with mocked HTTP; no network is used by tests.

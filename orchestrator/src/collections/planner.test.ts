@@ -27,12 +27,51 @@ describe('routed pre-call planner', () => {
     expect(body).toMatchObject({ model: 'gpt-oss:120b', reasoning_effort: 'low' });
     expect(body.messages[0].content).toContain('top-level');
   });
-  it.each([401, 429, 500])('does not downgrade HTTP %s errors to a local quality route', async status => {
+  it.each([401, 429, 500])('does not downgrade or retry HTTP %s errors', async status => {
     const http = vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status }));
     const cloud = createRouter({ fetch: http, cloudProvider: 'openrouter', cloudApiKey: 'test' });
     const fallbackRoute = vi.fn();
     await expect(createCallPlanner({ cloudRoute: cloud.route, fallbackRoute, reportFailure: vi.fn() }).draft(input)).rejects.toThrow('Call planner unavailable');
     expect(fallbackRoute).not.toHaveBeenCalled();
+    expect(http).toHaveBeenCalledTimes(1);
+  });
+
+  describe('low-confidence cloud plan', () => {
+    const anthropic = (confidence: number) => Response.json({ model: 'claude-haiku-5-5', stop_reason: 'end_turn',
+      usage: { input_tokens: 50, output_tokens: 50 }, content: [{ type: 'text', text: JSON.stringify({ output, confidence }) }] });
+    const planner = (http: typeof fetch, reportFailure = vi.fn(), fallbackRoute = vi.fn()) => createCallPlanner({ fallbackRoute, reportFailure, modelId: 'claude-haiku-5-5',
+      cloudRoute: createRouter({ stateStore: new MemoryStateStore(), fetch: http, cloudProvider: 'anthropic', anthropicApiKey: 'test', anthropicModel: 'claude-haiku-5-5' }).route });
+
+    it('retries the cloud planner once and returns the confident, costed plan', async () => {
+      const http = vi.fn<typeof fetch>().mockResolvedValueOnce(anthropic(0.5)).mockResolvedValueOnce(anthropic(0.95));
+      const reportFailure = vi.fn(), fallbackRoute = vi.fn();
+      const result = await planner(http, reportFailure, fallbackRoute).draft(input);
+      expect(result).toMatchObject({ output, route: 'cloud', model: 'claude-haiku-5-5' });
+      expect('costUsd' in result && result.costUsd).toBeGreaterThan(0);
+      expect(http).toHaveBeenCalledTimes(2);
+      expect(reportFailure).not.toHaveBeenCalled();
+      expect(fallbackRoute).not.toHaveBeenCalled();
+    });
+
+    it('denies after one retry and reports only the redacted failure kind', async () => {
+      const http = vi.fn<typeof fetch>(async () => anthropic(0.5));
+      const reportFailure = vi.fn(), fallbackRoute = vi.fn();
+      await expect(planner(http, reportFailure, fallbackRoute).draft(input)).rejects.toThrow('Call planner unavailable');
+      expect(http).toHaveBeenCalledTimes(2);
+      expect(fallbackRoute).not.toHaveBeenCalled();
+      expect(reportFailure).toHaveBeenCalledTimes(1);
+      expect(reportFailure).toHaveBeenCalledWith({ stage: 'cloud', errorType: 'Error', kind: 'confidence', code: 'confidence',
+        modelId: 'claude-haiku-5-5', attempts: 2 });
+    });
+
+    it('does not retry once the OFF switch is thrown between attempts', async () => {
+      const store = new MemoryStateStore();
+      const http = vi.fn<typeof fetch>(async () => anthropic(0.5));
+      const cloud = createRouter({ stateStore: store, fetch: http, cloudProvider: 'anthropic', anthropicApiKey: 'test', anthropicModel: 'claude-haiku-5-5' });
+      const cloudRoute: typeof cloud.route = async (...args) => { try { return await cloud.route(...args); } finally { await store.setLlmEnabled(false); } };
+      expect(await createCallPlanner({ cloudRoute, fallbackRoute: vi.fn(), reportFailure: vi.fn() }).draft(input)).toMatchObject({ kind: 'LLM_OFF' });
+      expect(http).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('reports only a sanitized provider cause while keeping the public error generic', async () => {
@@ -43,7 +82,7 @@ describe('routed pre-call planner', () => {
       const planner = createCallPlanner({ cloudRoute: cloud.route, modelId: 'claude-haiku-5-5' });
       await expect(planner.draft(input)).rejects.toThrow('Call planner unavailable');
       expect(log).toHaveBeenCalledWith('call planner unavailable', { stage: 'cloud', status: 401,
-        errorType: 'ModelFailure', code: 'http', modelId: 'claude-haiku-5-5' });
+        errorType: 'ModelFailure', kind: 'http', code: 'http', modelId: 'claude-haiku-5-5' });
       expect(JSON.stringify(log.mock.calls)).not.toMatch(/private provider payload|private-key/);
     } finally { log.mockRestore(); }
   });
