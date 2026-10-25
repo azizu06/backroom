@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
 const prompt = (page: Page) => page.locator('.play-prompt');
@@ -6,6 +7,7 @@ const prompt = (page: Page) => page.locator('.play-prompt');
 async function start(page: Page, spawn: string) {
   await page.goto(`/office?view=overview&playSpawn=${spawn}`);
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-yaw', /\d/);

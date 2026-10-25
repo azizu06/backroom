@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Play needs WebGL.
 const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
@@ -45,10 +46,10 @@ test('the Enter key starts first person from the splash', async ({ page }) => {
 });
 
 test('Tab three times stays in the splash, Escape closes it, and focus returns to the opener', async ({ page }) => {
-  // Focus a real control before hydration so the splash's opener is the view select, not the body.
+  // Focus a real control before hydration so the splash's opener is the corner menu button, not the body.
   await page.addInitScript(() => {
     window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('office-view')?.focus();
+      document.querySelector<HTMLElement>('.office-corner-toggle')?.focus();
     });
   });
   await page.goto('/office');
@@ -75,7 +76,7 @@ test('Tab three times stays in the splash, Escape closes it, and focus returns t
   await page.keyboard.press('Escape');
   await expect(gate).toHaveCount(0);
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
-  await expect(page.getByLabel('Office view')).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Backroom menu' })).toBeFocused();
 });
 
 test('the splash traps Tab at both ends and Escape still opens the overview', async ({ page }) => {
@@ -108,12 +109,14 @@ test('choosing the overview is remembered for the next visit', async ({ page }) 
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
   expect(await page.evaluate(() => localStorage.getItem('office.start'))).toBe('overview');
   await page.reload();
+  await openMenu(page);
   await expect(page.getByRole('button', { name: 'Enter first person' })).toBeVisible();
   await expect(splash(page)).toHaveCount(0);
 });
 
 test('?view=overview shows no splash and offers Enter first person', async ({ page }) => {
   await page.goto('/office?view=overview');
+  await openMenu(page);
   const enter = page.getByRole('button', { name: 'Enter first person' });
   await expect(enter).toBeVisible();
   await expect(splash(page)).toHaveCount(0);
@@ -124,6 +127,7 @@ test('?view=overview shows no splash and offers Enter first person', async ({ pa
   // The Enter click asked for pointer lock, which routes mouse clicks to the surface: activate by keyboard.
   await page.getByRole('button', { name: 'Overview', exact: true }).press('Enter');
   await expect(page.getByLabel('Office view')).toHaveValue('walk');
+  await openMenu(page);
   await expect(page.getByRole('button', { name: 'Enter first person' })).toBeVisible();
 });
 
@@ -141,6 +145,7 @@ test.describe('on a phone', () => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('/office');
+    await openMenu(page);
     const enter = page.getByRole('button', { name: 'Enter first person' });
     await expect(enter).toBeVisible();
     await expect(splash(page)).toHaveCount(0);

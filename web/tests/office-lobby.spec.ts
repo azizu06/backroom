@@ -1,18 +1,10 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { openMenu, openPanels } from './office-menu';
 import { DENY_MOMENT_MS } from '../lib/office/props/treasuryDeny';
 import { ROLES } from '../lib/office/palette';
 
 // Run via test:office:browser after building the web app.
 
-/** /office is the 3D world: room presets and preview controls sit in the corner menu, footer panels in a drawer (both closed by default). */
-async function openMenu(page: Page) {
-  const toggle = page.getByRole('button', { name: 'Backroom menu' });
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-}
-async function openPanels(page: Page) {
-  const toggle = page.getByRole('button', { name: /^Office panels/ });
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
-}
 async function preset(page: Page, name: string | RegExp) {
   await openMenu(page);
   // A CSS locator: a pick closes the menu, and role queries skip the closed (hidden) panel.
@@ -54,8 +46,8 @@ test('office lobby mounts the live audit wall and ask-why without breaking the o
   expect(wall!.x + wall!.width).toBeLessThanOrEqual(drawer!.x + drawer!.width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await openMenu(page);
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
-  const previewReceipts = page.getByRole('region', { name: 'Preview audit receipts' });
+  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
+  const previewReceipts = page.getByRole('region', { name: 'Local audit receipts' });
   await expect(previewReceipts).toContainText('DENY');
   // Fixture rows stay out of the server-record lobby wall (its own rows may carry data-audit-id).
   const denialId = await previewReceipts.locator('[data-audit-id]').first().getAttribute('data-audit-id');
@@ -68,7 +60,8 @@ test('office demo guide and keyboard shortcuts help open and restore focus', asy
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=overview');
-  const guideButton = page.getByRole('button', { name: 'Demo guide' });
+  await openMenu(page);
+  const guideButton = page.getByRole('button', { name: 'Guide', exact: true });
   await guideButton.click();
   const guide = page.getByRole('dialog', { name: 'Try this' });
   await expect(guide).toBeVisible();
@@ -92,6 +85,7 @@ test('office demo guide and keyboard shortcuts help open and restore focus', asy
   await page.keyboard.press('Escape');
   await expect(shortcuts).toHaveCount(0);
   await expect(guideButton).toBeFocused();
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption('play');
   await page.locator('.play-surface').press('?');
   await expect(shortcuts).toBeVisible();
@@ -279,7 +273,7 @@ test('office desk monitors survive the Collections escalation preview', async ({
   await expect(canvas).toBeVisible();
   await expect(viewport.getByText('Loading 3D office…')).toHaveCount(0);
   await openMenu(page);
-  await page.getByRole('button', { name: 'Preview escalation' }).click();
+  await page.getByRole('button', { name: 'Show escalation' }).click();
   // The pick closes the menu; the control now offers the way back.
   await expect(page.locator('.mock-controls button', { hasText: 'Return to Collections' })).toBeAttached();
   await (await preset(page, 'Collections')).click();
@@ -322,6 +316,7 @@ test('office judge tour visits the rooms with agent tags and stops on any key', 
   await expect(page.locator('[data-agent-tag]')).toHaveCount(3);
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
+  await openMenu(page);
   await view.selectOption('tour');
   await expect(caption).toContainText('Tour');
   await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toBeVisible();
@@ -329,7 +324,7 @@ test('office judge tour visits the rooms with agent tags and stops on any key', 
   await expect(page.locator('.room-navigation button').filter({ hasText: /^Lobby$/ })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Shift');
   await expect(view).toHaveValue('tween');
-  await expect(caption).not.toContainText('Tour');
+  await expect(caption).toHaveCount(0); // back in the overview, which shows no caption
   await expect(page.getByRole('button', { name: 'Stop tour', exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -342,13 +337,14 @@ test('office judge tour advances under reduced motion and stops on a click', asy
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
+  await openMenu(page);
   await view.selectOption('tour');
   await expect(caption).toContainText('Tour · 1 of');
   await expect(caption).toContainText('Tour · 2 of', { timeout: 8000 });
   const box = await page.getByTestId('office-viewport').boundingBox();
   await page.mouse.click(box!.x + 8, box!.y + 8);
   await expect(view).toHaveValue('tween');
-  await expect(caption).not.toContainText('Tour');
+  await expect(caption).toHaveCount(0); // back in the overview, which shows no caption
   expect(errors).toEqual([]);
 });
 
@@ -358,6 +354,7 @@ test('office judge tour is not cancelled by the view select navigation keys', as
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
+  await openMenu(page);
   await view.selectOption('tour');
   await expect(caption).toContainText('Tour · 1 of');
   for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown']) await view.dispatchEvent('keydown', { key });
@@ -367,7 +364,7 @@ test('office judge tour is not cancelled by the view select navigation keys', as
   await view.focus();
   await page.keyboard.press('Tab');
   await expect(view).toHaveValue('tween');
-  await expect(caption).not.toContainText('Tour');
+  await expect(caption).toHaveCount(0); // back in the overview, which shows no caption
 });
 
 test('office judge tour started with the native select arrow keys', async ({ page, browserName }) => {
@@ -377,6 +374,7 @@ test('office judge tour started with the native select arrow keys', async ({ pag
   await expect(page.locator('canvas')).toBeVisible();
   const view = page.getByLabel('Office view');
   const caption = page.locator('.office-caption');
+  await openMenu(page);
   await view.selectOption('plan');
   await view.focus();
   await page.keyboard.press('ArrowDown');
@@ -417,7 +415,7 @@ test('office Treasury denial preview plays the door moment without breaking the 
   const before = await signRedness(page, canvas);
   expect(Math.max(...before), `redness before the preview: ${before.join(', ')}`).toBeLessThan(40);
   await openMenu(page);
-  await page.getByRole('button', { name: 'Preview Treasury denial' }).click();
+  await page.getByRole('button', { name: 'Show Treasury denial' }).click();
   // The preview button sits below the scene, so clicking it can scroll the canvas out of view.
   await canvas.scrollIntoViewIfNeeded();
   // Poll rather than sample at a fixed time: under load the first frame of the moment can land late.
@@ -427,6 +425,7 @@ test('office Treasury denial preview plays the door moment without breaking the 
   // The 3D ViewBoundary swallows render errors into its floor-plan fallback, so assert it never appeared.
   await expect(page.getByText(/3D unavailable/).filter({ visible: true })).toHaveCount(0);
   await expect(viewport.locator('.floor-plan')).toHaveCount(0);
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption('plan');
   await expect(page.locator('.floor-plan .denial-text')).toHaveText('Entry denied');
   expect(errors).toEqual([]);

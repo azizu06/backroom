@@ -63,7 +63,7 @@ export function callFromProjection(row: unknown): CallState | null {
   } as CallState;
 }
 
-export const CALL_DISCLOSURE = 'Calls are AI-disclosed and only go to the allowlisted demo number.';
+export const CALL_DISCLOSURE = 'Calls are AI-disclosed and only go to the allowlisted number.';
 // Aziz's host routes (web/lib/calls): the operator-session request and the read-only live feed.
 const CALL_REQUEST_ENDPOINT: string | null = '/api/calls/request';
 const CALL_FEED_ENDPOINT = '/api/calls/active';

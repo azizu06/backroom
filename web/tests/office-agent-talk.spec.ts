@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Needs WebGL; fails loudly without it.
 // Helpers mirror tests/office-play.spec.ts (Playwright specs here do not share modules).
@@ -33,6 +34,7 @@ async function startPlay(page: Page) {
   const select = page.getByLabel('Office view');
   await expect(select).toHaveValue('walk');
   await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+  await openMenu(page);
   await select.selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);

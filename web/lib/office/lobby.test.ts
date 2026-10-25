@@ -63,7 +63,7 @@ describe('office lobby', () => {
     const html = renderToStaticMarkup(createElement(RoomInspector, { room: 'lobby', snapshot, close: () => {} }));
     expect(html).toContain('data-office-mount="inbox-inspector"');
     expect(html).toContain('href="/inbox"');
-    expect(html).toContain('not synced into this static scene');
+    expect(html).toContain('not synced into this scene');
     expect(html).not.toContain('href="#office-inbox-tray"');
   });
 

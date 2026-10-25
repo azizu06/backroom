@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openMenu, openPanels } from './office-menu';
 
 // Mock handoff stream (`?handoffs=mock`). Run via test:office:browser after building; needs WebGL.
 // Set HANDOFF_SHOTS=/some/dir to also save demo screenshots there.
@@ -12,11 +13,6 @@ async function requireWebGL(page: Page) {
     return !!(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
   });
   if (!available) throw new Error('WebGL is unavailable in this headless Chromium, so the 3D handoffs cannot render.');
-}
-/** The handoff log and voice controls live in the office panels drawer, closed by default. */
-async function openPanels(page: Page) {
-  const toggle = page.getByRole('button', { name: /^Office panels/ });
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
 }
 function log(page: Page) {
   return page.getByRole('log');
@@ -147,6 +143,7 @@ test('play mode: facing a handoff agent and pressing E shows the handoff details
   // Intake's two handoffs finish within a few seconds; then it stands at its lobby station until the next cycle.
   await expect(log(page)).toContainText('INV-1043', { timeout: 10_000 });
   await page.waitForTimeout(6_000);
+  await openMenu(page);
   await page.getByLabel('Office view').selectOption({ label: 'Play (first person)' });
   await expect(surface(page)).toBeFocused();
   await expect(surface(page)).toHaveAttribute('data-player-z', /\d/);

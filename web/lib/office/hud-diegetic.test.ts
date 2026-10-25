@@ -41,7 +41,7 @@ describe('diegetic lobby notice board', () => {
   it('shows today counts and the newest decisions first, capped', () => {
     const board = noticeBoard({ ...at({ escalationId: 'e' }), inboxCount: 3, connection: 'preview',
       audit: [row('1', 'ALLOW'), row('2', 'DENY'), row('3', 'ESCALATE'), row('4', 'RECORDED'), row('5', 'ALLOW')] }, 3);
-    expect(board.mode).toBe('Preview');
+    expect(board.mode).toBeUndefined();
     expect(board.stats.map(stat => [stat.label, stat.value, stat.alert])).toEqual([
       ['Inbox', 3, false], ['Held', 1, true], ['Denied', 1, true], ['Escalations', 1, true]]);
     expect(board.happened.map(entry => entry.id)).toEqual(['5', '4', '3']);

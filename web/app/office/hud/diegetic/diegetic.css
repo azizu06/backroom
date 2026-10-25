@@ -183,7 +183,12 @@ html body .office-shell .office-viewport.office-viewport { position: fixed; inse
 .office-shell .office-corner .overview-toggle { position: static; padding: 5px 12px; box-shadow: none; }
 .office-shell .office-corner .office-mode-chip { margin: 0; }
 .office-shell .office-corner-panel { display: grid; gap: 10px; padding: 4px 2px 2px; }
-.office-shell .office-corner-panel[hidden], .office-shell .office-drawer[hidden] { display: none; }
+.office-shell .office-drawer[hidden] { display: none; }
+/* Closed: out of sight, the tab order and the accessibility tree, but still rendered so its dialogs (guide, shortcuts) can open. */
+.office-shell .office-corner-panel:not([data-open]) { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; visibility: hidden; }
+.office-shell .office-corner-panel dialog[open] { visibility: visible; }
+.office-shell .office-corner-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.office-shell .office-corner .office-sound-toggle, .office-shell .office-corner .office-drawer-toggle { position: static; box-shadow: none; }
 .office-shell .office-corner-panel .site-nav { border-radius: 10px; flex-wrap: wrap; }
 .office-shell .office-corner-panel .office-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .office-shell .office-corner-panel .office-tools > button, .office-shell .office-corner-panel .room-navigation button {
@@ -195,9 +200,7 @@ html body .office-shell .office-viewport.office-viewport { position: fixed; inse
 .office-shell .office-corner-panel .office-advanced-panel { left: 0; right: auto; z-index: 12; max-height: calc(100dvh - 190px); overflow: auto; }
 .office-shell .office-corner-panel .room-navigation { position: static; display: flex; flex-wrap: wrap; gap: 4px; padding: 0; min-height: 0; border: 0; background: transparent; overflow: visible; }
 .office-shell .office-corner-panel .room-navigation button[aria-pressed='true'] { color: var(--office-cream); background: var(--office-navy); border-color: var(--office-navy); }
-/* Demo disclosure stays visible as a small pill, bottom left; the caption moves to the bottom centre. */
-.office-shell .office-disclosure { position: absolute; z-index: 5; left: 12px; bottom: 12px; max-width: min(520px, calc(100% - 200px)); }
-.office-shell .office-disclosure .demo-pill { white-space: normal; box-shadow: var(--office-plate-shadow); }
+/* Tour and story captions sit at the bottom centre. */
 .office-shell:not([data-hud='diegetic']) .office-caption { left: 50%; transform: translateX(-50%); bottom: 12px; max-width: min(520px, calc(100% - 420px)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .office-shell .office-drawer-toggle {
   position: absolute; z-index: 5; right: 12px; bottom: 12px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
@@ -216,11 +219,9 @@ html body .office-shell .office-drawer {
 /* Hidden, not removed: the corner hosts the keyboard-shortcuts dialog that ? opens from Play. */
 .office-shell[data-hud='diegetic'] .office-corner { visibility: hidden; }
 .office-shell[data-hud='diegetic'] .office-corner dialog[open] { visibility: visible; }
-.office-shell[data-hud='diegetic'] .office-disclosure { z-index: 100; }
-/* The Enter splash covers the world, but never the disclosure pill. */
-.office-shell:has(.play-splash) .office-disclosure { z-index: 51; }
+/* Sound stays in Play's quiet control row even though its home is the (hidden) corner menu. */
+.office-shell[data-hud='diegetic'] .office-corner .office-sound-toggle { position: fixed; visibility: visible; }
 @media (max-width: 760px) {
-  .office-shell .office-disclosure { max-width: calc(100% - 150px); }
   .office-shell:not([data-hud='diegetic']) .office-caption { display: none; }
   html body .office-shell .office-drawer { top: 64px; }
 }
