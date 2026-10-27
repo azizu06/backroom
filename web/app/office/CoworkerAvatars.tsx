@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Html } from '@react-three/drei';
 import { MathUtils, type Group } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { legSwing } from '../../lib/office/a11y';
-import { ghostPeers, type PresencePeer } from '../../lib/office/presence';
+import { ghostPeers, viewerColor, type PresencePeer } from '../../lib/office/presence';
+import { CHAIR_SEAT_TOP, WORKSTATION_SEATS } from '../../lib/office/baked-seat';
+import { screenStore, type ScreenSeat } from '../../lib/office/screens';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
 import { useReducedMotion } from './mounts/shared';
+import { VoiceIcon } from './VoiceIcon';
+import type { VoiceLevel } from '../../lib/office/voice';
 
 const SKIN = '#d6a782', TROUSERS = '#3e4740', HAIR = '#3a3029';
 const TAG = { color: '#d0d6c6', background: '#272f25dd', border: '1px solid #8b987b', borderRadius: 3, padding: '2px 5px', fontSize: 11, whiteSpace: 'nowrap', pointerEvents: 'none' } as const;
@@ -17,7 +21,7 @@ function Part({ at, size, color }: { at: [number, number, number]; size: [number
 }
 
 /** Another viewer walking in Play: a low-poly person (bears are the AI agents) that eases toward its published pose. */
-function Coworker({ peer, bubble }: { peer: PresencePeer; bubble?: ChatBubble }) {
+function Coworker({ peer, bubble, level = 0 }: { peer: PresencePeer; bubble?: ChatBubble; level?: VoiceLevel }) {
   const root = useRef<Group>(null);
   const legs = useRef<Group>(null);
   const walked = useRef(0);
@@ -54,14 +58,40 @@ function Coworker({ peer, bubble }: { peer: PresencePeer; bubble?: ChatBubble })
     <mesh position={[0, 1.46, 0]} castShadow><icosahedronGeometry args={[0.19, 0]} /><meshStandardMaterial color={SKIN} flatShading roughness={0.8} /></mesh>
     <Part at={[0, 1.6, 0.03]} size={[0.34, 0.1, 0.32]} color={HAIR} />
     {[-1, 1].map(side => <Part key={side} at={[side * 0.07, 1.49, -0.17]} size={[0.04, 0.04, 0.02]} color='#202620' />)}
-    <Html position={[0, 1.9, 0]} center distanceFactor={12} zIndexRange={[5, 4]} style={{ ...TAG, borderColor: peer.color }}>{peer.name}</Html>
+    <Html position={[0, 1.9, 0]} center distanceFactor={12} zIndexRange={[5, 4]} style={{ ...TAG, borderColor: peer.color }}><VoiceIcon level={level} />{peer.name}</Html>
     {bubble && <Html position={[0, 2.25, 0]} center distanceFactor={10} zIndexRange={[5, 4]}>
       <div className='coworker-bubble' data-viewer-id={peer.viewerId}>{bubble.text}</div>
     </Html>}
   </group>;
 }
 
-/** Play replaces the translucent presence ghosts with people; each carries its latest chat bubble. */
-export function CoworkerAvatars({ peers, bubbles = [] }: { peers: PresencePeer[]; bubbles?: ChatBubble[] }) {
-  return <>{ghostPeers(peers).map(peer => <Coworker key={peer.viewerId} peer={peer} bubble={bubbles.find(bubble => bubble.viewerId === peer.viewerId)} />)}</>;
+/** Play replaces the translucent presence ghosts with people; each carries its latest chat bubble. Someone sharing a desk sits instead. */
+export function CoworkerAvatars({ peers, bubbles = [], speaking = {} }: { peers: PresencePeer[]; bubbles?: ChatBubble[]; speaking?: Record<string, VoiceLevel> }) {
+  const screens = useSyncExternalStore(screenStore.subscribe, screenStore.getSnapshot, screenStore.getServerSnapshot);
+  return <>{ghostPeers(peers).filter(peer => !screens.seats.some(seat => seat.viewerId === peer.viewerId)).map(peer =>
+    <Coworker key={peer.viewerId} peer={peer} bubble={bubbles.find(bubble => bubble.viewerId === peer.viewerId)} level={speaking[peer.viewerId]} />)}</>;
+}
+
+/** A person sitting at a desk, facing its monitor while they share their screen. */
+function SeatedSharer({ seat, level = 0 }: { seat: ScreenSeat; level?: VoiceLevel }) {
+  const { x, z, heading } = WORKSTATION_SEATS[seat.desk]!;
+  const color = viewerColor(seat.viewerId), top = CHAIR_SEAT_TOP;
+  // The figure's front is -z; a seat heading of 0 faces +z.
+  return <group position={[x, 0, z]} rotation={[0, heading + Math.PI, 0]} name={`sharer:${seat.viewerId}`}>
+    {[-1, 1].map(side => <group key={side}>
+      <Part at={[side * 0.11, top + 0.08, -0.2]} size={[0.16, 0.16, 0.42]} color={TROUSERS} />
+      <Part at={[side * 0.11, top / 2, -0.4]} size={[0.16, top, 0.18]} color={TROUSERS} />
+    </group>)}
+    <Part at={[0, top + 0.31, 0]} size={[0.44, 0.62, 0.26]} color={color} />
+    {[-1, 1].map(side => <Part key={side} at={[side * 0.29, top + 0.4, -0.12]} size={[0.12, 0.16, 0.42]} color={color} />)}
+    <mesh position={[0, top + 0.81, 0]} castShadow><icosahedronGeometry args={[0.19, 0]} /><meshStandardMaterial color={SKIN} flatShading roughness={0.8} /></mesh>
+    <Part at={[0, top + 0.95, 0.03]} size={[0.34, 0.1, 0.32]} color={HAIR} />
+    <Html position={[0, top + 1.25, 0]} center distanceFactor={12} zIndexRange={[5, 4]} style={{ ...TAG, borderColor: color }}><VoiceIcon level={level} />{seat.name} · sharing</Html>
+  </group>;
+}
+
+/** Everyone else sitting at a desk to share their screen, in every view. */
+export function SeatedSharers({ speaking = {} }: { speaking?: Record<string, VoiceLevel> }) {
+  const screens = useSyncExternalStore(screenStore.subscribe, screenStore.getSnapshot, screenStore.getServerSnapshot);
+  return <>{screens.seats.filter(seat => seat.viewerId !== screens.selfId).map(seat => <SeatedSharer key={seat.viewerId} seat={seat} level={speaking[seat.viewerId]} />)}</>;
 }

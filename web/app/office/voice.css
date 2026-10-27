@@ -1,0 +1,9 @@
+/* Size, bubble and hover come from the shared view-control rules in iisu.css; these are the mic's own states. */
+html body .office-shell .office-view-controls .office-mic-toggle[aria-pressed='true'] { color: var(--office-navy) !important; background: var(--pastel-mint, #cdeedd) !important; }
+html body .office-shell .office-view-controls .office-mic-toggle[data-voice='asking'] { animation: mic-pulse 1s ease-in-out infinite; }
+html body .office-shell .office-view-controls .office-mic-toggle:is([data-voice='denied'], [data-voice='unavailable']) { color: var(--deny, #b3261e) !important; }
+html body .office-shell .office-view-controls .office-mic-toggle[data-level='1'] { box-shadow: 0 0 0 3px #9be7c4 !important; }
+html body .office-shell .office-view-controls .office-mic-toggle[data-level='2'] { box-shadow: 0 0 0 5px #9be7c4 !important; }
+html body .office-shell .office-view-controls .office-mic-toggle[data-level='3'] { box-shadow: 0 0 0 7px #6fd3a6 !important; }
+@keyframes mic-pulse { 50% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { html body .office-shell .office-view-controls .office-mic-toggle { transition: none; animation: none !important; } }
