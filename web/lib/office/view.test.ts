@@ -1,8 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
+import * as React from "react";
+import { createRequire } from "node:module";
+import { MockOffice } from "../../app/office/Office";
 import {
-  DOOR_FLASH_MS, INITIAL_VIEWPORT, boundaryStateForProps, doorFlash, isFixedCamera, reportViewFailure, viewportLayers, viewportReducer,
+  DOOR_FLASH_MS, INITIAL_VIEWPORT, VIEW_OPTIONS, boundaryStateForProps, doorFlash, isFixedCamera, reportViewFailure, viewportLayers, viewportReducer,
   type ViewportEvent, type ViewportState,
 } from "./view";
+
+const { renderToStaticMarkup } = createRequire(import.meta.url)("react-dom/server") as { renderToStaticMarkup: (node: React.ReactElement) => string };
+Object.assign(globalThis, { React });
+
+describe("office camera picker", () => {
+  it("offers distinct fixed and orbit cameras and an explicit pick leaves the fixed default", () => {
+    expect(VIEW_OPTIONS).toContainEqual({ mode: "tween", label: "Fixed camera" });
+    expect(VIEW_OPTIONS).toContainEqual({ mode: "walk", label: "Orbit Camera" });
+    expect(new Set(VIEW_OPTIONS.map(option => option.mode)).size).toBe(VIEW_OPTIONS.length);
+    const orbit = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "walk" });
+    expect(orbit).not.toBe(INITIAL_VIEWPORT);
+    expect(orbit.mode).toBe("walk");
+    expect(isFixedCamera(orbit.mode)).toBe(false);
+  });
+
+  it("renders the real fixed default as the selected option with an actionable caption", () => {
+    const html = renderToStaticMarkup(React.createElement(MockOffice));
+    const select = html.slice(html.indexOf('id="office-view"'), html.indexOf('</select>'));
+    expect(select).toContain('<option value="tween" selected="">Fixed camera</option>');
+    expect(select).not.toContain('<option value="walk" selected="">');
+    expect(html).toContain('Fixed camera · pick Orbit camera to look around</button>');
+    expect(html).not.toContain('Drag to look around');
+  });
+});
 
 /** Blank = no floor plan and either no scene or a visible scene whose WebGL context is lost. */
 function expectNotBlank(state: ViewportState, lostAttempts: ReadonlySet<number>) {

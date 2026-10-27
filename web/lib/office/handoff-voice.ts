@@ -1,11 +1,12 @@
 /**
  * Optional handoff voices (#133). Browser-safe: only the HandoffRole *type* comes from the orchestrator;
  * audio is fetched through the same-origin `/api/handoff` proxy, which adds the gateway secret server-side.
- * Sound is off until the viewer turns it on, and any failure falls back to silent visuals.
+ * Sound defaults on after the first user gesture; a failed line never disables later voices.
  */
 import type { HandoffLine } from '@backroom/orchestrator/handoff-client';
 
 import type { HandoffPlan } from './handoff-plan';
+import type { Handoff } from './handoffs';
 
 export type HandoffRole = HandoffLine['role'];
 /** Mirrors orchestrator/src/voice/voices.ts (server-only); the type check keeps the names in step. */
@@ -34,37 +35,41 @@ export function voiceCues(plan: HandoffPlan): VoiceCue[] {
   }).sort((a, b) => a.at - b.at);
 }
 
+/** New live rows speak on publication, even when subscription updates coalesce their statuses.
+ * Desk choreography can queue trips indefinitely; it must not gate live audio. The mount time
+ * excludes history on reload, and HandoffVoice deduplicates later updates by handoff id.
+ */
+export function liveVoiceCues(rows: readonly Handoff[], since: number): VoiceCue[] {
+  return rows.flatMap(row => {
+    const line = handoffVoiceLine(row.fromVoiceRole, row.line);
+    return line && Number.isFinite(row.createdAt) && row.createdAt >= since
+      ? [{ key: row.handoffId, at: row.createdAt, line }] : [];
+  }).sort((a, b) => a.at - b.at);
+}
+
 export type FetchAudio = (line: HandoffLine) => Promise<Blob>;
 /** Plays a clip; must settle when `signal` aborts (sound turned off or the office unmounted). */
 export type PlayAudio = (audio: Blob, signal: AbortSignal) => Promise<void>;
-/**
- * Statuses that mean the voice service is unusable for this visit (not configured, rejected, too large).
- * 429 (busy) and 502/504 (slow or unreachable synthesis) only drop that line.
- */
-const FATAL = /HANDOFF_AUDIO_HTTP_(400|401|403|404|405|413|415|500|503)$/;
-
-/**
- * Plays cues one at a time while enabled. Errors never surface: a fatal status or a blocked playback
- * silences voices for the visit; a transient one just drops the line.
- */
+/** Plays cues one at a time while enabled. Every failure drops only that line. */
 export class HandoffVoice {
   private readonly spoken = new Set<string>();
   private queue: VoiceCue[] = [];
   private playing = false;
   private current: AbortController | null = null;
-  enabled = false;
-  failed = false;
+  enabled = true;
   constructor(private readonly fetchAudio: FetchAudio, private readonly play: PlayAudio, private readonly onChange: () => void = () => {}) {}
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
-    if (!enabled) { this.queue = []; this.current?.abort(); }
+    if (!enabled) this.stop();
     this.onChange();
   }
+  /** Stop pending audio without changing the viewer’s preference (also safe on effect cleanup). */
+  stop() { this.queue = []; this.current?.abort(); }
   /** Marks a cue as already handled (e.g. it started before sound was turned on). */
   skip(key: string) { this.spoken.add(key); }
   say(cue: VoiceCue) {
-    if (!this.enabled || this.failed || this.spoken.has(cue.key)) return;
+    if (!this.enabled || this.spoken.has(cue.key)) return;
     this.spoken.add(cue.key);
     // Keep the queue short so voices never trail far behind the visuals.
     this.queue = [...this.queue, cue].slice(-2);
@@ -74,7 +79,7 @@ export class HandoffVoice {
     if (this.playing) return;
     this.playing = true;
     try {
-      while (this.queue.length && this.enabled && !this.failed) {
+      while (this.queue.length && this.enabled) {
         const cue = this.queue.shift()!;
         const controller = new AbortController();
         this.current = controller;
@@ -83,11 +88,9 @@ export class HandoffVoice {
           // Sound may have been turned off while the line was synthesizing.
           if (!this.enabled || controller.signal.aborted) continue;
           await this.play(audio, controller.signal);
-        } catch (error) {
-          if (controller.signal.aborted) continue;
-          const message = error instanceof Error ? error.message : String(error);
-          const transient = /HANDOFF_AUDIO_HTTP_\d+$/.test(message) && !FATAL.test(message);
-          if (!transient) { this.failed = true; this.queue = []; this.onChange(); }
+        } catch {
+          // HTTP failures, timeouts and playback refusals apply only to this cue.
+          // The next gesture can re-arm the player; later cues remain eligible.
         } finally {
           if (this.current === controller) this.current = null;
         }
@@ -98,7 +101,19 @@ export class HandoffVoice {
   }
 }
 
-// A valid zero-length WAV, played inside the click that enables sound so later clips may autoplay (iOS Safari).
+/** Keep gestures armed so a playback refusal can recover on the next click or key. */
+export function unlockOnGesture(target: EventTarget, unlock: () => void) {
+  const cleanup = () => {
+    target.removeEventListener('pointerdown', gesture, { capture: true });
+    target.removeEventListener('keydown', gesture, { capture: true });
+  };
+  const gesture = () => { unlock(); };
+  target.addEventListener('pointerdown', gesture, { capture: true });
+  target.addEventListener('keydown', gesture, { capture: true });
+  return cleanup;
+}
+
+// A valid zero-length WAV, played inside a user gesture so later clips may autoplay (iOS Safari).
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 /**
  * One reused <audio> element. `unlock` must run inside the user's click; `play` resolves when a clip ends
@@ -106,14 +121,21 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAI
  */
 export function createAudioPlayer() {
   let element: HTMLAudioElement | null = null;
+  let unlocked = false;
   const get = () => (element ??= new Audio());
   return {
     unlock() {
+      if (unlocked) return;
+      unlocked = true;
       const audio = get();
       audio.src = SILENT_WAV;
-      audio.play().catch(() => { /* Unlock is best effort; a refused clip later falls back to silence. */ });
+      audio.play().catch(() => {
+        // An interrupted primer must not re-lock a real clip that replaced it.
+        if (audio.src === SILENT_WAV) unlocked = false;
+      });
     },
     play(clip: Blob, signal: AbortSignal): Promise<void> {
+      if (!unlocked || signal.aborted) return Promise.resolve();
       return new Promise((resolve, reject) => {
         const audio = get();
         const url = URL.createObjectURL(clip);
@@ -130,7 +152,10 @@ export function createAudioPlayer() {
         audio.addEventListener('error', failed);
         signal.addEventListener('abort', aborted);
         audio.src = url;
-        audio.play().catch(error => { cleanup(); reject(error); });
+        audio.play().catch(error => {
+          if (error instanceof Error && error.name === 'NotAllowedError') unlocked = false;
+          cleanup(); reject(error);
+        });
       });
     },
   };

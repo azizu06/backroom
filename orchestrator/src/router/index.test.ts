@@ -91,7 +91,7 @@ describe('router public boundary', () => {
     const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(completion({bad:true})).mockResolvedValueOnce(completion({},0.2)).mockResolvedValueOnce(completion({},0.9,{}));
     const router=createRouter({fetch:fetcher,cloudApiKey:'test'});
     await expect(router.route('ask_why',{},schema)).rejects.toThrow('Missing seat');
-    await expect(router.route('ask_why',{})).rejects.toThrow('human review');
+    await expect(router.route('call_plan',{})).rejects.toThrow('human review');
     await expect(router.route('ask_why',{})).rejects.toThrow('Missing cloud usage');
     await expect(router.route('in_call' as keyof typeof TASK_ROUTES,{})).rejects.toThrow('Cartesia');
   });
@@ -153,4 +153,10 @@ it('reports a bounded timeout separately from transport failures', async () => {
     expect(failures.mock.calls.map(([failure]) => failure.kind)).toEqual(['timeout']);
     expect(network).toHaveBeenCalledTimes(2);
   } finally { vi.mocked(AbortSignal.timeout).mockRestore(); }
+});
+
+// Every other task retains the default confidence gate, including local-to-cloud routes.
+it.each(Object.keys(TASK_ROUTES).filter(task => task !== 'ask_why' && task !== 'document_extraction') as (keyof typeof TASK_ROUTES)[])('rejects %s below 0.7', async task => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => completion({}, 0.69));
+  await expect(createRouter({ fetch: fetcher, cloudApiKey: 'test' }).route(task, {})).rejects.toThrow('human review');
 });

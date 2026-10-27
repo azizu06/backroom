@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
-import { isCloseKey } from '../../lib/office/a11y';
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
+import { isCloseKey, REDUCED_MOTION_QUERY } from '../../lib/office/a11y';
 import { requestSceneFrame } from '../../lib/office/frame';
 import { setBakedTalkingAgent } from '../../lib/office/baked-character';
 import { playOfficeCue } from '../../lib/office/sound-events';
@@ -64,7 +64,7 @@ function releasePointer() {
  */
 export function focusAskWhy(question?: string) {
   // The ask-why entry lives in the office panels drawer (closed by default): open it first.
-  window.dispatchEvent(new CustomEvent('office-drawer'));
+  window.dispatchEvent(new CustomEvent('office-drawer', { detail: 'ask-why' }));
   const mount = document.querySelector<HTMLElement>("[data-office-mount='ask-why']");
   if (!mount) return;
   mount.scrollIntoView({ block: 'center' });
@@ -78,14 +78,66 @@ export function focusAskWhy(question?: string) {
   field?.focus({ preventScroll: true });
 }
 
-function PlaySettingsDialog({ settings, change, close }: { settings: PlaySettings; change: (next: PlaySettings) => void; close: () => void }) {
+function PlaySettingsDialog({ settings, change, close, tryWalking, anchor }: {
+  settings: PlaySettings; change: (next: PlaySettings, feedback?: string) => void; close: () => void; tryWalking: () => void;
+  anchor: RefObject<HTMLButtonElement | null>;
+}) {
   const headingId = useId();
+  const motionNoteId = useId();
+  const dialog = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const button = anchor.current;
+    const panel = dialog.current;
+    if (!button || !panel) return;
+    const position = () => {
+      const rect = button.getBoundingClientRect();
+      const width = panel.getBoundingClientRect().width;
+      const top = rect.bottom + 8;
+      panel.style.top = `${top}px`;
+      panel.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
+      panel.style.maxHeight = `${Math.max(0, window.innerHeight - top - 8)}px`;
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(button);
+    observer.observe(panel);
+    // A wrapped row can move the button without changing the button's own size.
+    if (button.parentElement) observer.observe(button.parentElement);
+    window.addEventListener('resize', position);
+    return () => { observer.disconnect(); window.removeEventListener('resize', position); };
+  }, [anchor]);
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia(REDUCED_MOTION_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(REDUCED_MOTION_QUERY);
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const motionBlocked = reducedMotion && !settings.useMotionAnyway;
+  const [groups, setGroups] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('backroom.office.play-settings-groups.v1') ?? '{}');
+      return { controls: saved?.controls !== false, feel: saved?.feel === true };
+    } catch { return { controls: true, feel: false }; }
+  });
+  const rememberGroup = (group: 'controls' | 'feel', open: boolean) => {
+    setGroups(previous => previous[group] === open ? previous : { ...previous, [group]: open });
+  };
+  useEffect(() => {
+    try { localStorage.setItem('backroom.office.play-settings-groups.v1', JSON.stringify(groups)); } catch { /* Storage is optional. */ }
+  }, [groups]);
   const first = useRef<HTMLInputElement>(null);
-  useEffect(() => { first.current?.focus(); }, []);
-  return <section className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
+  const controlsSummary = useRef<HTMLElement>(null);
+  useEffect(() => {
+    (first.current?.getClientRects().length ? first.current : controlsSummary.current)?.focus();
+  }, []);
+  return <section ref={dialog} className='play-panel play-settings' role='dialog' aria-labelledby={headingId} onKeyDown={event => {
     if (isCloseKey(event.key)) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <header><h2 id={headingId}>Play Settings</h2><button onClick={close} aria-label='Close Play settings'>Close</button></header>
+    <details className='play-setting-group' open={groups.controls} onToggle={event => rememberGroup('controls', event.currentTarget.open)}>
+      <summary ref={controlsSummary}>Controls</summary>
     <label className='play-setting'><span>Look sensitivity <output>{formatMultiplier(settings.sensitivity)}</output></span>
       <input ref={first} aria-label='Look sensitivity' type='range' min={SENSITIVITY_RANGE.min} max={SENSITIVITY_RANGE.max} step={SENSITIVITY_RANGE.step} value={settings.sensitivity}
         onChange={event => change({ ...settings, sensitivity: Number(event.target.value) })} />
@@ -95,20 +147,32 @@ function PlaySettingsDialog({ settings, change, close }: { settings: PlaySetting
         onChange={event => change({ ...settings, speed: Number(event.target.value) })} />
     </label>
     <label className='play-setting play-setting-check'>
-      <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked })} /> Invert Y (look)
+      <input type='checkbox' checked={settings.invertY} onChange={event => change({ ...settings, invertY: event.target.checked }, `Invert Y ${event.target.checked ? 'on' : 'off'}`)} /> Invert Y (look)
     </label>
-    <fieldset className='play-setting-group'><legend>Movement Feel</legend>
+    </details>
+    <details className='play-setting-group' open={groups.feel} onToggle={event => rememberGroup('feel', event.currentTarget.open)}>
+      <summary aria-labelledby={`${headingId}-feel`} aria-describedby={motionNoteId}>
+        <span id={`${headingId}-feel`}>Movement Feel</span>
+        <span id={motionNoteId} className='play-settings-note' aria-live='polite'>{motionBlocked
+          ? 'Reduced motion is on in your system, so these are off'
+          : reducedMotion ? 'Reduced motion is on in your system. Motion is enabled for this office only.' : 'Motion applies while walking.'}</span>
+      </summary>
       <label className='play-setting play-setting-check'>
-        <input type='checkbox' checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked })} /> Smooth movement
+        <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.smoothMove} onChange={event => change({ ...settings, smoothMove: event.target.checked }, `Smooth movement ${event.target.checked ? 'on' : 'off'}`)} /> Smooth movement
       </label>
       <label className='play-setting play-setting-check'>
-        <input type='checkbox' checked={settings.headBob} onChange={event => change({ ...settings, headBob: event.target.checked })} /> Head bob
+        <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.headBob} onChange={event => change({ ...settings, headBob: event.target.checked }, `Head bob ${event.target.checked ? 'on' : 'off'}`)} /> Head bob
       </label>
       <label className='play-setting play-setting-check'>
-        <input type='checkbox' checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked })} /> Field-of-view kick
+        <input type='checkbox' disabled={motionBlocked} aria-describedby={motionNoteId} checked={settings.fovKick} onChange={event => change({ ...settings, fovKick: event.target.checked }, `Field-of-view kick ${event.target.checked ? 'on' : 'off'}`)} /> Field-of-view kick
       </label>
-      <p className='play-settings-note'>All three stay off while your system asks to reduce motion.</p>
-    </fieldset>
+      <label className='play-setting play-setting-check'>
+        <input type='checkbox' role='switch' checked={settings.useMotionAnyway} onChange={event => change({ ...settings, useMotionAnyway: event.target.checked }, `Use motion anyway ${event.target.checked ? 'on' : 'off'}`)} /> Use motion anyway
+      </label>
+      <p className='play-settings-note'>Overrides your system preference for this office only.</p>
+    </details>
+    <button onClick={tryWalking}>Try walking</button>
+    <p className='play-settings-note'>Use W A S D to feel your changes with this panel open.</p>
     <p className='play-settings-note'>Saved in this browser only.</p>
     <button className='play-settings-reset' onClick={() => change(DEFAULT_PLAY_SETTINGS)}>Reset to defaults</button>
   </section>;
@@ -165,11 +229,25 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   const handoffFor = useHandoffPresentation()?.handoffFor;
   const [panel, setPanel] = useState<PlayTarget | null>(null);
   const [settings, changeSettings] = usePlaySettings();
+  const [settingsToast, setSettingsToast] = useState<{ text: string } | null>(null);
+  useEffect(() => {
+    if (!settingsToast) return;
+    const timer = window.setTimeout(() => setSettingsToast(null), 1_000);
+    return () => window.clearTimeout(timer);
+  }, [settingsToast]);
+  function applySettings(next: PlaySettings, feedback?: string) {
+    input.feel = feelFlags(next);
+    input.speed = next.speed;
+    changeSettings(next);
+    if (feedback) setSettingsToast({ text: feedback });
+    requestSceneFrame();
+  }
   usePointerLockChrome(hud);
   // One frame once the surface exists, so the rig reports its pose even before the first key.
   useEffect(() => { requestSceneFrame(); }, []);
   useImmersiveAudio(hud, snapshot);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsButton = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const [chatOpen, setChatOpen] = useState(false);
@@ -191,7 +269,7 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     };
   }, [hud, input]);
   useEffect(() => { input.speed = settings.speed; }, [input, settings.speed]);
-  useEffect(() => { input.feel = feelFlags(settings); }, [input, settings.smoothMove, settings.headBob, settings.fovKick]);
+  useEffect(() => { input.feel = feelFlags(settings); requestSceneFrame(); }, [input, settings.smoothMove, settings.headBob, settings.fovKick, settings.useMotionAnyway]);
   // The agent being talked to faces the player and listens until the dialog closes (view only).
   useEffect(() => {
     agentCues.setTalking(panel ? cueKeyFor(panel) : null);
@@ -228,6 +306,10 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     input.clear();
     releasePointer();
     requestSceneFrame();
+    if (current.kind === 'ticket-board') {
+      window.dispatchEvent(new CustomEvent('office-drawer', { detail: 'inbox' }));
+      return;
+    }
     const cue = cueKeyFor(current);
     if (cue) agentCues.greet(cue);
     setPanel(current);
@@ -260,7 +342,6 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
   function askWhy(question?: string) {
     setPanel(null);
     releasePointer();
-    onExit();
     focusAskWhy(question);
   }
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -358,9 +439,11 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
     <div className='play-crosshair' data-state={aim} data-kind={aim === 'target' ? target?.kind : undefined} aria-hidden='true' />
     <RoomEntryLabel hud={hud} snapshot={snapshot} />
     <InteractPrompt prompt={prompt} />
-    {onOverview && <button className='play-overview' aria-label='Overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
-    <button className='play-exit' onClick={onExit}>Exit Play</button>
-    <button className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
+    <div className='play-controls'>
+      {onOverview && <button className='play-overview' aria-label='Overview' aria-keyshortcuts='O' onClick={() => { releasePointer(); onOverview(); }}>Overview <kbd>O</kbd></button>}
+      <button className='play-exit' onClick={onExit}>Exit Play</button>
+      <button ref={settingsButton} className='play-settings-toggle' aria-expanded={settingsOpen} onClick={() => settingsOpen ? closeSettings() : openSettings()}>Settings</button>
+    </div>
     <a href='/operator' onClick={releasePointer} style={{ position: 'absolute', right: 18, top: 92, color: '#f3dfb9', background: '#30382df2', padding: '6px 10px', fontSize: 13 }}>Operator</a>
     {touch && <>
       <div className='play-joystick' aria-hidden='true' onPointerDown={event => { event.currentTarget.setPointerCapture?.(event.pointerId); steer(event); }}
@@ -369,7 +452,8 @@ export function PlayHud({ snapshot, input, target, hud, onExit, onHelp, onOvervi
       </div>
       {aim === 'target' && <button className='play-interact' onClick={interact}>Interact</button>}
     </>}
-    {settingsOpen && <PlaySettingsDialog settings={settings} change={changeSettings} close={closeSettings} />}
+    {settingsOpen && <PlaySettingsDialog anchor={settingsButton} settings={settings} change={applySettings} close={closeSettings} tryWalking={() => hud.current?.focus()} />}
+    <div className='play-settings-toast' role='status' aria-live='polite'>{settingsToast?.text}</div>
     {chat && <ProximityChat chat={chat} open={chatOpen} onOpen={openChat} onClose={() => setChatOpen(false)} hud={hud} />}
     {panel && <PlayPanelDialog snapshot={snapshot} target={panel} close={closePanel} askWhy={askWhy} />}
   </div>;

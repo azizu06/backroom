@@ -22,6 +22,8 @@ export class PayablesSeat {
   private readonly payment?: PayablesClient;
   private readonly rail: 'nessie' | 'x402';
   private readonly label: 'nessie' | X402Label;
+  /** Server-selected rail; role tools cannot change it. */
+  get paymentRail() { return this.label; }
   /** `x402Label` only names an injected client's rail in results and audits. */
   constructor(private readonly options: SeatOptions & { nessie?: PayablesClient; x402?: PayablesClient; paymentRail?: string; x402Label?: X402Label }) {
     const rail = options.paymentRail ?? process.env.PAYMENT_RAIL ?? 'nessie';

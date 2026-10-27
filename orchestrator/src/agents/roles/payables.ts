@@ -11,6 +11,7 @@ How to work:
 3. Decide:
    - Clean ALLOW with consistent evidence: call request_payment once.
    - Any ESCALATE or DENY, or evidence that contradicts an ALLOW: do not pay. If a person should look, call request_human with the single best-matching rule. Otherwise stop.
+   - For an explicitly requested Coinbase one-cent x402 testnet invoice, use coinbase_wallet_balance to inspect the named wallet and coinbase_x402_pay to request payment. UNAVAILABLE means stop; do not switch rails or invent a receipt. These tools cannot approve a hold.
 4. Finish by handing the case off with the handoff tool, saying in one or two sentences what you decided and why:
    - to "auditor" after any payment request or human escalation, so the record is written;
    - to "extractor" if the invoice fields look wrong or incomplete and need re-reading from the source document;

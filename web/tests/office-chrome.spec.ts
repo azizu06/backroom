@@ -1,9 +1,28 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { openMenu, openSheet } from './office-menu';
 
 // /office uses AJ’s sidebar + topbar shell; the 3D scene fills the main pane, not the whole window.
 const BANNED = /\b(demo|synthetic|fake|sandbox|simulated|simulation|preview|hackathon)\b/i;
 const visibleText = (page: Page) => page.locator('.office-shell').evaluate(element => (element as HTMLElement).innerText);
+
+async function expectCenteredAction(dialog: Locator, column: Locator, action: Locator) {
+  await expect(dialog).toHaveCSS('scrollbar-gutter', 'stable both-edges');
+  await expect(action).toBeVisible();
+  await action.scrollIntoViewIfNeeded();
+  const contentCenter = await dialog.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+    const right = box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+    // Symmetric scrollbar reservations leave the content centre at this midpoint.
+    return (left + right) / 2;
+  });
+  for (const target of [column, action]) {
+    const box = await target.boundingBox();
+    expect(box).not.toBeNull();
+    expect(Math.abs(box!.x + box!.width / 2 - contentCenter)).toBeLessThanOrEqual(4);
+  }
+}
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test.describe(`at ${viewport.width}x${viewport.height}`, () => {
@@ -35,16 +54,298 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(await visibleText(page)).not.toMatch(BANNED);
 
       await openSheet(page, 'overview');
+      await expect(page.getByRole('heading', { name: 'Full Floor', exact: true, level: 2 })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
       expect(await visibleText(page)).not.toMatch(BANNED);
-      await page.getByRole('button', { name: 'Close Today at Backroom' }).click();
-      await expect(page.getByRole('dialog', { name: 'Today at Backroom' })).toHaveCount(0);
+      await page.getByRole('button', { name: 'Close Full Floor' }).click();
+      await expect(page.getByRole('dialog', { name: 'Full Floor' })).toHaveCount(0);
 
       await openSheet(page, 'help');
       await expect(page.getByRole('heading', { name: 'Things to Try' })).toBeVisible();
       await expect(page.getByText('Test the Treasury Lock')).toBeVisible();
       await page.getByRole('button', { name: 'Close Help' }).click();
       expect(errors).toEqual([]);
+    });
+  });
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`Full Floor at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport, hasTouch: viewport.width === 390 });
+
+    test('summary fits and Handoff history preserves scroll and disclosure state', async ({ page }) => {
+      await page.goto('/office?view=overview');
+      const dialog = await openSheet(page, 'overview');
+      const summary = dialog.getByTestId('full-floor-summary');
+      await expect(summary.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+      await expect(summary.locator('dt')).toHaveText(['Inbox', 'Handoffs in progress', 'Audit entries']);
+      const bounds = await summary.evaluate(element => ({
+        height: element.clientHeight, scrollHeight: element.scrollHeight,
+        bottom: element.getBoundingClientRect().bottom,
+      }));
+      expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.height);
+      const sheet = (await dialog.boundingBox())!;
+      expect(bounds.bottom - sheet.y).toBeLessThanOrEqual(viewport.height * (viewport.width === 390 ? 1.3 : 1));
+      if (viewport.width === 1280) expect(bounds.bottom).toBeLessThanOrEqual(sheet.y + sheet.height);
+      if (viewport.width === 390) {
+        const cards = await summary.locator('li').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
+        expect(new Set(cards).size).toBe(1);
+      }
+      const history = dialog.getByRole('button', { name: 'Handoff history', exact: true });
+      await expect(history).toHaveAttribute('aria-expanded', 'false');
+      await history.scrollIntoViewIfNeeded();
+      const scrollTop = await dialog.evaluate(element => element.scrollTop);
+      if (viewport.width === 390) await history.tap();
+      else await history.click();
+      await expect(history).toHaveAttribute('aria-expanded', 'true');
+      expect(await dialog.evaluate(element => element.scrollTop)).toBe(scrollTop);
+      await expect(dialog.getByRole('heading', { name: /^Agent Handoffs/ })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Workday', exact: true }).click();
+      await expect(history).toHaveAttribute('aria-expanded', 'true');
+    });
+  });
+}
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test.describe(`quiet sheets at ${viewport.width}x${viewport.height}, motion ${reducedMotion}`, () => {
+      test.use({ viewport, reducedMotion });
+
+      test('Inbox and Play Settings centre their content and primary actions', async ({ page }) => {
+        await page.goto('/office?view=overview');
+        const inbox = await openSheet(page, 'inbox');
+        await inbox.getByText('Advanced: Try Your Own Email', { exact: true }).click();
+        await expectCenteredAction(inbox, inbox.locator('.detail-sheet-body'),
+          inbox.getByRole('button', { name: 'Route scenario', exact: true }));
+        await page.keyboard.press('Escape');
+        await expect(inbox).toHaveCount(0);
+
+        await expect(page.getByLabel('Office view')).toBeEnabled();
+        await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+        await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+        await expect(page.getByRole('application', { name: /First-person office/ }))
+          .toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+        await page.evaluate(() => document.exitPointerLock?.());
+        await expect(page.getByTestId('office-viewport')).not.toHaveAttribute('data-pointer-locked');
+        await page.getByRole('button', { name: 'Settings', exact: true }).focus();
+        await page.keyboard.press('Enter');
+        const settings = page.getByRole('dialog', { name: 'Play Settings', exact: true });
+        const reset = settings.getByRole('button', { name: 'Reset to defaults', exact: true });
+        await expectCenteredAction(settings, settings.locator('details').first(), reset);
+        // Expanded controls exercise the same alignment when the panel needs to scroll.
+        await settings.locator('summary').filter({ hasText: 'Movement Feel' }).click();
+        await expectCenteredAction(settings, settings.locator('details').first(), reset);
+      });
+
+      test('Help anchors focus uncovered headings within the sheet and preserve search and Escape', async ({ page }) => {
+        await page.goto('/office?view=overview');
+        await openMenu(page);
+        const opener = page.getByRole('complementary', { name: 'Office navigation' }).getByRole('button', { name: 'Help', exact: true });
+        await opener.click();
+        const dialog = page.getByRole('dialog', { name: 'Help', exact: true });
+        await expect(dialog).toBeVisible({ timeout: 200 });
+        await expect(dialog.getByRole('button', { name: 'Close Help' })).toBeFocused();
+        // Include content and icon animations: a stagger must not extend the entrance beyond 200 ms.
+        const timings = await dialog.evaluate(element => element.getAnimations({ subtree: true })
+          .map(animation => Number(animation.effect!.getComputedTiming().endTime)));
+        if (reducedMotion === 'reduce') expect(timings).toEqual([]);
+        else {
+          expect(timings.length).toBeGreaterThan(0);
+          for (const end of timings) expect(end).toBeLessThanOrEqual(180);
+          await expect(dialog).toHaveCSS('animation-timing-function', 'ease-out');
+        }
+        await expect(dialog).toHaveCSS('opacity', '1', { timeout: 200 });
+        await expect(dialog.locator('.detail-sheet-body')).toHaveCSS('opacity', '1', { timeout: 200 });
+        await page.keyboard.press('Tab');
+        await expect(dialog.getByRole('searchbox', { name: 'Search help' })).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(dialog.getByRole('button', { name: 'Getting Around', exact: true })).toBeFocused();
+        const pageScroll = await page.evaluate(() => window.scrollY);
+        const anchors = dialog.getByRole('navigation', { name: 'Help sections' });
+        // Go down and back up, including the last section where scrolling is clamped at the bottom.
+        for (const [label, heading] of [
+          ['Glossary', 'Glossary'], ['Shortcuts', 'Keyboard Shortcuts'], ['Flows', 'How Things Flow'],
+          ['Things to Try', 'Things to Try'], ['Getting Around', 'Getting Around'],
+        ]) {
+          const button = anchors.getByRole('button', { name: label, exact: true });
+          if (label === 'Glossary') await button.click();
+          else {
+            await button.focus();
+            await page.keyboard.press('Enter');
+          }
+          const target = dialog.getByRole('heading', { name: heading, exact: true });
+          await expect(target).toBeFocused();
+          const [targetBox, headerBox, navigationBox, sheetBox] = await Promise.all([
+            target.boundingBox(), dialog.locator('.detail-sheet-header').boundingBox(),
+            dialog.locator('.help-navigation').boundingBox(), dialog.boundingBox(),
+          ]);
+          expect(targetBox!.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height);
+          expect(targetBox!.y).toBeGreaterThanOrEqual(navigationBox!.y + navigationBox!.height);
+          expect(targetBox!.y + targetBox!.height).toBeLessThanOrEqual(sheetBox!.y + sheetBox!.height);
+          expect(await page.evaluate(() => window.scrollY)).toBe(pageScroll);
+        }
+        await dialog.getByRole('searchbox', { name: 'Search help' }).fill('zzzz-no-match');
+        await expect(dialog.getByRole('status')).toContainText('Nothing matches');
+        for (const button of await anchors.getByRole('button').all()) await expect(button).toBeDisabled();
+        await dialog.getByRole('searchbox', { name: 'Search help' }).fill('');
+        await expect(anchors.getByRole('button', { name: 'Glossary', exact: true })).toBeEnabled();
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0, { timeout: 200 });
+        await expect(opener).toBeFocused();
+      });
+
+      test('Play Settings groups remember keyboard disclosure choices and Reset remains outside them', async ({ page }) => {
+        const enterPlay = async () => {
+          await page.goto('/office?view=overview');
+          await openMenu(page);
+          await expect(page.getByLabel('Office view')).toBeEnabled();
+          await expect(page.getByTestId('office-viewport').locator('canvas')).toBeVisible();
+          await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+          await expect(page.getByRole('application', { name: /First-person office/ }))
+            .toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+          // Both layouts render Settings; entering Play can hide it while the pointer is locked.
+          await page.evaluate(() => document.exitPointerLock?.());
+          await expect(page.getByTestId('office-viewport')).not.toHaveAttribute('data-pointer-locked');
+          await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+          await page.getByRole('button', { name: 'Settings', exact: true }).focus();
+          await page.keyboard.press('Enter');
+        };
+        await enterPlay();
+        const dialog = page.getByRole('dialog', { name: 'Play Settings', exact: true });
+        const controls = dialog.locator('details').filter({ has: page.locator('summary', { hasText: /^Controls$/ }) });
+        const feel = dialog.locator('details').filter({ has: page.locator('summary', { hasText: 'Movement Feel' }) });
+        await expect(controls).toHaveAttribute('open', '');
+        await expect(feel).not.toHaveAttribute('open');
+        await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toBeFocused();
+        await expect(feel.getByText(reducedMotion === 'reduce'
+          ? 'Reduced motion is on in your system, so these are off'
+          : 'Motion applies while walking.', { exact: true })).toBeVisible();
+        await expect(feel.getByRole('checkbox', { name: 'Head bob' })).toBeHidden();
+        for (const name of ['Look sensitivity', 'Movement speed']) {
+          await dialog.getByRole('slider', { name }).focus();
+          await page.keyboard.press('ArrowRight');
+          await page.keyboard.press('ArrowRight');
+        }
+        await dialog.getByRole('checkbox', { name: 'Invert Y (look)' }).check();
+        await feel.locator('summary').focus();
+        await page.keyboard.press('Enter');
+        await expect(feel).toHaveAttribute('open', '');
+        if (reducedMotion === 'reduce') {
+          for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+            await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeDisabled();
+          }
+          await dialog.getByRole('switch', { name: 'Use motion anyway' }).check();
+        }
+        for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+          await dialog.getByRole('checkbox', { name, exact: true }).uncheck();
+        }
+        await controls.locator('summary').focus();
+        await page.keyboard.press('Space');
+        await expect(controls).toHaveJSProperty('open', false);
+        // Native toggle events and the persistence effect run after the DOM changes.
+        // Wait for the saved choices before unmounting the dialog and reloading.
+        await expect.poll(() => page.evaluate(() =>
+          JSON.parse(localStorage.getItem('backroom.office.play-settings-groups.v1') ?? 'null')
+        )).toEqual({ controls: false, feel: true });
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0, { timeout: 200 });
+        // A fresh page proves the disclosure preferences and input values survive remounts.
+        await enterPlay();
+        await expect(controls).not.toHaveAttribute('open');
+        await expect(feel).toHaveAttribute('open', '');
+        await expect(controls.locator('summary')).toBeFocused();
+        for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+          await expect(dialog.getByRole('checkbox', { name, exact: true })).not.toBeChecked();
+        }
+        await controls.locator('summary').click();
+        await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toHaveValue('1.5');
+        await expect(dialog.getByRole('slider', { name: 'Movement speed' })).toHaveValue('1.5');
+        await expect(dialog.getByRole('checkbox', { name: 'Invert Y (look)' })).toBeChecked();
+        await controls.locator('summary').click();
+        await feel.locator('summary').click();
+        await expect(dialog.getByText('Saved in this browser only.')).toBeVisible();
+        await dialog.getByRole('button', { name: 'Reset to defaults' }).click();
+        await expect(controls).not.toHaveAttribute('open');
+        await expect(feel).not.toHaveAttribute('open');
+        await controls.locator('summary').click();
+        await feel.locator('summary').click();
+        await expect(dialog.getByRole('slider', { name: 'Look sensitivity' })).toHaveValue('1');
+        await expect(dialog.getByRole('slider', { name: 'Movement speed' })).toHaveValue('1');
+        await expect(dialog.getByRole('checkbox', { name: 'Invert Y (look)' })).not.toBeChecked();
+        for (const name of ['Smooth movement', 'Head bob', 'Field-of-view kick']) {
+          await expect(dialog.getByRole('checkbox', { name, exact: true })).toBeChecked();
+        }
+      });
+    });
+  }
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`office panel tabs at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport });
+
+    test('keeps each job mounted, its scroll position, and keyboard focus', async ({ page }) => {
+      // These checks exercise the drawer, without letting the camera capture browser clicks.
+      await page.addInitScript(() => { Element.prototype.requestPointerLock = async () => {}; });
+      await page.goto('/office?view=overview');
+      await openMenu(page);
+      await page.getByRole('button', { name: 'Play (First Person)', exact: true }).click();
+      await expect(page.getByRole('application', { name: /First-person office/ }))
+        .toHaveAttribute('data-player-fov', /\d/, { timeout: 30_000 });
+      await page.evaluate(() => document.exitPointerLock?.());
+      const trigger = page.getByRole('button', { name: 'Office panels', exact: true });
+      await trigger.click();
+      const drawer = page.locator('#office-drawer');
+      const summary = drawer.getByRole('tab', { name: /^Summary/ });
+      await expect(summary).toBeFocused();
+      await expect(summary).toHaveAttribute('aria-selected', 'true');
+      const summaryBody = drawer.getByRole('tabpanel', { name: /^Summary/ });
+      await expect(summaryBody.getByRole('heading', { name: 'Today at Backroom' })).toBeVisible();
+      expect(await summaryBody.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+      expect(await drawer.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+      await page.keyboard.press('ArrowRight');
+      const inboxTab = drawer.getByRole('tab', { name: /^Inbox/ });
+      await expect(inboxTab).toBeFocused();
+      const inbox = drawer.getByRole('tabpanel', { name: /^Inbox/ });
+      await expect(inbox.getByRole('heading', { name: /^Lobby Inbox Tray/ })).toBeVisible();
+      // Make overflow deterministic without relying on a live workday's inbox length.
+      // The node identity also catches a hidden tab being unmounted and fetched again.
+      await inbox.evaluate(element => {
+        const spacer = document.createElement('div');
+        spacer.dataset.scrollFixture = 'inbox'; spacer.style.height = '1800px';
+        element.append(spacer); element.scrollTop = 320;
+      });
+      const offset = await inbox.evaluate(element => element.scrollTop);
+      expect(offset).toBeGreaterThan(0);
+      await page.keyboard.press('ArrowRight');
+      await expect(drawer.getByRole('tab', { name: /^Audit/ })).toBeFocused();
+      await expect(drawer.getByRole('tabpanel', { name: /^Audit/ })).toBeVisible();
+      await page.keyboard.press('ArrowLeft');
+      await expect(inboxTab).toBeFocused();
+      expect(await inbox.evaluate(element => element.scrollTop)).toBe(offset);
+      await expect(inbox.locator('[data-scroll-fixture=inbox]')).toHaveCount(1);
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true');
+      expect(await inbox.evaluate(element => element.scrollTop)).toBe(offset);
+      await summary.click();
+      await page.keyboard.press('Escape');
+      const count = page.locator('.office-drawer-trigger').getByRole('button', { name: /^Inbox/ });
+      await count.click();
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true');
+      await page.keyboard.press('Escape');
+      await expect(count).toBeFocused();
+      // Legacy Ask why callers dispatch without a detail; their input must be visible immediately.
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('office-drawer')));
+      await expect(drawer.getByRole('tab', { name: /^Audit/ })).toHaveAttribute('aria-selected', 'true');
+      await expect(drawer.locator('[data-office-mount=ask-why]')).toBeVisible();
+      await page.evaluate(() => { window.location.hash = 'office-inbox-tray'; });
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true');
+      const tabs = drawer.getByRole('tablist');
+      await expect(tabs).toHaveCSS('overflow-x', 'auto');
+      expect(await drawer.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)).toBe(true);
     });
   });
 }

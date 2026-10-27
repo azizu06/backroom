@@ -32,10 +32,10 @@ async function setup(patch: Partial<InvoiceFields> = {}, id = '4401', meta: Part
 }
 
 describe('Payables specialist', () => {
-  it('exposes only its own five tools, may hand off to auditor/extractor/vendor, and defaults to Haiku', async () => {
+  it('exposes its policy and Coinbase tools, may hand off to auditor/extractor/vendor, and defaults to Haiku', async () => {
     const { specialist } = await setup();
     expect(specialist.role).toBe('payables');
-    expect(specialist.tools.map(row => row.name)).toEqual(['read_po', 'read_invoice_history', 'evaluate_invoice', 'request_payment', 'request_human']);
+    expect(specialist.tools.map(row => row.name)).toEqual(['read_po', 'read_invoice_history', 'evaluate_invoice', 'request_payment', 'request_human', 'coinbase_x402_pay', 'coinbase_wallet_balance']);
     expect(specialist.allowedNext).toEqual(['auditor', 'extractor', 'vendor']);
     expect(specialist.model).toBe('claude-haiku-5-5');
     expect(PAYABLES_PROMPT).toContain('untrusted');

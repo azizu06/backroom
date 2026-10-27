@@ -31,8 +31,11 @@ Publish records the publisher identity in the private `controller` table. Use
 that identity's **private token on trusted servers only**, never in browser props,
 `NEXT_PUBLIC_*`, tool arguments, or model input. Anonymous clients can subscribe
 but cannot invoke business writers; visual presence is the deliberate exception
-documented below. Maincloud browser authentication is still deferred;
-no hosted publish is claimed.
+documented below. The original T8 spike deferred Maincloud browser authentication
+and claimed no hosted publish; that is historical status, not the current host
+status. See the [hosted Maincloud parity evidence](../docs/evidence/maincloud-parity/README.md)
+and [current demo-host operations](../docs/demo-runbook.md) for later evidence
+and the actual host configuration.
 
 Put server settings in the repo root `.env.local`, loaded by the orchestrator
 runtime, or supply them in the process environment:

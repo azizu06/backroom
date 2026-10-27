@@ -4,14 +4,17 @@
  * No imports from ./play or ./playSettings so both can depend on it.
  */
 
-/** Which feel effects are on. All of them are forced off under prefers-reduced-motion (see `effectiveFeel`). */
-export interface FeelFlags { readonly smoothing: boolean; readonly bob: boolean; readonly fovKick: boolean }
-export const DEFAULT_FEEL: FeelFlags = { smoothing: true, bob: true, fovKick: true };
+/** Visual preferences; reduced motion wins unless the viewer explicitly opts in for this office. */
+export interface FeelFlags {
+  readonly smoothing: boolean; readonly bob: boolean; readonly fovKick: boolean;
+  readonly useMotionAnyway?: boolean;
+}
+export const DEFAULT_FEEL: FeelFlags = { smoothing: true, bob: true, fovKick: true, useMotionAnyway: false };
 export const NO_FEEL: FeelFlags = { smoothing: false, bob: false, fovKick: false };
 
-/** Reduced motion wins over the viewer's settings: no smoothing, no bob, no FOV change. */
+/** Apply the system preference without discarding the viewer's saved switches. */
 export function effectiveFeel(flags: FeelFlags, reducedMotion: boolean): FeelFlags {
-  return reducedMotion ? NO_FEEL : flags;
+  return reducedMotion && !flags.useMotionAnyway ? NO_FEEL : flags;
 }
 
 /** m/s². Full walk speed in about 0.1 s: weighted, not floaty. */

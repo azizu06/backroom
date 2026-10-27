@@ -28,22 +28,28 @@
 .play-panel dl { margin: 12px 0; font: 12px/1.5 'SFMono-Regular', Consolas, monospace; }
 .play-panel dl div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--office-lavender); padding: 4px 0; }
 .play-panel dd { margin: 0; }
-.play-panel button:focus-visible, .play-hud > button:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
+.play-panel button:focus-visible, .play-hud > button:focus-visible, .play-controls > button:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 @media (max-width: 760px) {
   .play-panel { top: 8px; left: 8px; width: min(300px, calc(100% - 16px)); }
 }
 .office-shell .play-settings-toggle { position: absolute; top: 52px; right: 18px; padding: 5px 10px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-peach); border-radius: 10px; box-shadow: var(--office-plate-shadow); font-size: 13px; }
-.play-panel.play-settings { left: auto; right: 18px; top: 92px; width: 280px; }
+/* Settings is last, so its popover stays below every button even when this row wraps. */
+.play-controls { position: absolute; top: 12px; right: 12px; max-width: calc(100% - 24px); display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: flex-end; gap: 6px; }
+.office-shell .play-controls > button { position: static; flex: none; white-space: nowrap; }
+.play-hud > .play-settings-toast { position: absolute; z-index: 7; bottom: 24px; left: 50%; transform: translateX(-50%); pointer-events: none; padding: 8px 14px; border-radius: 10px; background: var(--office-cream); color: var(--office-navy); border: 1px solid var(--office-lavender); box-shadow: var(--office-plate-shadow); }
+.play-settings-toast:empty { display: none; }
+.play-panel.play-settings { position: fixed; right: auto; box-sizing: border-box; width: 280px; max-width: calc(100vw - 16px); }
 .play-setting { display: grid; gap: 4px; margin: 12px 0; font-size: 13px; color: var(--office-navy); }
 .play-setting span { display: flex; justify-content: space-between; }
 .play-setting output { font: 12px 'SFMono-Regular', Consolas, monospace; color: var(--office-navy); font-weight: 700; }
 .play-setting input[type='range'] { width: 100%; accent-color: var(--office-navy); }
 .play-setting-check { display: flex; align-items: center; gap: 8px; }
 .play-settings-note { margin: 4px 0 10px; }
+.play-setting-group { margin: 12px 0; padding: 8px 12px; border: 1px solid var(--office-lavender); border-radius: 10px; }
+.play-setting-group summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+.play-setting-group summary .play-settings-note { display: block; margin: 4px 0 0; font-size: 13px; font-weight: 400; }
+.play-setting-group summary:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
 .play-settings input:focus-visible { outline: 2px solid var(--office-aqua); outline-offset: 2px; box-shadow: 0 0 0 2px var(--office-navy); }
-@media (max-width: 760px) {
-  .play-panel.play-settings { top: 88px; right: 8px; width: min(280px, calc(100% - 16px)); }
-}
 
 /* PaymentLinkPanel QR inside the narrow Play dialog. */
 .play-panel img { display: block; max-width: 100%; height: auto; }

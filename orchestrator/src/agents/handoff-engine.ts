@@ -1,6 +1,7 @@
 import { ROLES, type HandoffRecord, type HandoffRequest, type Role } from './contracts';
 import type { HandoffRole } from '../voice/voices';
 import type { AuditInput } from '../store';
+import { speakable } from '../speakable';
 
 /** Pure, deterministic case/handoff state machine. MemoryHandoffStore and the
  * SpacetimeDB `agent_*` reducers both run it, so ownership rules exist once.
@@ -298,12 +299,29 @@ export function safeText(value: string, max: number): string {
 export function toPublicHandoff(state: Pick<CaseState, 'displayId'>, record: HandoffRow): AgentHandoffPublic {
   const summary = safeText(record.summary, 160);
   const human = record.toHuman;
+  const desks: Record<Role, string> = { intake: 'Intake', extractor: 'Extractor', vendor: 'Vendor Desk',
+    payables: 'Payables', collections: 'Collections', reconciler: 'Reconciler', auditor: 'Auditor' };
+  const greeting = `Hey ${human ?? desks[record.to]}, `;
+  const note = record.summary.replace(/^\s*(?:intake|extractor|vendor(?: desk)?|payables|collections|reconciler|auditor)\s*(?:->|→)\s*(?:intake|extractor|vendor(?: desk)?|payables|collections|reconciler|auditor)\s*/i, '');
+  const details = speakable(safeText(note, 160))
+    .replace(/\[entry:[A-Za-z0-9_.:-]+\]/g, '')
+    .replace(/[.!?]+(?:\s+|$)/g, '; ').replace(/[;\s.…]+$/, '');
+  const topic = speakable(note.match(/\b(?:INV|CASE)-[A-Za-z0-9]+\b|\binvoice\s+#?\d+/i)?.[0] ?? 'this case');
+  const check = note.match(/\b(?:MAX_INSTALLMENTS|MIN_FIRST_PCT|MAX_PLAN_DAYS|FEES_NON_WAIVABLE|MAX_DISCOUNT|OVER_LIMIT|NO_PO|BANK_CHANGE_HOLD|LOOKALIKE_DOMAIN|DUPLICATE_INVOICE|PAYEE_NOT_IN_MASTER|FRAUD_RISK_HOLD)\b/)?.[0];
+  const wording = human
+    ? `${greeting}I need your passkey decision on the caller's request before we continue.`
+    : check
+      ? `${greeting}${record.correction ? `I need another look at ${topic}` : `I’m sending ${topic} your way`}, with a note about ${speakable(check)}.`
+      : `${greeting}${record.correction ? 'I need another look at this' : "I’m handing this over"}${details ? `: ${details}` : ''}.`;
+  // Expansion of a rule description must still fit the existing voice contract.
+  const spoken = speakable(wording);
+  const line = Array.from(spoken).slice(0, 239).join('');
   return { handoffId: record.handoffId, sequence: record.sequence, caseDisplayId: state.displayId,
     fromAgentId: agentIdFor(record.from), toAgentId: human ? `human:${human}` : agentIdFor(record.to), fromRole: record.from,
     toRole: human ? HUMAN_DESK : record.to,
     fromVoiceRole: ROLE_VOICE[record.from], toVoiceRole: (!human && ROLE_VOICE[record.to]) || ROLE_VOICE[record.from],
     status: record.status, correction: record.correction, reason: safeText(record.reason, 120), summary,
-    line: summary || 'Handing this case over.', createdAt: record.createdAt,
+    line: line.length < spoken.length ? `${line.replace(/\s+\S*$/, '')}…` : line, createdAt: record.createdAt,
     ...(record.acceptedAt !== undefined ? { acceptedAt: record.acceptedAt } : {}),
     ...(record.completedAt !== undefined ? { completedAt: record.completedAt } : {}),
     ...(record.toActivationId || record.escalationId ? { decisionRef: record.toActivationId ?? record.escalationId } : {}),
@@ -315,6 +333,9 @@ export function handoffAudits(state: CaseState, before: readonly HandoffRow[], n
   const prior = new Map(before.map(r => [r.handoffId, r.status]));
   return state.handoffs.filter(r => prior.get(r.handoffId) !== r.status).map(r => ({
     ts: now, actor: 'code', seat: 'controller', action: `agent_handoff_${r.status}`, ruleIds: r.errorCode ? [r.errorCode] : [],
-    policyVersion: 0, refs: [state.caseId, r.handoffId], route: 'agent', inputs: { ...toPublicHandoff(state, r) },
+    policyVersion: 0, refs: [state.caseId, r.handoffId], route: 'agent', inputs: { ...toPublicHandoff(state, r),
+      // Audit evidence keeps its original technical wording; only the office/TTS
+      // projection uses conversational speech.
+      line: safeText(r.summary, 160) || 'Handing this case over.' },
     latencyMs: 0, costUsd: 0 }));
 }

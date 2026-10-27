@@ -1,0 +1,14 @@
+{
+  "network": "eip155:84532",
+  "payer": "0x07d9Ba3B202Aa079DBFa8D8eD52c4F75DC551DB3",
+  "authorizationNonce": "0x5694de0a3ae2e4af2741a9c76059e5b87ee5910a999e30313345de3638315129",
+  "authorizationUsed": false,
+  "balanceAtomic": "1000000",
+  "balanceBlockNumber": "50081265",
+  "blockNumber": "50081532",
+  "blockTimestamp": "1792938175",
+  "at": "2026-10-25T14:22:55.457Z",
+  "status": "held",
+  "transaction": null,
+  "errorReason": "invalid_exact_evm_transaction_failed"
+}
