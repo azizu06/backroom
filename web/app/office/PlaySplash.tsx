@@ -37,7 +37,7 @@ export function PlaySplash({ onEnter, onOverview }: { onEnter: () => void; onOve
     <div className='play-splash-card'>
       <img src='/icon.png' alt='' />
       <p className='play-splash-kicker'>Enter the office</p>
-      <h2 id={titleId}>Backroom</h2>
+      <h2 id={titleId}>Backrooms</h2>
       <p className='play-splash-pitch'>Walk the floor of an AI back office: agents work, policy decides, and every receipt is on the wall.</p>
       <button type='button' className='play-splash-enter' onClick={onEnter}>Enter</button>
       <ul className='play-splash-controls' aria-label='Controls'>

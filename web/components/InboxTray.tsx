@@ -118,6 +118,10 @@ export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets
     event.preventDefault();
     route({ presetId: '', kind, senderDomain: sender, text, attachment });
   }
+  const presetCategories = [
+    { kind: 'invoice', title: 'Invoices', items: presets.filter(preset => preset.kind === 'invoice') },
+    { kind: 'email', title: 'Bank change emails', items: presets.filter(preset => preset.kind !== 'invoice') },
+  ];
   const field = receipt?.fields;
   const quote = receipt && 'quote' in receipt.decision ? receipt.decision.quote : undefined;
   const reason = receipt && 'reason' in receipt.decision ? receipt.decision.reason : undefined;
@@ -127,16 +131,22 @@ export function InboxTray({ presets = [], headingLevel = 1, actions }: { presets
   const fileHelp = `${uid}-file-help`, fileErrorId = `${uid}-file-error`;
   return <section className="inbox-tray" aria-labelledby={`${uid}-title`}>
     <header className="inbox-heading">
-      <Title id={`${uid}-title`} className="inbox-title">Inbox</Title>
+      {/* Embedded in the office, the sheet header already says "Inbox"; keep the name for assistive tech only. */}
+      <Title id={`${uid}-title`} className={headingLevel === 3 ? 'inbox-title inbox-sr' : 'inbox-title'}>Inbox</Title>
       {actions}
       <p>Vendor bills and emails land here. Code checks every one before anything gets paid.</p>
     </header>
     <div className="inbox-presets" role="group" aria-label="Planted scenarios">
-      {presets.map(preset => <button key={preset.id} type="button" className="inbox-card" disabled={busy}
-        aria-pressed={presetId === preset.id} onClick={() => runPreset(preset)}>
-        <strong>{preset.label}</strong>
-        <span>{preset.kind === 'invoice' ? `Invoice #${preset.id}` : 'Bank change email'}</span>
-      </button>)}
+      {presetCategories.map(({ kind: group, title, items }) => items.length > 0 && <div key={group} className="inbox-category">
+        <p className="inbox-category-title">{title}<span>{items.length}</span></p>
+        <div className="inbox-list">
+          {items.map(preset => <button key={preset.id} type="button" className="inbox-card" disabled={busy}
+            aria-pressed={presetId === preset.id} onClick={() => runPreset(preset)}>
+            <strong>{preset.label}</strong>
+            <span>{preset.kind === 'invoice' ? `#${preset.id}` : 'Email'}</span>
+          </button>)}
+        </div>
+      </div>)}
     </div>
     <section className="inbox-result" aria-labelledby={`${uid}-decision`} aria-live="polite" aria-busy={busy} ref={result} tabIndex={-1}>
       <Sub id={`${uid}-decision`}>Decision receipt</Sub>

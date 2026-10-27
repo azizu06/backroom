@@ -181,11 +181,11 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   function chooseView(next: ViewMode) {
     saveStartView(next === 'play' ? 'play' : 'overview'); setLookOnEnter(false); pickMode(next);
   }
-  // First person has its own Play button, so the camera list holds only the overhead views; while playing it reads "First person".
+  // First person has its own Play button, so the camera list holds only the overhead views; while playing it reads "First Person".
   const pickedView = mode;
   function viewPicker(id: string, ref?: RefObject<HTMLSelectElement | null>) {
     return <select ref={ref} id={id} aria-label='Office view' value={pickedView} onChange={e => chooseView(e.target.value as ViewMode)}>
-      {mode === 'play' && <option value='play' disabled>First person</option>}
+      {mode === 'play' && <option value='play' disabled>First Person</option>}
       {VIEW_OPTIONS.map(option => <option key={option.mode} value={option.mode}>{option.label}</option>)}
     </select>;
   }
@@ -459,7 +459,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       </section>}</>);
   const workdayContent = snapshot.connection !== 'replay' && <WorkdayPanel />;
   const handoffContent = (<ViewBoundary name='Handoff log' resetKey={snapshot.handoffs} fallback={<p role='status'>Handoff log unavailable.</p>}><HandoffLog /></ViewBoundary>);
-  const inboxContent = (<>{inboxTray ? <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'><h2>Lobby Inbox Tray · {snapshot.inboxCount}</h2>
+  const inboxContent = (<>{inboxTray ? <section id='office-inbox-tray' className='office-audit' aria-label='Lobby inbox tray' data-office-mount='inbox'>
         <ViewBoundary name='Inbox tray' resetKey={snapshot} fallback={<p role='status'>Inbox unavailable · the tray could not be displayed.</p>}>{inboxTray}</ViewBoundary>
       </section> : <p className='detail-sheet-empty' role='status'>No inbox tray in this scene.</p>}</>);
   function openLinkedSheet(event: MouseEvent) {
@@ -572,7 +572,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {mode === 'play' && menu && (() => { const content = menuContent(menu.pick, menu.opener); return <OverviewMenu key={JSON.stringify(menu.pick)} {...content} at={menu.at} close={closeMenu} />; })()}
       {mode === 'play' && talk && <PlayPanelDialog snapshot={snapshot} target={{ kind: 'agent', id: talk.id }} close={closeTalk} askWhy={question => { setTalk(null); focusAskWhy(question); }} />}
       <div className='office-caption'>{lostContext ? '3D unavailable · floor plan active' : plan ? 'Floor plan · same subscribed state' : storyActive ? 'Judge tour · ←/→ chapters · Space pause · Esc exit' : mode === 'play' ? touch ? PLAY_TOUCH_HINT : PLAY_HINT : touring ? tour ? tourCaption(tour.index, tour.stops) : 'Tour' : isFixedCamera(mode)
-        ? <button type='button' style={{ pointerEvents: 'auto', font: 'inherit', color: 'inherit', background: 'transparent', border: 0, padding: 0 }} onClick={() => (fullscreen ? document.getElementById('office-view-fullscreen') : viewSelect.current)?.focus()}>Fixed camera · pick Orbit camera to look around</button>
+        ? <button type='button' style={{ pointerEvents: 'auto', font: 'inherit', color: 'inherit', background: 'transparent', border: 0, padding: 0 }} onClick={() => (fullscreen ? document.getElementById('office-view-fullscreen') : viewSelect.current)?.focus()}>Fixed Camera · pick Orbit Camera to look around</button>
         : 'Drag to look around · choose a room to focus'}</div>
       <p className='visually-hidden' role='status' aria-live='polite'>{tourStop ? `Tour stop: ${OFFICE_ANCHORS[tourStop].name}` : ''}</p>
       {touring && <button type='button' className='tour-stop' onClick={stopTour}>Stop tour</button>}

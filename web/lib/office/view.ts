@@ -4,7 +4,7 @@ export type ViewMode = "walk" | "tween" | "plan" | "tour" | "play";
 /** The office view menu, in order. A new view mode adds its ViewMode member above and one entry here. */
 export const VIEW_OPTIONS: readonly { readonly mode: ViewMode; readonly label: string }[] = [
   { mode: "walk", label: "Orbit Camera" },
-  { mode: "tween", label: "Fixed camera" },
+  { mode: "tween", label: "Fixed Camera" },
   { mode: "plan", label: "Floor Plan" },
   { mode: "tour", label: "Tour" },
 ];

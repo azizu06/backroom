@@ -70,7 +70,7 @@ export function OverviewMap({ snapshot, motions, open, onPick, onFirstPerson, on
     <header className='overview-map-head'>
       <div><h2 id={headingId}>Office Overview</h2><p>Click a room: go there in first person, or talk to its agent.</p></div>
       <div className='overview-map-actions'>
-        <button type='button' className='overview-map-fp' aria-keyshortcuts='O' onClick={onFirstPerson}>First person <kbd>O</kbd></button>
+        <button type='button' className='overview-map-fp' aria-keyshortcuts='O' onClick={onFirstPerson}>First Person <kbd>O</kbd></button>
         <button type='button' onClick={onClose} aria-label='Close overview'>Close <kbd>Esc</kbd></button>
       </div>
     </header>

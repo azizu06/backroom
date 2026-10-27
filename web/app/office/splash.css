@@ -2,7 +2,7 @@
 .office-shell .play-splash { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; padding: 24px; background: rgba(25, 33, 59, 0.28); backdrop-filter: blur(8px); color: var(--ink); font-family: var(--font-ui); animation: play-splash-in .35s ease-out both; }
 .office-shell .play-splash:focus { outline: none; }
 .play-splash-card { width: min(520px, 100%); text-align: center; background: var(--paper); border: var(--bubble-border); border-radius: 36px; padding: 32px 28px 24px; box-shadow: 0 18px 48px rgba(25, 33, 59, 0.22); animation: play-splash-rise .45s cubic-bezier(.34, 1.56, .64, 1) both; }
-.play-splash-card img { display: block; width: 64px; height: 64px; margin: 0 auto 4px; border-radius: 20px; box-shadow: 0 4px 12px rgba(25, 33, 59, 0.15); }
+.play-splash-card img { display: block; width: 64px; height: 64px; margin: 0 auto 4px; }
 .play-splash-kicker { display: inline-block; margin: 0; padding: 4px 12px; font-size: 12px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; color: var(--on-pastel); background: var(--pastel-aqua); border-radius: 999px; }
 .play-splash h2 { margin: 10px 0 8px; font-size: 44px; font-weight: 900; letter-spacing: -1px; color: var(--ink); }
 .play-splash-pitch { margin: 0 auto 22px; max-width: 400px; font-size: 15px; font-weight: 700; color: var(--ink-soft); }

@@ -307,7 +307,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       const inboxTab = drawer.getByRole('tab', { name: /^Inbox/ });
       await expect(inboxTab).toBeFocused();
       const inbox = drawer.getByRole('tabpanel', { name: /^Inbox/ });
-      await expect(inbox.getByRole('heading', { name: /^Lobby Inbox Tray/ })).toBeVisible();
+      await expect(inbox.getByRole('region', { name: 'Lobby inbox tray' })).toBeVisible();
       // Make overflow deterministic without relying on a live workday's inbox length.
       // The node identity also catches a hidden tab being unmounted and fetched again.
       await inbox.evaluate(element => {
