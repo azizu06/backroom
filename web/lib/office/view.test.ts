@@ -12,7 +12,7 @@ Object.assign(globalThis, { React });
 
 describe("office camera picker", () => {
   it("offers distinct fixed and orbit cameras and an explicit pick leaves the fixed default", () => {
-    expect(VIEW_OPTIONS).toContainEqual({ mode: "tween", label: "Fixed camera" });
+    expect(VIEW_OPTIONS).toContainEqual({ mode: "tween", label: "Fixed Camera" });
     expect(VIEW_OPTIONS).toContainEqual({ mode: "walk", label: "Orbit Camera" });
     expect(new Set(VIEW_OPTIONS.map(option => option.mode)).size).toBe(VIEW_OPTIONS.length);
     const orbit = viewportReducer(INITIAL_VIEWPORT, { type: "pick", mode: "walk" });
@@ -24,9 +24,9 @@ describe("office camera picker", () => {
   it("renders the real fixed default as the selected option with an actionable caption", () => {
     const html = renderToStaticMarkup(React.createElement(MockOffice));
     const select = html.slice(html.indexOf('id="office-view"'), html.indexOf('</select>'));
-    expect(select).toContain('<option value="tween" selected="">Fixed camera</option>');
+    expect(select).toContain('<option value="tween" selected="">Fixed Camera</option>');
     expect(select).not.toContain('<option value="walk" selected="">');
-    expect(html).toContain('Fixed camera · pick Orbit camera to look around</button>');
+    expect(html).toContain('Fixed Camera · pick Orbit Camera to look around</button>');
     expect(html).not.toContain('Drag to look around');
   });
 });

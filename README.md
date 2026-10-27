@@ -35,7 +35,7 @@ Built at **Cal Hacks 13.0** by **Abduaziz Umarov, Tomiwa Aluko, Diego Mendoza an
 
 <a id="inspiration"></a>
 
-## From inbox to audit wall
+## From Inbox To Audit Wall
 
 A client asks to split an overdue invoice into seven payments, with 15% up front. The Collections agent can discuss the request, but it cannot grant itself a larger limit. Policy escalates the plan to Dana, the owner. Her passkey decision lets the call continue with the exact approved terms. A payment link carries that amount to the pay page; reconciliation checks the deposit against the invoice.
 
@@ -45,7 +45,7 @@ Meanwhile, a lookalike vendor email asks to change bank details. Payables holds 
 
 <a id="features"></a>
 
-## What you can do
+## What You Can Do
 
 | Experience | How it works |
 | --- | --- |
@@ -59,7 +59,7 @@ Meanwhile, a lookalike vendor email asks to change bank details. Payables holds 
 
 <a id="architecture"></a>
 
-## The whole system
+## The Whole System
 
 **The browser shows the work. The orchestrator coordinates it. Policy and passkeys control what can happen. SpacetimeDB records the transitions.**
 
@@ -122,7 +122,7 @@ The GX10 serves local models for routine work, including extraction. Cloud route
 
 <a id="getting-started"></a>
 
-## Run it
+## Run It
 
 You need **Node.js 22+ and pnpm**. The repository pins its package-manager version in `package.json`.
 
@@ -172,7 +172,7 @@ A configured service is not a completed call or payment. Use only authorized tes
 
 <a id="highlights"></a>
 
-## The receipts
+## The Receipts
 
 | Evidence | What it establishes |
 | --- | --- |
@@ -187,7 +187,7 @@ Backrooms is a hackathon prototype using a synthetic company. The sections below
 
 <a id="docs"></a>
 
-## Inside the repo
+## Inside The Repo
 
 | Area | Entry point | Guide |
 | --- | --- | --- |
@@ -200,9 +200,9 @@ Backrooms is a hackathon prototype using a synthetic company. The sections below
 | Synthetic data and evaluation | `fixtures/`, `docs/eval/` | [Scoreboard](docs/eval/scoreboard.md) · [Red team](docs/redteam.md) |
 | Team coordination | `tools/board`, `AGENTS.md` | [Board setup](docs/team-board.md) · [Team contract](AGENTS.md) |
 
-## Integration notes
+## Integration Notes
 
-## Cartesia setup features and limitations
+## Cartesia Setup Features And Limitations
 
 Cartesia Managed Agents provide the collections conversation and server-gated
 webhook tools; role-specific TTS makes responsibility handoffs audible. Code
@@ -225,7 +225,7 @@ the T1 document. A full phone-to-human-approval-to-bank flow needs its own trace
 Narration, cached audio, or a queued link cannot establish that flow. No new
 Cartesia request was made to prepare this README.
 
-## Apify: Best Use and Best Actor
+## Apify: Best Use And Best Actor
 
 [Client Health Check](https://apify.com/azizu/client-health-check) is our public
 Actor for both Best Use of Apify and Best Actor. Its
@@ -235,7 +235,7 @@ normalize supplied Maps observations and phone comparisons; it does not discover
 businesses or launch Maps scrapers. The [retained evidence](docs/evidence/apify/README.md)
 separates the historical website-only run from the later public-visibility check.
 
-## Real versus simulated
+## Real Versus Simulated
 
 | Component | What it demonstrates | Boundary to preserve |
 | --- | --- | --- |
@@ -252,7 +252,7 @@ See the [sponsor evidence checklist](docs/sponsor-deliverables.md) before copyin
 claims into a pitch. The [synthetic eval recheck](docs/evidence/eval/current-main-windows-2026-10-24.md)
 reports answer-key matches and explicitly unexecuted operations separately.
 
-## CRS data handling
+## CRS Data Handling
 
 Use only sponsor-provided sandbox identities. Server-side credentials stay in
 ignored environment files. The client projects typed summaries plus response
@@ -282,7 +282,7 @@ that credentialed wiring receipt remains pending in the sponsor checklist.
 This documentation does not enable or change either integration.
 
 
-## SpacetimeDB architecture
+## SpacetimeDB Architecture
 
 SpacetimeDB owns live state and reducer-enforced transitions. The orchestrator
 performs external I/O and applies policy; the office subscribes to state and
@@ -315,10 +315,10 @@ that the whole phone, human-approval and bank flow has been live-tested.
 
 ---
 
-## Built by
+<h2 align="center">Built By</h2>
 
-[**Abduaziz Umarov**](https://devpost.com/azizu06) · [**Tomiwa Aluko**](https://devpost.com/tomiwaaluko) · [**Diego Mendoza**](https://devpost.com/Diego-L-Mendoza) · [**Anthony Terry**](https://devpost.com/MarioTeachesTyping)
+<p align="center"><a href="https://devpost.com/azizu06"><b>Abduaziz Umarov</b></a> · <a href="https://devpost.com/tomiwaaluko"><b>Tomiwa Aluko</b></a> · <a href="https://devpost.com/Diego-L-Mendoza"><b>Diego Mendoza</b></a> · <a href="https://devpost.com/MarioTeachesTyping"><b>Anthony Terry</b></a></p>
 
-Built at Cal Hacks 13.0. [Watch the demo](https://youtu.be/dm1FlQTZYT8) · [Read the project story](https://devpost.com/software/backrooms-h4o783).
+<p align="center">Built at Cal Hacks 13.0. <a href="https://youtu.be/dm1FlQTZYT8">Watch the demo</a> · <a href="https://devpost.com/software/backrooms-h4o783">Read the project story</a>.</p>
 
 <p align="center"><strong>Every case has a desk. Every decision has a receipt.</strong></p>

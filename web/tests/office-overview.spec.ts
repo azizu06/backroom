@@ -118,7 +118,7 @@ test.describe('explicit orbit camera with reduced motion', () => {
     const select = page.getByLabel('Office view');
     const caption = page.locator('.office-caption');
     await expect(select).toHaveValue('tween');
-    await expect(caption).toHaveText('Fixed camera · pick Orbit camera to look around');
+    await expect(caption).toHaveText('Fixed Camera · pick Orbit Camera to look around');
     await caption.getByRole('button').click();
     await expect(select).toBeFocused();
     await select.selectOption('walk');
@@ -126,7 +126,7 @@ test.describe('explicit orbit camera with reduced motion', () => {
     await select.selectOption('plan');
     await expect(caption).toHaveText('Floor plan · same subscribed state');
     await select.selectOption('tween');
-    await expect(caption).toHaveText('Fixed camera · pick Orbit camera to look around');
+    await expect(caption).toHaveText('Fixed Camera · pick Orbit Camera to look around');
     await page.getByRole('button', { name: 'Full Screen', exact: true }).click();
     await caption.getByRole('button').click();
     await expect(page.locator('#office-view-fullscreen')).toBeFocused();

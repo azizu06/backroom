@@ -60,7 +60,7 @@ describe('office layout ownership', () => {
     expect(html).not.toContain('data-fullscreen');
     expect(html).toContain('>Play (First Person)</button>');
     const views = html.slice(html.indexOf('id="office-view"'), html.indexOf('</select>', html.indexOf('id="office-view"')));
-    expect(views).toContain('Fixed camera');
+    expect(views).toContain('Fixed Camera');
     expect(views).not.toContain('value="play"');
     const help = html.slice(html.indexOf('aria-label="Help"'), html.indexOf('</aside>'));
     expect(help).toContain('>Help</button>');

@@ -17,7 +17,7 @@ it('accepts only the voice path with a well-formed viewer id', () => {
   expect(acceptKey('dGhlIHNhbXBsZSBub25jZQ==')).toBe('s3pPLMBiTxaQ9kYGzzhZRbK+xOo=');
 });
 
-it('reads masked client frames split across chunks and rejects fragmented ones', () => {
+it('reads masked client frames split across chunks, reassembles fragments and rejects stray continuations', () => {
   const frames: [number, string][] = [];
   const read = createFrameReader((opcode, payload) => frames.push([opcode, payload.toString()]));
   const mask = Buffer.from([1, 2, 3, 4]), payload = Buffer.from('hello');
@@ -26,7 +26,13 @@ it('reads masked client frames split across chunks and rejects fragmented ones',
   expect(read(frame.subarray(0, 3))).toBe(true);
   expect(read(frame.subarray(3))).toBe(true);
   expect(frames).toEqual([[2, 'hello']]);
-  expect(createFrameReader(() => {})(Buffer.from([0x02, 0x00]))).toBe(false);
+  const parts: [number, string][] = [];
+  const reassemble = createFrameReader((opcode, payload) => parts.push([opcode, payload.toString()]));
+  expect(reassemble(Buffer.concat([Buffer.from([0x02, 2]), Buffer.from('he')]))).toBe(true);
+  expect(parts).toEqual([]);
+  expect(reassemble(Buffer.concat([Buffer.from([0x80, 3]), Buffer.from('llo')]))).toBe(true);
+  expect(parts).toEqual([[2, 'hello']]);
+  expect(createFrameReader(() => {})(Buffer.from([0x00, 0x00]))).toBe(false);
   expect(encodeFrame(2, Buffer.alloc(300)).subarray(0, 4)).toEqual(Buffer.from([0x82, 126, 1, 44]));
 });
 

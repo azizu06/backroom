@@ -3,7 +3,7 @@ import { openMenu } from './office-menu';
 
 // Run via test:office:browser after building the web app. Play needs WebGL.
 const surface = (page: Page) => page.getByRole('application', { name: /First-person office/ });
-const splash = (page: Page) => page.getByRole('dialog', { name: 'Backroom' });
+const splash = (page: Page) => page.getByRole('dialog', { name: 'Backrooms' });
 
 test('/office opens on the Enter the office splash and Enter starts first person', async ({ page }) => {
   const errors: string[] = [];
@@ -11,7 +11,7 @@ test('/office opens on the Enter the office splash and Enter starts first person
   await page.goto('/office');
   const gate = splash(page);
   await expect(gate).toBeVisible();
-  await expect(gate.getByRole('heading', { name: 'Backroom' })).toBeVisible();
+  await expect(gate.getByRole('heading', { name: 'Backrooms' })).toBeVisible();
   await expect(gate).toContainText('Enter the office');
   for (const control of ['WASD / arrows', 'Mouse or drag', 'interact', 'map', 'Esc']) await expect(gate).toContainText(control);
   await expect(gate.getByRole('button', { name: 'Overview (map view)' })).toBeVisible();

@@ -157,7 +157,7 @@ test('tickets are mounted at spawn and the nearby E prompt opens the existing in
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/office?view=play');
   await requireWebGL(page);
-  const gate = page.getByRole('dialog', { name: 'Backroom', exact: true });
+  const gate = page.getByRole('dialog', { name: 'Backrooms', exact: true });
   await expect(gate).toBeVisible();
   await gate.getByRole('button', { name: 'Enter', exact: true }).click();
   await expect(surface(page)).toBeFocused();
