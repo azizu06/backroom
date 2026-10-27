@@ -1,0 +1,15 @@
+.party-control { position: relative; display: inline-flex; }
+.office-tools .party-button { white-space: nowrap; }
+.office-tools .party-button[data-hosting] { background: var(--pastel-mint, #cdeedd); border-color: var(--office-navy); }
+.party-guest-chip { padding: 4px 10px; font-size: 12px; font-weight: 800; white-space: nowrap; color: var(--office-navy); background: var(--office-cream); border: 1px dashed var(--office-navy); border-radius: 999px; }
+.party-panel { position: fixed; z-index: 60; display: grid; gap: 10px; width: min(320px, calc(100vw - 32px));
+  padding: 14px; color: var(--ink); background: var(--page-bg, #fffdf6); border: 1px solid var(--office-lavender); border-radius: 16px; box-shadow: 0 12px 32px rgb(20 30 50 / 18%); }
+.party-panel p { margin: 0; font-size: 13px; line-height: 1.4; }
+.party-qr { justify-self: center; border-radius: 8px; background: #fff; }
+.party-link { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 13px; }
+.party-link > span { display: grid; gap: 2px; min-width: 0; }
+.party-link small { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+.party-link a { overflow-wrap: anywhere; font-weight: 700; }
+.party-hint { color: var(--muted-ink, inherit); opacity: .8; }
+.party-error { font-weight: 700; }
+@media (max-width: 760px) { .party-panel { left: 16px !important; right: 16px; width: auto; } .party-guest-chip { font-size: 11px; } }

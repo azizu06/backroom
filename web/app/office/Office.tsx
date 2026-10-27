@@ -32,6 +32,13 @@ import { ThemeToggle } from './ThemeToggle';
 import { RainToggle } from './RainToggle';
 import { PaymentToast } from './PaymentToast';
 import { PresenceChip } from './PresenceChip';
+import { PartyControl } from './PartyControl';
+import { MicToggle } from './MicToggle';
+import { useProximityVoice } from './useProximityVoice';
+import { useScreenShare } from './useScreenShare';
+import { ScreenShare } from './ScreenShare';
+import type { PartyState } from './useParty';
+import { guestPage, partyName } from '../../lib/office/party';
 import { usePresence } from './usePresence';
 import { useProximityChat } from './useProximityChat';
 import { coworkerSpots } from '../../lib/office/targets/coworker';
@@ -126,8 +133,8 @@ const OfficeScene = dynamic(() => import('./scene').then(module => module.Office
 });
 
 /** All finance state comes through OfficeState. Commands belong to an authenticated controller. */
-export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, storyStart = false, storyPreview }: {
-  source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
+export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, storyStart = false, storyPreview, party }: {
+  party?: PartyState; source: OfficeState; controls?: ReactNode; onToggleLlm?: (enabled: boolean) => Promise<void>;
   auditWall?: ReactNode | ((snapshot: OfficeSnapshot, focus: (anchor: AnchorId) => void) => ReactNode); inboxTray?: ReactNode; storyStart?: boolean; storyPreview?: (preview: StoryChapter['preview']) => void;
 }) {
   const received = useSyncExternalStore(source.subscribe, source.getSnapshot, () => INITIAL_OFFICE);
@@ -149,17 +156,26 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
   const [play] = useState((): PlayBridge & { hud: { current: HTMLDivElement | null }; coworkers: { current: readonly CoworkerSpot[] }; entry: { current: PlayEntry | null }; last: { current: PlayEntry | null } } => ({
     input: new PlayInput(), onTarget: setPlayTarget, hud: { current: null }, coworkers: { current: [] }, entry: { current: null }, last: { current: null },
   }));
-  const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection });
+  // Host party (live demo host only): guests watch; acting controls are hidden here and refused by the host.
+  const partyRole = party?.status.role ?? 'none';
+  const guest = partyRole === 'guest';
+  const nameFor = useCallback((viewerId: string) => partyName(partyRole, viewerId), [partyRole]);
+  const presence = usePresence({ mode, hud: play.hud, source, connectionMode: snapshot.connection, auto: guest || !!party?.status.hosting, nameFor });
   play.coworkers.current = coworkerSpots(presence.peers);
   const { setEnabled: setPresence } = presence;
   const showCoworkers = useCallback(() => setPresence(true), [setPresence]);
-  const chat = useProximityChat({ active: mode === 'play' && presence.enabled, hud: play.hud, selfId: presence.selfId, presence: presence.enabled, showCoworkers });
+  // Proximity voice needs the demo host's relay, which is where a party runs.
+  const voice = useProximityVoice({ selfId: presence.selfId, peers: presence.peers, hud: play.hud, play: mode === 'play' });
+  const screens = useScreenShare({ enabled: partyRole !== 'none', selfId: presence.selfId, selfName: presence.selfName, hud: play.hud, play: mode === 'play' });
+  const chat = useProximityChat({ active: mode === 'play' && presence.enabled, hud: play.hud, selfId: presence.selfId, selfName: presence.selfName, presence: presence.enabled, showCoworkers });
   const prePlay = useRef<ViewMode>('walk');
   useEffect(() => { if (mode !== 'play') prePlay.current = mode; }, [mode]);
   function exitPlay() { saveStartView('overview'); setLookOnEnter(false); flushSync(() => pickMode(prePlay.current)); document.getElementById('office-view')?.focus(); }
   // AJ shows the first-visit splash once per session; Enter supplies the Play gesture.
   const [splash, setSplash] = useState(false);
   const [lookOnEnter, setLookOnEnter] = useState(false);
+  // A guest who just joined gets the same Enter-to-play splash, so they spawn walking in the office.
+  useEffect(() => { if (guest) setSplash(true); }, [guest]);
   function enterPlay() { setSplash(false); saveStartView('play'); setLookOnEnter(true); pickMode('play'); }
   function enterOverview() { setSplash(false); saveStartView('overview'); }
   function chooseView(next: ViewMode) {
@@ -408,7 +424,9 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     const opener = drawerOpener.current;
     (opener?.isConnected && !opener.closest('#office-drawer') ? opener : drawerToggle.current)?.focus();
   }
+  const pagesOf = (group: typeof SIDEBAR_GROUPS[number]) => guest ? group.pages.filter(guestPage) : group.pages;
   function openSheet(next: DetailSheetId) {
+    if (guest && isPageSheet(next) && !guestPage(next)) return;
     if (mode === 'play' && (next === 'inbox' || next === 'audit')) {
       document.exitPointerLock?.();
       drawerOpener.current = (document.activeElement as HTMLElement | null) ?? null;
@@ -465,10 +483,11 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
         <button type='button' aria-pressed={sheet === 'audit'} onClick={() => openSheet('audit')}><span className='room-icon' aria-hidden='true'><OfficeChromeIcon name='audit' /></span>Audit Wall</button>
       </nav>
       <nav className='office-sidebar-links' aria-label='Site pages'>
-        {SIDEBAR_GROUPS.map(group => {
-          const ready = group.pages.includes(PAYMENT_LINK_HREF) && !!paymentLink;
-          return <button key={group.id} type='button' aria-haspopup='dialog' aria-pressed={isPageSheet(sheet) && group.pages.includes(sheet)} data-group={group.id} data-ready={ready || undefined}
-            title={group.hint} onClick={() => openSheet(ready ? PAYMENT_LINK_HREF : group.pages[0]!)}>
+        {SIDEBAR_GROUPS.filter(group => pagesOf(group).length > 0).map(group => {
+          const pages = pagesOf(group);
+          const ready = pages.includes(PAYMENT_LINK_HREF) && !!paymentLink;
+          return <button key={group.id} type='button' aria-haspopup='dialog' aria-pressed={isPageSheet(sheet) && pages.includes(sheet)} data-group={group.id} data-ready={ready || undefined}
+            title={group.hint} onClick={() => openSheet(ready ? PAYMENT_LINK_HREF : pages[0]!)}>
             <span className='room-icon' aria-hidden='true'><OfficeChromeIcon name={group.icon} /></span>{group.label}{ready && <span className='office-sidebar-ready'> · Pay Ready</span>}
           </button>;
         })}
@@ -489,12 +508,13 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           <button ref={mapButton} type='button' className='office-map-button' aria-expanded={mapOpen} onClick={() => { document.exitPointerLock?.(); if (mapOpen) closeMap(); else setMapOpen(true); }}>Map</button>
         </>}
         <OfficeHelp />
-        {snapshot.connection !== 'replay' && <StartWorkdayButton />}
+        {snapshot.connection !== 'replay' && !guest && <StartWorkdayButton />}
         <span className='connection-status' role='status'>{snapshot.connection === 'preview' ? 'Local State' : snapshot.connection === 'replay' ? 'REPLAY · Recorded State' : snapshot.connection === 'live' ? 'State Connected' : `State ${snapshot.connection}`}</span>
+        {party && <PartyControl party={party} />}
         <PresenceChip enabled={presence.enabled} setEnabled={presence.setEnabled} peers={presence.peers} selfName={presence.selfName} mode={mode === 'play' ? 'play' : touring ? 'tour' : 'overview'} />
-        <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
+        {!guest && <fieldset disabled={!onToggleLlm || snapshot.connection !== 'live'} className='llm-control'>
           <LlmToggle llmEnabled={snapshot.llmEnabled} onToggle={onToggleLlm ?? (async () => { throw new Error('Controller transport required'); })} />
-        </fieldset>
+        </fieldset>}
       </div>
     </header>
     <ThemeToggle onThemeChange={setTheme} />
@@ -502,6 +522,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
     <div ref={element => { viewportRef.current = element; viewportBox.current = element; }} className='office-viewport' data-testid='office-viewport' data-overview={overview || undefined}>
       <div className='office-view-controls'>
         <SoundToggle snapshot={snapshot} />
+        {partyRole !== 'none' && <MicToggle state={voice.state} toggle={voice.toggle} level={voice.speaking[presence.selfId] ?? 0} />}
         <button type='button' className='office-fullscreen-toggle' aria-pressed={fullscreen} aria-label={fullscreen ? 'Exit Full Screen' : 'Full Screen'} title={fullscreen ? 'Exit Full Screen (Esc)' : 'Full Screen'} onClick={toggleFullscreen}>
           <svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'>
             {fullscreen ? <path d='M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' /> : <path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5' />}
@@ -533,7 +554,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
           {/* Keyed by attempt: picking a view after a lost context builds a fresh Canvas and WebGL context.
               Kept mounted while lost so `webglcontextrestored` can bring this attempt back. */}
           <div key={layers.scene.key} style={{ position: 'absolute', inset: 0, visibility: layers.scene.visible ? undefined : 'hidden' }} aria-hidden={!layers.scene.visible || undefined}>
-            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? playView : undefined} presence={presence.peers} chatBubbles={chat.bubbles} onPick={overview ? onScenePick : undefined} />
+            <OfficeScene snapshot={snapshot} motions={motions} fixed={isFixedCamera(mode)} tour={touring || storyActive} paused={!layers.scene.visible} focus={focus} agentTag={agentTag} onFailure={onFailure} onRestored={onRestored} play={mode === 'play' ? playView : undefined} presence={presence.peers} chatBubbles={chat.bubbles} speaking={voice.speaking} onPick={overview ? onScenePick : undefined} />
           </div>
           {/* The Full Floor summary announces every name and state (seatLabel). */}
           {!layers.floorPlan && <div className='agent-tags' aria-hidden='true'>{snapshot.agents.map(agent => <div key={agent.id} className='agent-tag' data-agent-tag={agent.id}
@@ -558,6 +579,7 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       {storyActive && <StoryMode key={chapters.length} chapters={chapters} onChapter={changeStoryChapter} onExit={closeStory} onPreview={storyPreview} reduced={reducedMotion} snapshot={snapshot} />}
       {snapshot.connection === 'disconnected' && <div className='office-disconnected' role='alert'>Connection lost. Last received state is shown; model control is disabled.</div>}
       <PaymentToast snapshot={snapshot} />
+      <ScreenShare share={screens} />
     </div>
     </div>
     {inspecting && <RoomInspector room={inspecting} snapshot={snapshot} close={closeInspector} inboxTray={inboxTray} openSheet={openSheet} />}
@@ -569,11 +591,12 @@ export function Office({ source, controls, onToggleLlm, auditWall, inboxTray, st
       const group = groupOf(sheet);
       const title = pageLabel(sheet);
       const steps = PAGE_STEPS[sheet];
-      const tabbed = group.pages.length > 1;
+      const pages = pagesOf(group);
+      const tabbed = pages.length > 1;
       // Keyed by group: switching tabs keeps the dialog (and focus) instead of reopening it.
       return <DetailSheet key={group.id} title={group.label} icon={group.icon} size='wide' page={sheet.slice(1)} onClose={closeSheet}>
         {tabbed && <div className='sheet-tabs' role='tablist' aria-label={group.label}>
-          {group.pages.map(href => <button key={href} type='button' role='tab' id={`sheet-tab-${href.slice(1)}`} aria-selected={href === sheet} aria-controls='sheet-tab-panel'
+          {pages.map(href => <button key={href} type='button' role='tab' id={`sheet-tab-${href.slice(1)}`} aria-selected={href === sheet} aria-controls='sheet-tab-panel'
             data-ready={(href === PAYMENT_LINK_HREF && !!paymentLink) || undefined} onClick={() => setSheet(href)}>
             <OfficeChromeIcon name={PAGE_ICONS[href]} />{pageLabel(href)}{href === PAYMENT_LINK_HREF && paymentLink && <span className='office-sidebar-ready'> · Ready</span>}
           </button>)}

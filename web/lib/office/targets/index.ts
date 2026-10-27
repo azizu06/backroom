@@ -4,6 +4,7 @@
  */
 import { agentTarget } from "./agent";
 import { coworkerTarget } from "./coworker";
+import { workstationTarget } from "./workstation";
 import { deskTarget } from "./desk";
 import { handoffTarget } from "./handoff";
 import { inboxTarget } from "./inbox";
@@ -25,6 +26,7 @@ export const PLAY_TARGETS = [
   phoneTarget,
   serverTarget,
   coworkerTarget,
+  workstationTarget,
   inboxTarget,
   doorTarget,
   folderTarget,

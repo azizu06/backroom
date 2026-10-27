@@ -5,6 +5,7 @@ import { Ambient } from './Ambient';
 import { TreasuryDeny } from './TreasuryDeny';
 import { ContactDynamic } from '../ContactShadows';
 import { DeskMonitors } from './DeskMonitors';
+import { ScreenMonitors } from './ScreenMonitors';
 import { Whiteboard } from './Whiteboard';
 import { DeskPhone } from './DeskPhone';
 
@@ -19,6 +20,7 @@ export function OfficeProps({ snapshot }: { snapshot: OfficeSnapshot }) {
     <Ambient snapshot={snapshot} />
     <ContactDynamic name='prop:treasury-deny-moment'><TreasuryDeny snapshot={snapshot} /></ContactDynamic>
     <DeskMonitors snapshot={snapshot} />
+    <ScreenMonitors />
     <DeskPhone snapshot={snapshot} />
   </>;
 }

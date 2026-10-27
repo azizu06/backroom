@@ -6,7 +6,8 @@ import { createBroadcastPresence, createSpacetimePresence, presenceTransportKind
 import type { OfficeSnapshot, OfficeState } from '../../lib/office/state';
 import type { ViewMode } from '../../lib/office/view';
 
-export function usePresence({ mode, hud, source, connectionMode }: { mode: ViewMode; hud: { current: HTMLDivElement | null }; source: OfficeState & PresenceSource; connectionMode: OfficeSnapshot['connection'] }) {
+/** `auto` turns presence on (hosting a party, or joining one); `nameFor` replaces the random viewer name (keep it stable). */
+export function usePresence({ mode, hud, source, connectionMode, auto = false, nameFor }: { mode: ViewMode; hud: { current: HTMLDivElement | null }; source: OfficeState & PresenceSource; connectionMode: OfficeSnapshot['connection']; auto?: boolean; nameFor?: (viewerId: string) => string | undefined }) {
   const [enabled, setEnabled] = useState(false);
   const [peers, setPeers] = useState<PresencePeer[]>([]);
   const id = useRef('');
@@ -14,6 +15,7 @@ export function usePresence({ mode, hud, source, connectionMode }: { mode: ViewM
     id.current = getViewerId();
     setEnabled(new URLSearchParams(location.search).get('presence') === '1');
   }, []);
+  useEffect(() => { if (auto) setEnabled(true); }, [auto]);
   useEffect(() => {
     if (!enabled || connectionMode === 'replay' || isReplayPage()) { setPeers([]); return; }
     const connection = source.getPresenceConnection?.();
@@ -29,7 +31,7 @@ export function usePresence({ mode, hud, source, connectionMode }: { mode: ViewM
       const x = mode === 'play' ? Number(hud.current?.dataset.playerX ?? -5) : 0;
       const z = mode === 'play' ? Number(hud.current?.dataset.playerZ ?? 0.9) : 0;
       const yaw = mode === 'play' ? Number(hud.current?.dataset.playerYaw ?? 0) : 0;
-      const self: PresencePeer = { viewerId: id.current, name: viewerName(id.current), color: viewerColor(id.current), x, z, yaw,
+      const self: PresencePeer = { viewerId: id.current, name: nameFor?.(id.current) ?? viewerName(id.current), color: viewerColor(id.current), x, z, yaw,
         mode: mode === 'play' ? 'play' : mode === 'tour' ? 'tour' : 'overview', at: now };
       const changed = !last || Math.hypot(self.x - last.x, self.z - last.z) > 0.12 || Math.abs(self.yaw - last.yaw) > 0.08 || self.mode !== last.mode;
       if (now - lastAt >= PRESENCE_RATE && (changed || now - lastAt >= PRESENCE_HEARTBEAT)) { transport.publish(self); last = self; lastAt = now; }
@@ -40,6 +42,6 @@ export function usePresence({ mode, hud, source, connectionMode }: { mode: ViewM
     const timer = window.setInterval(update, PRESENCE_RATE);
     update();
     return () => { window.clearInterval(timer); unsubscribe(); transport.close(); setPeers([]); };
-  }, [enabled, mode, hud, source, connectionMode]);
-  return { enabled, setEnabled, peers, selfId: id.current, selfName: viewerName(id.current) };
+  }, [enabled, mode, hud, source, connectionMode, nameFor]);
+  return { enabled, setEnabled, peers, selfId: id.current, selfName: nameFor?.(id.current) ?? viewerName(id.current) };
 }

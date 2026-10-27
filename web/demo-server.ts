@@ -12,6 +12,9 @@ import { localOperatorSessionCookie } from './lib/operator/sign-in';
 import { operatorAudit } from './lib/operator/audit';
 import { proxyStateHTTP, proxyStateUpgrade, stateProxyEnabled } from './lib/demo/state-proxy';
 import { proxyVoiceRelay } from './lib/demo/voice-proxy';
+import { createPartyHost } from './lib/demo/party';
+import { createVoiceRelay } from './lib/demo/voice-relay';
+import { createScreenRelay } from './lib/demo/screen-relay';
 
 async function main() {
   if (!['memory', 'spacetime'].includes(process.env.STATE_STORE || '')) throw new Error('DEMO_STATE_REQUIRED');
@@ -27,8 +30,21 @@ async function main() {
   const handle = app.getRequestHandler();
   const active = new Set<Promise<void>>();
   let resetting = false;
+  let boundPort = port;
+  // Proximity voice and desk screen sharing ride every listener's upgrade path; everything else stays the state socket.
+  const voice = createVoiceRelay(), screens = createScreenRelay();
+  const upgrade = (req: Parameters<typeof proxyStateUpgrade>[0], socket: Parameters<typeof proxyStateUpgrade>[1], head: Buffer) => {
+    if (!voice.upgrade(req, socket, head) && !screens.upgrade(req, socket, head)) proxyStateUpgrade(req, socket, head);
+  };
+  // Host party: an optional view-only listener on the Wi-Fi address (see lib/demo/party). The voice relay stays host-only.
+  const party = createPartyHost({ port: () => boundPort, upgrade,
+    handler: (req, res) => {
+      if (voiceRelayPath(new URL(req.url || '/', 'http://localhost').pathname) !== undefined) { res.writeHead(403).end(); return; }
+      void handler(req, res);
+    } });
   const handler: RequestListener = async (req, res) => {
     const path = new URL(req.url || '/', 'http://localhost').pathname;
+    if (await party.route(req, res)) return;
     if (path === '/__demo/ping') { res.setHeader('Cache-Control', 'no-store'); res.end(`demo ${runtime.status().bank}; ${process.env.STATE_STORE} state`); return; }
     if (path === '/__operator/session') {
       res.setHeader('Cache-Control', 'no-store');
@@ -123,12 +139,14 @@ async function main() {
     try { await handle(req, res); } catch { if (!res.headersSent) res.writeHead(500); res.end('Demo request failed'); }
   };
   const host = demoBindHost(process.env);
-  const listeners = await listenDemo(handler, port, host, (req, socket, head) => proxyStateUpgrade(req, socket, head));
+  const listeners = await listenDemo(handler, port, host, upgrade);
+  boundPort = listeners.port;
   console.log(`Demo bound: ${host}:${port}${host === '127.0.0.1' ? '' : ` and 127.0.0.1:${port}`}`);
   let closing = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
     if (closing) return; closing = true;
-    void listeners.close().then(() => runtime.stop()).then(() => app.close()).finally(() => process.exit(0));
+    voice.close(); screens.close();
+    void party.stop().then(() => listeners.close()).then(() => runtime.stop()).then(() => app.close()).finally(() => process.exit(0));
   });
   console.log(`Demo ready: shared state, ${runtime.status().bank}, no phone call placed.`);
 

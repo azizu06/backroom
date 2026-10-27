@@ -31,8 +31,8 @@ function messageId() {
  * Proximity text chat while in Play with presence on. Positions come from the Play rig's data-player-*
  * attributes on `hud`: the sender's at send time and the receiver's on arrival.
  */
-export function useProximityChat({ active, hud, selfId, presence, showCoworkers }: {
-  active: boolean; hud: { current: HTMLElement | null }; selfId: string; presence: boolean; showCoworkers: () => void;
+export function useProximityChat({ active, hud, selfId, selfName, presence, showCoworkers }: {
+  active: boolean; hud: { current: HTMLElement | null }; selfId: string; selfName?: string; presence: boolean; showCoworkers: () => void;
 }): PlayChat & { bubbles: ChatBubble[] } {
   const [log, setLog] = useState<readonly ChatEntry[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -73,12 +73,12 @@ export function useProximityChat({ active, hud, selfId, presence, showCoworkers 
     const limited = rateLimit(sent.current, at);
     sent.current = limited.history;
     if (!limited.allowed) return 'limited';
-    const message = sanitizeChatMessage({ id: messageId(), viewerId: selfId, name: viewerName(selfId), color: viewerColor(selfId), text: clean, x: pose.x, z: pose.z, at }, at);
+    const message = sanitizeChatMessage({ id: messageId(), viewerId: selfId, name: selfName ?? viewerName(selfId), color: viewerColor(selfId), text: clean, x: pose.x, z: pose.z, at }, at);
     if (!message) return 'empty';
     transport.current.send(message);
     commit([...pruneChat(logRef.current, at), { ...message, receivedAt: at }]);
     return 'sent';
-  }, [hud, selfId, commit]);
+  }, [hud, selfId, selfName, commit]);
 
   const bubbles = useMemo(() => chatBubbles(log, selfId, now), [log, selfId, now]);
   return { log, selfId, presence, send, showCoworkers, bubbles };

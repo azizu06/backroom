@@ -517,26 +517,26 @@ html:has(.office-shell[data-theme=dark]) {
 
 /* ---------- View controls: icon-only sound and full screen, top right of the scene ---------- */
 .office-shell .office-view-controls { position: absolute; z-index: 6; top: 14px; right: 18px; display: flex; gap: 8px; }
-html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle) {
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle) {
   position: static !important; display: grid; place-items: center; width: 44px; height: 44px; padding: 0 !important; font-size: 22px !important;
   color: var(--ink) !important; background: var(--bubble-glass) !important; border: var(--bubble-border) !important; border-radius: 50% !important;
   box-shadow: var(--bubble-shadow); backdrop-filter: blur(10px); cursor: pointer; transition: transform 0.15s ease, background-color 0.15s ease;
 }
 /* Same bubbly hover as the sidebar and theme buttons: lift, grow a touch, settle with a soft overshoot. */
-html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle) { transition: transform 0.22s cubic-bezier(.34, 1.56, .64, 1), background-color 0.15s ease, box-shadow 0.15s ease !important; }
-html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle):is(:hover, :focus-visible) { background: var(--pastel-yellow) !important; transform: translateY(-2px) scale(1.1); box-shadow: 0 8px 18px rgba(25, 33, 59, 0.2); }
-html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle):active { transform: scale(0.92); }
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle) { transition: transform 0.22s cubic-bezier(.34, 1.56, .64, 1), background-color 0.15s ease, box-shadow 0.15s ease !important; }
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle):is(:hover, :focus-visible) { background: var(--pastel-yellow) !important; transform: translateY(-2px) scale(1.1); box-shadow: 0 8px 18px rgba(25, 33, 59, 0.2); }
+html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle):active { transform: scale(0.92); }
 html body .office-shell .office-view-controls .office-sound-toggle:hover svg { animation: sound-wiggle 0.4s ease; }
 html body .office-shell .office-view-controls .office-fullscreen-toggle:hover svg { animation: fullscreen-pulse 0.4s ease; }
 @keyframes sound-wiggle { 30% { transform: rotate(-12deg); } 60% { transform: rotate(8deg); } }
 @keyframes fullscreen-pulse { 50% { transform: scale(1.22); } }
-@media (prefers-reduced-motion: reduce) { html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle), html body .office-shell .office-view-controls svg { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { html body .office-shell .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle), html body .office-shell .office-view-controls svg { transition: none !important; animation: none !important; } }
 html body .office-shell .office-view-controls .office-sound-toggle[aria-pressed='true'] { background: var(--pastel-aqua) !important; }
 .office-shell[data-theme=dark] .office-view-controls :is(.office-sound-toggle[aria-pressed='true'], .office-fullscreen-toggle:hover, .office-sound-toggle:hover) { color: #19213B !important; }
 /* First person keeps its quiet control row; the view controls join it, left of Operator. */
 .office-shell[data-hud='diegetic'] .office-view-controls { top: 8px; right: 367px; }
-html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle) { width: 34px; height: 34px; font-size: 17px !important; opacity: .7 !important; }
-html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-sound-toggle, .office-fullscreen-toggle):is(:hover, :focus-visible) { opacity: 1 !important; }
+html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle) { width: 34px; height: 34px; font-size: 17px !important; opacity: .7 !important; }
+html body .office-shell[data-hud='diegetic'] .office-view-controls :is(.office-sound-toggle, .office-mic-toggle, .office-fullscreen-toggle):is(:hover, :focus-visible) { opacity: 1 !important; }
 
 /* ---------- Full screen: the 3D room fills the screen; edge overlays keep the exit and key status ---------- */
 .office-shell[data-fullscreen] { position: fixed; inset: 0; z-index: 900; padding: 0; gap: 0; }

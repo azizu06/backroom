@@ -25,7 +25,8 @@ import { UNIT_BOX } from './mounts/StaticGeometry';
 import { Bear, createBearRig, poseBear } from './avatars/Bear';
 import { useAgentAnimator } from './avatars/agentAnimator';
 import { agentCueKey, deskHeading } from '../../lib/office/agent-motion';
-import { CoworkerAvatars } from './CoworkerAvatars';
+import { CoworkerAvatars, SeatedSharers } from './CoworkerAvatars';
+import type { VoiceLevel } from '../../lib/office/voice';
 import type { PresencePeer } from '../../lib/office/presence';
 import type { ChatBubble } from '../../lib/office/proximity-chat';
 import { CLICK_SLOP, roomRect, type OverviewPick } from '../../lib/office/overview';
@@ -223,9 +224,11 @@ function ContextLoss({ onFailure, onRestored }: { onFailure: () => void; onResto
  * Renders on demand: frames are requested only while agents walk, doors flash or the camera moves.
  * `paused` stops avatars advancing the shared motions while another view (the floor plan) drives them.
  */
-export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, agentTag, onFailure, onRestored, play, presence = [], chatBubbles, onPick }: {
+export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = false, focus, agentTag, onFailure, onRestored, play, presence = [], chatBubbles, speaking, onPick }: {
   snapshot: OfficeSnapshot; motions: MotionRegistry; fixed: boolean; tour?: boolean; paused?: boolean; focus: AnchorId | null;
   agentTag?: AgentTagLookup; onFailure: () => void; onRestored: () => void; play?: PlayBridge; presence?: PresencePeer[]; chatBubbles?: ChatBubble[];
+  /** Talking levels by viewer id, for the voice icon on name tags. */
+  speaking?: Record<string, VoiceLevel>;
   /** Overview quick actions; only used outside Play. */
   onPick?: OverviewPickHandler;
 }) {
@@ -249,7 +252,7 @@ export function OfficeScene({ snapshot, motions, fixed, tour = false, paused = f
     {SCENE_MOUNTS.filter(mount => !mount.instanced).map(({ id, Component, moving }) => moving
       ? <ContactDynamic key={id}><Component snapshot={snapshot} /></ContactDynamic> : <Component key={id} snapshot={snapshot} />)}
     {picking && <RoomPicks rooms={visibleRooms(snapshot)} onPick={picking} />}
-    <ContactDynamic name='office:presence'>{play ? <CoworkerAvatars peers={presence} bubbles={chatBubbles} /> : <PresenceGhosts peers={presence} />}</ContactDynamic>
+    <ContactDynamic name='office:presence'>{play ? <CoworkerAvatars peers={presence} bubbles={chatBubbles} speaking={speaking} /> : <PresenceGhosts peers={presence} speaking={speaking} />}<SeatedSharers speaking={speaking} /></ContactDynamic>
     {play ? <PlayRig {...play} motions={motions} snapshot={snapshot} /> : <CameraRig focus={focus} fixed={fixed} tour={tour} />}<ContextLoss onFailure={onFailure} onRestored={onRestored} />
   </Canvas>;
 }
